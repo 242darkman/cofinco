@@ -127,16 +127,21 @@ export function registerAuthRoutes(app: Express) {
         console.error("Error fetching employee data for login:", e);
       }
 
-      // Save session and create tracking record
-      req.session.save(async (err) => {
-        if (err) {
-          console.error("Session save error:", err);
-        }
-
-        // Create session tracking record with session expiry (24h from now)
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        await createSessionRecord(req.sessionID, user.id, req, expiresAt);
+      // Save session and wait for it to complete before responding
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
       });
+
+      // Create session tracking record with session expiry (24h from now)
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await createSessionRecord(req.sessionID, user.id, req, expiresAt);
 
       // Log successful login in audit
       await logAudit(
