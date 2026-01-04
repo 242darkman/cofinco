@@ -43,6 +43,8 @@ echo -e "${GREEN}5. Configuration de la Base de Données...${NC}"
 sudo -u postgres psql -c "CREATE DATABASE $DB_NAME;" || echo "BDD existe déjà ou erreur"
 sudo -u postgres psql -c "CREATE USER $DB_USER WITH ENCRYPTED PASSWORD '$DB_PASS';" || echo "User existe déjà ou erreur"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
+sudo -u postgres psql -c "ALTER DATABASE $DB_NAME OWNER TO $DB_USER;"
+sudo -u postgres psql -d $DB_NAME -c "GRANT ALL ON SCHEMA public TO $DB_USER;"
 
 # 6. Configuration du pare-feu (UFW)
 echo -e "${GREEN}6. Configuration du pare-feu...${NC}"
