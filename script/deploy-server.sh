@@ -14,9 +14,9 @@ else
   exit 1
 fi
 
-echo "📥 Pulling latest changes from main..."
+echo "📥 Pulling latest changes from master..."
 git fetch --all
-git reset --hard origin/main
+git reset --hard origin/master
 
 echo "📦 Installing dependencies..."
 npm ci
