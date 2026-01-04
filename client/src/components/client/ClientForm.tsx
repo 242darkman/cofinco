@@ -286,12 +286,12 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           />
 
           <SelectField
-            label="Type de Marché"
+            label="Secteur d'activité"
             name="typeMarcheId"
             value={formData.typeMarcheId || ''}
             onChange={(e) => handleChange('typeMarcheId', e.target.value === '' ? null : e.target.value)}
             options={[
-                { value: '', label: 'Sélectionner un type' },
+                { value: '', label: 'Sélectionner un secteur' },
                 ...(typesMarches || []).map(tm => ({ value: tm.id, label: tm.nom }))
             ]}
           />

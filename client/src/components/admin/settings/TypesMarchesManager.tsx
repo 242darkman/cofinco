@@ -48,25 +48,25 @@ export default function TypesMarchesManager() {
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nom.trim()) {
-      toast.warning('Le nom du type de marché est requis');
+      toast.warning('Le nom du secteur est requis');
       return;
     }
 
     try {
-      if (editingId) {
+        if (editingId) {
         await typeMarcheApi.update(editingId, {
           nom: formData.nom,
           description: formData.description,
           actif: formData.actif
         });
-        toast.success('Type de marché mis à jour avec succès');
+        toast.success('Secteur mis à jour avec succès');
       } else {
         await typeMarcheApi.create({
           nom: formData.nom,
           description: formData.description,
           actif: formData.actif
         });
-        toast.success('Type de marché créé avec succès');
+        toast.success('Secteur créé avec succès');
       }
 
       setShowForm(false);
@@ -91,7 +91,7 @@ export default function TypesMarchesManager() {
   const executeDelete = useCallback(async (id: string) => {
     try {
       await typeMarcheApi.delete(id);
-      toast.success('Type de marché supprimé');
+      toast.success('Secteur supprimé');
       loadTypesMarches();
     } catch (error: any) {
       toast.error(handleApiError(error, 'Erreur suppression'));
@@ -103,7 +103,7 @@ export default function TypesMarchesManager() {
   const handleDelete = useCallback((id: string) => {
     setPendingDeleteId(id);
     openConfirm({
-      title: 'Supprimer ce type de marché ?',
+      title: 'Supprimer ce secteur ?',
       message: 'Cette action est irréversible.',
       variant: 'danger',
       confirmText: 'Supprimer',
@@ -123,9 +123,9 @@ export default function TypesMarchesManager() {
         <div>
           <h3 className="text-2xl font-bold text-white flex items-center gap-2">
             <Store className="text-cyan-400" />
-            Gestion des Types de Marchés
+            Gestion des Secteurs d'Activité
           </h3>
-          <p className="text-slate-400 mt-1">Définissez les types de marchés commerciaux pour catégoriser vos clients</p>
+          <p className="text-slate-400 mt-1">Définissez les secteurs d'activité commerciaux pour catégoriser vos clients</p>
         </div>
         {canCreateTypesMarches && (
           <button
@@ -134,7 +134,7 @@ export default function TypesMarchesManager() {
             data-testid="button-add-type-marche"
           >
             <Plus size={20} />
-            Nouveau type
+            Nouveau secteur
           </button>
         )}
       </div>
@@ -142,7 +142,7 @@ export default function TypesMarchesManager() {
       {showForm && (
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
           <h4 className="text-lg font-semibold text-white mb-4">
-            {editingId ? 'Modifier le type de marché' : 'Nouveau type de marché'}
+            {editingId ? 'Modifier le secteur' : 'Nouveau secteur'}
           </h4>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -152,7 +152,7 @@ export default function TypesMarchesManager() {
                 value={formData.nom}
                 onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white"
-                placeholder="Ex: Marché de gros"
+                placeholder="Ex: Commerce de gros"
                 data-testid="input-type-marche-nom"
               />
             </div>
@@ -163,7 +163,7 @@ export default function TypesMarchesManager() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white"
                 rows={3}
-                placeholder="Description du type de marché"
+                placeholder="Description du secteur"
                 data-testid="input-type-marche-description"
               />
             </div>
@@ -205,7 +205,7 @@ export default function TypesMarchesManager() {
           <div className="p-8 text-center text-slate-400">Chargement...</div>
         ) : typesMarches.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
-            Aucun type de marché défini. Cliquez sur "Nouveau type" pour en créer un.
+            Aucun secteur défini. Cliquez sur "Nouveau secteur" pour en créer un.
           </div>
         ) : (
           <table className="w-full">
