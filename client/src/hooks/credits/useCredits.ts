@@ -1,0 +1,96 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useWebSocket } from '../useWebSocket';
+
+export interface Credit {
+  id: string;
+  numero_credit: string;
+  client_id: string;
+  montant_principal: number;
+  taux_interet: number;
+  duree_mois: number;
+  montant_total: number;
+  montant_echeance: number;
+  date_deblocage: string;
+  statut: string;
+  nombre_echeances_payees: number;
+  nombre_echeances_total: number;
+  jours_retard: number;
+  type_credit: string | null;
+  clients?: {
+    nom: string;
+    phone: string;
+    photo_url?: string;
+  };
+}
+
+export function useCredits() {
+  const { data: credits = [], isLoading: loading, error, refetch } = useQuery<Credit[]>({
+    queryKey: ['credits'],
+    queryFn: async () => {
+      const response = await fetch('/api/credits');
+      if (!response.ok) throw new Error('Erreur serveur');
+      return response.json();
+    }
+  });
+
+  const { socket } = useWebSocket();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!socket) return;
+    
+    // Listen for manual events if needed, but Query Invalidation is handled in Context
+    // This is just for debug/verification that we are receiving scoping correctly
+    const handleMessage = (event: MessageEvent) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'CREDIT_UPDATE') {
+                console.log('[useCredits] Received real-time update');
+            }
+        } catch (e) {}
+    };
+
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, [socket]);
+
+  const getStatutColor = (statut: string) => {
+    const colors: Record<string, string> = {
+      'actif': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      'en_cours': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      'cloture': 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+      'en_retard': 'bg-red-500/20 text-red-400 border-red-500/30',
+      'suspendu': 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+    };
+    return colors[statut.toLowerCase()] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+  };
+
+  const getActiveCredits = () => credits.filter(c => c.statut === 'actif' || c.statut === 'en_cours');
+  
+  const getCreditsEnRetard = () => credits.filter(c => c.jours_retard && c.jours_retard > 0);
+
+  const getCreditsByClient = (clientId: string) => credits.filter(c => c.client_id === clientId);
+
+  const searchCredits = (term: string) => {
+    if (!term) return credits;
+    const lower = term.toLowerCase();
+    return credits.filter(c => 
+      c.numero_credit.toLowerCase().includes(lower) ||
+      c.clients?.nom.toLowerCase().includes(lower) ||
+      c.clients?.phone?.includes(term)
+    );
+  };
+
+  return {
+    credits,
+    loading,
+    error: error ? (error as Error).message : null,
+    fetchCredits: refetch, // Alias for backward compatibility
+    getStatutColor,
+    getActiveCredits,
+    getCreditsEnRetard,
+    getCreditsByClient,
+    searchCredits
+  };
+}

@@ -1,0 +1,722 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2 } from 'lucide-react';
+import PaymentValidationModal from '../operations/PaymentValidationModal';
+import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
+import { usePermissions } from '../../auth/ProtectedFeature';
+import { creditApi, remboursementApi } from '../../../lib/api-client';
+import { toast, handleApiError } from '../../../lib/toast';
+import { formatMoney } from '../../../lib/format';
+import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
+import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
+import ConfirmDialog from '../../ui/ConfirmDialog';
+import { SkeletonCard } from '../../ui/Skeleton';
+
+const MOBILE_OPERATORS = [
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
+  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04' }
+] as const;
+
+const PAYMENT_MODES = [
+  { id: 'Cash', icon: Banknote, label: 'Cash', disabled: false },
+  { id: 'Mobile Money', icon: Smartphone, label: 'Mobile', disabled: true },
+  { id: 'Virement', icon: Building, label: 'Virement', disabled: false },
+  { id: 'Chèque', icon: FileCheck, label: 'Chèque', disabled: false },
+  { id: 'Prélèvement', icon: ReceiptText, label: 'Prélèvement', disabled: false },
+] as const;
+
+interface Credit {
+  id: string;
+  numero_credit: string;
+  client_id: string;
+  montant_principal: number;
+  montant_echeance: number;
+  solde_restant: number;
+  nombre_echeances_payees: number;
+  nombre_echeances_total: number;
+  jours_retard: number;
+  penalites_retard: number;
+  total_paye?: number;
+  total_interets_payes?: number;
+  statut?: string;
+  clients: {
+    nom: string;
+    email: string;
+    phone: string;
+  };
+  echeances?: Echeance[];
+}
+
+interface Echeance {
+  id: string;
+  numero_echeance: number;
+  date_echeance: string;
+  montant_total: number;
+  montant_principal: number;
+  montant_interet: number;
+  montant_paye: number;
+  statut: string;
+  jours_retard: number;
+  penalite: number;
+}
+
+export default function CreditRemboursement() {
+  const { mobileMoneyEnabled, mobileMoneyMessage } = useFeatureFlags();
+
+  // RBAC permissions
+  const { hasPermission } = usePermissions();
+  const canCreatePayments = hasPermission('remboursements', 'create') || hasPermission('credits', 'edit');
+
+  const [credits, setCredits] = useState<Credit[]>([]);
+  const [selectedCredit, setSelectedCredit] = useState<Credit | null>(null);
+  const [echeances, setEcheances] = useState<Echeance[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadingCredits, setLoadingCredits] = useState(true);
+  const [loadingEcheances, setLoadingEcheances] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showConfirmPayment, setShowConfirmPayment] = useState(false);
+  const [paymentModalType, setPaymentModalType] = useState<'mobile_money' | 'especes'>('especes');
+  const [selectedOperator, setSelectedOperator] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [paymentData, setPaymentData] = useState({
+    montant: '',
+    mode_paiement: 'Cash',
+    reference_paiement: '',
+    notes: ''
+  });
+
+  useEffect(() => {
+    loadCredits();
+  }, []);
+
+  const loadCredits = useCallback(async () => {
+    setLoadingCredits(true);
+    try {
+      const data = await creditApi.getAll();
+      // Filter active credits
+      const activeCredits = data.filter((c: Credit) =>
+        c.statut === 'Actif' || c.statut === 'En retard'
+      );
+      setCredits(activeCredits);
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Erreur lors du chargement des crédits');
+      toast.error(errorMessage);
+    } finally {
+      setLoadingCredits(false);
+    }
+  }, []);
+
+  const loadEcheances = useCallback(async (creditId: string) => {
+    setLoadingEcheances(true);
+    try {
+      const credit = await creditApi.getById(creditId);
+      const data = credit.echeances || [];
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const updatedData = data.map((ech: any) => {
+        const dateEch = new Date(ech.date_echeance);
+        dateEch.setHours(0, 0, 0, 0);
+        const joursRetard = ech.statut === 'En attente' && dateEch < today
+          ? Math.floor((today.getTime() - dateEch.getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+
+        const penalite = joursRetard > 0 ? joursRetard * 500 : 0;
+
+        return {
+          ...ech,
+          montant_paye: ech.montant_paye || 0,
+          jours_retard: joursRetard,
+          penalite,
+          statut: joursRetard > 0 ? 'Retard' : ech.statut
+        };
+      });
+
+      setEcheances(updatedData);
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Erreur lors du chargement des échéances');
+      toast.error(errorMessage);
+      setEcheances([]);
+    } finally {
+      setLoadingEcheances(false);
+    }
+  }, []);
+
+  const handleSelectCredit = useCallback(async (credit: Credit) => {
+    setSelectedCredit(credit);
+    await loadEcheances(credit.id);
+    setShowPaymentForm(false);
+    setPaymentData({ montant: '', mode_paiement: 'Cash', reference_paiement: '', notes: '' });
+    setSelectedOperator('');
+    setErrors({});
+  }, [loadEcheances]);
+
+  // Memoized payment distribution calculation
+  const calculatePaymentDistribution = useCallback((montant: number) => {
+    const unpaidEcheances = echeances
+      .filter(e => e.statut !== 'Payé')
+      .sort((a, b) => a.numero_echeance - b.numero_echeance);
+
+    if (unpaidEcheances.length === 0) return [];
+
+    const distribution = [];
+    let remaining = montant;
+
+    for (const echeance of unpaidEcheances) {
+      if (remaining <= 0) break;
+
+      const totalDue = echeance.montant_total + echeance.penalite;
+      const payment = Math.min(remaining, totalDue);
+
+      const penalitePayment = Math.min(payment, echeance.penalite);
+      const principalInteretPayment = payment - penalitePayment;
+
+      const ratioInteret = echeance.montant_interet / echeance.montant_total;
+      const interetPayment = principalInteretPayment * ratioInteret;
+      const principalPayment = principalInteretPayment - interetPayment;
+
+      distribution.push({
+        echeance_id: echeance.id,
+        numero_echeance: echeance.numero_echeance,
+        montant_principal: principalPayment,
+        montant_interet: interetPayment,
+        penalites: penalitePayment,
+        montant_total: payment,
+        nouveau_statut: payment >= totalDue ? 'Payé' : 'Partiel'
+      });
+
+      remaining -= payment;
+    }
+
+    return distribution;
+  }, [echeances]);
+
+  // Memoized filtered credits
+  const filteredCredits = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return credits.filter(c =>
+      (c.numero_credit ?? '').toLowerCase().includes(term) ||
+      (c.clients?.nom ?? '').toLowerCase().includes(term)
+    );
+  }, [credits, searchTerm]);
+
+  // Memoized next echeance and montant prevu
+  const { nextEcheance, montantPrevu } = useMemo(() => {
+    const next = echeances.find(e => e.statut !== 'Payé');
+    const prevu = next
+      ? next.montant_total + next.penalite
+      : selectedCredit?.montant_echeance || 0;
+    return { nextEcheance: next, montantPrevu: prevu };
+  }, [echeances, selectedCredit]);
+
+  const validatePaymentForm = useCallback(() => {
+    const newErrors: Record<string, string> = {};
+    const montant = parseFloat(paymentData.montant);
+
+    // Validate amount
+    const amountValidation = validateAmount(montant, {
+      min: 100,
+      max: Math.min(selectedCredit?.solde_restant || VALIDATION_LIMITS.MAX_CREDIT, VALIDATION_LIMITS.MAX_CREDIT),
+    });
+
+    if (!amountValidation.isValid) {
+      newErrors.montant = amountValidation.error || 'Montant invalide';
+    }
+
+    // Validate operator for mobile money
+    if (paymentData.mode_paiement === 'Mobile Money' && !selectedOperator) {
+      newErrors.operateur = 'Veuillez sélectionner un opérateur';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [paymentData, selectedCredit, selectedOperator]);
+
+  const handlePayment = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedCredit) return;
+
+    if (!validatePaymentForm()) {
+      toast.warning('Veuillez corriger les erreurs dans le formulaire');
+      return;
+    }
+
+    // Show payment validation modal for cash or mobile money
+    if (paymentData.mode_paiement === 'Mobile Money') {
+      setPaymentModalType('mobile_money');
+      setShowPaymentModal(true);
+      return;
+    } else if (paymentData.mode_paiement === 'Cash') {
+      setPaymentModalType('especes');
+      setShowPaymentModal(true);
+      return;
+    }
+
+    // For other payment modes, show confirmation dialog
+    setShowConfirmPayment(true);
+  }, [selectedCredit, paymentData, validatePaymentForm]);
+
+  const processPayment = useCallback(async (paymentRef?: string, operator?: string) => {
+    if (!selectedCredit) return;
+
+    const montant = parseFloat(paymentData.montant);
+    setLoading(true);
+
+    try {
+      const distribution = calculatePaymentDistribution(montant);
+
+      const remboursementData = {
+        credit_id: selectedCredit.id,
+        date_remboursement: new Date().toISOString().split('T')[0],
+        montant: montant,
+        mode_paiement: paymentData.mode_paiement,
+        reference_paiement: sanitizeInput(paymentRef || paymentData.reference_paiement),
+        operateur_mobile: operator || selectedOperator || null,
+        notes: sanitizeInput(paymentData.notes),
+        distribution: distribution
+      };
+
+      await remboursementApi.create(remboursementData);
+
+      toast.success(`Remboursement de ${formatMoney(montant)} enregistré avec succès`);
+
+      // Reset form
+      setPaymentData({ montant: '', mode_paiement: 'Cash', reference_paiement: '', notes: '' });
+      setSelectedOperator('');
+      setShowPaymentForm(false);
+      setShowPaymentModal(false);
+      setShowConfirmPayment(false);
+      setErrors({});
+
+      // Reload data
+      await loadCredits();
+      if (selectedCredit) {
+        try {
+          const updated = await creditApi.getById(selectedCredit.id);
+          setSelectedCredit(updated);
+          await loadEcheances(updated.id);
+        } catch {
+          // Credit may be fully paid, just reload list
+          setSelectedCredit(null);
+          setEcheances([]);
+        }
+      }
+    } catch (error) {
+      const errorMessage = handleApiError(error, "Erreur lors de l'enregistrement du remboursement");
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCredit, paymentData, selectedOperator, calculatePaymentDistribution, loadCredits, loadEcheances]);
+
+  const handlePaymentValidation = useCallback((paymentRef: string, operator?: string) => {
+    processPayment(paymentRef, operator);
+  }, [processPayment]);
+
+  const handleModeChange = useCallback((mode: string) => {
+    setPaymentData(prev => ({ ...prev, mode_paiement: mode }));
+    if (mode !== 'Mobile Money') {
+      setSelectedOperator('');
+    }
+    if (errors.operateur) {
+      setErrors(prev => ({ ...prev, operateur: '' }));
+    }
+  }, [errors]);
+
+  const handleInputChange = useCallback((field: string, value: string) => {
+    setPaymentData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  }, [errors]);
+
+  // Safe escaped values
+  const safeClientName = selectedCredit ? escapeHtml(selectedCredit.clients?.nom || '') : '';
+
+  return (
+    <div className="space-y-6">
+      {/* Search Section */}
+      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+        <h3 className="text-lg font-bold text-white mb-4">Rechercher un Crédit</h3>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} aria-hidden="true" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Numéro de crédit ou nom du client..."
+            className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            aria-label="Rechercher un crédit"
+          />
+        </div>
+
+        {searchTerm && (
+          <div className="mt-4 max-h-60 overflow-y-auto space-y-2" role="listbox" aria-label="Résultats de recherche">
+            {loadingCredits ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="animate-spin text-cyan-400" size={24} />
+                <span className="ml-2 text-slate-400">Chargement...</span>
+              </div>
+            ) : filteredCredits.length > 0 ? (
+              filteredCredits.map(credit => (
+                <button
+                  key={credit.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedCredit?.id === credit.id}
+                  onClick={() => handleSelectCredit(credit)}
+                  className={`w-full p-3 rounded-lg cursor-pointer transition text-left focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                    selectedCredit?.id === credit.id
+                      ? 'bg-cyan-600/20 border border-cyan-500'
+                      : 'bg-slate-700 hover:bg-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-cyan-400 font-mono font-bold">{credit.numero_credit}</div>
+                      <div className="text-white text-sm">{escapeHtml(credit.clients?.nom || '')}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white font-bold">{formatMoney(credit.solde_restant)}</div>
+                      <div className="text-xs text-slate-400">Solde restant</div>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="text-center py-4 text-slate-400">Aucun crédit trouvé</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Selected Credit Details */}
+      {selectedCredit && (
+        <>
+          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-white">{selectedCredit.numero_credit}</h3>
+                <p className="text-slate-400 mt-1">{safeClientName}</p>
+              </div>
+              {canCreatePayments && (
+                <button
+                  onClick={() => setShowPaymentForm(!showPaymentForm)}
+                  disabled={loading}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  {showPaymentForm ? 'Annuler' : 'Enregistrer Paiement'}
+                </button>
+              )}
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="Statistiques du crédit">
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <div className="text-slate-400 text-sm mb-1">Solde Restant</div>
+                <div className="text-xl md:text-2xl font-bold text-white break-words">
+                  {formatMoney(selectedCredit.solde_restant)}
+                </div>
+              </div>
+
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <div className="text-slate-400 text-sm mb-1">Mensualité</div>
+                <div className="text-xl md:text-2xl font-bold text-green-400 break-words">
+                  {formatMoney(selectedCredit.montant_echeance)}
+                </div>
+              </div>
+
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <div className="text-slate-400 text-sm mb-1">Échéances</div>
+                <div className="text-2xl font-bold text-cyan-400">
+                  {selectedCredit.nombre_echeances_payees}/{selectedCredit.nombre_echeances_total}
+                </div>
+              </div>
+
+              <div className="bg-slate-700/50 rounded-lg p-4">
+                <div className="text-slate-400 text-sm mb-1">Pénalités</div>
+                <div className="text-xl md:text-2xl font-bold text-amber-400 break-words">
+                  {formatMoney(selectedCredit.penalites_retard || 0)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Form */}
+          {showPaymentForm && (
+            <form
+              onSubmit={handlePayment}
+              className="bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-500/50 rounded-lg p-6"
+            >
+              <h3 className="text-lg font-bold text-white mb-4">Nouveau Paiement</h3>
+
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                {/* Amount */}
+                <div>
+                  <label htmlFor="montant" className="block text-sm font-semibold text-slate-300 mb-2">
+                    Montant (FCFA) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    id="montant"
+                    type="number"
+                    inputMode="numeric"
+                    min="100"
+                    max={selectedCredit.solde_restant}
+                    value={paymentData.montant}
+                    onChange={(e) => handleInputChange('montant', e.target.value)}
+                    className={`w-full bg-slate-700 border ${errors.montant ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    placeholder={`Montant prévu: ${formatMoney(montantPrevu)}`}
+                    disabled={loading}
+                    aria-invalid={!!errors.montant}
+                    aria-describedby={errors.montant ? 'montant-error' : 'montant-help'}
+                  />
+                  {errors.montant ? (
+                    <p id="montant-error" className="text-red-400 text-xs mt-1" role="alert">{errors.montant}</p>
+                  ) : (
+                    <p id="montant-help" className="text-xs text-slate-400 mt-1">
+                      Maximum: {formatMoney(selectedCredit.solde_restant)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Payment Mode */}
+                <fieldset>
+                  <legend className="block text-sm font-semibold text-slate-300 mb-2">
+                    Mode de Paiement <span className="text-red-400">*</span>
+                  </legend>
+                  <div className="grid grid-cols-3 gap-2" role="radiogroup">
+                    {PAYMENT_MODES.map(({ id, icon: Icon, label, disabled }) => {
+                      const isDisabled = id === 'Mobile Money' ? !mobileMoneyEnabled : disabled;
+                      const isSelected = paymentData.mode_paiement === id;
+
+                      return (
+                        <div key={id} className="relative group">
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            aria-disabled={isDisabled}
+                            onClick={() => !isDisabled && handleModeChange(id)}
+                            disabled={isDisabled || loading}
+                            className={`flex flex-col items-center justify-center p-2 rounded-lg border transition w-full focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                              isDisabled
+                                ? 'opacity-50 cursor-not-allowed bg-slate-700 border-slate-600 text-slate-500'
+                                : isSelected
+                                ? 'bg-green-600 border-green-500 text-white'
+                                : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          >
+                            <Icon size={18} className="mb-1" aria-hidden="true" />
+                            <span className="text-xs">{label}</span>
+                            {id === 'Mobile Money' && !mobileMoneyEnabled && (
+                              <span className="absolute -top-1 -right-1 px-1 py-0.5 bg-amber-500/20 text-amber-400 text-[8px] rounded border border-amber-500/30">
+                                Bientôt
+                              </span>
+                            )}
+                          </button>
+                          {id === 'Mobile Money' && !mobileMoneyEnabled && (
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-amber-400 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-amber-500/30 pointer-events-none">
+                              {mobileMoneyMessage}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                {/* Mobile Operator Selection */}
+                {paymentData.mode_paiement === 'Mobile Money' && (
+                  <fieldset className="md:col-span-2">
+                    <legend className="block text-sm font-semibold text-slate-300 mb-2">
+                      <Smartphone size={16} className="inline mr-2" aria-hidden="true" />
+                      Opérateur <span className="text-red-400">*</span>
+                    </legend>
+                    <div className="grid grid-cols-2 gap-2" role="radiogroup">
+                      {MOBILE_OPERATORS.map(op => (
+                        <button
+                          key={op.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selectedOperator === op.id}
+                          onClick={() => {
+                            setSelectedOperator(op.id);
+                            if (errors.operateur) setErrors(prev => ({ ...prev, operateur: '' }));
+                          }}
+                          disabled={loading}
+                          className={`flex items-center gap-2 p-3 rounded-lg border-2 transition focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                            selectedOperator === op.id
+                              ? `${op.color} border-white text-white`
+                              : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+                          } disabled:opacity-50`}
+                        >
+                          <div className={`w-8 h-8 rounded-full ${selectedOperator === op.id ? 'bg-white/20' : op.color} flex items-center justify-center`}>
+                            <Smartphone size={16} className="text-white" aria-hidden="true" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-semibold text-sm">{op.name.split(' ')[0]}</p>
+                            <p className="text-xs opacity-75">{op.prefix}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {errors.operateur && (
+                      <p className="text-red-400 text-xs mt-1" role="alert">{errors.operateur}</p>
+                    )}
+                  </fieldset>
+                )}
+
+                {/* Reference */}
+                <div>
+                  <label htmlFor="reference" className="block text-sm font-semibold text-slate-300 mb-2">
+                    Référence Paiement
+                  </label>
+                  <input
+                    id="reference"
+                    type="text"
+                    value={paymentData.reference_paiement}
+                    onChange={(e) => handleInputChange('reference_paiement', e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="N° transaction, chèque..."
+                    maxLength={100}
+                    disabled={loading}
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label htmlFor="notes" className="block text-sm font-semibold text-slate-300 mb-2">
+                    Notes
+                  </label>
+                  <input
+                    id="notes"
+                    type="text"
+                    value={paymentData.notes}
+                    onChange={(e) => handleInputChange('notes', e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Informations additionnelles..."
+                    maxLength={500}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  'Confirmer le Paiement'
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* Echeancier */}
+          <div className="bg-slate-800/50 border border-slate-700 rounded-lg">
+            <div className="p-6 border-b border-slate-700">
+              <h3 className="text-lg font-bold text-white">Échéancier</h3>
+            </div>
+
+            <div className="divide-y divide-slate-700" role="list" aria-label="Liste des échéances">
+              {loadingEcheances ? (
+                <div className="p-4 space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <SkeletonCard key={i} />
+                  ))}
+                </div>
+              ) : echeances.length > 0 ? (
+                echeances.map(echeance => (
+                  <div
+                    key={echeance.id}
+                    role="listitem"
+                    className="p-4 hover:bg-slate-700/30 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            echeance.statut === 'Payé' ? 'bg-green-500/20 text-green-400' :
+                            echeance.statut === 'Retard' ? 'bg-red-500/20 text-red-400' :
+                            'bg-cyan-500/20 text-cyan-400'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {echeance.statut === 'Payé' ? <Check size={20} /> : echeance.numero_echeance}
+                        </div>
+
+                        <div>
+                          <div className="text-white font-semibold">Échéance #{echeance.numero_echeance}</div>
+                          <div className="text-sm text-slate-400">
+                            {new Date(echeance.date_echeance).toLocaleDateString('fr-FR')}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6">
+                        {echeance.jours_retard > 0 && (
+                          <div className="flex items-center gap-1 text-red-400 text-sm">
+                            <AlertTriangle size={14} aria-hidden="true" />
+                            <span>{echeance.jours_retard}j · +{formatMoney(echeance.penalite)}</span>
+                          </div>
+                        )}
+
+                        <div className="text-right">
+                          <div className="text-white font-bold">{formatMoney(echeance.montant_total)}</div>
+                          <div className={`text-xs ${
+                            echeance.statut === 'Payé' ? 'text-green-400' :
+                            echeance.statut === 'Retard' ? 'text-red-400' :
+                            'text-slate-400'
+                          }`}>
+                            {echeance.statut}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-slate-400">
+                  Aucune échéance disponible
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Payment Validation Modal */}
+      <PaymentValidationModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onValidate={handlePaymentValidation}
+        montant={parseFloat(paymentData.montant) || 0}
+        type={paymentModalType}
+        initialOperator={selectedOperator}
+        loading={loading}
+      />
+
+      {/* Confirmation Dialog for non-cash/mobile payments */}
+      <ConfirmDialog
+        isOpen={showConfirmPayment}
+        title="Confirmer le remboursement"
+        message={`Vous êtes sur le point d'enregistrer un remboursement de ${formatMoney(parseFloat(paymentData.montant) || 0)} pour le crédit ${selectedCredit?.numero_credit}. Mode de paiement: ${paymentData.mode_paiement}.`}
+        confirmText="Confirmer le paiement"
+        cancelText="Annuler"
+        onConfirm={() => processPayment()}
+        onClose={() => setShowConfirmPayment(false)}
+        variant="success"
+      />
+    </div>
+  );
+}

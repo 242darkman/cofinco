@@ -1,0 +1,1056 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700;900&display=swap");
+
+@import "tailwindcss";
+
+/* ==================== BANK-GRADE PROFESSIONAL DESIGN SYSTEM ==================== */
+/* Hybrid Theme System: CSS Variables + Tailwind dark: classes */
+
+/* =========================== THEME VARIABLES =========================== */
+
+/* Light Theme (Default) - Professional Banking Look */
+/* WCAG AA Contrast: 4.5:1 minimum for normal text, 3:1 for large text */
+:root {
+  /* Backgrounds - Blanc cassé / Gris très léger */
+  --bg-base: #f8fafc; /* Fond principal légèrement gris */
+  --bg-surface: #ffffff; /* Cartes et surfaces */
+  --bg-elevated: #ffffff; /* Éléments surélevés */
+  --bg-muted: #f1f5f9; /* Zones secondaires */
+  --bg-subtle: #e2e8f0; /* Zones tertiaires */
+
+  /* Text - Bleu nuit / Gris anthracite pour RGAA AA (4.5:1 min) */
+  --text-primary: #0f172a; /* Bleu nuit - Contrast 15.5:1 on white */
+  --text-secondary: #1e293b; /* Gris anthracite - Contrast 12.6:1 */
+  --text-muted: #475569; /* Gris foncé - Contrast 6.3:1 */
+  --text-inverted: #ffffff;
+
+  /* Borders - Visibles sur fond clair */
+  --border-default: #cbd5e1; /* Bordure standard */
+  --border-subtle: #e2e8f0; /* Bordure légère */
+  --border-strong: #94a3b8; /* Bordure marquée */
+
+  /* Brand/Accent Colors - Vert émeraude professionnel */
+  --accent-primary: #047857; /* Émeraude foncé - 5.1:1 contrast */
+  --accent-primary-hover: #065f46;
+  --accent-secondary: #0e7490; /* Cyan foncé - 5.5:1 contrast */
+  --accent-secondary-hover: #155e75;
+
+  /* Semantic Colors - RGAA AA compliant */
+  --color-success: #047857; /* Vert foncé - 5.1:1 */
+  --color-success-bg: #ecfdf5;
+  --color-success-text: #065f46;
+  --color-warning: #b45309; /* Ambre foncé - 5.2:1 */
+  --color-warning-bg: #fffbeb;
+  --color-warning-text: #92400e;
+  --color-danger: #dc2626; /* Rouge vif - 4.5:1 */
+  --color-danger-bg: #fef2f2;
+  --color-danger-text: #991b1b;
+  --color-info: #1d4ed8; /* Bleu foncé - 5.7:1 */
+  --color-info-bg: #eff6ff;
+  --color-info-text: #1e40af;
+
+  /* Shadows - Plus prononcées en mode clair */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08),
+    0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.08);
+  --shadow-glow: 0 0 20px rgba(4, 120, 87, 0.2);
+
+  /* Card specific - Bordure fine + ombre légère */
+  --card-border: #e2e8f0;
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+
+  /* Input/Form - Bordures visibles */
+  --input-bg: #ffffff;
+  --input-border: #94a3b8; /* Gris moyen visible */
+  --input-focus: #047857;
+  --input-text: #0f172a;
+  --input-placeholder: #64748b;
+
+  /* Sidebar - Fond blanc avec texte sombre */
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e2e8f0;
+  --sidebar-item-hover: #f1f5f9;
+  --sidebar-item-active: #ecfdf5;
+  --sidebar-text: #1e293b; /* Gris anthracite - très lisible */
+  --sidebar-text-active: #047857;
+
+  /* Header/Navigation - Icônes sombres sur fond clair */
+  --header-bg: #ffffff;
+  --header-border: #e2e8f0;
+  --header-text: #1e293b;
+  --header-icon: #475569;
+  --header-icon-hover: #0f172a;
+}
+
+/* Dark Theme - Professional Navy/Cyan theme */
+/* WCAG AA Contrast: Text must have 4.5:1 on dark backgrounds */
+.dark {
+  /* Backgrounds */
+  --bg-base: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-elevated: #334155;
+  --bg-muted: #1e293b;
+  --bg-subtle: #334155;
+
+  /* Text - RGAA AA compliant (min 4.5:1 on dark backgrounds) */
+  --text-primary: #f8fafc; /* Contrast 15.8:1 on #0f172a */
+  --text-secondary: #e2e8f0; /* Contrast 12.3:1 */
+  --text-muted: #94a3b8; /* Gris clair - Contrast 5.4:1 - RGAA compliant */
+  --text-inverted: #0f172a;
+
+  /* Borders - Séparations subtiles (rgba blanc) */
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  /* Brand/Accent Colors - Cyan vif pour dark mode */
+  --accent-primary: #22d3ee; /* Cyan brillant - 8.7:1 contrast */
+  --accent-primary-hover: #67e8f9;
+  --accent-secondary: #60a5fa; /* Bleu brillant - 6.1:1 contrast */
+  --accent-secondary-hover: #93c5fd;
+
+  /* Semantic Colors - RGAA AA compliant on dark */
+  --color-success: #34d399; /* Émeraude brillant - 8.2:1 */
+  --color-success-bg: rgba(52, 211, 153, 0.15);
+  --color-success-text: #6ee7b7;
+  --color-warning: #fbbf24; /* Ambre brillant - 10.4:1 */
+  --color-warning-bg: rgba(251, 191, 36, 0.15);
+  --color-warning-text: #fcd34d;
+  --color-danger: #ef4444; /* Rouge vif - 5.3:1 */
+  --color-danger-bg: rgba(239, 68, 68, 0.15);
+  --color-danger-text: #fca5a5;
+  --color-info: #60a5fa; /* Bleu brillant - 6.1:1 */
+  --color-info-bg: rgba(96, 165, 250, 0.15);
+  --color-info-text: #93c5fd;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6),
+    0 4px 6px -4px rgb(0 0 0 / 0.5);
+  --shadow-glow: 0 0 20px rgba(34, 211, 238, 0.4);
+
+  /* Card specific - Bordures subtiles blanches */
+  --card-border: rgba(255, 255, 255, 0.1);
+  --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+
+  /* Input/Form */
+  --input-bg: #1e293b;
+  --input-border: #475569;
+  --input-focus: #22d3ee;
+  --input-text: #f8fafc;
+  --input-placeholder: #94a3b8;
+
+  /* Sidebar - Texte blanc cassé lisible */
+  --sidebar-bg: #0f172a;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-item-hover: #1e293b;
+  --sidebar-item-active: rgba(34, 211, 238, 0.15);
+  --sidebar-text: #e2e8f0; /* 12.3:1 contrast - highly readable */
+  --sidebar-text-active: #67e8f9; /* Bright cyan for active state */
+
+  /* Header/Navigation - Icônes claires sur fond sombre */
+  --header-bg: #1e293b;
+  --header-border: rgba(255, 255, 255, 0.1);
+  --header-text: #f8fafc;
+  --header-icon: #94a3b8;
+  --header-icon-hover: #f8fafc;
+}
+
+/* Professional Typography */
+body {
+  font-family: "Inter", "IBM Plex Sans", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+/* Responsive breakpoints utilities */
+@layer utilities {
+  .container-responsive {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  .text-responsive {
+    @apply text-sm sm:text-base;
+  }
+
+  .heading-responsive {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-slate-700/50;
+  }
+
+  html {
+    @apply bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950;
+  }
+
+  html.light {
+    @apply bg-white;
+  }
+
+  body {
+    @apply antialiased bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950 text-slate-100 transition-colors duration-500 overflow-x-hidden;
+  }
+
+  body.light {
+    @apply bg-white text-slate-900;
+  }
+
+  #root {
+    @apply bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950 min-h-screen transition-colors duration-500 overflow-x-hidden max-w-full;
+  }
+
+  .light #root {
+    @apply bg-white;
+  }
+
+  .light .bg-slate-900 {
+    @apply bg-white shadow-sm border border-slate-200;
+  }
+
+  .light .bg-slate-800 {
+    @apply bg-white shadow-sm border border-slate-200;
+  }
+
+  .light .bg-slate-800\/90 {
+    @apply bg-white shadow-sm border border-slate-200;
+  }
+
+  .light .bg-slate-900\/90 {
+    @apply bg-white shadow-sm border border-slate-200;
+  }
+
+  .light .bg-slate-800\/50 {
+    @apply bg-white shadow-sm;
+  }
+
+  .light .bg-slate-900\/50 {
+    @apply bg-white shadow-sm;
+  }
+
+  .light .bg-slate-700 {
+    @apply bg-white shadow-sm;
+  }
+
+  .light .bg-slate-600 {
+    @apply bg-slate-50;
+  }
+
+  .light .text-slate-300 {
+    @apply text-slate-700;
+  }
+
+  .light .text-slate-400 {
+    @apply text-slate-600;
+  }
+
+  .light .border-slate-700 {
+    @apply border-slate-300;
+  }
+
+  .light .border-slate-600 {
+    @apply border-slate-400;
+  }
+
+  .light [class*="border-slate-700/"] {
+    @apply border-slate-200;
+  }
+
+  .light .text-slate-100 {
+    @apply text-slate-900;
+  }
+
+  .light .text-slate-200 {
+    @apply text-slate-800;
+  }
+
+  .light *:hover[class*="hover:bg-slate-800"] {
+    @apply bg-slate-100;
+  }
+
+  .light *:hover[class*="hover:bg-slate-700"] {
+    @apply bg-slate-200;
+  }
+
+  .light .bg-slate-950 {
+    @apply bg-white;
+  }
+
+  /* Inputs et forms en mode clair */
+  .light input,
+  .light textarea,
+  .light select {
+    @apply bg-white border-slate-300 text-slate-900 placeholder:text-slate-500;
+  }
+
+  .light input:focus,
+  .light textarea:focus,
+  .light select:focus {
+    @apply border-emerald-500 ring-emerald-500/20;
+  }
+
+  /* Tables en mode clair */
+  .light table {
+    @apply bg-white;
+  }
+
+  .light thead {
+    @apply bg-slate-50 border-slate-200;
+  }
+
+  .light tbody tr {
+    @apply border-slate-200 hover:bg-slate-50;
+  }
+
+  .light td,
+  .light th {
+    @apply border-slate-200 text-slate-900;
+  }
+
+  /* Tableaux responsives */
+  table {
+    table-layout: auto;
+    width: 100%;
+  }
+
+  /* Priorité d'affichage des colonnes sur petits écrans */
+  @media (max-width: 640px) {
+    th,
+    td {
+      padding: 0.5rem !important;
+      font-size: 0.875rem;
+    }
+  }
+
+  /* Badges et labels en mode clair */
+  .light [class*="bg-slate-500/20"] {
+    @apply bg-slate-100 text-slate-700;
+  }
+
+  .light [class*="bg-slate-600/20"] {
+    @apply bg-slate-100 text-slate-700;
+  }
+
+  .light [class*="bg-blue-600/20"],
+  .light [class*="bg-cyan-600/20"],
+  .light [class*="bg-green-600/20"],
+  .light [class*="bg-emerald-600/20"] {
+    @apply bg-slate-100 text-slate-700;
+  }
+
+  /* Header en mode clair */
+  .light header {
+    @apply bg-white border-slate-200 shadow-md;
+  }
+
+  .light header input {
+    @apply bg-slate-100 border-slate-300 text-slate-900 placeholder:text-slate-500;
+  }
+
+  .light header button:hover {
+    @apply bg-slate-100;
+  }
+
+  .light header .text-slate-300 {
+    @apply text-slate-700;
+  }
+
+  .light header .text-slate-400 {
+    @apply text-slate-600;
+  }
+
+  .light header .text-slate-200 {
+    @apply text-slate-800;
+  }
+
+  .light header .bg-slate-800 {
+    @apply bg-white shadow-md border-slate-300;
+  }
+
+  .light header .bg-slate-700 {
+    @apply bg-slate-100;
+  }
+
+  .light header *:hover[class*="hover:bg-slate-800"] {
+    @apply bg-slate-100;
+  }
+
+  .light header *:hover[class*="hover:bg-slate-700"] {
+    @apply bg-slate-200;
+  }
+
+  .light header .border-slate-700 {
+    @apply border-slate-300;
+  }
+
+  /* Sidebar en mode clair */
+  .light aside,
+  .light nav {
+    @apply bg-white border-slate-200 shadow-lg;
+  }
+
+  .light aside .text-slate-300 {
+    @apply text-slate-700;
+  }
+
+  .light aside .text-slate-400 {
+    @apply text-slate-600;
+  }
+
+  .light aside button,
+  .light nav button {
+    @apply hover:bg-slate-100;
+  }
+
+  .light [class*="hover:bg-slate-700"]:hover {
+    @apply bg-slate-100;
+  }
+
+  .light [class*="hover:bg-slate-800"]:hover {
+    @apply bg-slate-100;
+  }
+
+  .light [class*="bg-cyan-500/10"] {
+    @apply bg-emerald-50;
+  }
+
+  .light [class*="bg-blue-500/10"] {
+    @apply bg-emerald-50;
+  }
+
+  .light [class*="bg-emerald-500/10"] {
+    @apply bg-emerald-50;
+  }
+
+  /* Professional Banking Theme - Light Mode 
+     Uses consistent blue palette for institutional look */
+
+  /* Light mode professional background - clean white with subtle blue tint */
+  .light #root {
+    @apply bg-gradient-to-br from-slate-50 via-white to-blue-50/20;
+  }
+
+  .light html {
+    @apply bg-gradient-to-br from-slate-50 via-white to-blue-50/20;
+  }
+
+  .light body {
+    @apply bg-gradient-to-br from-slate-50 via-white to-blue-50/20;
+  }
+
+  /* Backgrounds avec gradients en mode clair - Only reset dark slate gradients */
+  .light [class*="from-slate-900"],
+  .light [class*="from-slate-800"],
+  .light [class*="from-blue-950"] {
+    background-image: none !important;
+    @apply bg-white;
+  }
+
+  /* Éliminer tous les backgrounds gris/bleus */
+  .light .bg-gray-900 {
+    @apply bg-white;
+  }
+
+  .light .bg-gray-800 {
+    @apply bg-white;
+  }
+
+  /* === MODE CLAIR - AMÉLIORATIONS COMPLÈTES === */
+
+  /* Cartes avec gradients */
+  .light [class*="bg-gradient-to-br"][class*="from-slate-800"],
+  .light [class*="bg-gradient-to-br"][class*="from-slate-900"] {
+    background-image: none !important;
+    @apply bg-white border border-slate-200 shadow-sm;
+  }
+
+  /* Texte blanc vers sombre */
+  .light .text-white {
+    @apply text-slate-900;
+  }
+
+  /* Textes colorés - conserver mais ajuster pour lisibilité */
+  .light .text-emerald-400 {
+    @apply text-emerald-600;
+  }
+
+  .light .text-cyan-400 {
+    @apply text-cyan-600;
+  }
+
+  .light .text-blue-400 {
+    @apply text-blue-600;
+  }
+
+  .light .text-purple-400 {
+    @apply text-purple-600;
+  }
+
+  .light .text-amber-400 {
+    @apply text-amber-600;
+  }
+
+  .light .text-red-400 {
+    @apply text-red-600;
+  }
+
+  /* Backgrounds avec opacité */
+  .light [class*="bg-slate-700/50"],
+  .light [class*="bg-slate-700/30"] {
+    @apply bg-slate-100;
+  }
+
+  .light [class*="bg-emerald-500/20"] {
+    @apply bg-emerald-50;
+  }
+
+  .light [class*="bg-cyan-500/20"] {
+    @apply bg-cyan-50;
+  }
+
+  .light [class*="bg-blue-500/20"] {
+    @apply bg-blue-50;
+  }
+
+  .light [class*="bg-purple-500/20"] {
+    @apply bg-purple-50;
+  }
+
+  .light [class*="bg-amber-500/20"] {
+    @apply bg-amber-50;
+  }
+
+  .light [class*="bg-red-500/20"],
+  .light [class*="bg-red-400/10"] {
+    @apply bg-red-50;
+  }
+
+  .light [class*="bg-emerald-400/10"] {
+    @apply bg-emerald-50;
+  }
+
+  .light [class*="bg-cyan-400/10"] {
+    @apply bg-cyan-50;
+  }
+
+  .light [class*="bg-amber-400/10"] {
+    @apply bg-amber-50;
+  }
+
+  /* Boutons en mode clair */
+  .light .bg-cyan-600 {
+    @apply bg-blue-600;
+  }
+
+  .light .bg-emerald-500 {
+    @apply bg-emerald-600;
+  }
+
+  .light .bg-blue-500 {
+    @apply bg-blue-600;
+  }
+
+  /* Graphiques et charts - backgrounds */
+  .light .recharts-cartesian-grid line {
+    stroke: #e2e8f0 !important;
+  }
+
+  .light .recharts-tooltip-wrapper .bg-slate-800 {
+    @apply bg-white border-slate-200 shadow-lg;
+  }
+
+  /* Tableaux de transactions */
+  .light [class*="border-slate-700/50"] {
+    @apply border-slate-200;
+  }
+
+  .light tr:hover[class*="hover:bg-slate-700/30"] {
+    @apply bg-slate-50;
+  }
+
+  /* Scrollbars en mode clair */
+  .light ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+
+  .light ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+  }
+
+  .light ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Focus states en mode clair */
+  .light [class*="focus:ring-cyan-500"] {
+    --tw-ring-color: rgb(14 165 233 / 0.3);
+  }
+
+  .light [class*="focus:ring-emerald-500"] {
+    --tw-ring-color: rgb(16 185 129 / 0.3);
+  }
+
+  /* Placeholders */
+  .light ::placeholder {
+    @apply text-slate-400;
+  }
+
+  /* Select et dropdown backgrounds */
+  /* Select et dropdown backgrounds */
+  .light select option {
+    @apply bg-white text-slate-900;
+  }
+
+  /* Dark mode select options */
+  .dark select {
+    color-scheme: dark;
+  }
+
+  .dark select option {
+    background-color: #1e293b;
+    color: #f8fafc;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+
+  .animate-suction {
+    animation: glow-pulse 2s ease-in-out infinite;
+    transition: all 0.3s ease;
+  }
+
+  .animate-suction:hover {
+    transform: scale(1.15) rotate(5deg);
+    cursor: pointer;
+    filter: brightness(1.2);
+  }
+
+  .glass-effect {
+    @apply bg-slate-800/40 backdrop-blur-xl border border-slate-700/50;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-500/10;
+  }
+
+  .light .card-hover {
+    @apply hover:shadow-xl hover:shadow-emerald-500/15;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent;
+  }
+
+  .light .gradient-text {
+    @apply bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-600 bg-clip-text text-transparent;
+  }
+
+  .bgfi-gradient {
+    @apply bg-gradient-to-r from-blue-600 to-emerald-600;
+  }
+
+  .light .bgfi-gradient {
+    @apply bg-gradient-to-r from-emerald-600 to-amber-500;
+  }
+
+  .bgfi-gradient-gold {
+    @apply bg-gradient-to-r from-emerald-500 to-blue-600;
+  }
+
+  .light .bgfi-gradient-gold {
+    @apply bg-gradient-to-r from-amber-500 to-emerald-600;
+  }
+
+  .bgfi-border {
+    @apply border-blue-600/50;
+  }
+
+  .light .bgfi-border {
+    @apply border-emerald-600/50;
+  }
+
+  .bgfi-hover {
+    @apply hover:bg-blue-700/20 hover:border-blue-500;
+  }
+
+  .light .bgfi-hover {
+    @apply hover:bg-emerald-700/20 hover:border-emerald-500;
+  }
+
+  /* African Finance Theme - Professional Light Mode Colors */
+  .finance-primary {
+    @apply text-emerald-600;
+  }
+
+  .finance-accent {
+    @apply text-amber-600;
+  }
+
+  .finance-bg-primary {
+    @apply bg-emerald-600;
+  }
+
+  .finance-bg-accent {
+    @apply bg-amber-500;
+  }
+
+  .finance-gradient {
+    @apply bg-gradient-to-r from-emerald-600 to-teal-600;
+  }
+
+  .finance-gradient-gold {
+    @apply bg-gradient-to-r from-emerald-600 via-teal-500 to-amber-500;
+  }
+
+  /* Options de polices modernes pour le logo */
+  .logo-poppins {
+    font-family: "Poppins", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .logo-inter {
+    font-family: "Inter", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  .logo-montserrat {
+    font-family: "Montserrat", sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  .logo-orbitron {
+    font-family: "Orbitron", sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .logo-space-grotesk {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+@keyframes suction {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 0 10px 25px -3px rgba(6, 182, 212, 0.3),
+      0 0 0 0 rgba(6, 182, 212, 0.4);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(0.85) rotate(-2deg);
+    box-shadow: 0 5px 10px -2px rgba(6, 182, 212, 0.5),
+      inset 0 4px 8px 0 rgba(6, 182, 212, 0.5);
+    filter: brightness(1.1);
+  }
+  50% {
+    transform: scale(0.8) rotate(0deg);
+    box-shadow: 0 2px 5px -1px rgba(6, 182, 212, 0.6),
+      inset 0 6px 12px 0 rgba(6, 182, 212, 0.7),
+      0 0 0 8px rgba(6, 182, 212, 0.2);
+    filter: brightness(1.2);
+  }
+  75% {
+    transform: scale(0.85) rotate(2deg);
+    box-shadow: 0 5px 10px -2px rgba(6, 182, 212, 0.5),
+      inset 0 4px 8px 0 rgba(6, 182, 212, 0.5);
+    filter: brightness(1.1);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.8), 0 0 40px rgba(6, 182, 212, 0.6),
+      0 0 60px rgba(6, 182, 212, 0.4);
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 1), 0 0 60px rgba(6, 182, 212, 0.8),
+      0 0 90px rgba(6, 182, 212, 0.6), 0 0 120px rgba(6, 182, 212, 0.4);
+    transform: scale(1.05);
+    filter: brightness(1.2);
+  }
+}
+
+@keyframes float-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(-8px) scale(1.03);
+  }
+  50% {
+    transform: translateY(-12px) scale(1.05);
+  }
+  75% {
+    transform: translateY(-8px) scale(1.03);
+  }
+}
+
+@keyframes border-dance {
+  0%,
+  100% {
+    border-color: rgba(6, 182, 212, 0.6);
+    border-width: 2px;
+  }
+  33% {
+    border-color: rgba(59, 130, 246, 0.8);
+    border-width: 3px;
+  }
+  66% {
+    border-color: rgba(168, 85, 247, 0.7);
+    border-width: 4px;
+  }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  @apply bg-slate-800/50 rounded-full;
+}
+
+.light .scrollbar-thin::-webkit-scrollbar-track {
+  @apply bg-slate-200 rounded-full;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-slate-600 rounded-full hover:bg-slate-500;
+}
+
+.light .scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-slate-400 rounded-full hover:bg-slate-500;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.input-focus {
+  @apply focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200;
+}
+
+.btn-primary {
+  @apply bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105 active:scale-95;
+}
+
+.light .btn-primary {
+  @apply bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/30 hover:shadow-emerald-500/40;
+}
+
+.btn-secondary {
+  @apply bg-slate-700 hover:bg-slate-600 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95;
+}
+
+.light .btn-secondary {
+  @apply bg-slate-200 hover:bg-slate-300 text-slate-900 shadow-md;
+}
+
+.btn-danger {
+  @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-105 active:scale-95;
+}
+
+.light .btn-danger {
+  @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-red-500/30 hover:shadow-red-500/40;
+}
+
+.card-gradient {
+  @apply bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl;
+}
+
+.light .card-gradient {
+  @apply bg-white backdrop-blur-xl border border-slate-200 rounded-xl shadow-md;
+}
+
+.stat-card {
+  @apply p-6 rounded-xl border border-slate-700/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer;
+}
+
+.light .stat-card {
+  @apply border-slate-200 bg-white shadow-md hover:shadow-xl;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-slate-800/50 rounded-full;
+}
+
+.light .custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-slate-200 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-600 rounded-full hover:bg-blue-600;
+}
+
+.light .custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-400 rounded-full hover:bg-emerald-500;
+}
+
+/* Fix pour les modals qui ne scrollent pas */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4;
+  overflow-y: visible !important;
+}
+
+.light .modal-overlay {
+  @apply bg-slate-900/40 backdrop-blur-md;
+}
+
+.modal-content {
+  @apply max-h-[90vh] overflow-y-auto;
+  margin: auto;
+}
+
+/* Empêcher le body de scroller quand un modal est ouvert */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+.modal-content::-webkit-scrollbar-track {
+  @apply bg-slate-800/50 rounded-full;
+}
+.light .modal-content::-webkit-scrollbar-track {
+  @apply bg-slate-200 rounded-full;
+}
+.modal-content::-webkit-scrollbar-thumb {
+  @apply bg-slate-600 rounded-full hover:bg-blue-600;
+}
+.light .modal-content::-webkit-scrollbar-thumb {
+  @apply bg-slate-400 rounded-full hover:bg-emerald-500;
+}
+
+@layer utilities {
+  .mask-linear-fade {
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

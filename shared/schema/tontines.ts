@@ -1,0 +1,166 @@
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+import { users } from "./auth";
+import { clients } from "./clients";
+import { agences } from "./agences";
+
+// Tontines
+export const tontines = pgTable("tontines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  typeDistribution: text("type_distribution").notNull(),
+  montantCotisation: numeric("montant_cotisation").notNull(),
+  tauxPlateforme: numeric("taux_plateforme").notNull().default("0"),
+  frequence: text("frequence").notNull(),
+  intervalleCotisation: integer("intervalle_cotisation").default(1),
+  delaiPenalite: integer("delai_penalite").default(2),
+  dateDebut: timestamp("date_debut").notNull(),
+  dateFin: timestamp("date_fin"),
+  nombreMembres: integer("nombre_membres").notNull(),
+  membresActuels: integer("membres_actuels").default(0),
+  statut: text("statut").notNull().default("Active"),
+  solde: numeric("solde").default("0"),
+  prochainTour: timestamp("prochain_tour"),
+  ordreDistribution: json("ordre_distribution"),
+  regles: text("regles"),
+  gestionnaireId: uuid("gestionnaire_id").references(() => users.id), // Gestionnaire de la tontine
+  agenceId: uuid("agence_id").references(() => agences.id), // Agence de la tontine
+  createdBy: uuid("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
+});
+
+export const insertTontineSchema = createInsertSchema(tontines, {
+  dateDebut: (schema) =>
+    z.preprocess(
+      (value) => {
+        if (value === undefined || value === null || value === "") return value;
+        return value instanceof Date ? value : new Date(value as string);
+      },
+      schema,
+    ),
+  dateFin: (schema) =>
+    z.preprocess(
+      (value) => {
+        if (value === undefined || value === null || value === "") return value;
+        return value instanceof Date ? value : new Date(value as string);
+      },
+      schema,
+    ),
+  prochainTour: (schema) =>
+    z.preprocess(
+      (value) => {
+        if (value === undefined || value === null || value === "") return value;
+        return value instanceof Date ? value : new Date(value as string);
+      },
+      schema,
+    ),
+}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertTontine = z.infer<typeof insertTontineSchema>;
+export type Tontine = typeof tontines.$inferSelect;
+
+// Membres de tontine
+export const membresTontine = pgTable("membres_tontine", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
+  clientId: uuid("client_id").notNull().references(() => clients.id),
+  dateAdhesion: timestamp("date_adhesion").defaultNow(),
+  statut: text("statut").notNull().default("Actif"),
+  totalCotisations: numeric("total_cotisations").default("0"),
+  totalRecus: numeric("total_recus").default("0"),
+  position: integer("position"),
+  aRecuBenefice: boolean("a_recu_benefice").default(false),
+  dateBenefice: timestamp("date_benefice"),
+  createdAt: timestamp("created_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
+});
+
+export const insertMembreTontineSchema = createInsertSchema(membresTontine).omit({ id: true, createdAt: true, deletedAt: true });
+export type InsertMembreTontine = z.infer<typeof insertMembreTontineSchema>;
+export type MembreTontine = typeof membresTontine.$inferSelect;
+
+// Contributions tontine
+export const contributionsTontine = pgTable("contributions_tontine", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
+  membreId: uuid("membre_id").notNull().references(() => membresTontine.id),
+  montant: numeric("montant").notNull(),
+  dateContribution: timestamp("date_contribution").defaultNow(),
+  methodePaiement: text("methode_paiement").default("Espèces"),
+  reference: text("reference"),
+  statut: text("statut").notNull().default("Validé"),
+  createdBy: uuid("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertContributionTontineSchema = createInsertSchema(contributionsTontine).omit({ id: true, createdAt: true });
+export type InsertContributionTontine = z.infer<typeof insertContributionTontineSchema>;
+export type ContributionTontine = typeof contributionsTontine.$inferSelect;
+
+// Tontine Règles (added from previous session context)
+export const tontineRegles = pgTable("tontine_regles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
+  typeRegle: text("type_regle").notNull(), // 'retard', 'absence', 'defaut'
+  montantPenalite: numeric("montant_penalite").notNull(),
+  description: text("description"),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertTontineRegleSchema = createInsertSchema(tontineRegles).omit({ id: true, createdAt: true });
+export type InsertTontineRegle = z.infer<typeof insertTontineRegleSchema>;
+export type TontineRegle = typeof tontineRegles.$inferSelect;
+
+// Tontine Pénalités
+export const tontinePenalites = pgTable("tontine_penalites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
+  membreId: uuid("membre_id").notNull().references(() => membresTontine.id),
+  regleId: uuid("regle_id").references(() => tontineRegles.id),
+  montant: numeric("montant").notNull(),
+  dateFaute: timestamp("date_faute").defaultNow(),
+  statut: text("statut").default("impaye"), // 'impaye', 'paye', 'annule'
+  datePaiement: timestamp("date_paiement"),
+  motif: text("motif"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertTontinePenaliteSchema = createInsertSchema(tontinePenalites).omit({ id: true, createdAt: true });
+export type InsertTontinePenalite = z.infer<typeof insertTontinePenaliteSchema>;
+export type TontinePenalite = typeof tontinePenalites.$inferSelect;
+
+// Tontine Distributions
+export const tontineDistributions = pgTable("tontine_distributions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
+  membreId: uuid("membre_id").notNull().references(() => membresTontine.id),
+  tourNumero: integer("tour_numero").notNull(),
+  montantTotal: numeric("montant_total").notNull(),
+  dateDistribution: timestamp("date_distribution").defaultNow(),
+  modePaiement: text("mode_paiement").default("ESPECES"),
+  referencePaiement: text("reference_paiement"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertTontineDistributionSchema = createInsertSchema(tontineDistributions).omit({ id: true, createdAt: true });
+export type InsertTontineDistribution = z.infer<typeof insertTontineDistributionSchema>;
+export type TontineDistribution = typeof tontineDistributions.$inferSelect;
+
+// Tontine Alertes
+export const tontineAlertes = pgTable("tontine_alertes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
+  membreId: uuid("membre_id").references(() => membresTontine.id),
+  typeAlerte: text("type_alerte").notNull(),
+  priorite: text("priorite").notNull().default("Normale"),
+  message: text("message").notNull(),
+  statut: text("statut").notNull().default("Active"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTontineAlerteSchema = createInsertSchema(tontineAlertes).omit({ id: true, createdAt: true });
+export type InsertTontineAlerte = z.infer<typeof insertTontineAlerteSchema>;
+export type TontineAlerte = typeof tontineAlertes.$inferSelect;

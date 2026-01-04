@@ -1,0 +1,71 @@
+/**
+ * UI Component Library - COFIN Platform
+ * Barrel export for all reusable UI components
+ */
+
+// Basic Components
+export { default as Button } from './Button';
+export type { ButtonProps, ButtonVariant, ButtonSize } from './Button';
+
+export { default as IconButton } from './IconButton';
+export type { IconButtonProps, IconButtonVariant, IconButtonSize } from './IconButton';
+
+export { default as Card } from './Card';
+export type { CardProps } from './Card';
+
+export { default as StatCard } from './StatCard';
+export type { StatCardProps, StatCardColor } from './StatCard';
+
+export { default as Badge } from './Badge';
+export type { BadgeProps, BadgeVariant, BadgeSize } from './Badge';
+
+// Table Components
+export { default as ResponsiveTable } from './ResponsiveTable';
+export type { ResponsiveTableProps, TableColumn } from './ResponsiveTable';
+
+// Form Components
+export { default as FormField } from './FormField';
+export type { FormFieldProps } from './FormField';
+
+export { default as Switch } from './Switch';
+
+export { default as SelectField } from './SelectField';
+export type { SelectFieldProps, SelectOption } from './SelectField';
+
+export { default as TextareaField } from './TextareaField';
+export type { TextareaFieldProps } from './TextareaField';
+
+export { default as SearchInput } from './SearchInput';
+export type { SearchInputProps } from './SearchInput';
+
+// Modal & Dialog Components
+export { default as Modal } from './Modal';
+export type { ModalProps, ModalSize, ModalVariant } from './Modal';
+
+export { default as ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmDialogProps, ConfirmDialogVariant } from './ConfirmDialog';
+
+// Navigation Components
+export { default as TabGroup } from './TabGroup';
+export type { TabGroupProps, Tab, TabVariant, TabSize } from './TabGroup';
+
+// Feedback Components
+export { default as EmptyState } from './EmptyState';
+export type { EmptyStateProps, EmptyStateAction } from './EmptyState';
+
+export { default as ProgressBar } from './ProgressBar';
+export type { ProgressBarProps, ProgressBarColor, ProgressBarSize } from './ProgressBar';
+
+// Loading Components
+export { default as LoadingScreen } from './LoadingScreen';
+export { default as LoadingSpinner } from './LoadingSpinner';
+
+// Layout Components
+export { default as PageHeader } from './PageHeader';
+export type { PageHeaderProps } from './PageHeader';
+export { default as SelectableCard } from './SelectableCard';
+export { Pagination } from './Pagination';
+
+// Theme Components
+export { default as ThemeToggle } from './ThemeToggle';
+export type { ThemeToggleProps } from './ThemeToggle';
