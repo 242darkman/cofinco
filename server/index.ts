@@ -114,10 +114,10 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
-setupAuth(app);
+// Auth setup moved to async block below
 
 // Session activity tracking middleware (updates last_activity in active_sessions)
-app.use(sessionActivityMiddleware);
+// Note: sessionActivityMiddleware will be added after setupAuth in the async block
 
 // log, logError, logWarn are now imported from ./logger
 export { log, logError, logWarn } from "./logger";
@@ -176,6 +176,12 @@ async function seedAdminUser() {
 }
 
 (async () => {
+  // Setup auth first (creates session table and middleware)
+  await setupAuth(app);
+
+  // Session activity tracking middleware (must be after auth setup)
+  app.use(sessionActivityMiddleware);
+
   // Create admin user on startup
   await seedAdminUser();
 

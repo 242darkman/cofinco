@@ -33,12 +33,12 @@ declare module 'express-session' {
 
 export let sessionMiddleware: any;
 
-export function setupAuth(app: Express) {
+export async function setupAuth(app: Express) {
   const isProduction = process.env.NODE_ENV === 'production';
-  
-  // Trust first proxy (Replit's reverse proxy)
+
+  // Trust first proxy (nginx, Cloudflare, etc.)
   app.set('trust proxy', 1);
-  
+
   // Create session table SQL (inline to avoid file read issues in production bundle)
   const createTableSQL = `
     CREATE TABLE IF NOT EXISTS "session" (
@@ -47,13 +47,20 @@ export function setupAuth(app: Express) {
       "expire" timestamp(6) NOT NULL,
       CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
     ) WITH (OIDS=FALSE);
+  `;
+
+  const createIndexSQL = `
     CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
   `;
 
-  // Ensure session table exists before starting
-  pool.query(createTableSQL).catch(err => {
+  // Ensure session table exists before starting (synchronous)
+  try {
+    await pool.query(createTableSQL);
+    await pool.query(createIndexSQL);
+    console.log('[Auth] Session table ready');
+  } catch (err) {
     console.error("Failed to create session table:", err);
-  });
+  }
 
   sessionMiddleware = session({
     store: new PostgresStore({
@@ -71,9 +78,10 @@ export function setupAuth(app: Express) {
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
       sameSite: 'lax',
+      // Don't set domain - let browser handle it automatically
     },
   });
-  
+
   app.use(sessionMiddleware);
 }
 
