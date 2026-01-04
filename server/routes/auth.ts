@@ -203,14 +203,14 @@ export function registerAuthRoutes(app: Express) {
           const employe = await storage.getEmployeByUserId(req.session.user.id);
           if (employe) {
                req.session.user.agenceId = employe.agenceId || undefined;
-               req.session.save();
+               await new Promise<void>((resolve) => req.session.save(() => resolve()));
           } else {
              // Fallback lookup by name
              const agences = await storage.getAllAgences();
              const agence = agences.find(a => a.nom === req.session.user?.agence);
              if (agence && req.session.user) {
                 req.session.user.agenceId = agence.id;
-                req.session.save();
+                await new Promise<void>((resolve) => req.session.save(() => resolve()));
              }
           }
        } catch (e) {
@@ -301,7 +301,7 @@ export function registerAuthRoutes(app: Express) {
           if (updated.username) {
             req.session.user.username = updated.username;
           }
-          req.session.save();
+          await new Promise<void>((resolve) => req.session.save(() => resolve()));
       }
 
       // Log if username was changed
@@ -348,7 +348,7 @@ export function registerAuthRoutes(app: Express) {
     // Update session to reflect password change completion
     if (req.session.user) {
       req.session.user.mustChangePassword = false;
-      req.session.save();
+      await new Promise<void>((resolve) => req.session.save(() => resolve()));
     }
 
     await logAudit(
