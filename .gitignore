@@ -7,3 +7,6 @@ vite.config.ts.*
 /logs
 .local
 .config
+
+deploy_key
+deploy_key.pub
