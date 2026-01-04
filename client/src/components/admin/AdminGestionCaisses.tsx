@@ -20,7 +20,7 @@ interface Caisse {
 
 export default function AdminGestionCaisses() {
   const user = authService.getCurrentUser();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'admin_generale' || user?.role === 'Administrateur';
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
