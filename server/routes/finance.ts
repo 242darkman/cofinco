@@ -326,7 +326,7 @@ export function registerFinanceRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body) as any;
       const user = req.session.user!;
       
-      const isAdmin = user.role === 'admin' || user.role === 'admin_generale';
+      const isAdmin = user.role === 'admin' || user.role === 'admin_generale' || user.role === 'Administrateur';
       
       // If admin, use provided agenceId (validate it exists?)
       // If not admin, FORCE user's agenceId
