@@ -39,11 +39,27 @@ export function setupAuth(app: Express) {
   // Trust first proxy (Replit's reverse proxy)
   app.set('trust proxy', 1);
   
+  // Create session table SQL (inline to avoid file read issues in production bundle)
+  const createTableSQL = `
+    CREATE TABLE IF NOT EXISTS "session" (
+      "sid" varchar NOT NULL COLLATE "default",
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL,
+      CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+    ) WITH (OIDS=FALSE);
+    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+  `;
+
+  // Ensure session table exists before starting
+  pool.query(createTableSQL).catch(err => {
+    console.error("Failed to create session table:", err);
+  });
+
   sessionMiddleware = session({
     store: new PostgresStore({
       pool,
       tableName: 'session',
-      createTableIfMissing: true,
+      createTableIfMissing: false, // We create it manually above
     }),
     secret: process.env.SESSION_SECRET || 'cofin-secret-key-change-in-production',
     resave: false,

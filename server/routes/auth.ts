@@ -128,16 +128,21 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Save session and wait for it to complete before responding
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => {
-          if (err) {
-            console.error("Session save error:", err);
-            reject(err);
-          } else {
-            resolve();
-          }
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error("Session save error:", err);
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
         });
-      });
+      } catch (sessionErr) {
+        // Log but don't fail the login - session might still work
+        console.error("Warning: Session save failed, but continuing login:", sessionErr);
+      }
 
       // Create session tracking record with session expiry (24h from now)
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
