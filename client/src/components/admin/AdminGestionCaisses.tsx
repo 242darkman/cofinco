@@ -204,13 +204,13 @@ export default function AdminGestionCaisses() {
               <div className="flex flex-col items-end gap-2">
                  <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
                  <Button 
-                    variant="ghost" 
+                    variant="outline" 
                     size="sm" 
-                    className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    className="h-8 w-8 p-0 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-600"
                     onClick={() => handleDelete(caisse.id)}
-                    title="Supprimer"
+                    title="Supprimer cette caisse"
                  >
-                    <Trash2 size={14} />
+                    <Trash2 size={16} />
                  </Button>
               </div>
             </div>
