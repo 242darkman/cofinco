@@ -16,6 +16,7 @@ import Button from '../ui/Button';
 import FormField from '../ui/FormField';
 import Card from '../ui/Card';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserType) => void;
@@ -24,6 +25,11 @@ interface LoginPageProps {
 
 export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: LoginPageProps) {
   const { t } = useLanguage();
+  const { settings: systemSettings } = useSystemSettings(); // Fetch system settings
+  
+  // Safe helper to get dynamic name
+  const agenceName = systemSettings?.find(s => s.cle === 'agence_name')?.valeur || 'COFIN&CO-M';
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -141,7 +147,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent">
-                COFIN&CO-M
+                {agenceName}
               </h1>
               <p className="truncate text-xs text-cyan-300/80 font-medium">
                 Institution de Microfinance
@@ -190,7 +196,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               </div>
 
               <h1 className="text-5xl xl:text-6xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent mb-4 tracking-tight drop-shadow-[0_0_25px_rgba(34,211,238,0.6)]">
-                COFIN&CO-M
+                {agenceName}
               </h1>
               <p className="text-lg xl:text-xl text-cyan-300/80 mb-10 font-medium drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
                 Institution de Microfinance
@@ -235,7 +241,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
             </div>
 
             <div className="absolute bottom-6 text-center">
-              <p className="text-slate-400 text-sm">&copy; {new Date().getFullYear()} COFIN&CO-M. {t('tousDroitsReserves') || 'Tous droits réservés.'}</p>
+              <p className="text-slate-400 text-sm">&copy; {new Date().getFullYear()} {agenceName}. {t('tousDroitsReserves') || 'Tous droits réservés.'}</p>
               <p className="text-slate-500 text-xs mt-1">Développé par WESLEY Global Développement & BV Corp</p>
             </div>
           </div>
@@ -357,7 +363,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
             {/* Mobile page footer (outside the card, avoids pushing content too much) */}
             <div className="lg:hidden mt-4 text-center">
               <p className="text-slate-400/90 text-xs">
-                © {new Date().getFullYear()} COFIN&CO-M. {t('tousDroitsReserves') || 'Tous droits réservés.'}
+                © {new Date().getFullYear()} {agenceName}. {t('tousDroitsReserves') || 'Tous droits réservés.'}
               </p>
               <p className="text-slate-500 text-[11px] mt-1">Développé par WESLEY Global Développement & BV Corp</p>
             </div>

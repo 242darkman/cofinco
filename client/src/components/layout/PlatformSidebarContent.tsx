@@ -5,6 +5,7 @@ import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import Button from '../ui/Button';
+import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -26,6 +27,9 @@ export default function PlatformSidebarContent({
   userRole = 'agent'
 }: PlatformSidebarContentProps) {
   const { t } = useLanguage();
+  const { settings: systemSettings } = useSystemSettings();
+  const agenceName = systemSettings?.find(s => s.cle === 'agence_name')?.valeur || 'COFIN&CO-M';
+
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set([currentModule]));
 
   // Filtrer les routes accessibles par le rôle
@@ -92,7 +96,7 @@ export default function PlatformSidebarContent({
             >
               <img
                 src="/cofin-logo.png"
-                alt="COFIN&CO-M Logo"
+                alt={`${agenceName} Logo`}
                 className="w-12 h-12 object-contain"
               />
             </div>
