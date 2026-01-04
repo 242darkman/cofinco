@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Monitor, Lock, AlertCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, Button, FormField, SelectField, Badge, Modal } from '../ui';
+import { Card, Button, FormField, SelectField, Badge, Modal, ConfirmDialog } from '../ui';
 import { authService } from '../../lib/auth';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api } from '../../lib/api';
 
 // Types
@@ -22,6 +23,7 @@ export default function AdminGestionCaisses() {
   const user = authService.getCurrentUser();
   const isAdmin = user?.role === 'admin' || user?.role === 'admin_generale' || user?.role === 'Administrateur';
   const queryClient = useQueryClient();
+  const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -149,10 +151,14 @@ export default function AdminGestionCaisses() {
     }
   });
 
-  const handleDelete = (id: string) => {
-      if (window.confirm("Êtes-vous sûr de vouloir supprimer cette caisse ? Cette action est irréversible.")) {
-          deleteMutation.mutate(id);
-      }
+  const handleDelete = (id: string, nom: string) => {
+      openConfirm({
+          title: "Supprimer la caisse",
+          message: `Êtes-vous sûr de vouloir supprimer la caisse "${nom}" ? Cette action est irréversible et impossible si la caisse a de l'historique.`,
+          variant: 'danger',
+          confirmText: "Supprimer",
+          onConfirm: () => deleteMutation.mutate(id)
+      });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -201,18 +207,7 @@ export default function AdminGestionCaisses() {
                   <p className="text-xs text-muted-foreground">{caisse.type}</p>
                 </div>
                 </div>
-              <div className="flex flex-col items-end gap-2">
-                 <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
-                 <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-600"
-                    onClick={() => handleDelete(caisse.id)}
-                    title="Supprimer cette caisse"
-                 >
-                    <Trash2 size={16} />
-                 </Button>
-              </div>
+              <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
             </div>
 
             <div className="mt-2 space-y-2">
@@ -241,12 +236,23 @@ export default function AdminGestionCaisses() {
               )}
             </div>
 
-            <div className="pt-2 mt-auto border-t flex justify-end">
+            <div className="pt-4 mt-auto border-t border-border flex items-center justify-between gap-3">
+                 <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleDelete(caisse.id, caisse.nom)}
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-8"
+                    title="Supprimer définitivement"
+                 >
+                    <Trash2 size={15} className="mr-1.5" />
+                    <span className="text-xs font-medium">Supprimer</span>
+                 </Button>
+
                 <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => handleOpenAssign(caisse)}
-                    className="text-xs h-8"
+                    className="text-xs h-8 ml-auto"
                 >
                     Assigner
                 </Button>
@@ -346,6 +352,17 @@ export default function AdminGestionCaisses() {
             </div>
         </div>
       </Modal>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={handleConfirm}
+        title={confirmState.title || "Confirmation"}
+        message={confirmState.message || ""}
+        variant={confirmState.variant}
+        confirmText={confirmState.confirmText}
+      />
     </div>
   );
 }
