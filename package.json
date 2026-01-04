@@ -7,7 +7,7 @@
     "dev:client": "vite dev --port 5173",
     "dev": "NODE_ENV=development node --env-file=.env --import tsx server/index.ts",
     "build": "tsx script/build.ts",
-    "start": "NODE_ENV=production node dist/index.cjs",
+    "start": "NODE_ENV=production node --env-file=.env dist/index.cjs",
     "check": "tsc",
     "db:push": "node --env-file=.env node_modules/drizzle-kit/bin.cjs push",
     "db:seed:demo": "node --env-file=.env --import tsx server/seed-demo.ts",
