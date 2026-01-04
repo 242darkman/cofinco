@@ -594,7 +594,7 @@ export const caisseIncidentApi = {
 export const systemSettingsApi = {
   get: () => request<any>('/system-settings'),
   update: (data: any) => request<any>('/system-settings', {
-    method: 'PATCH',
+    method: 'PUT',
     body: JSON.stringify(data),
   }),
 };

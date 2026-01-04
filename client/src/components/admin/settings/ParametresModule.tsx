@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Settings, Building2, DollarSign, Shield, Palette, Flag, User, Save, Lock, LayoutDashboard, FileText } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { Card, Button, Badge, LoadingSpinner, TabGroup, FormField } from '../../ui';
+import { systemSettingsApi } from '../../../lib/api-client';
 import { useSystemSettings } from '../../../hooks/settings/useSystemSettings';
 import { useCompanySettings } from '../../../hooks/settings/useCompanySettings';
 import { useInterestRates } from '../../../hooks/settings/useInterestRates';
@@ -29,10 +30,13 @@ interface ParametresModuleProps {
 export default function ParametresModule({ activeView }: ParametresModuleProps) {
   const [activeTab, setActiveTab] = useState<string>('general');
   const [formData, setFormData] = useState({
-      nom_agence: 'COFIN - Microfinance',
-      code_agence: 'COF001',
-      devise: 'Franc CFA (FCFA)'
+      agence_name: '',
+      agence_code: '',
+      devise: '',
+      email: '',
+      telephone: ''
   });
+  const [localLoading, setLocalLoading] = useState(false);
 
   useEffect(() => {
     if (activeView) {
@@ -47,6 +51,40 @@ export default function ParametresModule({ activeView }: ParametresModuleProps) 
     }
   }, [activeView]);
 
+  useEffect(() => {
+    const loadSettings = async () => {
+        try {
+            setLocalLoading(true);
+            const data = await systemSettingsApi.get();
+            setFormData({
+                agence_name: data.agence_name || '',
+                agence_code: data.agence_code || '',
+                devise: data.devise || '',
+                email: data.email || '',
+                telephone: data.telephone || ''
+            });
+        } catch (error) {
+            console.error(error);
+            // Silent error or toast?
+        } finally {
+            setLocalLoading(false);
+        }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+        setLocalLoading(true);
+        await systemSettingsApi.update(formData);
+        toast.success("Paramètres enregistrés avec succès");
+    } catch (error) {
+        toast.error("Erreur lors de l'enregistrement");
+    } finally {
+        setLocalLoading(false);
+    }
+  };
+
   const systemSettings = useSystemSettings();
   const companySettings = useCompanySettings();
   const interestRates = useInterestRates();
@@ -55,15 +93,8 @@ export default function ParametresModule({ activeView }: ParametresModuleProps) 
   const uiSettings = useUISettings();
   const { user: currentUser } = useUserProfile();
 
-  const isLoading = systemSettings.loading || companySettings.loading;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value } = e.target;
@@ -86,9 +117,10 @@ export default function ParametresModule({ activeView }: ParametresModuleProps) 
                 </div>
             </div>
             <Button 
-                variant="primary" 
+                variant="primary"
                 className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 font-semibold self-start w-full sm:w-auto mt-2 sm:mt-0"
-                onClick={() => toast.info('Fonction d\'enregistrement à implémenter')}
+                onClick={handleSave}
+                isLoading={localLoading}
             >
                 <Save size={18} className="mr-2" />
                 Enregistrer
@@ -120,8 +152,8 @@ export default function ParametresModule({ activeView }: ParametresModuleProps) 
                         <div className="grid gap-5">
                             <FormField 
                                 label="Nom de l'Agence *" 
-                                name="nom_agence" 
-                                value={formData.nom_agence} 
+                                name="agence_name" 
+                                value={formData.agence_name} 
                                 onChange={handleInputChange}
                                 placeholder="Ex: Ma Microfinance"
                                 className="bg-slate-800/50 border-slate-700 focus:border-blue-500 focus:ring-blue-500/20"
@@ -130,8 +162,8 @@ export default function ParametresModule({ activeView }: ParametresModuleProps) 
                             
                             <FormField 
                                 label="Code Agence *" 
-                                name="code_agence" 
-                                value={formData.code_agence} 
+                                name="agence_code" 
+                                value={formData.agence_code} 
                                 onChange={handleInputChange}
                                 placeholder="Ex: AGC001"
                                 className="bg-slate-800/50 border-slate-700 focus:border-blue-500 focus:ring-blue-500/20"
@@ -158,18 +190,18 @@ export default function ParametresModule({ activeView }: ParametresModuleProps) 
                              <FormField 
                                 label="Email de contact" 
                                 name="email" 
-                                value={companySettings.settings?.email || ''} 
-                                onChange={() => {}}
-                                className="bg-slate-800/50 border-slate-700"
-                                disabled
+                                value={formData.email} 
+                                onChange={handleInputChange}
+                                className="bg-slate-800/50 border-slate-700 focus:border-blue-500 focus:ring-blue-500/20"
+                                icon={FileText} // Add icon if desired
                             />
                              <FormField 
                                 label="Téléphone" 
-                                name="phone" 
-                                value={companySettings.settings?.telephone || ''} 
-                                onChange={() => {}}
-                                className="bg-slate-800/50 border-slate-700"
-                                disabled
+                                name="telephone" 
+                                value={formData.telephone} 
+                                onChange={handleInputChange}
+                                className="bg-slate-800/50 border-slate-700 focus:border-blue-500 focus:ring-blue-500/20"
+                                icon={FileText} // Add icon if desired
                             />
                          </div>
                     </div>
