@@ -65,7 +65,11 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
   const suggestedRate = useMemo(() => {
     const montant = parseFloat(formData.montant_demande) || 0;
-    const duree = parseInt(formData.duree_mois) || 0;
+    const dureeRaw = parseInt(formData.duree_mois) || 0;
+    const isCommercial = formData.type_credit === 'Commercial';
+    // Convert days to months for commercial (approx 30 days = 1 month)
+    const duree = isCommercial ? dureeRaw / 30 : dureeRaw;
+    
     const revenus = parseFloat(formData.revenus_mensuels) || 0;
     const charges = parseFloat(formData.charges_mensuelles) || 0;
     const client = clients.find(c => c.id === formData.client_id);
@@ -120,6 +124,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     formData.revenus_mensuels,
     formData.charges_mensuelles,
     formData.client_id,
+    formData.type_credit,
     clients
   ]);
 
@@ -132,7 +137,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
   useEffect(() => {
     calculateLoan();
-  }, [formData.montant_demande, formData.duree_mois, formData.taux_interet, formData.frequence_remboursement, formData.revenus_mensuels, formData.charges_mensuelles]);
+  }, [formData.montant_demande, formData.duree_mois, formData.taux_interet, formData.frequence_remboursement, formData.revenus_mensuels, formData.charges_mensuelles, formData.type_credit]);
 
   const loadClients = async () => {
     try {
@@ -160,25 +165,42 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     const taux = parseFloat(formData.taux_interet) || suggestedRate || 0;
     const revenus = parseFloat(formData.revenus_mensuels) || 0;
     const charges = parseFloat(formData.charges_mensuelles) || 0;
+    const isCommercial = formData.type_credit === 'Commercial';
 
     if (montant > 0 && duree > 0) {
       const montantTotal = montant * (1 + taux / 100);
       let nombreEcheances = duree;
-      if (formData.frequence_remboursement === 'Journalier') {
-        nombreEcheances = duree * 30;
-      } else if (formData.frequence_remboursement === 'Hebdomadaire') {
-        nombreEcheances = duree * 4;
+      
+      if (isCommercial) {
+        // Durée en jours
+        if (formData.frequence_remboursement === 'Journalier') {
+          nombreEcheances = duree;
+        } else if (formData.frequence_remboursement === 'Hebdomadaire') {
+          nombreEcheances = Math.ceil(duree / 7);
+        } else if (formData.frequence_remboursement === 'Mensuel') {
+          nombreEcheances = Math.ceil(duree / 30);
+        }
+      } else {
+        // Durée en mois
+        if (formData.frequence_remboursement === 'Journalier') {
+          nombreEcheances = duree * 30;
+        } else if (formData.frequence_remboursement === 'Hebdomadaire') {
+          nombreEcheances = duree * 4;
+        }
       }
 
       const montantEcheance = nombreEcheances > 0 ? montantTotal / nombreEcheances : 0;
       const capaciteRemboursement = revenus - charges;
 
       let montantEcheanceMensuel = montantEcheance;
+      
+      // Calcul du montant mensuel équivalent pour le taux d'endettement
       if (formData.frequence_remboursement === 'Journalier') {
         montantEcheanceMensuel = montantEcheance * 30;
       } else if (formData.frequence_remboursement === 'Hebdomadaire') {
         montantEcheanceMensuel = montantEcheance * 4;
       }
+      // Pour Mensuel, c'est déjà bon
 
       const tauxEndettement = revenus > 0 ? (montantEcheanceMensuel / revenus) * 100 : 0;
 
@@ -399,12 +421,12 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
           />
 
           <FormField
-            label="Durée (mois)"
+            label={formData.type_credit === 'Commercial' ? "Durée (jours)" : "Durée (mois)"}
             name="duree_mois"
             type="number"
             value={formData.duree_mois}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, duree_mois: e.target.value })}
-            placeholder="12"
+            placeholder={formData.type_credit === 'Commercial' ? "30" : "12"}
             error={errors.duree_mois}
             required
             icon={Calendar}
@@ -418,9 +440,15 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
             options={frequenceOptions}
             required
             helperText={
-              formData.frequence_remboursement === 'Journalier' ? `≈ ${parseInt(formData.duree_mois || '0') * 30} paiements` :
-              formData.frequence_remboursement === 'Hebdomadaire' ? `≈ ${parseInt(formData.duree_mois || '0') * 4} paiements` :
-              `≈ ${formData.duree_mois || '0'} paiements`
+              formData.type_credit === 'Commercial' ? (
+                formData.frequence_remboursement === 'Journalier' ? `≈ ${parseInt(formData.duree_mois || '0')} paiements` :
+                formData.frequence_remboursement === 'Hebdomadaire' ? `≈ ${Math.ceil(parseInt(formData.duree_mois || '0') / 7)} paiements` :
+                `≈ ${Math.ceil(parseInt(formData.duree_mois || '0') / 30)} paiements`
+              ) : (
+                formData.frequence_remboursement === 'Journalier' ? `≈ ${parseInt(formData.duree_mois || '0') * 30} paiements` :
+                formData.frequence_remboursement === 'Hebdomadaire' ? `≈ ${parseInt(formData.duree_mois || '0') * 4} paiements` :
+                `≈ ${formData.duree_mois || '0'} paiements`
+              )
             }
           />
 
