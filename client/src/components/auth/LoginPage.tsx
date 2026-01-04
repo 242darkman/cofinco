@@ -236,7 +236,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
 
             <div className="absolute bottom-6 text-center">
               <p className="text-slate-400 text-sm">&copy; {new Date().getFullYear()} COFIN&CO-M. {t('tousDroitsReserves') || 'Tous droits réservés.'}</p>
-              <p className="text-slate-500 text-xs mt-1">Développé par WESLEY Global Développement</p>
+              <p className="text-slate-500 text-xs mt-1">Développé par WESLEY Global Développement & BV Corp</p>
             </div>
           </div>
         </div>
@@ -359,7 +359,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               <p className="text-slate-400/90 text-xs">
                 © {new Date().getFullYear()} COFIN&CO-M. {t('tousDroitsReserves') || 'Tous droits réservés.'}
               </p>
-              <p className="text-slate-500 text-[11px] mt-1">Développé par WESLEY Global Développement</p>
+              <p className="text-slate-500 text-[11px] mt-1">Développé par WESLEY Global Développement & BV Corp</p>
             </div>
           </div>
         </div>
