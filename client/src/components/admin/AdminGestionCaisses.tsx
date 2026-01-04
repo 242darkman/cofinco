@@ -118,10 +118,7 @@ export default function AdminGestionCaisses() {
   // Create Mutation
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await api.post('/caisses', {
-        ...data,
-        agenceId: user?.agenceId
-      });
+      const res = await api.post('/caisses', data);
       if (res.error) throw new Error(res.error);
       return res.data;
     },
