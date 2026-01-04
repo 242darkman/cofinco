@@ -322,11 +322,46 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ success: true });
   });
 
-  app.post("/api/caisses", requireAuth, requireRole('admin'), requireAgenceAccess(), async (req, res) => {
-      const data = normalizeKeysDeep(req.body);
+  app.post("/api/caisses", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), requireAgenceAccess(), async (req, res) => {
+      const data = normalizeKeysDeep(req.body) as any;
+      const user = req.session.user!;
+      
+      const isAdmin = user.role === 'admin' || user.role === 'admin_generale';
+      
+      // If admin, use provided agenceId (validate it exists?)
+      // If not admin, FORCE user's agenceId
+      if (!isAdmin) {
+          data.agenceId = user.agenceId;
+      } else {
+          // Admin must provide agenceId
+          if (!data.agenceId) {
+             return res.status(400).json({ message: "L'agence est obligatoire pour la création par un administrateur." });
+          }
+      }
+
       const parsed = insertCaisseSchema.parse(data);
       const caisse = await storage.createCaisse(parsed);
       res.status(201).json(addSnakeCaseAliasesDeep(caisse));
+  });
+
+  app.delete("/api/caisses/:id", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+
+    const caisse = await storage.getCaisse(id);
+    if (!caisse) return res.status(404).json({ message: "Caisse non trouvée" });
+
+    // Check Agency Access
+    if (user.role !== 'admin' && user.role !== 'admin_generale' && caisse.agenceId !== user.agenceId) {
+        return res.status(403).json({ message: "Accès refusé à cette agence" });
+    }
+
+    const deleted = await storage.deleteCaisse(id);
+    if (!deleted) {
+        return res.status(409).json({ message: "Impossible de supprimer cette caisse car elle a déjà été utilisée (historique présent)." });
+    }
+
+    res.json({ success: true });
   });
 
   app.get("/api/sessions-caisse/active", requireAuth, async (req, res) => {

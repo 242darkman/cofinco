@@ -426,6 +426,22 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     return updated || undefined;
   }
 
+  export async function deleteCaisse(id: string): Promise<boolean> {
+    // 1. Check if caisse has usage history (sessions)
+    const [usage] = await db.select({ count: count() }).from(sessionsCaisse).where(eq(sessionsCaisse.caisseId, id));
+    
+    if (usage && usage.count > 0) {
+        return false; // Cannot delete used caisse
+    }
+
+    // 2. Clear assignments
+    await db.delete(caisseAssignations).where(eq(caisseAssignations.caisseId, id));
+
+    // 3. Delete Caisse
+    const result = await db.delete(caisses).where(eq(caisses.id, id)).returning();
+    return result.length > 0;
+  }
+
   export async function getCaisseAssignments(caisseId: string): Promise<CaisseAssignation[]> {
       return db.select().from(caisseAssignations).where(eq(caisseAssignations.caisseId, caisseId));
   }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Monitor, Lock, AlertCircle } from 'lucide-react';
+import { Plus, Search, Monitor, Lock, AlertCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, Button, FormField, SelectField, Badge, Modal } from '../ui';
 import { authService } from '../../lib/auth';
@@ -20,16 +20,35 @@ interface Caisse {
 
 export default function AdminGestionCaisses() {
   const user = authService.getCurrentUser();
+  const isAdmin = user?.role === 'admin';
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Fetch Agences for Admin
+  const { data: agences = [] } = useQuery<any[]>({
+    queryKey: ['agences'],
+    queryFn: async () => {
+       const res = await api.get('/agences');
+       return (res.data as any[]) || [];
+    },
+    enabled: isAdmin
+  });
   
   // Form State
   const [formData, setFormData] = useState({
     nom: '',
     type: 'Physique',
     agenceId: user?.agenceId || '', 
-  });
+  }); 
+
+  // Reset form when opening modal for admin
+  React.useEffect(() => {
+     if (isModalOpen && isAdmin && !formData.agenceId) {
+         // Optionally set first agency or keep empty?
+         // Let's keep empty to force selection
+     }
+  }, [isModalOpen, isAdmin]);
 
   // Assignment State
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -115,6 +134,27 @@ export default function AdminGestionCaisses() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+        const res = await api.delete(`/caisses/${id}`);
+        if (res.error) throw new Error(res.error);
+        return res.data;
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['caisses'] });
+        toast.success('Caisse supprimée');
+    },
+    onError: (err: any) => {
+        toast.error(err.message || "Impossible de supprimer (Caisse utilisée ?)");
+    }
+  });
+
+  const handleDelete = (id: string) => {
+      if (window.confirm("Êtes-vous sûr de vouloir supprimer cette caisse ? Cette action est irréversible.")) {
+          deleteMutation.mutate(id);
+      }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     createMutation.mutate(formData);
@@ -160,8 +200,19 @@ export default function AdminGestionCaisses() {
                   <h3 className="font-semibold text-lg">{caisse.nom}</h3>
                   <p className="text-xs text-muted-foreground">{caisse.type}</p>
                 </div>
+                </div>
+              <div className="flex flex-col items-end gap-2">
+                 <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
+                 <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    onClick={() => handleDelete(caisse.id)}
+                    title="Supprimer"
+                 >
+                    <Trash2 size={14} />
+                 </Button>
               </div>
-              <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
             </div>
 
             <div className="mt-2 space-y-2">
@@ -216,6 +267,17 @@ export default function AdminGestionCaisses() {
               value={formData.nom}
               onChange={e => setFormData({...formData, nom: e.target.value})}
             />
+
+            {isAdmin && (
+                <SelectField
+                  label="Agence"
+                  name="agenceId"
+                  required
+                  options={agences.map(a => ({ value: a.id, label: a.nom }))}
+                  value={formData.agenceId}
+                  onChange={e => setFormData({...formData, agenceId: e.target.value})}
+                />
+            )}
             
             <SelectField
               label="Type"

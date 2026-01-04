@@ -143,6 +143,7 @@ export interface IStorage {
     getAllCaisses(): Promise<Caisse[]>;
     createCaisse(caisse: InsertCaisse): Promise<Caisse>;
     updateCaisse(id: string, caisse: Partial<InsertCaisse>): Promise<Caisse | undefined>;
+    deleteCaisse(id: string): Promise<boolean>;
 
     // Agents Terrain
     getAgentTerrain(id: string): Promise<AgentTerrain | undefined>;
