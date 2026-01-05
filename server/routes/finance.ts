@@ -642,34 +642,66 @@ export function registerFinanceRoutes(app: Express) {
         const parsed = insertOperationCaisseSchema.parse(data);
         const op = await storage.createOperationCaisse(parsed);
 
-        // Update account balance if compteId is provided
-        if (parsed.compteId && parsed.montant) {
-            const compte = await storage.getCompteEpargne(parsed.compteId);
+        // Update account balance and create transaction history
+        let targetCompteId = parsed.compteId;
+        
+        // If no specific account provided, try to find the client's default savings account
+        if (!targetCompteId && parsed.clientId) {
+             const clientAccounts = await storage.getComptesByClient(parsed.clientId);
+             const defaultAccount = clientAccounts.find(c => c.typeCompte === 'Epargne' && c.statut === 'Actif') || clientAccounts[0];
+             if (defaultAccount) {
+                 targetCompteId = defaultAccount.id;
+             }
+        }
+
+        if (targetCompteId && parsed.montant) {
+            const compte = await storage.getCompteEpargne(targetCompteId);
             if (compte) {
                 const montant = Number(parsed.montant);
                 const currentSolde = Number(compte.solde) || 0;
                 let newSolde: number;
+                let transactionType = 'Dépôt';
 
                 // Versement/Dépôt = add to balance, Retrait = subtract from balance
                 const opType = (parsed.typeOperation || '').toLowerCase();
-                if (opType === 'versement' || opType === 'dépôt' || opType === 'depot' || opType === 'depôt') {
+                const isDeposit = ['versement', 'dépôt', 'depot', 'depôt'].includes(opType);
+                const isWithdrawal = ['retrait'].includes(opType);
+
+                if (isDeposit) {
                     newSolde = currentSolde + montant;
-                } else if (opType === 'retrait') {
+                    transactionType = 'Dépôt';
+                } else if (isWithdrawal) {
                     newSolde = currentSolde - montant;
+                    transactionType = 'Retrait';
                 } else {
                     newSolde = currentSolde; // No change for other operations
                 }
 
-                await storage.updateCompteEpargne(parsed.compteId, { solde: String(newSolde) });
+                if (newSolde !== currentSolde) {
+                    // 1. Update Balance
+                    await storage.updateCompteEpargne(targetCompteId, { solde: String(newSolde) });
 
-                // Broadcast account update
-                try {
-                    const wsInstance = require("../ws-server").getWsInstance();
-                    if (wsInstance) {
-                        wsInstance.broadcast({ type: "COMPTE_UPDATE", payload: { compteId: parsed.compteId, newSolde } });
+                    // 2. Create Transaction Record (CRUCIAL for History)
+                    await storage.createTransactionEpargne({
+                        compteId: targetCompteId,
+                        typeTransaction: transactionType,
+                        montant: String(montant),
+                        soldeApres: String(newSolde),
+                        methodePaiement: 'Espèces',
+                        reference: op.reference || `OP-${Date.now()}`,
+                        observations: `Opération Caisse: ${parsed.typeOperation}`,
+                        createdBy: user.id
+                    });
+
+                    // 3. Broadcast account update
+                    try {
+                        const wsInstance = require("../ws-server").getWsInstance();
+                        if (wsInstance) {
+                            wsInstance.broadcast({ type: "COMPTE_UPDATE", payload: { compteId: targetCompteId, newSolde } });
+                        }
+                    } catch (wsErr) {
+                        console.error('Error broadcasting compte update:', wsErr);
                     }
-                } catch (wsErr) {
-                    console.error('Error broadcasting compte update:', wsErr);
                 }
             }
         }
