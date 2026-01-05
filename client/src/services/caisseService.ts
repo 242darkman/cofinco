@@ -103,7 +103,10 @@ export class CaisseService {
       const response = await fetch('/api/operations-caisse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(operation)
+        body: JSON.stringify({
+          ...operation,
+          montant: String(operation.montant)
+        })
       });
 
       if (!response.ok) {
