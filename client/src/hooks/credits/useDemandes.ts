@@ -97,6 +97,13 @@ export function useDemandes() {
 
   useEffect(() => {
     fetchDemandes();
+
+    const handleUpdate = () => {
+        fetchDemandes();
+    };
+
+    window.addEventListener('credit-update', handleUpdate);
+    return () => window.removeEventListener('credit-update', handleUpdate);
   }, []);
 
   return {

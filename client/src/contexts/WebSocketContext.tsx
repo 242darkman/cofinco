@@ -208,6 +208,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "CREDIT_UPDATE":
          queryClient.invalidateQueries({ queryKey: ["credits"] });
          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+         window.dispatchEvent(new CustomEvent('credit-update', { detail: message.payload }));
          break;
 
       case "CLIENT_UPDATE":
