@@ -390,8 +390,9 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   app.get("/api/sessions-caisse/active", requireAuth, async (req, res) => {
-      const sessions = await storage.getActiveSessions();
-      res.json(addSnakeCaseAliasesDeep(sessions));
+      const user = req.session.user!;
+      const session = await storage.getActiveSessionForUser(user.id);
+      res.json(addSnakeCaseAliasesDeep(session || null));
   });
 
   app.get("/api/sessions-caisse", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence', 'superviseur'), requireAgenceAccess(), async (req, res) => {

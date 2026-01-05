@@ -307,6 +307,31 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     };
   }
 
+  export async function getActiveSessionForUser(userId: string): Promise<any | undefined> {
+    const results = await db.select({
+      session: sessionsCaisse,
+      caisse_nom: caisses.nom,
+      caissier_nom: users.nom,
+      caissier_prenom: users.prenom
+    })
+    .from(sessionsCaisse)
+    .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
+    .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
+    .where(and(
+      eq(sessionsCaisse.caissierId, userId),
+      eq(sessionsCaisse.statut, 'Ouverte')
+    ));
+
+    if (results.length === 0) return undefined;
+    
+    const r = results[0];
+    return {
+      ...r.session,
+      caisse_nom: r.caisse_nom || 'Caisse Inconnue',
+      caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Moi'
+    };
+  }
+
   export async function getActiveSessions(): Promise<SessionCaisse[]> {
     return db.select().from(sessionsCaisse).where(eq(sessionsCaisse.statut, 'Ouverte'));
   }

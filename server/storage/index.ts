@@ -122,6 +122,7 @@ export interface IStorage {
 
     // Sessions Caisse
     getSessionCaisse(id: string): Promise<SessionCaisse | undefined>;
+    getActiveSessionForUser(userId: string): Promise<any | undefined>;
     getActiveSessions(): Promise<SessionCaisse[]>;
     getAllSessionsCaisse(filter?: { agence?: string }): Promise<any[]>;
     createSessionCaisse(session: InsertSessionCaisse): Promise<SessionCaisse>;
