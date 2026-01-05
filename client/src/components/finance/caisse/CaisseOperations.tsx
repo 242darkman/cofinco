@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, User, CreditCard, Coins, Users, CheckCircle, XCircle, Loader, ArrowLeft, Printer } from 'lucide-react';
 import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
 import { Card, Button, SearchInput, Badge, FormField, SelectField } from '../../ui';
-import { clientSearchApi, creditApi, tontineApi, operationCaisseApi, systemSettingsApi, factureApi, validationOtpApi } from '../../../lib/api-client';
+import { clientSearchApi, clientApi, creditApi, tontineApi, operationCaisseApi, systemSettingsApi, factureApi, validationOtpApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
@@ -89,6 +89,35 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
       console.error('Erreur chargement paramètres:', error);
     }
   }, []);
+  
+  // Refresh client data (Real-time)
+  const refreshClientData = useCallback(async (clientId: string) => {
+      try {
+          const updatedClient = await clientApi.getById(clientId);
+          if (updatedClient) {
+              setSelectedClient(prev => ({ ...prev, ...updatedClient }));
+              // Also refresh credits/tontines just in case
+              await chargerDonneesClient(clientId);
+          }
+      } catch (err) {
+          console.error("Failed to refresh client data:", err);
+      }
+  }, []);
+
+  // Listen for real-time updates
+  useEffect(() => {
+      const handleClientUpdate = (event: CustomEvent) => {
+          const { clientId } = event.detail || {};
+          if (clientId && selectedClient && selectedClient.id === clientId) {
+               refreshClientData(clientId);
+          }
+      };
+
+      window.addEventListener('client-update', handleClientUpdate as EventListener);
+      return () => {
+          window.removeEventListener('client-update', handleClientUpdate as EventListener);
+      };
+  }, [selectedClient, refreshClientData]);
 
   // Validation du montant
   const validateMontant = useCallback((value: string): boolean => {

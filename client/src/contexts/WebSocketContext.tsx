@@ -214,6 +214,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "CLIENT_UPDATE":
          queryClient.invalidateQueries({ queryKey: ["clients"] });
          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+         window.dispatchEvent(new CustomEvent('client-update', { detail: message.payload }));
          break;
 
       case "LIVE_ACTIVITY":
