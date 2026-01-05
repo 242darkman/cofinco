@@ -221,7 +221,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
         nom_client: `${selectedClient!.nom} ${selectedClient!.prenom}`,
         telephone_client: selectedClient!.telephone,
         type: typeOperation,
-        montant: parseFloat(montant),
+        montant: montant, // Send as string for numeric/decimal DB field
         statut_otp: smsValidationEnabled ? 'En attente' : 'Non requis',
         credit_id: selectedCredit?.id,
         tontine_id: selectedTontine?.id,
