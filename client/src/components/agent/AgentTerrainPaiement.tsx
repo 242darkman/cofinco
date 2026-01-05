@@ -184,6 +184,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     if (isTontinePayment && !selectedTontine) {
       newErrors.tontine = 'Veuillez sélectionner une tontine';
     }
+    if (!selectedClient) {
+      newErrors.client_id = 'Chargement des données client...';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
