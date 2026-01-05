@@ -24,6 +24,13 @@ export function registerAccountingRoutes(app: Express) {
     try {
       const data = insertCompteSchema.parse(normalizeKeysDeep(req.body));
       const compte = await storage.createCompte(data);
+      
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'compte_new', id: compte.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(compte));
     } catch (e) {
       res.status(400).json({ message: "Invalid data" });
@@ -41,6 +48,13 @@ export function registerAccountingRoutes(app: Express) {
     try {
       const data = insertJournalSchema.parse(normalizeKeysDeep(req.body));
       const journal = await storage.createJournal(data);
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'journal_new', id: journal.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(journal));
     } catch (e) {
       res.status(400).json({ message: "Invalid data" });
@@ -69,6 +83,13 @@ export function registerAccountingRoutes(app: Express) {
       const lignesData = z.array(z.any()).parse(body.lignes);
       
       const ecriture = await storage.createEcriture(headerData, lignesData);
+      
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'ecriture_new', id: ecriture.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(ecriture));
     } catch (e) {
       console.error(e);
@@ -97,6 +118,13 @@ export function registerAccountingRoutes(app: Express) {
     try {
       const data = insertDeclarationTvaSchema.parse(normalizeKeysDeep(req.body));
       const declaration = await storage.createDeclarationTva(data);
+      
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'tva_new', id: declaration.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(declaration));
     } catch (e) {
       res.status(400).json({ message: "Invalid data" });

@@ -64,6 +64,13 @@ export function registerFinanceRoutes(app: Express) {
           "success",
           "low"
        );
+
+       // Notify Credit Update
+       const wsInstance = require("../ws-server").getWsInstance();
+       if (wsInstance) {
+          wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'credit_new', id: credit.id } });
+       }
+
        res.status(201).json(addSnakeCaseAliasesDeep(credit));
      } catch (e) {
        res.status(400).json({ message: "Invalid data" });
@@ -160,6 +167,13 @@ export function registerFinanceRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertEnqueteCreditSchema.parse(data);
       const enquete = await storage.createEnqueteCredit(parsed);
+      
+      // Notify Credit Update
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'enquete_new', demandeId: parsed.demandeId } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(enquete));
   });
 

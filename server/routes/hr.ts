@@ -90,6 +90,12 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
       dateDecision: dateDecision
     }).returning();
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_new', id: newConge.id } });
+    }
+    
     res.status(201).json(newConge);
   } catch (error) {
     console.error("Erreur création congé:", error);
@@ -134,6 +140,12 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     
     if (!updated) {
       return res.status(404).json({ error: "Demande non trouvée" });
+    }
+    
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_approved', id: updated.id } });
     }
     
     res.json(updated);
@@ -182,6 +194,12 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
       return res.status(404).json({ error: "Demande non trouvée" });
     }
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_rejected', id: updated.id } });
+    }
+
     res.json(updated);
   } catch (error) {
     console.error("Erreur rejet congé:", error);
@@ -246,6 +264,12 @@ hrRouter.post("/formations", getAuthUser, async (req, res) => {
       statut: "Planifiée"
     }).returning();
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_new', id: newFormation.id } });
+    }
+
     res.status(201).json(newFormation);
   } catch (error) {
     console.error("Erreur création formation:", error);
@@ -285,6 +309,12 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
       employeNom
     });
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_participant_added', formationId: id } });
+    }
+
     res.status(201).json({ message: "Participant ajouté" });
   } catch (error) {
     console.error("Erreur ajout participant:", error);
@@ -303,6 +333,12 @@ hrRouter.delete("/formations/:id/participants/:employeId", getAuthUser, async (r
         eq(formationParticipants.employeId, employeId)
       ));
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_participant_removed', formationId: id } });
+    }
+
     res.json({ message: "Participant retiré" });
   } catch (error) {
     console.error("Erreur retrait participant:", error);
@@ -329,6 +365,12 @@ hrRouter.patch("/formations/:id", getAuthUser, async (req, res) => {
       return res.status(404).json({ error: "Formation non trouvée" });
     }
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_status_update', id: updated.id } });
+    }
+
     res.json(updated);
   } catch (error) {
     console.error("Erreur mise à jour formation:", error);
@@ -385,6 +427,12 @@ hrRouter.post("/sanctions", getAuthUser, async (req, res) => {
       emetteurId: userId
     }).returning();
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'sanction_new', id: newSanction.id } });
+    }
+    
     res.status(201).json(newSanction);
   } catch (error) {
     console.error("Erreur création sanction:", error);
@@ -434,6 +482,12 @@ hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
       statut: "En attente"
     }).returning();
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'candidature_new', id: newCandidature.id } });
+    }
+    
     res.status(201).json(newCandidature);
   } catch (error) {
     console.error("Erreur création candidature:", error);
@@ -466,6 +520,12 @@ hrRouter.patch("/candidatures/:id", getAuthUser, async (req, res) => {
       return res.status(404).json({ error: "Candidature non trouvée" });
     }
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'candidature_updated', id: updated.id } });
+    }
+
     res.json(updated);
   } catch (error) {
     console.error("Erreur mise à jour candidature:", error);
@@ -513,6 +573,12 @@ hrRouter.post("/paie/generate", getAuthUser, requireRole(['rh', 'admin']), async
         if (!mois) return res.status(400).json({ error: "Mois requis (YYYY-MM)" });
 
         const results = await storage.generateMonthlyPaie(mois, userId);
+        // Broadcast HR Update
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'paie_generated', mois } });
+        }
+
         res.status(201).json({ message: `${results.length} fiches de paie générées`, data: results });
     } catch (error) {
         console.error("Erreur génération paie:", error);
@@ -597,6 +663,12 @@ hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
       statut: "Validé" // Directement validé si archivé manuellement
     }).returning();
     
+    // Broadcast HR Update
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'bulletin_archived', id: newBulletin.id } });
+    }
+
     res.status(201).json(newBulletin);
   } catch (error) {
     console.error("Erreur archivage bulletin:", error);
@@ -666,6 +738,12 @@ hrRouter.post("/avantages/assign", getAuthUser, async (req, res) => {
             statut: 'Actif',
             dateAttribution: new Date().toISOString().split('T')[0]
         });
+        // Broadcast HR Update
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'avantage_assigned', employeId } });
+        }
+
         res.status(201).json(result);
     } catch (error) {
         console.error("Erreur assignation avantage:", error);

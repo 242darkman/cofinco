@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 
-type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE";
+type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -227,6 +227,21 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "CAISSE_UPDATE":
          queryClient.invalidateQueries({ queryKey: ["caisses"] });
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
+         break;
+
+      case "HR_UPDATE":
+         // Invalidate generic HR keys
+         queryClient.invalidateQueries({ queryKey: ["/api/hr"] });
+         // Specific keys can be refined if needed (e.g., ["/api/hr/conges"])
+         break;
+
+      case "TONTINE_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/tontines"] });
+         break;
+
+      case "ACCOUNTING_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/comptabilite"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/factures"] });
          break;
     }
   };

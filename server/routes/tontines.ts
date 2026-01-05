@@ -37,6 +37,13 @@ export function registerTontineRoutes(app: Express) {
       }
       
       const tontine = await storage.createTontine(parsed);
+      
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'tontine_new', id: tontine.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(tontine));
   });
 
@@ -66,6 +73,13 @@ export function registerTontineRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertMembreTontineSchema.parse(Object.assign({}, data, { tontineId: req.params.id }));
       const membre = await storage.createMembreTontine(parsed);
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'membre_added', tontineId: req.params.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(membre));
   });
 
@@ -79,6 +93,13 @@ export function registerTontineRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertContributionTontineSchema.parse(data);
       const contrib = await storage.createContributionTontine(parsed);
+      
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'contribution_new', tontineId: parsed.tontineId } });
+      }
+      
       res.json(addSnakeCaseAliasesDeep(contrib));
   });
   // Tontine Rules
@@ -91,12 +112,26 @@ export function registerTontineRoutes(app: Express) {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertTontineRegleSchema.parse(data);
     const regle = await storage.createTontineRegle(parsed);
+    
+    // Notify
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_new', tontineId: parsed.tontineId } });
+    }
+
     res.json(addSnakeCaseAliasesDeep(regle));
   });
 
   app.patch("/api/tontine-regles/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const updated = await storage.updateTontineRegle(req.params.id, data as any);
+    
+    // Notify
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_updated', id: req.params.id } });
+    }
+
     res.json(addSnakeCaseAliasesDeep(updated));
   });
 
@@ -115,6 +150,13 @@ export function registerTontineRoutes(app: Express) {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertTontinePenaliteSchema.partial().parse(data);
     const updated = await storage.updateTontinePenalite(req.params.id, parsed);
+    
+    // Notify
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'penalite_updated', id: req.params.id } });
+    }
+
     res.json(addSnakeCaseAliasesDeep(updated));
   });
 }
