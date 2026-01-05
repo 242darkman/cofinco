@@ -50,14 +50,14 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   // Calculs financiers approximatifs basés sur les soldes
   // Note: Pour plus de précision, il faudrait charger les opérations de chaque session
   const totalMouvements = sessions.reduce((acc, s) => {
-      const diff = s.solde_theorique - s.solde_initial;
+      const diff = Number(s.solde_theorique) - Number(s.solde_initial);
       if (diff > 0) acc.entrees += diff;
       else acc.sorties += Math.abs(diff);
       return acc;
   }, { entrees: 0, sorties: 0 });
 
   const soldeNet = totalMouvements.entrees - totalMouvements.sorties;
-  const totalEcarts = sessions.reduce((sum, s) => sum + (s.ecart || 0), 0);
+  const totalEcarts = sessions.reduce((sum, s) => sum + Number(s.ecart || 0), 0);
 
   const setPeriode = (type: 'auj' | 'semaine' | 'mois') => {
       const today = new Date();
@@ -168,9 +168,9 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {sessions.map((session) => {
-                  const mouvements = session.solde_theorique - session.solde_initial;
-                  const entrees = mouvements > 0 ? mouvements : 0;
-                  const sorties = mouvements < 0 ? Math.abs(mouvements) : 0;
+                   const mouvements = Number(session.solde_theorique) - Number(session.solde_initial);
+                   const entrees = mouvements > 0 ? mouvements : 0;
+                   const sorties = mouvements < 0 ? Math.abs(mouvements) : 0;
 
                   return (
                     <tr key={session.id} className="hover:bg-slate-800/50 transition-colors group">
@@ -178,7 +178,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                         {new Date(session.date_ouverture).toLocaleDateString('fr-FR')}
                       </td>
                       <td className="px-6 py-4 text-right text-slate-400 font-medium font-mono">
-                        {session.solde_initial.toLocaleString()}
+                        {Number(session.solde_initial).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-right text-emerald-400 font-bold font-mono">
                         +{entrees.toLocaleString()}
@@ -187,17 +187,17 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                         -{sorties.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-right text-slate-300 font-mono">
-                        {session.solde_theorique.toLocaleString()}
+                        {Number(session.solde_theorique).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-right text-white font-bold font-mono">
-                        {session.solde_reel?.toLocaleString() || '-'}
+                        {session.solde_reel ? Number(session.solde_reel).toLocaleString() : '-'}
                       </td>
                       <td className="px-6 py-4 text-right font-mono">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                          !session.ecart || session.ecart === 0 ? 'bg-emerald-500/10 text-emerald-400' :
+                          !session.ecart || Number(session.ecart) === 0 ? 'bg-emerald-500/10 text-emerald-400' :
                           'bg-amber-500/10 text-amber-400'
                         }`}>
-                          {session.ecart ? `${session.ecart > 0 ? '+' : ''}${session.ecart.toLocaleString()}` : '-'}
+                          {session.ecart ? `${Number(session.ecart) > 0 ? '+' : ''}${Number(session.ecart).toLocaleString()}` : '-'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -218,7 +218,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                   <tr>
                     <td className="px-6 py-4 text-white uppercase text-xs tracking-wider">Totaux</td>
                     <td className="px-6 py-4 text-right text-slate-400 font-mono">
-                      {sessions.reduce((sum, s) => sum + s.solde_initial, 0).toLocaleString()}
+                      {sessions.reduce((sum, s) => sum + Number(s.solde_initial), 0).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right text-emerald-400 font-mono">
                       +{totalMouvements.entrees.toLocaleString()}
@@ -227,10 +227,10 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                       -{totalMouvements.sorties.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right text-slate-300 font-mono">
-                      {sessions.reduce((sum, s) => sum + s.solde_theorique, 0).toLocaleString()}
+                      {sessions.reduce((sum, s) => sum + Number(s.solde_theorique), 0).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right text-white font-mono">
-                      {sessions.reduce((sum, s) => sum + (s.solde_reel || 0), 0).toLocaleString()}
+                      {sessions.reduce((sum, s) => sum + Number(s.solde_reel || 0), 0).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right font-mono">
                       <span className={`${totalEcarts !== 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
