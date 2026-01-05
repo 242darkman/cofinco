@@ -315,7 +315,7 @@ export default function Dashboard({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
             <PerformanceGauge
-              value={g.creditsRetard && g.creditsEnCours ? Math.round(100 - (g.creditsRetard / g.creditsEnCours * 100)) : 85}
+              value={g.tauxRecouvrement ?? 0}
               label="Taux de Recouvrement"
             />
             <ObjectivesWidget 

@@ -76,15 +76,20 @@ export function registerDashboardRoutes(app: Express) {
         }).from(clients).where(withAgence(clients)),
 
         // 2. Credits statistics
+        // 2. Credits statistics
         db.select({
           total: count(),
-          enCours: sql<number>`COUNT(CASE WHEN ${credits.statut} IN ('actif', 'en_cours', 'En cours') THEN 1 END)`,
-          enAttente: sql<number>`COUNT(CASE WHEN ${credits.statut} = 'En attente' THEN 1 END)`,
-          enRetard: sql<number>`COUNT(CASE WHEN ${credits.statut} = 'En retard' THEN 1 END)`,
+          enCours: sql<number>`COUNT(CASE WHEN ${credits.statut} IN ('actif', 'Actif', 'en_cours', 'En_cours', 'En cours', 'En Cours') THEN 1 END)`,
+          enAttente: sql<number>`COUNT(CASE WHEN ${credits.statut} IN ('En attente', 'en attente', 'En_attente') THEN 1 END)`,
+          enRetard: sql<number>`COUNT(CASE WHEN ${credits.statut} IN ('En retard', 'en retard', 'En_retard') THEN 1 END)`,
           montantTotal: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} NOT IN ('Rejeté', 'rejeté', 'Annulé', 'annulé') THEN ${credits.montant} ELSE 0 END), 0)`,
-          montantDecaisse: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN ('actif', 'en_cours', 'En cours') THEN ${credits.montant} ELSE 0 END), 0)`,
-          montantRecouvre: sql<number>`COALESCE(SUM(${credits.montant} - COALESCE(${credits.soldeRestant}, 0)), 0)`,
-          montantEnAttente: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} = 'En attente' THEN ${credits.montant} ELSE 0 END), 0)`
+          montantDecaisse: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN ('actif', 'Actif', 'en_cours', 'En_cours', 'En cours', 'En Cours', 'Soldé', 'soldé', 'En retard', 'en retard') THEN ${credits.montant} ELSE 0 END), 0)`,
+          montantRecouvre: sql<number>`COALESCE(SUM(
+            CASE WHEN ${credits.statut} IN ('actif', 'Actif', 'en_cours', 'En_cours', 'En cours', 'En Cours', 'Soldé', 'soldé', 'En retard', 'en retard') 
+            THEN (${credits.montant} - COALESCE(${credits.soldeRestant}, 0)) 
+            ELSE 0 END
+          ), 0)`,
+          montantEnAttente: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN ('En attente', 'en attente', 'En_attente') THEN ${credits.montant} ELSE 0 END), 0)`
         }).from(credits).where(withAgence(credits)),
 
         // 3. Epargnes statistics
