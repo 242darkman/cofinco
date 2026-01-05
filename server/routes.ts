@@ -49,6 +49,26 @@ export function registerRoutes(app: Express): Server {
   registerStockMarketRoutes(app);
 
   // Other specific legacy or minor routes can be added here or in another module
+  // System Version Endpoint
+  app.get("/api/version", async (req, res) => {
+    try {
+      const { readFile } = await import("fs/promises");
+      const { join } = await import("path");
+      
+      const packagePath = join(process.cwd(), "package.json");
+      const content = await readFile(packagePath, "utf-8");
+      const pkg = JSON.parse(content);
+      
+      res.json({ 
+        version: pkg.version || "1.0.0",
+        environment: process.env.NODE_ENV || "development"
+      });
+    } catch (error) {
+      console.error("Error reading version:", error);
+      res.status(500).json({ version: "unknown" });
+    }
+  });
+
   // System Health Check Endpoint - vérifie la santé réelle du système
   app.get("/api/health", async (req, res) => {
     const startTime = Date.now();

@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, Code, Calendar, Server, Database, Globe, Shield } from 'lucide-react';
 import { Card, Badge } from '../ui';
 
-// Import version from package.json at build time
-const APP_VERSION = '1.0.0'; // Read from package.json at build
+// Import version from package.json at build time (fallback)
+const BUILD_VERSION = '1.0.0'; 
 const BUILD_ENV = import.meta.env.MODE || 'development';
 
 interface InfoRowProps {
@@ -27,6 +27,28 @@ function InfoRow({ icon: Icon, label, value, valueColor = 'text-white' }: InfoRo
 
 export default function AdminVersionInfo() {
   const currentYear = new Date().getFullYear();
+  const [versionData, setVersionData] = useState({
+    version: BUILD_VERSION,
+    environment: BUILD_ENV
+  });
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const res = await fetch('/api/version');
+        if (res.ok) {
+          const data = await res.json();
+          setVersionData({
+            version: data.version,
+            environment: data.environment
+          });
+        }
+      } catch (e) {
+        console.error("Failed to fetch version info", e);
+      }
+    };
+    fetchVersion();
+  }, []);
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6 p-2 sm:p-4">
@@ -51,10 +73,10 @@ export default function AdminVersionInfo() {
           <div>
             <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Version actuelle</p>
             <div className="flex items-center gap-3">
-              <span className="text-3xl sm:text-4xl font-bold text-white">v{APP_VERSION}</span>
+              <span className="text-3xl sm:text-4xl font-bold text-white">v{versionData.version}</span>
               <Badge 
-                value={BUILD_ENV === 'production' ? 'Production' : 'Développement'} 
-                variant={BUILD_ENV === 'production' ? 'success' : 'warning'} 
+                value={versionData.environment === 'production' ? 'Production' : 'Développement'} 
+                variant={versionData.environment === 'production' ? 'success' : 'warning'} 
                 size="sm"
               />
             </div>
@@ -73,8 +95,8 @@ export default function AdminVersionInfo() {
           Informations Système
         </h3>
         <div className="space-y-2">
-          <InfoRow icon={Code} label="Version" value={`v${APP_VERSION}`} valueColor="text-blue-400" />
-          <InfoRow icon={Globe} label="Environnement" value={BUILD_ENV === 'production' ? 'Production' : 'Développement'} valueColor={BUILD_ENV === 'production' ? 'text-green-400' : 'text-amber-400'} />
+          <InfoRow icon={Code} label="Version" value={`v${versionData.version}`} valueColor="text-blue-400" />
+          <InfoRow icon={Globe} label="Environnement" value={versionData.environment === 'production' ? 'Production' : 'Développement'} valueColor={versionData.environment === 'production' ? 'text-green-400' : 'text-amber-400'} />
           <InfoRow icon={Database} label="Base de données" value="PostgreSQL" valueColor="text-cyan-400" />
           <InfoRow icon={Shield} label="Authentification" value="Session + RBAC" />
           <InfoRow icon={Calendar} label="Année" value={currentYear.toString()} />
