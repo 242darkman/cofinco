@@ -256,27 +256,27 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                <div className="flex items-center gap-2 justify-end">
                  <Button 
                    variant="ghost" 
-                   className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-600 p-2 h-9 w-9" 
+                   className="bg-emerald-500/20 border-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30 hover:border-emerald-500/50 hover:text-emerald-300 p-2 h-9 w-9 rounded-xl" 
                    title="Paiement"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }}
                  >
-                   <DollarSign size={18} />
+                   <DollarSign size={20} className="stroke-[2.5]" />
                  </Button>
                  <Button 
                    variant="ghost" 
-                   className="bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 hover:text-blue-600 p-2 h-9 w-9" 
+                   className="bg-cyan-500/20 border-2 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/30 hover:border-cyan-500/50 hover:text-cyan-300 p-2 h-9 w-9 rounded-xl" 
                    title="Nouvelle visite"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }}
                  >
-                   <Plus size={18} />
+                   <Plus size={20} className="stroke-[2.5]" />
                  </Button>
                  <Button 
                    variant="ghost" 
-                   className="bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:bg-slate-500/20 hover:text-slate-300 p-2 h-9 w-9" 
+                   className="bg-slate-600/30 border-2 border-slate-500/30 text-slate-300 hover:bg-slate-600/50 hover:border-slate-500/50 hover:text-white p-2 h-9 w-9 rounded-xl" 
                    title="Voir profil"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }}
                  >
-                   <Eye size={18} />
+                   <Eye size={20} className="stroke-[2.5]" />
                  </Button>
                </div>
             )}
