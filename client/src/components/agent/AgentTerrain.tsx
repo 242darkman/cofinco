@@ -256,11 +256,11 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                <div className="flex items-center gap-2 justify-end">
                  <Button 
                    variant="ghost" 
-                   className="!bg-emerald-500/20 !border-2 !border-emerald-500/30 !text-emerald-400 hover:!bg-emerald-500/30 hover:!border-emerald-500/50 hover:!text-emerald-300 p-2 h-auto px-3 rounded-xl font-bold text-xs" 
+                   className="!bg-emerald-500/20 !border-2 !border-emerald-500/30 !text-emerald-400 hover:!bg-emerald-500/30 hover:!border-emerald-500/50 hover:!text-emerald-300 p-2 h-9 w-9 rounded-xl flex items-center justify-center" 
                    title="Paiement"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }}
                  >
-                   PAYER
+                   <DollarSign size={20} absoluteStrokeWidth strokeWidth={2.5} style={{ minWidth: '20px', minHeight: '20px' }} />
                  </Button>
                  <Button 
                    variant="ghost" 
@@ -268,17 +268,15 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                    title="Nouvelle visite"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }}
                  >
-                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                     <path d="M5 12h14M12 5v14" />
-                   </svg>
+                   <Plus size={20} absoluteStrokeWidth strokeWidth={2.5} style={{ minWidth: '20px', minHeight: '20px' }} />
                  </Button>
                  <Button 
                    variant="ghost" 
-                   className="!bg-slate-600/30 !border-2 !border-slate-500/30 !text-slate-300 hover:!bg-slate-600/50 hover:!border-slate-500/50 hover:!text-white p-2 h-9 w-9 rounded-xl" 
+                   className="!bg-slate-600/30 !border-2 !border-slate-500/30 !text-slate-300 hover:!bg-slate-600/50 hover:!border-slate-500/50 hover:!text-white p-2 h-9 w-9 rounded-xl flex items-center justify-center" 
                    title="Voir profil"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }}
                  >
-                   <span className="text-lg">👁</span>
+                   <Eye size={20} absoluteStrokeWidth strokeWidth={2.5} style={{ minWidth: '20px', minHeight: '20px' }} />
                  </Button>
                </div>
             )}
