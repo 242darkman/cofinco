@@ -298,9 +298,29 @@ export function registerFinanceRoutes(app: Express) {
       
       const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
          const activeSession = activeSessions.find(s => s.caisseId === c.id && s.statut === 'Ouverte');
+         let currentSolde = c.solde || "0";
+
+         if (activeSession) {
+            // Calculate real-time balance
+            const ops = await storage.getOperationsBySession(activeSession.id);
+            let solde = Number(activeSession.soldeInitial || 0);
+            
+            for (const op of ops) {
+                const montant = Number(op.montant || 0);
+                // "Versement" / "Depot" = IN, "Retrait" = OUT
+                if (['Versement', 'Depot', 'Encaissement'].includes(op.typeOperation)) {
+                    solde += montant;
+                } else if (['Retrait', 'Decaissement'].includes(op.typeOperation)) {
+                    solde -= montant;
+                }
+            }
+            currentSolde = solde.toString();
+         }
+
          const assignments = await storage.getCaisseAssignments(c.id);
          return {
              ...c,
+             solde: currentSolde,
              isOccupied: !!activeSession,
              occupiedBy: activeSession ? activeSession.caissierId : null,
              assignments: assignments.map(a => a.userId)
@@ -323,9 +343,28 @@ export function registerFinanceRoutes(app: Express) {
 
       const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
          const activeSession = activeSessions.find(s => s.caisseId === c.id && s.statut === 'Ouverte');
+         let currentSolde = c.solde || "0";
+
+         if (activeSession) {
+            // Calculate real-time balance for Admin View as well
+            const ops = await storage.getOperationsBySession(activeSession.id);
+            let solde = Number(activeSession.soldeInitial || 0);
+            
+            for (const op of ops) {
+                const montant = Number(op.montant || 0);
+                if (['Versement', 'Depot', 'Encaissement'].includes(op.typeOperation)) {
+                    solde += montant;
+                } else if (['Retrait', 'Decaissement'].includes(op.typeOperation)) {
+                    solde -= montant;
+                }
+            }
+            currentSolde = solde.toString();
+         }
+
          const assignments = await storage.getCaisseAssignments(c.id);
          return {
              ...c,
+             solde: currentSolde,
              isOccupied: !!activeSession,
              occupiedBy: activeSession ? activeSession.caissierId : null,
              assignments: assignments.map(a => a.userId)
@@ -475,6 +514,14 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       const session = await storage.createSessionCaisse(parsed);
+      
+      // Update UI real-time
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: parsed.caisseId } });
+          wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+      }
+
       res.json(addSnakeCaseAliasesDeep(session));
   });
 
@@ -547,6 +594,13 @@ export function registerFinanceRoutes(app: Express) {
           observations
       });
 
+      // Update UI real-time
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
+          wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+      }
+
       res.json(addSnakeCaseAliasesDeep(closedSession));
   });
 
@@ -586,8 +640,9 @@ export function registerFinanceRoutes(app: Express) {
           const wsInstance = require("../ws-server").getWsInstance();
           if (wsInstance) {
               wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: parsed.clientId } });
-              // Also update dashboard
+              // Also update dashboard & Caisse List
               wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+              wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
           }
       }
 

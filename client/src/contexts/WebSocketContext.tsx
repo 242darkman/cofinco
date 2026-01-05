@@ -224,6 +224,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "CAISSE_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["caisses"] });
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
          break;
     }
