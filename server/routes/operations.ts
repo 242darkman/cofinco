@@ -17,6 +17,13 @@ export function registerOperationsRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertAgentTerrainSchema.parse(data);
       const agent = await storage.createAgentTerrain(parsed);
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'agent_new', id: agent.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(agent));
   });
 
@@ -44,6 +51,13 @@ export function registerOperationsRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertProspectionSchema.parse(data);
       const prospection = await storage.createProspection(parsed);
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'prospection_new', id: prospection.id } });
+      }
+
       res.json(addSnakeCaseAliasesDeep(prospection));
   });
 
@@ -71,6 +85,13 @@ export function registerOperationsRoutes(app: Express) {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertZoneSchema.parse(data);
     const zone = await storage.createZone(parsed);
+
+    // Notify
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'zone_new', id: zone.id } });
+    }
+
     res.json(addSnakeCaseAliasesDeep(zone));
   });
 
@@ -97,6 +118,13 @@ export function registerOperationsRoutes(app: Express) {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertObjectifMensuelSchema.parse(data);
     const objectif = await storage.createOrUpdateObjectifMensuel(parsed);
+
+    // Notify
+    const wsInstance = require("../ws-server").getWsInstance();
+    if (wsInstance) {
+        wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'objectif_update', agentId: parsed.agentId } });
+    }
+
     res.json(addSnakeCaseAliasesDeep(objectif));
   });
 }

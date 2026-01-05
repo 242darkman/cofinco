@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 
-type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE";
+type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -242,6 +242,30 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "ACCOUNTING_UPDATE":
          queryClient.invalidateQueries({ queryKey: ["/api/comptabilite"] });
          queryClient.invalidateQueries({ queryKey: ["/api/factures"] });
+         break;
+
+      case "OPERATIONS_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/agents-terrain"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/prospections"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/zones"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/objectifs-mensuels"] });
+         break;
+
+      case "SETTINGS_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/system-settings"] });
+         break;
+
+      case "RBAC_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/permissions"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/role-permissions"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/my-permissions"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/user-permissions"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/rbac"] });
+         break;
+
+      case "AGENCE_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/agences"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/me/agences"] });
          break;
     }
   };

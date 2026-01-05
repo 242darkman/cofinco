@@ -93,6 +93,12 @@ export function registerSettingsRoutes(app: Express) {
           }
         });
       
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'settings_changed' } });
+      }
+      
       res.json({ success: true, message: 'Settings updated successfully' });
     } catch (error: any) {
       console.error("Error updating system settings:", error);
@@ -174,6 +180,12 @@ export function registerSettingsRoutes(app: Express) {
         
         SET session_replication_role = 'origin';
       `);
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'platform_reset' } });
+      }
 
       res.json({ success: true, message: "Plateforme réinitialisée avec succès." });
     } catch (error: any) {
@@ -299,6 +311,12 @@ export function registerSettingsRoutes(app: Express) {
       await db.execute(sql`UPDATE employes SET agence_id = NULL WHERE agence_id = ${agenceId}`);
       
       await db.execute(sql`SET session_replication_role = 'origin'`);
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'agence_reset', agenceId } });
+      }
 
       res.json({ 
         success: true, 

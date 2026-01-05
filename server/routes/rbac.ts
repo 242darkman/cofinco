@@ -184,6 +184,12 @@ export function registerRbacRoutes(app: Express) {
         "medium"
       );
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_created', role } });
+      }
+
       res.status(201).json(created);
     } catch (error) {
       console.error("Create role permission error:", error);
@@ -216,6 +222,12 @@ export function registerRbacRoutes(app: Express) {
         "medium"
       );
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_updated', id } });
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Update role permission error:", error);
@@ -245,6 +257,12 @@ export function registerRbacRoutes(app: Express) {
         "success",
         "medium"
       );
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_deleted', id } });
+      }
 
       res.json({ message: "Permission supprimée", deleted });
     } catch (error) {
@@ -308,6 +326,12 @@ export function registerRbacRoutes(app: Express) {
         "success",
         "high"
       );
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'bulk_update', role } });
+      }
 
       res.json({ message: "Permissions mises à jour", count: results.length, results });
     } catch (error) {
@@ -628,6 +652,12 @@ export function registerRbacRoutes(app: Express) {
         "high"
       );
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'user_permission_toggled', userId } });
+      }
+
       res.json({ message: "Permission mise à jour", permissionId: permission_id, granted });
     } catch (error) {
       console.error("Toggle user permission error:", error);
@@ -652,6 +682,12 @@ export function registerRbacRoutes(app: Express) {
         "success",
         "high"
       );
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'user_permissions_reset', userId } });
+      }
 
       res.json({ message: "Permissions réinitialisées" });
     } catch (error) {

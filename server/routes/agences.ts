@@ -163,6 +163,12 @@ export function registerAgencesRoutes(app: Express) {
         codeAgence: newAgence.codeAgence
       });
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_new', id: newAgence.id } });
+      }
+
       res.status(201).json(newAgence);
     } catch (error: any) {
       console.error("Erreur POST /api/agences:", error);
@@ -207,6 +213,12 @@ export function registerAgencesRoutes(app: Express) {
 
       await logAudit(userId, "UPDATE", "agences", id, { changes: data });
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_updated', id } });
+      }
+
       res.json(updated);
     } catch (error: any) {
       console.error("Erreur PATCH /api/agences/:id:", error);
@@ -242,6 +254,12 @@ export function registerAgencesRoutes(app: Express) {
       }
 
       await logAudit(userId, "DELETE", "agences", id, { nom: deleted.nom });
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_deleted', id } });
+      }
 
       res.json({ message: "Agence supprimée avec succès" });
     } catch (error: any) {
@@ -390,6 +408,12 @@ export function registerAgencesRoutes(app: Express) {
         agenceNom: agence.nom
       });
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'user_assigned', agenceId, userId } });
+      }
+
       res.status(201).json(newAffectation);
     } catch (error: any) {
       console.error("Erreur POST /api/users/:userId/agences:", error);
@@ -435,6 +459,12 @@ export function registerAgencesRoutes(app: Express) {
 
       await logAudit(adminUserId, "UPDATE", "user_agences", id, { changes: req.body });
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'assignment_updated', id } });
+      }
+
       res.json(updated);
     } catch (error: any) {
       console.error("Erreur PATCH /api/user-agences/:id:", error);
@@ -460,6 +490,12 @@ export function registerAgencesRoutes(app: Express) {
       }
 
       await logAudit(adminUserId, "DELETE", "user_agences", id, {});
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'assignment_deleted', id } });
+      }
 
       res.json({ message: "Affectation supprimée avec succès" });
     } catch (error: any) {
