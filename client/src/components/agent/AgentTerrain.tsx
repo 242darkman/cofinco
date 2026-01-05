@@ -256,26 +256,29 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                <div className="flex items-center gap-2 justify-end">
                  <Button 
                    variant="ghost" 
-                   className="!bg-emerald-500/20 !border-2 !border-emerald-500/30 !text-emerald-400 hover:!bg-emerald-500/30 hover:!border-emerald-500/50 hover:!text-emerald-300 p-2 h-9 w-9 rounded-xl" 
-                   title="Paiement - Test Icon Prop"
-                   icon={DollarSign}
+                   className="!bg-emerald-500/20 !border-2 !border-emerald-500/30 !text-emerald-400 hover:!bg-emerald-500/30 hover:!border-emerald-500/50 hover:!text-emerald-300 p-2 h-auto px-3 rounded-xl font-bold text-xs" 
+                   title="Paiement"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }}
-                 />
+                 >
+                   PAYER
+                 </Button>
                  <Button 
                    variant="ghost" 
-                   className="!bg-cyan-500/20 !border-2 !border-cyan-500/30 !text-cyan-400 hover:!bg-cyan-500/30 hover:!border-cyan-500/50 hover:!text-cyan-300 p-2 h-9 w-9 rounded-xl" 
-                   title="Nouvelle visite - Test Text"
+                   className="!bg-cyan-500/20 !border-2 !border-cyan-500/30 !text-cyan-400 hover:!bg-cyan-500/30 hover:!border-cyan-500/50 hover:!text-cyan-300 p-2 h-9 w-9 rounded-xl flex items-center justify-center" 
+                   title="Nouvelle visite"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }}
                  >
-                   TEST
+                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                     <path d="M5 12h14M12 5v14" />
+                   </svg>
                  </Button>
                  <Button 
                    variant="ghost" 
                    className="!bg-slate-600/30 !border-2 !border-slate-500/30 !text-slate-300 hover:!bg-slate-600/50 hover:!border-slate-500/50 hover:!text-white p-2 h-9 w-9 rounded-xl" 
-                   title="Voir profil - Test StrokeWidth"
+                   title="Voir profil"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }}
                  >
-                   <Eye size={20} strokeWidth={2.5} />
+                   <span className="text-lg">👁</span>
                  </Button>
                </div>
             )}
