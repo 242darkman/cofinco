@@ -79,7 +79,7 @@ export interface IStorage {
     getAllComptesEpargne(filter?: { agence?: string }): Promise<CompteEpargne[]>;
     createCompteEpargne(compte: InsertCompteEpargne): Promise<CompteEpargne>;
     updateCompteEpargne(id: string, compte: Partial<InsertCompteEpargne>): Promise<CompteEpargne | undefined>;
-    updateClientAccount(id: string, updateData: { typeCompte?: string; tauxInteret?: string; statut?: string }): Promise<CompteEpargne | undefined>;
+    updateClientAccount(id: string, updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }): Promise<CompteEpargne | undefined>;
 
     getTransactionEpargne(id: string): Promise<TransactionEpargne | undefined>;
     getTransactionsByCompte(compteId: string): Promise<TransactionEpargne[]>;

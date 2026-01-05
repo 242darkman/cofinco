@@ -272,7 +272,7 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
   
   export async function updateClientAccount(
     id: string,
-    updateData: { typeCompte?: string; tauxInteret?: string; statut?: string }
+    updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }
   ): Promise<CompteEpargne | undefined> {
     const [compte] = await db.update(comptesEpargne)
       .set({ ...updateData, updatedAt: new Date() })

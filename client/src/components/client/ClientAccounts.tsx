@@ -107,7 +107,8 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
               body: JSON.stringify({
                   typeCompte: formData.typeCompte,
                   tauxInteret: formData.tauxInteret,
-                  statut: formData.statut
+                  statut: formData.statut,
+                  solde: formData.solde
               })
           });
 

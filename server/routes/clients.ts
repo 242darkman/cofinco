@@ -247,16 +247,40 @@ export function registerClientRoutes(app: Express) {
         const schema = z.object({
             typeCompte: z.enum(['Courant', 'Épargne']).optional(),
             tauxInteret: z.coerce.number().min(0).optional(),
-            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).optional()
+            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).optional(),
+            solde: z.coerce.number().optional()
         });
 
         const parsed = schema.parse(req.body);
+        
+        // Fetch current account to compare balance
+        const currentAccount = await storage.getCompteEpargne(accountId);
+        if (!currentAccount) return res.status(404).json({ message: "Compte introuvable" });
+
+        // Handle Balance Correction (Safe Mode)
+        if (parsed.solde !== undefined && parsed.solde !== Number(currentAccount.solde)) {
+            const difference = parsed.solde - Number(currentAccount.solde);
+            
+            // Create automatic transaction line
+            await storage.createTransactionEpargne({
+                compteId: accountId,
+                typeTransaction: difference > 0 ? 'DEPOT' : 'RETRAIT', // Or specific 'AJUSTEMENT' if enum allows
+                montant: Math.abs(difference).toString(),
+                soldeApres: parsed.solde.toString(),
+                methodePaiement: 'Ajustement',
+                reference: `CORRECTION-${Date.now()}`,
+                observations: `Correction manuelle de solde par ${req.session.user?.username || 'Admin'}`,
+                createdBy: req.session.user?.id
+            });
+        }
 
         // 3. Update account
         const updatedAccount = await storage.updateClientAccount(accountId, {
           typeCompte: parsed.typeCompte,
           tauxInteret: parsed.tauxInteret?.toString(),
-          statut: parsed.statut
+          statut: parsed.statut,
+          // If solde was provided, it's now backed by a transaction, so we can update it in the account record too
+          ...(parsed.solde !== undefined ? { solde: parsed.solde.toString() } : {})
         });
 
         if (!updatedAccount) {
