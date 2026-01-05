@@ -99,7 +99,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     setLoadingClients(true);
     try {
       const data = await clientApi.getAll();
-      const activeClients = data.filter((c: any) => c.status === 'Actif');
+      const activeClients = Array.isArray(data) ? data.filter((c: any) => c.status === 'Actif') : [];
       setClients(activeClients);
     } catch (error) {
       const errorMessage = handleApiError(error, 'Erreur lors du chargement des clients');
@@ -112,7 +112,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const loadComptesClient = useCallback(async (clientIdParam: string) => {
     try {
       const data = await compteEpargneApi.getByClient(clientIdParam);
-      const activeComptes = data.filter((c: any) => c.statut === 'Actif');
+      const activeComptes = Array.isArray(data) ? data.filter((c: any) => c.statut === 'Actif') : [];
       setComptesExistants(activeComptes);
     } catch (error) {
       console.warn('Erreur chargement comptes:', error);
