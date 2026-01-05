@@ -100,13 +100,13 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       closeOnEsc={!isLoading}
       showCloseButton={!isLoading}
       footer={
-        <>
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
           <Button
             variant="secondary"
             size="md"
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 sm:flex-none"
+            className="flex-1 min-h-[44px] text-sm leading-tight whitespace-normal"
           >
             {cancelText}
           </Button>
@@ -116,11 +116,11 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             onClick={handleConfirm}
             disabled={isLoading}
             isLoading={isLoading}
-            className="flex-1 sm:flex-none"
+            className="flex-1 min-h-[44px] text-sm leading-tight whitespace-normal"
           >
             {confirmText}
           </Button>
-        </>
+        </div>
       }
     >
       <div className="flex flex-col gap-4">
@@ -135,8 +135,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <Icon className={config.iconColor} size={24} />
           </div>
 
-          <div className="flex-1 text-center sm:text-left">
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+          <div className="flex-1 text-center sm:text-left max-w-full overflow-hidden">
+            <p className="text-sm sm:text-base text-slate-300 leading-relaxed break-words">
               {message}
             </p>
           </div>
