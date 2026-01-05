@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, CreditCard, Wallet, X, Edit2, Trash2, Check, AlertCircle, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Card, Badge, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -38,6 +38,8 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
     tauxInteret: 0,
     statut: 'Actif' as 'Actif' | 'Fermé' | 'Suspendu'
   });
+  
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     fetchComptes();
@@ -63,6 +65,7 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
     e.preventDefault();
 
     if (editingCompte) {
+        setShowForm(false);
         setShowConfirm(true);
         return;
     }
@@ -99,6 +102,9 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
   const handleConfirmUpdate = async () => {
       if (!editingCompte) return;
 
+      setLoading(true);
+      isSubmittingRef.current = true;
+
       try {
           const res = await fetch(`/api/clients/${clientId}/accounts/${editingCompte.id}`, {
               method: 'PATCH',
@@ -121,6 +127,11 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
       } catch (error) {
           console.error("Update error:", error);
           alert("Erreur lors de la modification");
+          setShowForm(true); // Re-open form on error
+          setShowConfirm(false);
+      } finally {
+          setLoading(false);
+          isSubmittingRef.current = false;
       }
   };
 
@@ -177,7 +188,12 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
 
       <ConfirmDialog
         isOpen={showConfirm}
-        onClose={() => setShowConfirm(false)}
+        onClose={() => {
+            setShowConfirm(false);
+            if (!isSubmittingRef.current && editingCompte) {
+                setShowForm(true);
+            }
+        }}
         onConfirm={handleConfirmUpdate}
         title="Modifier le compte"
         message={
