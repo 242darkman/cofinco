@@ -68,6 +68,30 @@ export function registerOperationsRoutes(app: Express) {
   });
   
 
+  // Create Paiement Terrain (roles: admin, chef, terrain, superviseur)
+  app.post("/api/paiements-terrain", requireAuth, requireRole('admin', 'chef', 'terrain', 'superviseur'), async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = insertPaiementTerrainSchema.parse(data);
+        const paiement = await storage.createPaiementTerrain(parsed);
+        
+        // Notify
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_new', id: paiement.id } });
+            
+            // Notify specific client channel if implemented
+             if (paiement.clientId) {
+               wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: paiement.clientId } });
+            }
+        }
+        
+        res.status(201).json(addSnakeCaseAliasesDeep(paiement));
+      } catch (error: any) {
+        res.status(400).json({ error: error.message || "Invalid data" });
+      }
+  });
+
   // Paiements
   app.get("/api/paiements-terrain", requireAuth, async (req, res) => {
       const list = await storage.getAllPaiementsTerrain();

@@ -175,10 +175,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     if (!formData.montant || parseFloat(formData.montant) <= 0) {
       newErrors.montant = 'Montant invalide';
     }
-    if (formData.methode_paiement !== 'Espèce' && !formData.numero_telephone) {
+    if (['Airtel Money', 'MTN Mobile Money'].includes(formData.methode_paiement) && !formData.numero_telephone) {
       newErrors.numero_telephone = 'Numéro requis pour Mobile Money';
     }
-    if (formData.methode_paiement !== 'Espèce' && !formData.numero_transaction) {
+    if (['Airtel Money', 'MTN Mobile Money'].includes(formData.methode_paiement) && !formData.numero_transaction) {
       newErrors.numero_transaction = 'Numéro de transaction requis';
     }
     if (isTontinePayment && !selectedTontine) {
@@ -468,7 +468,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 setFormData({ ...formData, type_paiement: e.target.value });
                 setSelectedTontine(null);
               }}
-              options={['Tontine', 'Crédit', 'Épargne', 'Autre']}
+              options={['Tontine', 'Crédit', 'Épargne', 'Compte Courant', 'Compte Bloqué', 'Autre']}
             />
 
             <FormField
