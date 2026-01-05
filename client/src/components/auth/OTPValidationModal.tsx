@@ -40,6 +40,7 @@ export default function OTPValidationModal({
   const [otpId, setOtpId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
+  const [otpCodeDisplay, setOtpCodeDisplay] = useState<string | null>(null);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -101,6 +102,7 @@ export default function OTPValidationModal({
           console.log('%c🔐 CODE OTP: ' + data.otp_code_debug, 'background: #1a1a1a; color: #00ff00; font-size: 24px; padding: 15px; border: 2px solid #00ff00;');
           console.log('%c📱 Client: ' + clientName + ' (' + clientPhone + ')', 'background: #1a1a1a; color: #00aaff; font-size: 16px; padding: 10px;');
           console.log('%c💰 Montant: ' + montant.toLocaleString() + ' FCFA', 'background: #1a1a1a; color: #ffaa00; font-size: 16px; padding: 10px;');
+          setOtpCodeDisplay(data.otp_code_debug);
         }
 
         setStep('waiting');
@@ -218,6 +220,7 @@ export default function OTPValidationModal({
     setError('');
     setTimeLeft(300);
     setAttemptsLeft(3);
+    setOtpCodeDisplay(null);
     onClose();
   };
 
@@ -278,6 +281,13 @@ export default function OTPValidationModal({
                   <span className="font-mono font-bold">{formatTime(timeLeft)}</span>
                 </div>
               </div>
+
+              {otpCodeDisplay && (
+                 <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-center">
+                    <p className="text-xs text-yellow-500 mb-1 uppercase tracking-wider font-bold">Code OTP (Démo/Test)</p>
+                    <p className="text-3xl font-mono font-bold text-white tracking-[0.5em]">{otpCodeDisplay}</p>
+                 </div>
+              )}
 
               <div className="flex gap-2 justify-center mb-4" onPaste={handlePaste}>
                 {otpCode.map((digit, index) => (
