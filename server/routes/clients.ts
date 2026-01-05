@@ -12,6 +12,7 @@ import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
+import { createClientAccount, getComptesByClient } from "../storage/finance";
 
 export function registerClientRoutes(app: Express) {
   // LISTE CLIENTS : Filtrée par agence (supporte agenceId via header ou agence legacy)
@@ -126,6 +127,104 @@ export function registerClientRoutes(app: Express) {
     };
 
     res.json(result);
+  });
+
+  // ============================================
+  // COMPTES BANCAIRES (Refactored)
+  // ============================================
+
+  // GET Accounts
+  app.get("/api/clients/:id/accounts", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      // 1. Verify access to client
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+      if (agenceFilter) {
+        if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
+          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+        } else if (agenceFilter.agence && client.agence !== agenceFilter.agence) {
+          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+        }
+      }
+
+      // 2. Fetch accounts
+      const accounts = await getComptesByClient(req.params.id);
+      res.json(accounts);
+    } catch (error) {
+       console.error("Error fetching accounts:", error);
+       res.status(500).json({ message: "Erreur chargement comptes" });
+    }
+  });
+
+  // POST Account (Create)
+  app.post("/api/clients/:id/accounts", requireAuth, requireRole('admin', 'chef'), requireAgenceIdAccess(), async (req, res) => {
+      try {
+        // 1. Verify access to client
+        const client = await storage.getClient(req.params.id);
+        if (!client) return res.status(404).json({ message: "Client not found" });
+
+        const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+        if (agenceFilter) {
+          if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
+            return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+          }
+        }
+
+        // 2. Validate input
+        const schema = z.object({
+            typeCompte: z.enum(['Courant', 'Épargne']),
+            soldeInitial: z.coerce.number().min(0, "Le solde initial ne peut pas être négatif"),
+            tauxInteret: z.coerce.number().min(0).default(0),
+            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).default('Actif')
+        });
+
+        const parsed = schema.parse(req.body);
+
+        // 3. Create account atomically
+        const account = await createClientAccount(req.params.id, parsed, req.session.user?.id);
+
+        // 4. Log Audit
+        await logAudit(
+            req,
+            "CREATE_ACCOUNT",
+            "client",
+            client.id,
+            { type: parsed.typeCompte, numero: account.numeroCompte },
+            "success",
+            "medium"
+        );
+
+        // 5. Notify Real-Time Updates
+        const wsServer = await import("../ws-server");
+        const wsInstance = wsServer.getWsInstance();
+        if (wsInstance) {
+            // Notify client update (force refresh of client details everywhere)
+            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: client.id, agenceId: client.agenceId } });
+            
+            // Notify live activity
+            wsInstance.broadcast({
+              type: "LIVE_ACTIVITY",
+              payload: {
+                action: `Nouveau compte ${parsed.typeCompte} : ${account.numeroCompte}`,
+                user: req.session.user?.nom || 'Système',
+                type: 'finance',
+                timestamp: new Date().toISOString(),
+                agenceId: client.agenceId
+              }
+            });
+
+            // Update dashboard stats if there was an invalidation needed
+            wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+        }
+
+        res.status(201).json(account);
+      } catch (error) {
+         if (error instanceof z.ZodError) return res.status(400).json(error);
+         console.error("Error creating account:", error);
+         res.status(500).json({ message: "Erreur création compte" });
+      }
   });
 
   // CREATE: Validation de l'agence cible (supporte agenceId)

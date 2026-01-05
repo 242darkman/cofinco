@@ -227,6 +227,48 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     const [compte] = await db.update(comptesEpargne).set({ ...updateData, updatedAt: new Date() }).where(eq(comptesEpargne.id, id)).returning();
     return compte || undefined;
   }
+
+  // Atomic Account Creation with Initial Transaction
+  export async function createClientAccount(
+    clientId: string,
+    data: { typeCompte: string; soldeInitial: number; tauxInteret: number; statut: string },
+    userId: string | undefined
+  ): Promise<CompteEpargne> {
+    return await db.transaction(async (tx) => {
+      // 1. Generate unique account number
+      const prefix = data.typeCompte === 'Courant' ? 'CC' : 'CE';
+      const timestamp = Date.now().toString().slice(-6);
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const numeroCompte = `${prefix}-${timestamp}-${random}`;
+
+      // 2. Create Account
+      const [compte] = await tx.insert(comptesEpargne).values({
+        clientId,
+        numeroCompte,
+        typeCompte: data.typeCompte,
+        solde: data.soldeInitial.toString(),
+        tauxInteret: data.tauxInteret.toString(),
+        statut: data.statut,
+        dateOuverture: new Date(),
+      }).returning();
+
+      // 3. Create Initial Transaction if needed
+      if (data.soldeInitial > 0) {
+        await tx.insert(transactionsEpargne).values({
+          compteId: compte.id,
+          typeTransaction: 'DEPOT_INITIAL',
+          montant: data.soldeInitial.toString(),
+          soldeApres: data.soldeInitial.toString(), 
+          methodePaiement: 'Report',
+          reference: `INIT-${numeroCompte}`,
+          observations: 'Solde initial à la création',
+          createdBy: userId,
+        });
+      }
+
+      return compte;
+    });
+  }
   
   // Transactions Epargne
   export async function getTransactionEpargne(id: string): Promise<TransactionEpargne | undefined> {
