@@ -174,7 +174,7 @@ export default function CaisseDashboard({
   };
 
   const totalEntrees = transactions
-    .filter(t => ['Dépôt', 'Remboursement', 'Encaissement'].includes(t.type_operation))
+    .filter(t => ['Dépôt', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Encaissement', 'Cotisation Tontine'].includes(t.type_operation))
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
   const totalSorties = transactions
