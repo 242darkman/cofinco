@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Monitor, Lock, AlertCircle, Trash2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, Button, FormField, SelectField, Badge, Modal, ConfirmDialog } from '../ui';
+import { Card, Button, FormField, SelectField, Badge, Modal, ConfirmDialog, Pagination } from '../ui';
 import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api } from '../../lib/api';
@@ -26,6 +26,8 @@ export default function AdminGestionCaisses() {
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Agencies per page for admin view
   
   // Fetch Agences for Admin
   const { data: agences = [] } = useQuery<any[]>({
@@ -258,26 +260,60 @@ export default function AdminGestionCaisses() {
 
       {/* Grid Display */}
       {isAdmin ? (
-         // Grouped View for Admin
+         // Grouped View for Admin with Pagination
          <div className="space-y-8">
-            {Object.entries(
-                filteredCaisses.reduce((acc, caisse) => {
+            {(() => {
+                // Group by Agency
+                const grouped = filteredCaisses.reduce((acc, caisse) => {
                     const agenceName = agences.find(a => a.id === caisse.agenceId)?.nom || 'Agence Inconnue';
                     if (!acc[agenceName]) acc[agenceName] = [];
                     acc[agenceName].push(caisse);
                     return acc;
-                }, {} as Record<string, Caisse[]>)
-            ).sort(([a], [b]) => a.localeCompare(b)).map(([agenceName, agenceCaisses]) => (
-                <div key={agenceName} className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                        <Building2 className="w-4 h-4" />
-                        {agenceName} ({agenceCaisses.length})
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {agenceCaisses.map(caisse => renderCaisseCard(caisse))}
-                    </div>
-                </div>
-            ))}
+                }, {} as Record<string, Caisse[]>);
+
+                const sortedAgencies = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
+                
+                // Pagination Logic
+                const totalItems = sortedAgencies.length;
+                const totalPages = Math.ceil(totalItems / itemsPerPage);
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const visibleAgencies = sortedAgencies.slice(startIndex, startIndex + itemsPerPage);
+
+                return (
+                    <>
+                        {visibleAgencies.map(([agenceName, agenceCaisses]) => (
+                            <div key={agenceName} className="space-y-3">
+                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                                    <Building2 className="w-4 h-4" />
+                                    {agenceName} ({agenceCaisses.length})
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {agenceCaisses.map(caisse => renderCaisseCard(caisse))}
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {totalItems > itemsPerPage && (
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                                canGoNext={currentPage < totalPages}
+                                canGoPrevious={currentPage > 1}
+                                totalItems={totalItems}
+                                itemsPerPage={itemsPerPage}
+                                className="mt-8"
+                            />
+                        )}
+                        
+                        {totalItems === 0 && (
+                            <div className="text-center py-12 text-muted-foreground">
+                                Aucune caisse trouvée.
+                            </div>
+                        )}
+                    </>
+                );
+            })()}
          </div>
       ) : (
          // Standard View
