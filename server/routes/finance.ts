@@ -297,6 +297,12 @@ export function registerFinanceRoutes(app: Express) {
               timestamp: new Date().toISOString()
             }
           });
+
+          // Notify client data update for real-time refresh
+          wsInstance.broadcastToAgency(userAgence, { 
+            type: "CLIENT_UPDATE", 
+            payload: { clientId: parsed.compteId } 
+          });
       }
 
       res.json(addSnakeCaseAliasesDeep(trans));
