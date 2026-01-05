@@ -253,10 +253,31 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
             emptyMessage="Aucun agent trouvé"
             loading={loading}
             actions={(agent) => (
-               <div className="flex items-center gap-1 justify-end">
-                 <Button size="sm" variant="success" className="h-8 w-8 p-0" icon={DollarSign} onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }} />
-                 <Button size="sm" variant="primary" className="h-8 w-8 p-0" icon={Plus} onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }} />
-                 <Button size="sm" variant="secondary" className="h-8 w-8 p-0" icon={Eye} onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }} />
+               <div className="flex items-center gap-2 justify-end">
+                 <Button 
+                   variant="ghost" 
+                   className="text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600 p-2 h-auto w-auto" 
+                   title="Paiement"
+                   onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }}
+                 >
+                   <DollarSign size={20} />
+                 </Button>
+                 <Button 
+                   variant="ghost" 
+                   className="text-blue-500 hover:bg-blue-500/10 hover:text-blue-600 p-2 h-auto w-auto" 
+                   title="Nouvelle visite"
+                   onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }}
+                 >
+                   <Plus size={20} />
+                 </Button>
+                 <Button 
+                   variant="ghost" 
+                   className="text-slate-400 hover:bg-slate-500/10 hover:text-slate-300 p-2 h-auto w-auto" 
+                   title="Voir profil"
+                   onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }}
+                 >
+                   <Eye size={20} />
+                 </Button>
                </div>
             )}
             onRowClick={(agent) => { setSelectedAgent(agent); setShowAgentProfile(true); }}
