@@ -194,6 +194,12 @@ export function registerEmployesRoutes(app: Express) {
         "medium"
       );
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_new', id: result.employe.id } });
+      }
+
       // Retourner l'employé avec ses données user
       const employeWithUser = await storage.getEmployeWithUser(result.employe.id);
       res.status(201).json(employeWithUser);
@@ -272,6 +278,12 @@ export function registerEmployesRoutes(app: Express) {
         "medium"
       );
 
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_updated', id: employeId } });
+      }
+
       res.json(updated);
 
     } catch (error) {
@@ -307,6 +319,12 @@ export function registerEmployesRoutes(app: Express) {
         "success",
         "high"
       );
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_deleted', id: employeId } });
+      }
 
       res.json({ message: "Employé supprimé avec succès" });
 
@@ -360,6 +378,12 @@ export function registerEmployesRoutes(app: Express) {
         "success",
         "medium"
       );
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_new', id: employe.id } });
+      }
 
       const employeWithUser = await storage.getEmployeWithUser(employe.id);
       res.status(201).json(employeWithUser);

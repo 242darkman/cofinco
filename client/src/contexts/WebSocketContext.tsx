@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 
-type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE";
+type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -266,6 +266,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "AGENCE_UPDATE":
          queryClient.invalidateQueries({ queryKey: ["/api/agences"] });
          queryClient.invalidateQueries({ queryKey: ["/api/me/agences"] });
+         break;
+
+      case "EMPLOYE_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/employes"] });
+         break;
+
+      case "LOYALTY_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["/api/loyalty"] });
          break;
     }
   };

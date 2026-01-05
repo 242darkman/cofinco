@@ -42,6 +42,12 @@ loyaltyRouter.post("/:clientId/bonus", requireAuth, requireRole(['admin', 'rh'])
         await storage.addLoyaltyPoints(clientId, points, 'BONUS', description);
         await storage.calculateEngagementScore(clientId);
         
+        // Notify
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "LOYALTY_UPDATE", payload: { type: 'bonus_added', clientId, points } });
+        }
+        
         res.json({ success: true, message: `${points} points ajoutés` });
     } catch (error) {
         console.error("Erreur ajout bonus:", error);
