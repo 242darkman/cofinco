@@ -9,6 +9,7 @@ import { LocationTracker } from '@/components/agent/LocationTracker';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { AgenceProvider } from './contexts/AgenceContext';
+import { UpdatePrompt } from './components/shared/UpdatePrompt';
 
 // Lazy load heavy components
 // Lazy load heavy components
@@ -205,6 +206,7 @@ function App() {
       <AgenceProvider>
         <WebSocketProvider>
           <ErrorBoundary>
+            <UpdatePrompt />
             <LocationTracker />
             <Suspense fallback={null}>
               {isAuthenticated && showSeasonalWelcome && (
