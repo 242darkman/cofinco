@@ -310,6 +310,31 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
   });
 
+  app.get("/api/caisses", requireAuth, requireRole('admin', 'Administrateur', 'admin_generale'), async (req, res) => {
+      // Admin only: Get ALL caisses
+      const caisses = await storage.getAllCaisses();
+      const activeSessions = await storage.getActiveSessions();
+      
+      // Need agency names for grouping
+      // We can fetch all agencies or assume frontend has them. 
+      // Better to enrich here if possible, but storage.getAllCaisses returns flat Caisse objects.
+      // Frontend can match agenceId to Agency Name if it constructs the map.
+      // Let's stick to returning the caisses list. Frontend will handle grouping.
+
+      const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
+         const activeSession = activeSessions.find(s => s.caisseId === c.id && s.statut === 'Ouverte');
+         const assignments = await storage.getCaisseAssignments(c.id);
+         return {
+             ...c,
+             isOccupied: !!activeSession,
+             occupiedBy: activeSession ? activeSession.caissierId : null,
+             assignments: assignments.map(a => a.userId)
+         };
+      }));
+
+      res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
+  });
+
   app.post("/api/caisses/:id/assign", requireAuth, requireRole('admin', 'chef'), requireAgenceAccess(), async (req, res) => {
       const { id } = req.params;
       const { userIds } = req.body; // Expect array of user IDs

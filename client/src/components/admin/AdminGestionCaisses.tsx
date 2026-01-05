@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Monitor, Lock, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, Search, Monitor, Lock, AlertCircle, Trash2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, Button, FormField, SelectField, Badge, Modal, ConfirmDialog } from '../ui';
 import { authService } from '../../lib/auth';
@@ -106,13 +106,15 @@ export default function AdminGestionCaisses() {
 
 
   // Fetch Caisses
+  // Fetch Caisses (Global for admin, Scoped for others)
   const { data: caisses = [], isLoading } = useQuery<Caisse[]>({
-    queryKey: ['caisses', user?.agenceId],
+    queryKey: ['caisses', isAdmin ? 'all' : user?.agenceId],
     queryFn: async () => {
-       const res = await api.get<Caisse[]>(`/agences/${user?.agenceId}/caisses`);
+       const endpoint = isAdmin ? '/caisses' : `/agences/${user?.agenceId}/caisses`;
+       const res = await api.get<Caisse[]>(endpoint);
        return res.data || [];
     },
-    enabled: !!user?.agenceId
+    enabled: !!user?.agenceId || isAdmin
   });
 
   // Create Mutation
@@ -167,6 +169,72 @@ export default function AdminGestionCaisses() {
     c.nom.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const renderCaisseCard = (caisse: Caisse) => (
+      <Card key={caisse.id} padding="md" className="flex flex-col gap-3 hover:border-primary/50 transition-colors">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              caisse.type === 'Coffre-Fort' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
+            }`}>
+              {caisse.type === 'Coffre-Fort' ? <Lock className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">{caisse.nom}</h3>
+              <p className="text-xs text-muted-foreground">{caisse.type}</p>
+            </div>
+          </div>
+          <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
+        </div>
+
+        <div className="mt-2 space-y-2">
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">Solde Actuel</span>
+            <span className="font-mono font-medium">{Number(caisse.solde).toLocaleString()} FCFA</span>
+          </div>
+            <div className="flex flex-wrap gap-1 mt-1">
+               {(caisse as any).assignments?.length > 0 ? (
+                   <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                       {(caisse as any).assignments.length} agent(s) assigné(s)
+                   </span>
+               ) : (
+                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                       Accès libre / Non assigné
+                   </span>
+               )}
+            </div>
+
+           {caisse.isOccupied && (
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-md">
+               <AlertCircle className="w-3 h-3" />
+               Session en cours (Par: {caisse.occupiedBy})
+            </div>
+          )}
+        </div>
+
+        <div className="pt-4 mt-auto border-t border-border flex items-center justify-between gap-3">
+             <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => handleDelete(caisse.id, caisse.nom)}
+                className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-8"
+                title="Supprimer définitivement"
+             >
+                <Trash2 size={15} className="mr-1.5" />
+                <span className="text-xs font-medium">Supprimer</span>
+             </Button>
+
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleOpenAssign(caisse)}
+                className="text-xs h-8 ml-auto"
+            >
+                Assigner
+            </Button>
+        </div>
+      </Card>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header Actions */}
@@ -189,74 +257,35 @@ export default function AdminGestionCaisses() {
       </div>
 
       {/* Grid Display */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredCaisses.map((caisse) => (
-          <Card key={caisse.id} padding="md" className="flex flex-col gap-3 hover:border-primary/50 transition-colors">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  caisse.type === 'Coffre-Fort' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
-                }`}>
-                  {caisse.type === 'Coffre-Fort' ? <Lock className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+      {isAdmin ? (
+         // Grouped View for Admin
+         <div className="space-y-8">
+            {Object.entries(
+                filteredCaisses.reduce((acc, caisse) => {
+                    const agenceName = agences.find(a => a.id === caisse.agenceId)?.nom || 'Agence Inconnue';
+                    if (!acc[agenceName]) acc[agenceName] = [];
+                    acc[agenceName].push(caisse);
+                    return acc;
+                }, {} as Record<string, Caisse[]>)
+            ).sort(([a], [b]) => a.localeCompare(b)).map(([agenceName, agenceCaisses]) => (
+                <div key={agenceName} className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Building2 className="w-4 h-4" />
+                        {agenceName} ({agenceCaisses.length})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {agenceCaisses.map(caisse => renderCaisseCard(caisse))}
+                    </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-lg">{caisse.nom}</h3>
-                  <p className="text-xs text-muted-foreground">{caisse.type}</p>
-                </div>
-                </div>
-              <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
-            </div>
+            ))}
+         </div>
+      ) : (
+         // Standard View
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCaisses.map((caisse) => renderCaisseCard(caisse))}
+         </div>
+      )}
 
-            <div className="mt-2 space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Solde Actuel</span>
-                <span className="font-mono font-medium">{Number(caisse.solde).toLocaleString()} FCFA</span>
-              </div>
-                {/* Assignment Info */}
-                <div className="flex flex-wrap gap-1 mt-1">
-                   {(caisse as any).assignments?.length > 0 ? (
-                       <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                           {(caisse as any).assignments.length} agent(s) assigné(s)
-                       </span>
-                   ) : (
-                       <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                           Accès libre / Non assigné
-                       </span>
-                   )}
-                </div>
-
-               {caisse.isOccupied && (
-                <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-md">
-                   <AlertCircle className="w-3 h-3" />
-                   Session en cours (Par: {caisse.occupiedBy})
-                </div>
-              )}
-            </div>
-
-            <div className="pt-4 mt-auto border-t border-border flex items-center justify-between gap-3">
-                 <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleDelete(caisse.id, caisse.nom)}
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-8"
-                    title="Supprimer définitivement"
-                 >
-                    <Trash2 size={15} className="mr-1.5" />
-                    <span className="text-xs font-medium">Supprimer</span>
-                 </Button>
-
-                <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleOpenAssign(caisse)}
-                    className="text-xs h-8 ml-auto"
-                >
-                    Assigner
-                </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
 
       {/* Modal Creation */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nouvelle Caisse">
