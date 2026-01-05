@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Phone, User, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { DollarSign, Phone, User, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, Trash2, AlertTriangle, Printer, Check } from 'lucide-react';
 import OTPValidationModal from '../auth/OTPValidationModal';
 import { Modal, Button, FormField, SelectField, TextareaField, Card } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
+import { ReceiptTemplate } from '../ui/printable/ReceiptTemplate';
+import { useReceiptPrinter } from '../../hooks/useReceiptPrinter';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <img src={airtelLogo} alt="Airtel Money" className={className} />
@@ -42,6 +44,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const { hasPermission } = usePermissions();
   const canCreatePayments = hasPermission('agent_terrain', 'create') || hasPermission('paiements', 'create');
 
+  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
+
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [agents, setAgents] = useState<any[]>([]);
@@ -53,6 +57,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [clientTontines, setClientTontines] = useState<ClientTontine[]>([]);
   const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
   const [loadingTontines, setLoadingTontines] = useState(false);
+  
+  // State for success modal and printing
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastPaymentInfo, setLastPaymentInfo] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     agent_id: agentId || '',
@@ -248,7 +256,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
       if (!response.ok) throw new Error('Erreur lors de l\'enregistrement');
 
-      // Record tontine contribution if applicable - MUST succeed for tontine payments
       if (isTontinePayment && selectedTontine) {
         const cotisationResponse = await fetch(`/api/tontines/${selectedTontine.tontineId}/cotisation`, {
           method: 'POST',
@@ -268,7 +275,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         }
       }
 
-      // Record client activity
       await fetch('/api/client-activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -281,7 +287,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         })
       });
 
-      // Update visit if applicable
       if (paiementData.visite_id) {
         await fetch(`/api/visites-terrain/${paiementData.visite_id}`, {
           method: 'PATCH',
@@ -294,7 +299,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         });
       }
 
-      onSuccess();
+      // Store payment info for printing and show success modal
+      setLastPaymentInfo(paiementData);
+      setShowSuccessModal(true);
+      
     } catch (error: any) {
       console.error('Erreur:', error);
       setErrors({ submit: error.error });
@@ -309,7 +317,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
       setLoading(true);
 
-      // Create the payment
       const response = await fetch('/api/paiements-terrain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -323,7 +330,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
       if (!response.ok) throw new Error('Erreur lors de l\'enregistrement');
 
-      // Record tontine contribution if applicable - MUST succeed for tontine payments
       if (isTontinePayment && selectedTontine) {
         const cotisationResponse = await fetch(`/api/tontines/${selectedTontine.tontineId}/cotisation`, {
           method: 'POST',
@@ -343,7 +349,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         }
       }
 
-      // Record client activity
       await fetch('/api/client-activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -356,7 +361,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         })
       });
 
-      // Update visit if applicable
       if (pendingPaymentData.visite_id) {
         await fetch(`/api/visites-terrain/${pendingPaymentData.visite_id}`, {
           method: 'PATCH',
@@ -371,7 +375,11 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
       setShowOTPModal(false);
       setPendingPaymentData(null);
-      onSuccess();
+      
+      // Store payment info (merged with validation status implicitly) and show success modal
+      setLastPaymentInfo(pendingPaymentData);
+      setShowSuccessModal(true);
+
     } catch (error: any) {
       console.error('Erreur:', error);
       setErrors({ submit: error.error });
@@ -381,10 +389,91 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
   };
 
+  const handlePrint = () => {
+    if (!lastPaymentInfo || !selectedClient) return;
+    
+    // Find agent name
+    const agent = agents.find(a => a.id === lastPaymentInfo.agent_id);
+    const agentName = agent ? `${agent.nom} ${agent.prenom}` : 'Agent Terrain';
+
+    printReceipt({
+      title: 'REÇU DE PAIEMENT TERRAIN',
+      reference: lastPaymentInfo.reference || 'N/A',
+      date: new Date(),
+      type: lastPaymentInfo.type_paiement,
+      client: {
+        nom: selectedClient.nom,
+        prenom: selectedClient.prenom,
+        email: selectedClient.email,
+        telephone: selectedClient.phone || selectedClient.telephone,
+        numeroCompte: selectedClient.numero_compte
+      },
+      agent: {
+        nom: agentName,
+        prenom: ''
+      },
+      items: [{
+        description: `Paiement ${lastPaymentInfo.type_paiement}`,
+        details: lastPaymentInfo.notes || 'Paiement terrain',
+        montant: parseFloat(lastPaymentInfo.montant),
+        quantite: 1
+      }],
+      total: parseFloat(lastPaymentInfo.montant),
+      modePaiement: lastPaymentInfo.methode_paiement
+    });
+  };
+
+  const handleCloseSuccess = () => {
+    setShowSuccessModal(false);
+    setLastPaymentInfo(null);
+    onSuccess(); // Trigger parent close/refresh logic
+  };
+
   return (
     <>
+      {/* Hidden Receipt Template for Printing */}
+      {receiptData && (
+        <div style={{ display: "none" }}>
+          <ReceiptTemplate ref={componentRef} data={receiptData} />
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center transform scale-100 animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-green-500/10 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+              <Check size={32} strokeWidth={3} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Paiement Validé !</h3>
+            <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+              Le paiement de <strong className="text-white font-mono text-base ml-1">{lastPaymentInfo?.montant?.toLocaleString()} FCFA</strong> a été enregistré avec succès.
+            </p>
+            
+            <div className="flex flex-col gap-3">
+              <Button 
+                variant="secondary" 
+                onClick={handlePrint}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-slate-700 border-slate-600"
+                disabled={isPrinting}
+              >
+                <Printer size={18} /> 
+                <span>Imprimer Reçu</span>
+              </Button>
+              <Button 
+                variant="primary" 
+                className="w-full py-3"
+                onClick={handleCloseSuccess}
+              >
+                Terminer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Modal
-        isOpen={true}
+        isOpen={!showSuccessModal} // Hide main modal when success modal shows to reduce clutter
         onClose={onClose}
         title="Enregistrer un Paiement"
         size="lg"

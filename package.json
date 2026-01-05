@@ -1,6 +1,6 @@
 {
   "name": "cofinco",
-  "version": "1.0.36",
+  "version": "1.1.0",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -89,6 +89,7 @@
     "react-hook-form": "^7.66.0",
     "react-leaflet": "^5.0.0",
     "react-resizable-panels": "^2.1.9",
+    "react-to-print": "^3.2.0",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",

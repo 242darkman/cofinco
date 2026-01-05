@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2 } from 'lucide-react';
+import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2, Printer } from 'lucide-react';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -10,6 +10,9 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
+import { Button } from '../../ui';
+import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
+import { useReceiptPrinter } from '../../../hooks/useReceiptPrinter';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
@@ -42,6 +45,8 @@ interface Credit {
     nom: string;
     email: string;
     phone: string;
+    telephone?: string;
+    numero_compte?: string;
   };
   echeances?: Echeance[];
 }
@@ -61,6 +66,7 @@ interface Echeance {
 
 export default function CreditRemboursement() {
   const { mobileMoneyEnabled, mobileMoneyMessage } = useFeatureFlags();
+  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
 
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -79,6 +85,9 @@ export default function CreditRemboursement() {
   const [paymentModalType, setPaymentModalType] = useState<'mobile_money' | 'especes'>('especes');
   const [selectedOperator, setSelectedOperator] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [lastPaymentRef, setLastPaymentRef] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastPaymentAmount, setLastPaymentAmount] = useState<number>(0);
 
   const [paymentData, setPaymentData] = useState({
     montant: '',
@@ -154,7 +163,7 @@ export default function CreditRemboursement() {
     setErrors({});
   }, [loadEcheances]);
 
-  // Memoized payment distribution calculation
+  // Memoized payment distribution calculation (unchanged)
   const calculatePaymentDistribution = useCallback((montant: number) => {
     const unpaidEcheances = echeances
       .filter(e => e.statut !== 'Payé')
@@ -269,12 +278,14 @@ export default function CreditRemboursement() {
     try {
       const distribution = calculatePaymentDistribution(montant);
 
+      const finalRef = sanitizeInput(paymentRef || paymentData.reference_paiement || `REF-${Date.now()}`);
+
       const remboursementData = {
         credit_id: selectedCredit.id,
         date_remboursement: new Date().toISOString().split('T')[0],
         montant: montant,
         mode_paiement: paymentData.mode_paiement,
-        reference_paiement: sanitizeInput(paymentRef || paymentData.reference_paiement),
+        reference_paiement: finalRef,
         operateur_mobile: operator || selectedOperator || null,
         notes: sanitizeInput(paymentData.notes),
         distribution: distribution
@@ -282,7 +293,9 @@ export default function CreditRemboursement() {
 
       await remboursementApi.create(remboursementData);
 
-      toast.success(`Remboursement de ${formatMoney(montant)} enregistré avec succès`);
+      // Store payment info for receipt
+      setLastPaymentRef(finalRef);
+      setLastPaymentAmount(montant);
 
       // Reset form
       setPaymentData({ montant: '', mode_paiement: 'Cash', reference_paiement: '', notes: '' });
@@ -291,6 +304,9 @@ export default function CreditRemboursement() {
       setShowPaymentModal(false);
       setShowConfirmPayment(false);
       setErrors({});
+
+      // Show Success Modal instead of just toast
+      setShowSuccessModal(true);
 
       // Reload data
       await loadCredits();
@@ -317,6 +333,35 @@ export default function CreditRemboursement() {
     processPayment(paymentRef, operator);
   }, [processPayment]);
 
+  const handlePrint = useCallback(() => {
+    if (!selectedCredit) return;
+    
+    printReceipt({
+      title: 'REÇU DE REMBOURSEMENT',
+      reference: lastPaymentRef || 'N/A',
+      date: new Date(),
+      type: 'Remboursement Crédit',
+      client: {
+        nom: selectedCredit.clients.nom,
+        email: selectedCredit.clients.email,
+        telephone: selectedCredit.clients.phone || selectedCredit.clients.telephone, // Handle potential property name diffs
+        numeroCompte: selectedCredit.clients.numero_compte
+      },
+      agent: {
+        nom: 'Agent',
+        prenom: 'Crédit'
+      },
+      items: [{
+        description: `Remboursement Crédit ${selectedCredit.numero_credit}`,
+        details: `Solde restant avant paiement: ${formatMoney(selectedCredit.solde_restant + lastPaymentAmount)}`,
+        montant: lastPaymentAmount,
+        quantite: 1
+      }],
+      total: lastPaymentAmount,
+      modePaiement: paymentData.mode_paiement || 'Espèces'
+    });
+  }, [selectedCredit, lastPaymentRef, lastPaymentAmount, printReceipt, paymentData]);
+
   const handleModeChange = useCallback((mode: string) => {
     setPaymentData(prev => ({ ...prev, mode_paiement: mode }));
     if (mode !== 'Mobile Money') {
@@ -338,7 +383,47 @@ export default function CreditRemboursement() {
   const safeClientName = selectedCredit ? escapeHtml(selectedCredit.clients?.nom || '') : '';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      
+      {/* Hidden Receipt Template for Printing */}
+      {receiptData && (
+        <div style={{ display: "none" }}>
+          <ReceiptTemplate ref={componentRef} data={receiptData} />
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
+            <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-green-500/10">
+              <Check size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Remboursement Enregistré !</h3>
+            <p className="text-slate-400 mb-6">
+              Le remboursement de <strong className="text-white">{formatMoney(lastPaymentAmount)}</strong> a été validé avec succès.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                variant="secondary" 
+                onClick={handlePrint}
+                className="flex items-center justify-center gap-2"
+                disabled={isPrinting}
+              >
+                <Printer size={18} /> Imprimer Reçu
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={() => setShowSuccessModal(false)}
+              >
+                Continuer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search Section */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
         <h3 className="text-lg font-bold text-white mb-4">Rechercher un Crédit</h3>

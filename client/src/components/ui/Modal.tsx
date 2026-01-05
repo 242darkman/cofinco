@@ -25,7 +25,7 @@ export type ModalVariant = 'default' | 'danger' | 'success' | 'warning';
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   subtitle?: string;
   size?: ModalSize;
   variant?: ModalVariant;

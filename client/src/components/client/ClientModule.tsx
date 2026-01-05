@@ -3,6 +3,7 @@ import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List,
 import { Button, IconButton, Card, ResponsiveTable } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
+import ClientView from './ClientView';
 import ClientFilters from './ClientFilters';
 import ClientStatsDashboard from './ClientStatsDashboard';
 import ClientExport from './ClientExport';
@@ -27,6 +28,7 @@ export default function ClientModule() {
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [viewingClient, setViewingClient] = useState<any>(null);
   const [searchFilters, setSearchFilters] = useState({});
   const [activeView, setActiveView] = useState<'list' | 'map'>('list');
 
@@ -67,6 +69,10 @@ export default function ClientModule() {
   const handleEditClient = (client: any) => {
     setSelectedClient(client);
     setShowForm(true);
+  };
+
+  const handleViewClient = (client: any) => {
+    setViewingClient(client);
   };
 
   const handleDeleteClient = async (id: string) => {
@@ -234,7 +240,7 @@ export default function ClientModule() {
                     icon={Eye}
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleEditClient(client)}
+                    onClick={() => handleViewClient(client)}
                     aria-label="Voir"
                   />
                   {canEditClients && (
@@ -257,7 +263,7 @@ export default function ClientModule() {
                   )}
                 </>
               )}
-              onRowClick={(client) => handleEditClient(client)}
+              onRowClick={(client) => handleViewClient(client)}
               emptyMessage="Aucun client trouvé"
               mobileBreakpoint="lg"
             />
@@ -266,6 +272,13 @@ export default function ClientModule() {
       )}
 
       {/* Modals */}
+      {viewingClient && (
+        <ClientView
+            client={viewingClient}
+            onClose={() => setViewingClient(null)}
+        />
+      )}
+
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3">
           <div className="bg-white dark:bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">

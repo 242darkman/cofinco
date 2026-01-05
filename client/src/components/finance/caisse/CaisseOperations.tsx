@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, User, CreditCard, Coins, Users, CheckCircle, XCircle, Loader, ArrowLeft } from 'lucide-react';
+import { Search, User, CreditCard, Coins, Users, CheckCircle, XCircle, Loader, ArrowLeft, Printer } from 'lucide-react';
 import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
 import { Card, Button, SearchInput, Badge, FormField, SelectField } from '../../ui';
 import { clientSearchApi, creditApi, tontineApi, operationCaisseApi, systemSettingsApi, factureApi, validationOtpApi } from '../../../lib/api-client';
@@ -9,6 +9,8 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
+import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
+import { useReceiptPrinter } from '../../../hooks/useReceiptPrinter';
 
 interface Client {
   id: string;
@@ -68,6 +70,9 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   const [smsValidationEnabled, setSmsValidationEnabled] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [montantError, setMontantError] = useState<string | null>(null);
+  const [lastOperationReference, setLastOperationReference] = useState<string | null>(null);
+
+  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
 
   // Charger les paramètres système
   useEffect(() => {
@@ -204,6 +209,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
       };
 
       const operationInserted = await operationCaisseApi.create(operationData);
+      setLastOperationReference(operationInserted.reference || `OP-${Date.now()}`);
 
       if (smsValidationEnabled) {
         const codeOTP = Math.floor(100000 + Math.random() * 900000).toString();
@@ -239,6 +245,46 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     }
   }, [sessionId, selectedClient, typeOperation, montant, smsValidationEnabled, selectedCredit, selectedTontine]);
 
+  // Handle Receipt Printing
+  const handlePrintReceipt = useCallback(() => {
+    if (!selectedClient || !typeOperation || !montant) return;
+    
+    const details = selectedCredit 
+      ? `Crédit ${selectedCredit.type_credit || ''} - Reste: ${formatMoney(selectedCredit.solde_restant - parseFloat(montant))}` 
+      : selectedTontine 
+        ? `Cotisation ${selectedTontine.nom}`
+        : '';
+
+    printReceipt({
+      title: 'REÇU DE TRANSACTION',
+      reference: lastOperationReference || `OP-${Date.now()}`,
+      date: new Date(),
+      type: typeOperation,
+      client: {
+        nom: selectedClient.nom,
+        prenom: selectedClient.prenom,
+        telephone: selectedClient.telephone,
+        numeroCompte: selectedClient.numero_compte,
+      },
+      agent: {
+        nom: 'Agent', // TODO: Get from Auth Context if available
+        prenom: 'Caisse',
+      },
+      items: [
+        {
+          description: typeOperation,
+          details: details,
+          montant: parseFloat(montant),
+          quantite: 1
+        }
+      ],
+      total: parseFloat(montant),
+      modePaiement: 'Espèces', // Default for Caisse Physics
+      devise: 'FCFA'
+    });
+  }, [selectedClient, typeOperation, montant, selectedCredit, selectedTontine, lastOperationReference, printReceipt]);
+
+
   // Finaliser l'opération sans OTP
   const finaliserOperationSansOTP = useCallback(async (operationId: string) => {
     const loadingId = toast.loading('Finalisation de l\'opération...');
@@ -252,7 +298,8 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
       toast.success('Opération validée avec succès !');
 
       setSuccessMessage('Opération validée avec succès !');
-      setTimeout(() => reinitialiserFormulaire(), 3000);
+      // DO NOT Auto-reset immediately if we want to print
+      // setTimeout(() => reinitialiserFormulaire(), 3000); 
     } catch (error) {
       toast.dismiss(loadingId);
       const errorMessage = handleApiError(error, 'Erreur lors de la finalisation');
@@ -302,7 +349,8 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
       toast.success('Opération validée avec succès !');
 
       setSuccessMessage('Opération validée avec succès !');
-      setTimeout(() => reinitialiserFormulaire(), 3000);
+      // DO NOT Auto-reset immediately if we want to print
+      // setTimeout(() => reinitialiserFormulaire(), 3000);
     } catch (error) {
       toast.dismiss(loadingId);
       const errorMessage = handleApiError(error, 'Erreur lors de la validation');
@@ -353,6 +401,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     setSuccessMessage('');
     setOtpData(null);
     setMontantError(null);
+    setLastOperationReference(null);
   }, []);
 
   // Nouveau solde du crédit mémorisé
@@ -376,6 +425,14 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
 
   return (
     <div className="flex flex-col font-sans selection:bg-cyan-500/30">
+        
+      {/* Hidden Receipt Template for Printing */}
+      {receiptData && (
+        <div style={{ display: "none" }}>
+          <ReceiptTemplate ref={componentRef} data={receiptData} />
+        </div>
+      )}
+
       <div className="w-full max-w-sm mx-auto">
         <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 shadow-2xl shadow-cyan-900/10 rounded-2xl overflow-hidden ring-1 ring-white/5">
           <div className="p-5 relative">
@@ -453,13 +510,15 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
                     aria-label="Informations du client sélectionné"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />
-                    <button
-                      onClick={reinitialiserFormulaire}
-                      className="absolute top-2.5 right-2.5 text-slate-500 hover:text-red-400 transition bg-slate-800/50 hover:bg-slate-800 p-1 rounded-full backdrop-blur-sm z-20"
-                      aria-label="Annuler et réinitialiser le formulaire"
-                    >
-                      <XCircle size={16} aria-hidden="true" />
-                    </button>
+                    {!successMessage && (
+                      <button
+                        onClick={reinitialiserFormulaire}
+                        className="absolute top-2.5 right-2.5 text-slate-500 hover:text-red-400 transition bg-slate-800/50 hover:bg-slate-800 p-1 rounded-full backdrop-blur-sm z-20"
+                        aria-label="Annuler et réinitialiser le formulaire"
+                      >
+                        <XCircle size={16} aria-hidden="true" />
+                      </button>
+                    )}
                     <div className="flex items-center gap-3 pr-6 relative z-10">
                       <div className="w-12 h-12 rounded-full p-0.5 bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/20">
                         <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center">
@@ -491,267 +550,295 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
                     </div>
                   </div>
 
-                  {/* Success Message */}
-                  {successMessage && (
-                    <div
-                      className="bg-emerald-950/30 border border-emerald-900/50 text-emerald-400 px-4 py-3 rounded-xl flex items-center gap-3 text-sm shadow-sm backdrop-blur-sm animate-in zoom-in-95 duration-300"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <div className="p-1 bg-emerald-500/10 rounded-full">
-                        <CheckCircle size={14} aria-hidden="true" />
+                   {/* Success Message & Actions */}
+                   {successMessage ? (
+                    <div className="space-y-4 animate-in zoom-in-95 duration-300">
+                      
+                      <div
+                        className="bg-emerald-950/30 border border-emerald-900/50 text-emerald-400 px-4 py-6 rounded-xl flex flex-col items-center gap-3 text-center shadow-lg backdrop-blur-sm"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <div className="p-3 bg-emerald-500/10 rounded-full ring-1 ring-emerald-500/20 mb-1">
+                          <CheckCircle size={32} aria-hidden="true" />
+                        </div>
+                        <span className="text-lg font-bold tracking-tight text-white">{successMessage}</span>
+                        <p className="text-sm text-emerald-400/80">Transaction enregistrée avec succès</p>
                       </div>
-                      <span className="text-xs font-semibold tracking-wide">{successMessage}</span>
-                    </div>
-                  )}
 
-                  {/* Operation Type Selection */}
-                  <div className="space-y-2.5">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">
-                      Type d'opération
-                    </label>
-                    <div
-                      className="grid grid-cols-2 gap-2.5"
-                      role="group"
-                      aria-label="Sélectionner le type d'opération"
-                    >
-                      {(['Versement', 'Retrait', 'Remboursement Crédit', 'Cotisation Tontine'] as TypeOperation[]).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            setTypeOperation(type);
-                            setMontantError(null);
-                            if (type !== 'Cotisation Tontine') {
-                              setMontant('');
-                            }
-                          }}
-                          className={`p-3 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center gap-2 text-center h-[72px] relative group overflow-hidden ${
-                            typeOperation === type
-                              ? 'border-cyan-500/50 bg-cyan-950/30 text-cyan-300 shadow-[0_0_15px_-3px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
-                              : 'border-slate-800 bg-slate-800/30 text-slate-400 hover:border-slate-700 hover:bg-slate-800/50 hover:text-slate-200'
-                          }`}
-                          aria-pressed={typeOperation === type}
-                          aria-label={`Sélectionner ${type}`}
-                        >
-                          <div
-                            className={`absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 transition-opacity duration-500 ${
-                              typeOperation === type ? 'opacity-100' : 'group-hover:opacity-100'
-                            }`}
-                            aria-hidden="true"
-                          />
-                          {type === 'Versement' && (
-                            <Coins
-                              className={`transition-colors ${
-                                typeOperation === type
-                                  ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
-                                  : 'text-slate-500 group-hover:text-slate-300'
-                              }`}
-                              size={20}
-                              aria-hidden="true"
-                            />
-                          )}
-                          {type === 'Retrait' && (
-                            <CreditCard
-                              className={`transition-colors ${
-                                typeOperation === type
-                                  ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
-                                  : 'text-slate-500 group-hover:text-slate-300'
-                              }`}
-                              size={20}
-                              aria-hidden="true"
-                            />
-                          )}
-                          {type === 'Remboursement Crédit' && (
-                            <CreditCard
-                              className={`transition-colors ${
-                                typeOperation === type
-                                  ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
-                                  : 'text-slate-500 group-hover:text-slate-300'
-                              }`}
-                              size={20}
-                              aria-hidden="true"
-                            />
-                          )}
-                          {type === 'Cotisation Tontine' && (
-                            <Users
-                              className={`transition-colors ${
-                                typeOperation === type
-                                  ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
-                                  : 'text-slate-500 group-hover:text-slate-300'
-                              }`}
-                              size={20}
-                              aria-hidden="true"
-                            />
-                          )}
-                          <span className="font-semibold text-[10px] leading-tight relative z-10">{type}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-2 gap-3">
+                         <Button 
+                            variant="secondary" 
+                            className="w-full py-3 h-auto flex flex-col gap-1 items-center justify-center border-slate-700 bg-slate-800/80 hover:bg-slate-700"
+                            onClick={handlePrintReceipt}
+                            disabled={isPrinting}
+                         >
+                            <Printer size={20} />
+                            <span className="text-xs">Imprimer Reçu</span>
+                         </Button>
 
-                  {/* Dynamic Sections based on Operation Type */}
-                  {typeOperation === 'Remboursement Crédit' && credits.length > 0 && (
-                    <div className="space-y-2.5 animate-in slide-in-from-bottom-2 fade-in duration-300">
+                         <Button 
+                            variant="primary" 
+                            className="w-full py-3 h-auto flex flex-col gap-1 items-center justify-center"
+                            onClick={reinitialiserFormulaire}
+                         >
+                            <Coins size={20} />
+                            <span className="text-xs">Nouvelle Opération</span>
+                         </Button>
+                      </div>
+
+                    </div>
+                  ) : (
+                    <>
+                    {/* Operation Type Selection */}
+                    <div className="space-y-2.5">
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">
-                        Sélectionner un crédit
+                        Type d'opération
                       </label>
                       <div
-                        className="flex overflow-x-auto gap-2.5 pb-2 -mx-1 px-1 snap-x scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
-                        role="listbox"
-                        aria-label="Sélectionner un crédit"
+                        className="grid grid-cols-2 gap-2.5"
+                        role="group"
+                        aria-label="Sélectionner le type d'opération"
                       >
-                        {credits.map((credit) => (
-                          <div
-                            key={credit.id}
-                            onClick={() => setSelectedCredit(credit)}
-                            className={`min-w-[160px] snap-center p-3.5 rounded-xl border cursor-pointer transition-all duration-300 ${
-                              selectedCredit?.id === credit.id
-                                ? 'border-blue-500/50 bg-blue-950/30 shadow-[0_0_15px_-3px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/20'
-                                : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
-                            }`}
-                            role="option"
-                            aria-selected={selectedCredit?.id === credit.id}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                setSelectedCredit(credit);
+                        {(['Versement', 'Retrait', 'Remboursement Crédit', 'Cotisation Tontine'] as TypeOperation[]).map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => {
+                              setTypeOperation(type);
+                              setMontantError(null);
+                              if (type !== 'Cotisation Tontine') {
+                                setMontant('');
                               }
                             }}
+                            className={`p-3 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center gap-2 text-center h-[72px] relative group overflow-hidden ${
+                              typeOperation === type
+                                ? 'border-cyan-500/50 bg-cyan-950/30 text-cyan-300 shadow-[0_0_15px_-3px_rgba(6,182,212,0.15)] ring-1 ring-cyan-500/20'
+                                : 'border-slate-800 bg-slate-800/30 text-slate-400 hover:border-slate-700 hover:bg-slate-800/50 hover:text-slate-200'
+                            }`}
+                            aria-pressed={typeOperation === type}
+                            aria-label={`Sélectionner ${type}`}
                           >
-                            <div className="font-bold text-xs text-slate-200 mb-1">
-                              {formatMoney(credit.montant_total_du || credit.montant || 0)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 flex justify-between items-center">
-                              <span>Reste:</span>
-                              <span className="font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
-                                {formatMoney(credit.solde_restant || 0)}
-                              </span>
-                            </div>
-                          </div>
+                            <div
+                              className={`absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 transition-opacity duration-500 ${
+                                typeOperation === type ? 'opacity-100' : 'group-hover:opacity-100'
+                              }`}
+                              aria-hidden="true"
+                            />
+                            {type === 'Versement' && (
+                              <Coins
+                                className={`transition-colors ${
+                                  typeOperation === type
+                                    ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
+                                    : 'text-slate-500 group-hover:text-slate-300'
+                                }`}
+                                size={20}
+                                aria-hidden="true"
+                              />
+                            )}
+                            {type === 'Retrait' && (
+                              <CreditCard
+                                className={`transition-colors ${
+                                  typeOperation === type
+                                    ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
+                                    : 'text-slate-500 group-hover:text-slate-300'
+                                }`}
+                                size={20}
+                                aria-hidden="true"
+                              />
+                            )}
+                            {type === 'Remboursement Crédit' && (
+                              <CreditCard
+                                className={`transition-colors ${
+                                  typeOperation === type
+                                    ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
+                                    : 'text-slate-500 group-hover:text-slate-300'
+                                }`}
+                                size={20}
+                                aria-hidden="true"
+                              />
+                            )}
+                            {type === 'Cotisation Tontine' && (
+                              <Users
+                                className={`transition-colors ${
+                                  typeOperation === type
+                                    ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
+                                    : 'text-slate-500 group-hover:text-slate-300'
+                                }`}
+                                size={20}
+                                aria-hidden="true"
+                              />
+                            )}
+                            <span className="font-semibold text-[10px] leading-tight relative z-10">{type}</span>
+                          </button>
                         ))}
                       </div>
                     </div>
-                  )}
 
-                  {typeOperation === 'Cotisation Tontine' && tontines.length > 0 && (
-                    <div className="space-y-2.5 animate-in slide-in-from-bottom-2 fade-in duration-300">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">
-                        Sélectionner une tontine
-                      </label>
-                      <div
-                        className="flex overflow-x-auto gap-2.5 pb-2 -mx-1 px-1 snap-x scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
-                        role="listbox"
-                        aria-label="Sélectionner une tontine"
-                      >
-                        {tontines.map((tontine) => (
-                          <div
-                            key={tontine.id}
-                            onClick={() => {
-                              setSelectedTontine(tontine);
-                              setMontant((tontine.montant_contribution || 0).toString());
-                              setMontantError(null);
-                            }}
-                            className={`min-w-[160px] snap-center p-3.5 rounded-xl border cursor-pointer transition-all duration-300 ${
-                              selectedTontine?.id === tontine.id
-                                ? 'border-emerald-500/50 bg-emerald-950/30 shadow-[0_0_15px_-3px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/20'
-                                : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
-                            }`}
-                            role="option"
-                            aria-selected={selectedTontine?.id === tontine.id}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
+                    {/* Dynamic Sections based on Operation Type */}
+                    {typeOperation === 'Remboursement Crédit' && credits.length > 0 && (
+                      <div className="space-y-2.5 animate-in slide-in-from-bottom-2 fade-in duration-300">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">
+                          Sélectionner un crédit
+                        </label>
+                        <div
+                          className="flex overflow-x-auto gap-2.5 pb-2 -mx-1 px-1 snap-x scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+                          role="listbox"
+                          aria-label="Sélectionner un crédit"
+                        >
+                          {credits.map((credit) => (
+                            <div
+                              key={credit.id}
+                              onClick={() => setSelectedCredit(credit)}
+                              className={`min-w-[160px] snap-center p-3.5 rounded-xl border cursor-pointer transition-all duration-300 ${
+                                selectedCredit?.id === credit.id
+                                  ? 'border-blue-500/50 bg-blue-950/30 shadow-[0_0_15px_-3px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/20'
+                                  : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
+                              }`}
+                              role="option"
+                              aria-selected={selectedCredit?.id === credit.id}
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  setSelectedCredit(credit);
+                                }
+                              }}
+                            >
+                              <div className="font-bold text-xs text-slate-200 mb-1">
+                                {formatMoney(credit.montant_total_du || credit.montant || 0)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 flex justify-between items-center">
+                                <span>Reste:</span>
+                                <span className="font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                                  {formatMoney(credit.solde_restant || 0)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {typeOperation === 'Cotisation Tontine' && tontines.length > 0 && (
+                      <div className="space-y-2.5 animate-in slide-in-from-bottom-2 fade-in duration-300">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">
+                          Sélectionner une tontine
+                        </label>
+                        <div
+                          className="flex overflow-x-auto gap-2.5 pb-2 -mx-1 px-1 snap-x scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+                          role="listbox"
+                          aria-label="Sélectionner une tontine"
+                        >
+                          {tontines.map((tontine) => (
+                            <div
+                              key={tontine.id}
+                              onClick={() => {
                                 setSelectedTontine(tontine);
                                 setMontant((tontine.montant_contribution || 0).toString());
-                              }
-                            }}
-                          >
-                            <div className="font-bold text-xs text-slate-200 truncate mb-1">
-                              {escapeHtml(tontine.nom)}
+                                setMontantError(null);
+                              }}
+                              className={`min-w-[160px] snap-center p-3.5 rounded-xl border cursor-pointer transition-all duration-300 ${
+                                selectedTontine?.id === tontine.id
+                                  ? 'border-emerald-500/50 bg-emerald-950/30 shadow-[0_0_15px_-3px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/20'
+                                  : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
+                              }`}
+                              role="option"
+                              aria-selected={selectedTontine?.id === tontine.id}
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  setSelectedTontine(tontine);
+                                  setMontant((tontine.montant_contribution || 0).toString());
+                                }
+                              }}
+                            >
+                              <div className="font-bold text-xs text-slate-200 truncate mb-1">
+                                {escapeHtml(tontine.nom)}
+                              </div>
+                              <div className="text-emerald-400 font-bold text-sm bg-emerald-500/10 inline-block px-2 py-0.5 rounded">
+                                {formatMoney(tontine.montant_contribution || 0)}
+                              </div>
                             </div>
-                            <div className="text-emerald-400 font-bold text-sm bg-emerald-500/10 inline-block px-2 py-0.5 rounded">
-                              {formatMoney(tontine.montant_contribution || 0)}
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Amount Input */}
-                  {typeOperation && (
-                    <div className="space-y-2.5 animate-in slide-in-from-bottom-2 fade-in duration-300">
-                      <label
-                        htmlFor="montant-input"
-                        className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1"
-                      >
-                        Montant (FCFA)
-                      </label>
-                      <div className="relative group">
-                        <input
-                          id="montant-input"
-                          type="number"
-                          value={montant}
-                          onChange={(e) => {
-                            setMontant(e.target.value);
-                            if (e.target.value) validateMontant(e.target.value);
-                          }}
-                          disabled={typeOperation === 'Cotisation Tontine'}
-                          placeholder="0"
-                          className={`w-full px-4 py-3.5 text-2xl font-bold text-center border rounded-xl focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none bg-slate-950/50 transition-all placeholder:text-slate-800 text-white disabled:opacity-50 disabled:bg-slate-900 group-hover:border-slate-600 shadow-inner ${
-                            montantError ? 'border-red-500' : 'border-slate-700'
-                          }`}
-                          aria-invalid={!!montantError}
-                          aria-describedby={montantError ? 'montant-error' : undefined}
-                        />
-                        {typeOperation !== 'Cotisation Tontine' && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600 pointer-events-none">
-                            FCFA
+                    {/* Amount Input */}
+                    {typeOperation && (
+                      <div className="space-y-2.5 animate-in slide-in-from-bottom-2 fade-in duration-300">
+                        <label
+                          htmlFor="montant-input"
+                          className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1"
+                        >
+                          Montant (FCFA)
+                        </label>
+                        <div className="relative group">
+                          <input
+                            id="montant-input"
+                            type="number"
+                            value={montant}
+                            onChange={(e) => {
+                              setMontant(e.target.value);
+                              if (e.target.value) validateMontant(e.target.value);
+                            }}
+                            disabled={typeOperation === 'Cotisation Tontine'}
+                            placeholder="0"
+                            className={`w-full px-4 py-3.5 text-2xl font-bold text-center border rounded-xl focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none bg-slate-950/50 transition-all placeholder:text-slate-800 text-white disabled:opacity-50 disabled:bg-slate-900 group-hover:border-slate-600 shadow-inner ${
+                              montantError ? 'border-red-500' : 'border-slate-700'
+                            }`}
+                            aria-invalid={!!montantError}
+                            aria-describedby={montantError ? 'montant-error' : undefined}
+                          />
+                          {typeOperation !== 'Cotisation Tontine' && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600 pointer-events-none">
+                              FCFA
+                            </div>
+                          )}
+                        </div>
+                        {montantError && (
+                          <p
+                            id="montant-error"
+                            className="text-[10px] text-red-400 text-center"
+                            role="alert"
+                          >
+                            {montantError}
+                          </p>
+                        )}
+                        {selectedCredit && nouveauSoldeCredit !== null && (
+                          <div className="flex justify-center">
+                            <p className="text-[10px] text-slate-400 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700/50">
+                              Nouveau reste:{' '}
+                              <span className={`font-bold ml-1 ${nouveauSoldeCredit < 0 ? 'text-red-400' : 'text-white'}`}>
+                                {formatMoney(nouveauSoldeCredit)}
+                              </span>
+                            </p>
                           </div>
                         )}
                       </div>
-                      {montantError && (
-                        <p
-                          id="montant-error"
-                          className="text-[10px] text-red-400 text-center"
-                          role="alert"
-                        >
-                          {montantError}
-                        </p>
-                      )}
-                      {selectedCredit && nouveauSoldeCredit !== null && (
-                        <div className="flex justify-center">
-                          <p className="text-[10px] text-slate-400 bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700/50">
-                            Nouveau reste:{' '}
-                            <span className={`font-bold ml-1 ${nouveauSoldeCredit < 0 ? 'text-red-400' : 'text-white'}`}>
-                              {formatMoney(nouveauSoldeCredit)}
-                            </span>
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
 
-                  {/* Action Button */}
-                  <div className="pt-2">
-                    <Button
-                      onClick={preparerOperation}
-                      disabled={loading || !typeOperation || !montant || !!montantError}
-                      className={`w-full py-3.5 text-sm font-bold tracking-wide shadow-xl transition-all duration-300 relative overflow-hidden group ${
-                        loading || !typeOperation || !montant || !!montantError
-                          ? 'opacity-70 grayscale'
-                          : 'hover:shadow-cyan-500/25 active:scale-[0.98]'
-                      }`}
-                      variant="primary"
-                      aria-label="Confirmer l'opération"
-                    >
-                      <div
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"
-                        aria-hidden="true"
-                      />
-                      {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" aria-hidden="true" /> : "CONFIRMER L'OPÉRATION"}
-                    </Button>
-                  </div>
+                    {/* Action Button */}
+                    <div className="pt-2">
+                      <Button
+                        onClick={preparerOperation}
+                        disabled={loading || !typeOperation || !montant || !!montantError}
+                        className={`w-full py-3.5 text-sm font-bold tracking-wide shadow-xl transition-all duration-300 relative overflow-hidden group ${
+                          loading || !typeOperation || !montant || !!montantError
+                            ? 'opacity-70 grayscale'
+                            : 'hover:shadow-cyan-500/25 active:scale-[0.98]'
+                        }`}
+                        variant="primary"
+                        aria-label="Confirmer l'opération"
+                      >
+                        <div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"
+                          aria-hidden="true"
+                        />
+                        {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" aria-hidden="true" /> : "CONFIRMER L'OPÉRATION"}
+                      </Button>
+                    </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

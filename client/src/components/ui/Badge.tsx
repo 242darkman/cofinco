@@ -10,7 +10,7 @@ import React from 'react';
  * <Badge value="Rejeté" size="lg" />
  */
 
-export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary';
+export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' | 'outline';
 export type BadgeSize = 'sm' | 'md' | 'lg';
 
 export interface BadgeProps {
@@ -77,6 +77,7 @@ const Badge: React.FC<BadgeProps> = ({
     info: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     neutral: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
     primary: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+    outline: 'bg-transparent text-slate-600 border-slate-300',
   };
 
   // Size classes (mobile-first)

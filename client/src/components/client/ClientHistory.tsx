@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, DollarSign, FileText, Phone, Mail, MessageSquare, CheckCircle, TrendingUp, Users, Filter, Calendar, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
-import { Card, Badge } from '../ui';
+import { Clock, DollarSign, FileText, Phone, Mail, MessageSquare, CheckCircle, TrendingUp, Users, Filter, Calendar, ArrowUpRight, ArrowDownLeft, Printer } from 'lucide-react';
+import { Card, Badge, Button } from '../ui';
+import { useReceiptPrinter } from '../../hooks/useReceiptPrinter';
+import { ReceiptTemplate } from '../ui/printable/ReceiptTemplate';
 
 interface ClientActivity {
-  id: number; // Changed to number to match existing code logic, though string might be better long term
+  id: number;
   client_id: string;
   activity_type: string;
   activity_description: string;
@@ -20,10 +22,26 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
   const [activities, setActivities] = useState<ClientActivity[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>('all');
+  const [clientDetails, setClientDetails] = useState<any>(null);
+
+  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
 
   useEffect(() => {
     fetchActivities();
+    fetchClientDetails();
   }, [clientId]);
+
+  const fetchClientDetails = async () => {
+    try {
+        const res = await fetch(`/api/clients/${clientId}`);
+        if (res.ok) {
+            const data = await res.json();
+            setClientDetails(data);
+        }
+    } catch (error) {
+        console.error("Error fetching client details:", error);
+    }
+  };
 
   const fetchActivities = async () => {
     setLoading(true);
@@ -85,6 +103,37 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
     }
   };
 
+  const handleReprint = (activity: ClientActivity) => {
+      const isPayment = ['payment', 'epargne', 'tontine', 'credit'].includes(activity.activity_type);
+      if (!isPayment || !activity.amount || !clientDetails) return;
+
+      printReceipt({
+          title: `REÇU - ${getActivityLabel(activity.activity_type).toUpperCase()}`,
+          reference: (activity.metadata?.reference as string) || `ACT-${activity.id}`,
+          date: new Date(activity.created_at),
+          type: activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1),
+          client: {
+              nom: clientDetails.nom,
+              prenom: clientDetails.prenom,
+              email: clientDetails.email,
+              telephone: clientDetails.phone || clientDetails.telephone,
+              numeroCompte: clientDetails.numero_compte
+          },
+          agent: {
+              nom: 'Agent', // Activity log might not have agent name readily available without extra fetch
+              prenom: 'Guichet'
+          },
+          items: [{
+              description: activity.activity_description,
+              details: (activity.metadata?.notes as string) || '',
+              montant: activity.amount,
+              quantite: 1
+          }],
+          total: activity.amount,
+          modePaiement: (activity.metadata?.mode_paiement as string) || 'Espèces' // Fallback
+      });
+  };
+
   const filteredActivities = filter === 'all'
     ? activities
     : activities.filter(a => a.activity_type === filter);
@@ -106,6 +155,13 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
 
   return (
     <div className="space-y-4">
+      {/* Hidden Receipt Template */}
+      {receiptData && (
+        <div style={{ display: "none" }}>
+          <ReceiptTemplate ref={componentRef} data={receiptData} />
+        </div>
+      )}
+
       {/* 1. Header & Stats - Compact Mobile First */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
          <Card variant="default" padding="sm" className="bg-slate-800/30 text-center">
@@ -193,11 +249,25 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
                                 </span>
                             )}
                         </div>
-                        <span className="text-[10px] text-slate-500 font-medium">
-                            {new Date(activity.created_at).toLocaleDateString('fr-FR', {
-                                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-                            })}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-500 font-medium">
+                                {new Date(activity.created_at).toLocaleDateString('fr-FR', {
+                                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                                })}
+                            </span>
+                            
+                            {/* Reprint Button */}
+                            {activity.amount && activity.amount > 0 && ['payment', 'epargne', 'tontine', 'credit'].includes(activity.activity_type) && (
+                                <button
+                                    onClick={() => handleReprint(activity)}
+                                    className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-cyan-400 transition"
+                                    title="Imprimer Reçu"
+                                    disabled={isPrinting}
+                                >
+                                    <Printer size={14} />
+                                </button>
+                            )}
+                        </div>
                      </div>
 
                      {/* Description */}
