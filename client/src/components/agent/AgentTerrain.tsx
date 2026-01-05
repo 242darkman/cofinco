@@ -257,26 +257,25 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                  <Button 
                    variant="ghost" 
                    className="!bg-emerald-500/20 !border-2 !border-emerald-500/30 !text-emerald-400 hover:!bg-emerald-500/30 hover:!border-emerald-500/50 hover:!text-emerald-300 p-2 h-9 w-9 rounded-xl" 
-                   title="Paiement"
+                   title="Paiement - Test Icon Prop"
+                   icon={DollarSign}
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }}
-                 >
-                   <DollarSign size={20} className="stroke-[2.5]" />
-                 </Button>
+                 />
                  <Button 
                    variant="ghost" 
                    className="!bg-cyan-500/20 !border-2 !border-cyan-500/30 !text-cyan-400 hover:!bg-cyan-500/30 hover:!border-cyan-500/50 hover:!text-cyan-300 p-2 h-9 w-9 rounded-xl" 
-                   title="Nouvelle visite"
+                   title="Nouvelle visite - Test Text"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }}
                  >
-                   <Plus size={20} className="stroke-[2.5]" />
+                   TEST
                  </Button>
                  <Button 
                    variant="ghost" 
                    className="!bg-slate-600/30 !border-2 !border-slate-500/30 !text-slate-300 hover:!bg-slate-600/50 hover:!border-slate-500/50 hover:!text-white p-2 h-9 w-9 rounded-xl" 
-                   title="Voir profil"
+                   title="Voir profil - Test StrokeWidth"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }}
                  >
-                   <Eye size={20} className="stroke-[2.5]" />
+                   <Eye size={20} strokeWidth={2.5} />
                  </Button>
                </div>
             )}
