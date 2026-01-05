@@ -8,6 +8,7 @@ interface DashboardHeaderProps {
   currentTime: Date;
   language: string;
   onRefresh: () => void;
+  isRefreshing?: boolean;
   getGreeting: () => string;
   getRoleLabel: (role: string) => string;
   t: (key: string) => string;
@@ -19,6 +20,7 @@ export default function DashboardHeader({
   currentTime,
   language,
   onRefresh,
+  isRefreshing = false,
   getGreeting,
   getRoleLabel,
   t
@@ -57,6 +59,8 @@ export default function DashboardHeader({
             onClick={onRefresh}
             aria-label="Rafraîchir"
             data-testid="button-refresh-stats"
+            className={isRefreshing ? '[&_svg]:animate-spin' : ''}
+            disabled={isRefreshing}
           />
         </div>
       </div>

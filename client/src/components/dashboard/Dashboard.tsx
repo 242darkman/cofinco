@@ -119,6 +119,7 @@ export default function Dashboard({
         currentTime={currentTime}
         language={language}
         onRefresh={refresh}
+        isRefreshing={loading}
         getGreeting={getGreeting}
         getRoleLabel={getRoleLabel}
         t={t}
