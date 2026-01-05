@@ -102,6 +102,13 @@ export function registerTontineRoutes(app: Express) {
       
       res.json(addSnakeCaseAliasesDeep(contrib));
   });
+
+  // Get tontines for a specific client (their memberships)
+  app.get("/api/clients/:id/tontines", requireAuth, async (req, res) => {
+    const tontines = await storage.getTontinesByClient(req.params.id);
+    res.json(addSnakeCaseAliasesDeep(tontines));
+  });
+
   // Tontine Rules
   app.get("/api/tontines/:id/regles", requireAuth, async (req, res) => {
     const regles = await storage.getTontineRegles(req.params.id);

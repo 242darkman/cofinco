@@ -162,12 +162,13 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     try {
       const [creditsData, tontinesData, comptesData] = await Promise.all([
         creditApi.getAll({ clientId, statut: 'Approuvé,En cours,Actif' }),
-        tontineApi.getAll({ statut: 'Active' }),
+        tontineApi.getByClient(clientId),
         compteEpargneApi.getByClient(clientId)
       ]);
 
       setCredits(creditsData || []);
-      setTontines(tontinesData || []);
+      // Map the result to extract the tontine objects from the membership data
+      setTontines(tontinesData?.map((m: any) => m.tontine || m) || []);
       setClientComptes(comptesData || []);
     } catch (error) {
       console.error('Erreur chargement données:', error);
