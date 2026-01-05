@@ -27,7 +27,7 @@ export function useCreditStats() {
     
     demandesEnAttente: demandes.filter(d => {
       const s = normalizeStatus(d.statut);
-      return s === 'en_attente' || s === 'pending';
+      return s === 'en_attente' || s === 'pending' || s.includes('analyse');
     }).length,
     demandesTotal: demandes.length,
     demandesApprouvees: demandes.filter(d => {
@@ -52,7 +52,7 @@ export function useCreditStats() {
     montantTotalDemandes: demandes.reduce((sum, d) => sum + (d.montant_demande || 0), 0),
     montantDemandesEnAttente: demandes.filter(d => {
       const s = normalizeStatus(d.statut);
-      return s === 'en_attente' || s === 'pending';
+      return s === 'en_attente' || s === 'pending' || s.includes('analyse');
     }).reduce((sum, d) => sum + (d.montant_demande || 0), 0),
     montantDemandesAccorde: demandes.filter(d => {
       const s = normalizeStatus(d.statut);
