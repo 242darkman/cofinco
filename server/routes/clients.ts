@@ -227,6 +227,84 @@ export function registerClientRoutes(app: Express) {
       }
   });
 
+  // UPDATE Account (PATCH)
+  app.patch("/api/clients/:clientId/accounts/:accountId", requireAuth, requireRole('admin', 'chef'), requireAgenceIdAccess(), async (req, res) => {
+      try {
+        const { clientId, accountId } = req.params;
+        
+        // 1. Verify access to client
+        const client = await storage.getClient(clientId);
+        if (!client) return res.status(404).json({ message: "Client not found" });
+
+        const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+        if (agenceFilter) {
+          if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
+            return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+          }
+        }
+
+        // 2. Validate input
+        const schema = z.object({
+            typeCompte: z.enum(['Courant', 'Épargne']).optional(),
+            tauxInteret: z.coerce.number().min(0).optional(),
+            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).optional()
+        });
+
+        const parsed = schema.parse(req.body);
+
+        // 3. Update account
+        const updatedAccount = await storage.updateClientAccount(accountId, {
+          typeCompte: parsed.typeCompte,
+          tauxInteret: parsed.tauxInteret?.toString(),
+          statut: parsed.statut
+        });
+
+        if (!updatedAccount) {
+            return res.status(404).json({ message: "Compte introuvable" });
+        }
+
+        // 4. Log Audit
+        await logAudit(
+            req,
+            "UPDATE_ACCOUNT",
+            "client",
+            client.id,
+            { accountId, updates: parsed },
+            "success",
+            "medium"
+        );
+
+        // 5. Notify Real-Time Updates
+        const wsServer = await import("../ws-server");
+        const wsInstance = wsServer.getWsInstance();
+        if (wsInstance) {
+            // Notify client update (force refresh of client details everywhere)
+            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: client.id, agenceId: client.agenceId } });
+            
+            // Notify live activity
+            wsInstance.broadcast({
+              type: "LIVE_ACTIVITY",
+              payload: {
+                action: `Modification compte ${updatedAccount.numeroCompte}`,
+                user: req.session.user?.nom || 'Système',
+                type: 'finance',
+                timestamp: new Date().toISOString(),
+                agenceId: client.agenceId
+              }
+            });
+
+             // Update dashboard stats if there was an invalidation needed
+            wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+        }
+
+        res.json(updatedAccount);
+      } catch (error) {
+         if (error instanceof z.ZodError) return res.status(400).json(error);
+         console.error("Error updating account:", error);
+         res.status(500).json({ message: "Erreur mise à jour compte" });
+      }
+  });
+
   // CREATE: Validation de l'agence cible (supporte agenceId)
   app.post("/api/clients", requireAuth, requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
       try {

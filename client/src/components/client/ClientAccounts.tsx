@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, CreditCard, Wallet, X, Edit2, Trash2, Check, AlertCircle, TrendingUp, AlertTriangle } from 'lucide-react';
-import { Card, Badge } from '../ui';
+import { Card, Badge, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 interface CompteBancaire {
@@ -30,6 +30,7 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
   const [comptes, setComptes] = useState<CompteBancaire[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [editingCompte, setEditingCompte] = useState<CompteBancaire | null>(null);
   const [formData, setFormData] = useState({
     typeCompte: 'Courant' as 'Courant' | 'Épargne',
@@ -61,14 +62,12 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    try {
-      if (editingCompte) {
-        // Edit logic if feasible (PATCH /api/accounts/:id probably needed in future)
-        // For now, assume creation context primarily or implement PATCH later
-        alert("La modification n'est pas encore implémentée sur la nouvelle API");
+    if (editingCompte) {
+        setShowConfirm(true);
         return;
-      } 
+    }
 
+    try {
       const payload = {
         typeCompte: formData.typeCompte,
         soldeInitial: formData.solde,
@@ -95,6 +94,33 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
       console.error('Erreur souscription compte:', error);
       alert(error instanceof Error ? error.message : 'Erreur inconnue');
     }
+  };
+
+  const handleConfirmUpdate = async () => {
+      if (!editingCompte) return;
+
+      try {
+          const res = await fetch(`/api/clients/${clientId}/accounts/${editingCompte.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                  typeCompte: formData.typeCompte,
+                  tauxInteret: formData.tauxInteret,
+                  statut: formData.statut
+              })
+          });
+
+          if (!res.ok) throw new Error('Erreur modification');
+          
+          const updated = await res.json();
+          setComptes(prev => prev.map(c => c.id === updated.id ? updated : c));
+          resetForm();
+          setShowConfirm(false);
+      } catch (error) {
+          console.error("Update error:", error);
+          alert("Erreur lors de la modification");
+      }
   };
 
   const handleDelete = async (compteId: string) => {
@@ -147,6 +173,28 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
           </button>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleConfirmUpdate}
+        title="Modifier le compte"
+        message={
+            <div className="space-y-2">
+                <p>Êtes-vous sûr de vouloir modifier ce compte ?</p>
+                <div className="bg-slate-800/50 p-3 rounded-lg text-sm border border-slate-700/50">
+                    <p className="flex justify-between"><span>Type:</span> <span className="font-medium text-white">{formData.typeCompte}</span></p>
+                    <p className="flex justify-between"><span>Statut:</span> <span className={`font-medium ${formData.statut === 'Actif' ? 'text-emerald-400' : 'text-red-400'}`}>{formData.statut}</span></p>
+                    {formData.typeCompte === 'Épargne' && (
+                         <p className="flex justify-between"><span>Taux:</span> <span className="font-medium text-white">{formData.tauxInteret}%</span></p>
+                    )}
+                </div>
+            </div>
+        }
+        confirmText="Sauvegarder"
+        variant="warning"
+        isLoading={loading}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

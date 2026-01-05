@@ -270,6 +270,17 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     });
   }
   
+  export async function updateClientAccount(
+    id: string,
+    updateData: { typeCompte?: string; tauxInteret?: string; statut?: string }
+  ): Promise<CompteEpargne | undefined> {
+    const [compte] = await db.update(comptesEpargne)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(comptesEpargne.id, id))
+      .returning();
+    return compte || undefined;
+  }
+  
   // Transactions Epargne
   export async function getTransactionEpargne(id: string): Promise<TransactionEpargne | undefined> {
     const [transaction] = await db.select().from(transactionsEpargne).where(eq(transactionsEpargne.id, id));
