@@ -256,27 +256,27 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                <div className="flex items-center gap-2 justify-end">
                  <Button 
                    variant="ghost" 
-                   className="text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-600 p-2 h-auto w-auto" 
+                   className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-600 p-2 h-9 w-9" 
                    title="Paiement"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }}
                  >
-                   <DollarSign size={20} />
+                   <DollarSign size={18} />
                  </Button>
                  <Button 
                    variant="ghost" 
-                   className="text-blue-500 hover:bg-blue-500/10 hover:text-blue-600 p-2 h-auto w-auto" 
+                   className="bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 hover:text-blue-600 p-2 h-9 w-9" 
                    title="Nouvelle visite"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }}
                  >
-                   <Plus size={20} />
+                   <Plus size={18} />
                  </Button>
                  <Button 
                    variant="ghost" 
-                   className="text-slate-400 hover:bg-slate-500/10 hover:text-slate-300 p-2 h-auto w-auto" 
+                   className="bg-slate-500/10 border border-slate-500/20 text-slate-400 hover:bg-slate-500/20 hover:text-slate-300 p-2 h-9 w-9" 
                    title="Voir profil"
                    onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }}
                  >
-                   <Eye size={20} />
+                   <Eye size={18} />
                  </Button>
                </div>
             )}
