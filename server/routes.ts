@@ -17,6 +17,7 @@ import { registerRbacRoutes } from "./routes/rbac";
 import { registerAgencesRoutes } from "./routes/agences";
 import { registerEmployesRoutes } from "./routes/employes";
 import loyaltyRouter from "./routes/loyalty";
+import { registerOtpRoutes } from "./routes/otp";
 
 export function registerRoutes(app: Express): Server {
   // Register modular routes
@@ -43,6 +44,9 @@ export function registerRoutes(app: Express): Server {
 
   // Employes Module (nouvelle architecture users/employes)
   registerEmployesRoutes(app);
+  
+  // OTP Module
+  registerOtpRoutes(app);
 
   // External Services
   registerMobileMoneyRoutes(app);
