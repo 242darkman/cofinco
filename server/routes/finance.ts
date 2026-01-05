@@ -641,7 +641,39 @@ export function registerFinanceRoutes(app: Express) {
 
         const parsed = insertOperationCaisseSchema.parse(data);
         const op = await storage.createOperationCaisse(parsed);
-        
+
+        // Update account balance if compteId is provided
+        if (parsed.compteId && parsed.montant) {
+            const compte = await storage.getCompteEpargne(parsed.compteId);
+            if (compte) {
+                const montant = Number(parsed.montant);
+                const currentSolde = Number(compte.solde) || 0;
+                let newSolde: number;
+
+                // Versement/Dépôt = add to balance, Retrait = subtract from balance
+                const opType = (parsed.typeOperation || '').toLowerCase();
+                if (opType === 'versement' || opType === 'dépôt' || opType === 'depot' || opType === 'depôt') {
+                    newSolde = currentSolde + montant;
+                } else if (opType === 'retrait') {
+                    newSolde = currentSolde - montant;
+                } else {
+                    newSolde = currentSolde; // No change for other operations
+                }
+
+                await storage.updateCompteEpargne(parsed.compteId, { solde: String(newSolde) });
+
+                // Broadcast account update
+                try {
+                    const wsInstance = require("../ws-server").getWsInstance();
+                    if (wsInstance) {
+                        wsInstance.broadcast({ type: "COMPTE_UPDATE", payload: { compteId: parsed.compteId, newSolde } });
+                    }
+                } catch (wsErr) {
+                    console.error('Error broadcasting compte update:', wsErr);
+                }
+            }
+        }
+
         try {
             // Loyalty Points: Award points for deposits
             if (parsed.clientId && parsed.typeOperation === 'Versement' && parsed.montant) {

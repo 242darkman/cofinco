@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins } from 'lucide-react';
 import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
 import { Card, Button, Badge } from '@/components/ui';
-import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi } from '../../../lib/api-client';
+import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
@@ -58,6 +58,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [tontinesActives, setTontinesActives] = useState<any[]>([]);
   const [tontineSelectionnee, setTontineSelectionnee] = useState<any>(null);
   const [membresTontine, setMembresTontine] = useState<any[]>([]);
+  const [comptesClient, setComptesClient] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [montantError, setMontantError] = useState<string | null>(null);
 
@@ -121,10 +122,11 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
 
       if (data) {
         setSelectedClient(data);
-        // Charger en parallèle les crédits et tontines
+        // Charger en parallèle les crédits, tontines et comptes
         await Promise.all([
           chargerCreditsActifs(data.id),
-          chargerTontinesActives(data.id)
+          chargerTontinesActives(data.id),
+          chargerComptesClient(data.id)
         ]);
         toast.success(`Client ${data.nom} ${data.prenom || ''} sélectionné`);
       } else {
@@ -189,6 +191,40 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     }
   }, []);
 
+  // Charger les comptes du client
+  const chargerComptesClient = useCallback(async (clientId: string) => {
+    try {
+      const comptes = await compteEpargneApi.getByClient(clientId);
+      setComptesClient(comptes || []);
+    } catch (error) {
+      console.error('Erreur chargement comptes:', error);
+      setComptesClient([]);
+    }
+  }, []);
+
+  // Trouver le compte approprié selon le type d'opération
+  const getCompteIdForOperation = useCallback((typeOp: TypeDepot | TypeRetrait | null): string | undefined => {
+    if (!comptesClient.length) return undefined;
+
+    let typeCompte: string | null = null;
+    if (typeOp === 'Compte Courant' || typeOp === 'Retrait Compte Courant') {
+      typeCompte = 'Courant';
+    } else if (typeOp === 'Compte Épargne' || typeOp === 'Retrait Épargne') {
+      typeCompte = 'Epargne';
+    } else if (typeOp === 'Compte Bloqué') {
+      typeCompte = 'Bloqué';
+    }
+
+    if (typeCompte) {
+      const compte = comptesClient.find(c => {
+        const ct = c.type_compte || c.typeCompte || '';
+        return ct === typeCompte || ct.toLowerCase().includes(typeCompte!.toLowerCase());
+      });
+      return compte?.id;
+    }
+    return undefined;
+  }, [comptesClient]);
+
   // Préparer l'opération avec validation
   const preparerOperation = useCallback(async () => {
     if (!typeOperation || !montant) {
@@ -223,9 +259,13 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       const reference = `ESP-${Date.now()}`;
       const typeDetaille = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
 
+      // Trouver le compte associé à ce type d'opération
+      const compteId = getCompteIdForOperation(typeDetaille);
+
       const operationData = {
         session_id: sessionId,
         client_id: selectedClient!.id,
+        compte_id: compteId,
         type_operation: typeOperation,
         sous_type_operation: typeDetaille,
         montant: parseFloat(montant),
@@ -249,7 +289,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     } finally {
       setLoading(false);
     }
-  }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, description, billetage]);
+  }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, description, billetage, getCompteIdForOperation]);
 
   // Valider l'opération après OTP
   const validerOperation = useCallback(async (code: string) => {
