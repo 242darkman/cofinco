@@ -317,7 +317,10 @@ export const sessionCaisseApi = {
   getOperations: (sessionId: string) => request<any[]>(`/sessions-caisse/${sessionId}/operations`),
   addOperation: (data: any) => request<any>('/operations-caisse', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      montant: String(data.montant)
+    }),
   }),
   close: (id: string, data: any) => request<any>(`/sessions-caisse/${id}/close`, {
     method: 'POST',
@@ -331,7 +334,10 @@ export const caisseOperationApi = {
   getToday: () => request<any[]>('/operations-caisse/today'),
   create: (data: any) => request<any>('/operations-caisse', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      montant: String(data.montant)
+    }),
   }),
   update: (id: string, data: any) => request<any>(`/operations-caisse/${id}`, {
     method: 'PATCH',

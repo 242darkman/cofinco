@@ -139,7 +139,10 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
       const opResponse = await fetch('/api/operations-caisse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(otpData.operation)
+        body: JSON.stringify({
+          ...otpData.operation,
+          montant: String(otpData.operation.montant)
+        })
       });
       if (!opResponse.ok) throw new Error('Erreur opération caisse');
 
