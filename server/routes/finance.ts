@@ -626,47 +626,87 @@ export function registerFinanceRoutes(app: Express) {
 
   // Opération caisse (roles: admin, chef, caisse)
   app.post("/api/operations-caisse", requireAuth, requireRole('admin', 'chef', 'caisse', 'Administrateur'), async (req, res) => {
-      const data = normalizeKeysDeep(req.body) as any;
-      const user = req.session.user!;
-      
-      // Ownership check
-      const session = await storage.getSessionCaisse(data.sessionId);
-      if (!session) return res.status(404).json({ message: "Session introuvable" });
-      
-      const isManager = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role);
-      if (session.caissierId !== user.id && !isManager) {
-          return res.status(403).json({ message: "Vous n'avez pas l'autorisation d'ajouter des opérations à cette session" });
-      }
+      try {
+        const data = normalizeKeysDeep(req.body) as any;
+        const user = req.session.user!;
+        
+        // Ownership check
+        const session = await storage.getSessionCaisse(data.sessionId);
+        if (!session) return res.status(404).json({ message: "Session introuvable" });
+        
+        const isManager = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role);
+        if (session.caissierId !== user.id && !isManager) {
+            return res.status(403).json({ message: "Vous n'avez pas l'autorisation d'ajouter des opérations à cette session" });
+        }
 
-      const parsed = insertOperationCaisseSchema.parse(data);
-      const op = await storage.createOperationCaisse(parsed);
-      
-      // Loyalty Points: Award points for deposits
-      if (parsed.clientId && parsed.typeOperation === 'Versement' && parsed.montant) {
-          const points = Math.floor(Number(parsed.montant) / 1000); // 1 point per 1000 FCFA
-          await storage.addLoyaltyPoints(
-              parsed.clientId,
-              points,
-              'EPARGNE',
-              `Versement de ${parsed.montant} FCFA`,
-              Number(parsed.montant)
-          );
-          // Recalculate engagement score
-          await storage.calculateEngagementScore(parsed.clientId);
-      }
-      
-      // Notify Client Update for Limits Real-time Refresh
-      if (parsed.clientId) {
-          const wsInstance = require("../ws-server").getWsInstance();
-          if (wsInstance) {
-              wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: parsed.clientId } });
-              // Also update dashboard & Caisse List
-              wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
-              wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
-          }
-      }
+        const parsed = insertOperationCaisseSchema.parse(data);
+        const op = await storage.createOperationCaisse(parsed);
+        
+        try {
+            // Loyalty Points: Award points for deposits
+            if (parsed.clientId && parsed.typeOperation === 'Versement' && parsed.montant) {
+                const points = Math.floor(Number(parsed.montant) / 1000); // 1 point per 1000 FCFA
+                await storage.addLoyaltyPoints(
+                    parsed.clientId,
+                    points,
+                    'EPARGNE',
+                    `Versement de ${parsed.montant} FCFA`,
+                    Number(parsed.montant)
+                );
+                // Recalculate engagement score
+                await storage.calculateEngagementScore(parsed.clientId);
+            }
+            
+            // Notify Client Update for Limits Real-time Refresh
+            if (parsed.clientId) {
+                const wsInstance = require("../ws-server").getWsInstance();
+                if (wsInstance) {
+                    wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: parsed.clientId } });
+                    // Also update dashboard & Caisse List
+                    wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+                    wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
+                }
+            }
+        } catch (wsError) {
+             console.error('Error in post-operation processing (WS/Loyalty):', wsError);
+        }
 
-      res.json(addSnakeCaseAliasesDeep(op));
+        res.json(addSnakeCaseAliasesDeep(op));
+      } catch (error: any) {
+        console.error('Error creating operation:', error);
+        res.status(400).json({ message: error.message || "Erreur lors de la création de l'opération" });
+      }
+  });
+
+  // Update Opération caisse (PATCH)
+  app.patch("/api/operations-caisse/:id", requireAuth, requireRole('admin', 'chef', 'caisse', 'Administrateur'), async (req, res) => {
+      try {
+        const { id } = req.params;
+        const data = normalizeKeysDeep(req.body) as any;
+        
+        const updated = await storage.updateOperationCaisse(id, data);
+        if (!updated) {
+             return res.status(404).json({ message: "Opération introuvable" });
+        }
+        
+        // Notify updates
+        try {
+             if (updated.clientId) {
+                const wsInstance = require("../ws-server").getWsInstance();
+                if (wsInstance) {
+                    wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: updated.clientId } });
+                    wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+                }
+             }
+        } catch (wsError) {
+             console.error("WS Broadcast error:", wsError);
+        }
+
+        res.json(addSnakeCaseAliasesDeep(updated));
+      } catch (error: any) {
+         console.error('Error updating operation:', error);
+         res.status(400).json({ message: error.message || "Erreur lors de la mise à jour" });
+      }
   });
 
   // Factures - Basic logic
