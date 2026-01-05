@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins } from 'lucide-react';
+import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins, Printer } from 'lucide-react';
 import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
 import { Card, Button, Badge } from '@/components/ui';
 import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi } from '../../../lib/api-client';
@@ -9,6 +9,9 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
+import { useReceiptPrinter } from '../../../hooks/useReceiptPrinter';
+import { ReceiptTemplate, ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { authService } from '../../../lib/auth';
 
 interface Client {
   id: string;
@@ -40,6 +43,7 @@ const DENOMINATIONS = [
 ];
 
 export default function CaisseEspeces({ sessionId, onTransactionComplete }: CaisseEspecesProps) {
+  const user = authService.getCurrentUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [typeOperation, setTypeOperation] = useState<TypeOperation | null>(null);
@@ -61,6 +65,11 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [comptesClient, setComptesClient] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [montantError, setMontantError] = useState<string | null>(null);
+  const [lastOperationData, setLastOperationData] = useState<any>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+
+  // Receipt Printer Hook
+  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
 
   // Billetage State
   const [showBilletage, setShowBilletage] = useState(false);
@@ -331,11 +340,18 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       toast.dismiss(loadingId);
       toast.success(`${typeOperation} de ${formatMoney(parseFloat(montant))} effectué avec succès !`);
 
+      // Sauvegarder les données pour le reçu
+      setLastOperationData({
+        reference: otpData.operation.reference,
+        typeOperation,
+        typeDetaille: typeOperation === 'Dépôt' ? typeDepot : typeRetrait,
+        montant: parseFloat(montant),
+        client: selectedClient,
+        date: new Date()
+      });
+
       setSuccessMessage(`${typeOperation} effectué avec succès !`);
-      setTimeout(() => {
-        reinitialiserFormulaire();
-        onTransactionComplete();
-      }, 2000);
+      setShowPrintDialog(true); // Afficher le dialogue d'impression
     } catch (error) {
       toast.dismiss(loadingId);
       const errorMessage = handleApiError(error, 'Erreur lors de l\'opération');
@@ -364,6 +380,52 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setShowBilletage(false);
     setMontantError(null);
   }, []);
+
+  // Fonction pour imprimer le reçu
+  const handlePrintReceipt = useCallback(() => {
+    if (!lastOperationData) return;
+
+    const receiptData: ReceiptData = {
+      title: `Reçu de ${lastOperationData.typeOperation}`,
+      reference: lastOperationData.reference,
+      date: lastOperationData.date,
+      type: lastOperationData.typeDetaille || lastOperationData.typeOperation,
+      client: {
+        nom: lastOperationData.client?.nom || '',
+        prenom: lastOperationData.client?.prenom || '',
+        telephone: lastOperationData.client?.telephone || lastOperationData.client?.phone || '',
+        numeroCompte: lastOperationData.client?.numero_compte
+      },
+      agent: {
+        nom: user?.nom || 'Agent',
+        prenom: user?.prenom || '',
+        id: user?.id
+      },
+      items: [
+        {
+          description: `${lastOperationData.typeOperation} - ${lastOperationData.typeDetaille || 'Espèces'}`,
+          montant: lastOperationData.montant,
+          details: description || undefined
+        }
+      ],
+      total: lastOperationData.montant,
+      modePaiement: 'Espèces',
+      devise: 'FCFA'
+    };
+
+    printReceipt(receiptData);
+  }, [lastOperationData, user, description, printReceipt]);
+
+  // Fermer le dialogue d'impression et réinitialiser
+  const handleClosePrintDialog = useCallback((shouldPrint: boolean) => {
+    if (shouldPrint) {
+      handlePrintReceipt();
+    }
+    setShowPrintDialog(false);
+    setLastOperationData(null);
+    reinitialiserFormulaire();
+    onTransactionComplete();
+  }, [handlePrintReceipt, reinitialiserFormulaire, onTransactionComplete]);
 
   // Calcul du total billetage mémorisé
   const totalBilletage = useMemo(() => {
@@ -797,6 +859,26 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
           operationType={typeOperation || ''}
           amount={parseFloat(montant)}
         />
+      )}
+
+      {/* Print Receipt Dialog */}
+      <ConfirmDialog
+        isOpen={showPrintDialog}
+        title="Opération réussie !"
+        message={lastOperationData ?
+          `${lastOperationData.typeOperation} de ${formatMoney(lastOperationData.montant)} effectué avec succès pour ${lastOperationData.client?.nom} ${lastOperationData.client?.prenom || ''}. Voulez-vous imprimer le reçu ?` :
+          'Opération effectuée avec succès. Voulez-vous imprimer le reçu ?'
+        }
+        onConfirm={() => handleClosePrintDialog(true)}
+        onClose={() => handleClosePrintDialog(false)}
+        variant="success"
+        confirmText={isPrinting ? "Impression..." : "Imprimer le reçu"}
+        cancelText="Fermer sans imprimer"
+      />
+
+      {/* Hidden Receipt Template for Printing */}
+      {receiptData && (
+        <ReceiptTemplate ref={componentRef} data={receiptData} />
       )}
     </div>
   );
