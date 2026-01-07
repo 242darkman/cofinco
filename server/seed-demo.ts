@@ -97,6 +97,7 @@ import {
   ordresBourse,
   transactionsBourse,
   watchlistBourse,
+  dureesSuggerees,
 } from '@shared/schema';
 import { hashPassword, ROLES } from './auth';
 import { eq } from 'drizzle-orm';
@@ -147,9 +148,7 @@ const PROFESSIONS = [
 ];
 
 const CREDIT_TYPES = [
-  'Crédit stock', 'Crédit équipement', 'Crédit fonds de roulement', 'Crédit investissement',
-  'Crédit commerce', 'Crédit agriculture', 'Crédit élevage', 'Crédit artisanat',
-  'Crédit urgence', 'Crédit consommation', 'Crédit scolaire', 'Crédit habitat',
+  'Personnel', 'Immobilier', 'Commercial'
 ];
 
 const CREDIT_OBJECTS = [
@@ -1531,7 +1530,7 @@ async function seedDemo() {
     await db.insert(objectifsEpargne).values(objectifsEpargneData);
 
     // Générer 40 demandes de crédit avec différents statuts
-    const DEMANDE_STATUSES = ['En attente', 'En cours d\'analyse', 'Approuvée', 'Rejetée', 'Déboursé', 'Annulée'];
+    const DEMANDE_STATUSES = ['En attente', 'En cours', 'Approuvée', 'Rejetée', 'Décaissée', 'Annulée'];
     const demandesData: any[] = [];
 
     for (let i = 0; i < 40; i++) {
@@ -1539,18 +1538,49 @@ async function seedDemo() {
       const clientRevenu = parseInt(client.revenuMensuel || '300000');
       const montantDemande = parseInt(generateRealisticAmount(100000, Math.min(clientRevenu * 6, 2000000), 50000));
       const statut = randomFromArray(DEMANDE_STATUSES);
-      const isApproved = ['Approuvée', 'Déboursé'].includes(statut);
+      const isApproved = ['Approuvée', 'Décaissée'].includes(statut);
+
+      const typeRevenu = Math.random() > 0.3 ? 'Mensuel' : 'Journalier';
+      let revenuJournalier = null;
+      let revenuMensuel = clientRevenu;
+
+      if (typeRevenu === 'Journalier') {
+         // Si journalier, on dérive le journalier du mensuel approximatif (26 jours/mois)
+         revenuJournalier = Math.round(clientRevenu / 26 / 500) * 500;
+         revenuMensuel = revenuJournalier * 26;
+      }
+
+      // V2: dureeValeur + dureeUnite instead of 'duree'
+      const frequence = randomFromArray(['Journalier', 'Journalier', 'Hebdomadaire', 'Mensuel']) as 'Journalier' | 'Hebdomadaire' | 'Bimensuel' | 'Mensuel' | 'Trimestriel';
+      let dureeValeur: number;
+      let dureeUnite: 'Jour' | 'Semaine' | 'Mois';
+
+      // Choose duration based on frequency
+      if (frequence === 'Journalier') {
+        dureeValeur = randomFromArray([15, 30, 45, 60, 90]);
+        dureeUnite = 'Jour';
+      } else if (frequence === 'Hebdomadaire') {
+        dureeValeur = randomFromArray([4, 8, 12, 16]);
+        dureeUnite = 'Semaine';
+      } else {
+        dureeValeur = randomFromArray([1, 3, 6, 9, 12]);
+        dureeUnite = 'Mois';
+      }
 
       demandesData.push({
         numeroDemande: `DEM-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
         clientId: client.id,
         montantDemande: String(montantDemande),
-        tauxInteret: String(randomBetween(9, 18)),
-        dureeMois: randomBetween(3, 24),
+        tauxInteret: String(randomBetween(15, 25)),
+        // V2 duration fields
+        dureeValeur,
+        dureeUnite,
+        frequenceRemboursement: frequence,
         typeCredit: randomFromArray(CREDIT_TYPES),
         objetCredit: randomFromArray(CREDIT_OBJECTS),
-        frequenceRemboursement: randomFromArray(['Mensuel', 'Hebdomadaire', 'Bi-mensuel']),
-        revenusMensuels: String(clientRevenu),
+        revenusMensuels: String(revenuMensuel),
+        typeRevenu,
+        revenuJournalier: revenuJournalier ? String(revenuJournalier) : null,
         chargesMensuelles: generateRealisticAmount(clientRevenu * 0.2, clientRevenu * 0.5, 10000),
         scoreCredit: randomBetween(35, 95),
         montantApprouve: isApproved ? generateRealisticAmount(montantDemande * 0.7, montantDemande, 50000) : null,
@@ -1568,13 +1598,15 @@ async function seedDemo() {
     const HABITATIONS = ['Propriétaire', 'Locataire', 'Hébergé', 'Logement de fonction'];
     const EVALUATIONS = ['Très bonne', 'Bonne', 'Moyenne', 'Faible'];
 
-    insertedDemandes.filter(d => ['Approuvée', 'Déboursé', 'En cours d\'analyse'].includes(d.statut)).forEach((demande, idx) => {
+    insertedDemandes.filter(d => ['Approuvée', 'Décaissée', 'En cours'].includes(d.statut || '')).forEach((demande, idx) => {
       enquetesData.push({
         clientId: demande.clientId,
         demandeId: demande.id,
         montantDemande: demande.montantDemande,
         objetCredit: demande.objetCredit,
         revenuMensuel: demande.revenusMensuels,
+        typeRevenu: demande.typeRevenu,
+        revenuJournalier: demande.revenuJournalier,
         chargesMensuelles: demande.chargesMensuelles,
         autrePrets: generateRealisticAmount(0, 200000, 25000),
         personnesCharge: randomBetween(0, 8),
@@ -1587,8 +1619,8 @@ async function seedDemo() {
           10000
         ),
         scoreGlobal: demande.scoreCredit || randomBetween(40, 90),
-        recommandation: demande.statut === 'Déboursé' ? 'Favorable' : randomFromArray(RECOMMANDATIONS),
-        statut: demande.statut === 'Déboursé' ? 'Validée' : demande.statut === 'Approuvée' ? 'Validée' : 'En cours',
+        recommandation: demande.statut === 'Décaissée' ? 'Favorable' : randomFromArray(RECOMMANDATIONS),
+        statut: demande.statut === 'Décaissée' ? 'Validée' : demande.statut === 'Approuvée' ? 'Validée' : 'En cours',
         observations: faker.lorem.sentence(),
         createdBy: staffGroups.Agents[idx % staffGroups.Agents.length]?.id,
         createdAt: daysAgo(randomBetween(5, 60)),
@@ -2071,6 +2103,9 @@ async function seedDemo() {
         typeActivite: 'Commerce',
         descriptionActivite: 'Vente de vêtements',
         revenuEstime: '300000',
+        typeRevenu: 'Mensuel',
+        revenuJournalier: null,
+        joursTravailMois: 26,
         chiffreAffairesMensuel: '900000',
         interetCredit: true,
         montantSouhaite: '200000',
@@ -2092,6 +2127,9 @@ async function seedDemo() {
         typeActivite: 'Restauration',
         descriptionActivite: 'Cuisine locale',
         revenuEstime: '400000',
+        typeRevenu: 'Journalier',
+        revenuJournalier: '20000',
+        joursTravailMois: 20,
         chiffreAffairesMensuel: '1100000',
         interetCredit: true,
         montantSouhaite: '350000',
@@ -3727,6 +3765,37 @@ async function seedDemo() {
     ]);
 
     console.log('   ✅ Loge & Bourse data created');
+
+    // SEED DUREES SUGGEREES (Credit)
+    console.log('\n📅 Seeding Durees Suggerees (Credit)...');
+
+    await db.delete(dureesSuggerees);
+
+    await db.insert(dureesSuggerees).values([
+      // Journalier
+      { frequence: 'Journalier', dureeValeur: 15, dureeUnite: 'Jour', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 30, dureeUnite: 'Jour', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 60, dureeUnite: 'Jour', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 90, dureeUnite: 'Jour', estRecommandee: 0, ordre: 3, actif: 1 },
+      // Hebdomadaire
+      { frequence: 'Hebdomadaire', dureeValeur: 1, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Hebdomadaire', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Hebdomadaire', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      // Mensuel
+      { frequence: 'Mensuel', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Mensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Mensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      // Bimensuel
+      { frequence: 'Bimensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Bimensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Bimensuel', dureeValeur: 18, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      // Trimestriel
+      { frequence: 'Trimestriel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Trimestriel', dureeValeur: 24, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Trimestriel', dureeValeur: 36, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+    ]);
+
+    console.log('   ✅ Durees Suggerees created');
 
     console.log('\n🎉 DEMO SEED COMPLETED SUCCESSFULLY!');
     console.log('\n═══════════════════════════════════════════════════════════════');

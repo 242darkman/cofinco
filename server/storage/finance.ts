@@ -1,11 +1,12 @@
-import { 
-    credits, demandesCredit, enquetesCredit, remboursements, 
+import {
+    credits, demandesCredit, enquetesCredit, remboursements,
     comptesEpargne, transactionsEpargne, plansEpargne, objectifsEpargne,
     sessionsCaisse, operationsCaisse, shiftsCaisse, caisseSecurityCodes, caisseCodeUsages, comptageBillets,
-    factures, lignesFactures, modelesFactures, caisses, clients, agences, caisseAssignations, users
+    factures, lignesFactures, modelesFactures, caisses, clients, agences, caisseAssignations, users,
+    dureesSuggerees
   } from "@shared/schema";
-  import { 
-    type Credit, type InsertCredit, type DemandeCredit, type InsertDemandeCredit, 
+  import {
+    type Credit, type InsertCredit, type DemandeCredit, type InsertDemandeCredit,
     type EnqueteCredit, type InsertEnqueteCredit, type Remboursement, type InsertRemboursement,
     type CompteEpargne, type InsertCompteEpargne, type TransactionEpargne, type InsertTransactionEpargne,
     type PlanEpargne, type InsertPlanEpargne, type ObjectifEpargne, type InsertObjectifEpargne,
@@ -14,7 +15,8 @@ import {
     type Facture, type InsertFacture, type LigneFacture, type InsertLigneFacture,
     type ModeleFacture, type InsertModeleFacture, type Caisse, type InsertCaisse,
     caisseTransferts, type CaisseTransfert, type InsertCaisseTransfert,
-    type Agence, type CaisseAssignation
+    type Agence, type CaisseAssignation,
+    type DureeSuggeree, type InsertDureeSuggeree
   } from "@shared/schema";
   import { db } from "../db";
 import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
@@ -763,4 +765,46 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
         }
         
         return upcomingPayments.sort((a, b) => 0);
+    }
+
+    // Durees Suggerees
+    export async function getDureesSuggerees(frequence?: string): Promise<DureeSuggeree[]> {
+        let query = db.select().from(dureesSuggerees).where(eq(dureesSuggerees.actif, 1));
+
+        if (frequence) {
+            query = db.select().from(dureesSuggerees).where(
+                and(
+                    eq(dureesSuggerees.actif, 1),
+                    eq(dureesSuggerees.frequence, frequence as any)
+                )
+            );
+        }
+
+        return query.orderBy(dureesSuggerees.ordre);
+    }
+
+    export async function getDureeSuggereeRecommandee(frequence: string): Promise<DureeSuggeree | undefined> {
+        const [duree] = await db.select().from(dureesSuggerees).where(
+            and(
+                eq(dureesSuggerees.actif, 1),
+                eq(dureesSuggerees.frequence, frequence as any),
+                eq(dureesSuggerees.estRecommandee, 1)
+            )
+        );
+        return duree || undefined;
+    }
+
+    export async function createDureeSuggeree(insertDuree: InsertDureeSuggeree): Promise<DureeSuggeree> {
+        const [duree] = await db.insert(dureesSuggerees).values(insertDuree).returning();
+        return duree;
+    }
+
+    export async function updateDureeSuggeree(id: string, updateData: Partial<InsertDureeSuggeree>): Promise<DureeSuggeree | undefined> {
+        const [duree] = await db.update(dureesSuggerees).set(updateData).where(eq(dureesSuggerees.id, id)).returning();
+        return duree || undefined;
+    }
+
+    export async function deleteDureeSuggeree(id: string): Promise<boolean> {
+        const result = await db.delete(dureesSuggerees).where(eq(dureesSuggerees.id, id));
+        return true;
     }

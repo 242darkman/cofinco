@@ -1,10 +1,11 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 import { caisses } from "./operations";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum } from "@shared/enum/enums";
 
 // Interest Rates
 export const interestRates = pgTable("interest_rates", {
@@ -40,7 +41,7 @@ export const credits = pgTable("credits", {
   dateSolde: timestamp("date_solde"),
   soldeAvant2Mois: boolean("solde_avant_2_mois").default(false),
   soldeRestant: numeric("solde_restant"),
-  echeance: text("echeance").default("Mensuel"),
+  echeance: text("echeance").default("Journalier"),
   garanties: text("garanties"),
   observations: text("observations"),
   agenceId: uuid("agence_id").references(() => agences.id), // Agence du crédit
@@ -55,24 +56,45 @@ export type InsertCredit = z.infer<typeof insertCreditSchema>;
 export type Credit = typeof credits.$inferSelect;
 
 // Demandes de crédit
-export const demandesCredit = pgTable("demandes_credit", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  numeroDemande: text("numero_demande").notNull().unique(),
-  clientId: uuid("client_id").notNull().references(() => clients.id),
-  montantDemande: numeric("montant_demande").notNull(),
-  tauxInteret: numeric("taux_interet").notNull(),
-  dureeMois: integer("duree_mois").notNull(),
-  typeCredit: text("type_credit"),
-  objetCredit: text("objet_credit").notNull(),
-  frequenceRemboursement: text("frequence_remboursement").default("Mensuel"),
-  revenusMensuels: numeric("revenus_mensuels"),
-  chargesMensuelles: numeric("charges_mensuelles"),
-  scoreCredit: integer("score_credit"),
-  montantApprouve: numeric("montant_approuve"),
-  statut: text("statut").notNull().default("En attente"),
-  createdBy: uuid("created_by"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const demandesCredit = pgTable(
+  "demandes_credit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    numeroDemande: text("numero_demande").notNull().unique(),
+    clientId: uuid("client_id").notNull().references(() => clients.id),
+
+    montantDemande: numeric("montant_demande").notNull(),
+    tauxInteret: numeric("taux_interet").notNull(),
+
+    // Fréquence et durée (V2 - champs principaux)
+    frequenceRemboursement: frequenceRemboursementEnum("frequence_remboursement").notNull(),
+    dureeValeur: integer("duree_valeur").notNull(),       // ex: 15, 3, 12
+    dureeUnite: dureeUniteEnum("duree_unite").notNull(),  // Jour / Semaine / Mois
+
+    // Calculs backend
+    nombreEcheances: integer("nombre_echeances"),    // calculé / recalculable
+
+    // Enums
+    typeRevenu: typeRevenuEnum("type_revenu"),
+    statut: statutDemandeEnum("statut"),
+    typeCredit: typeCreditEnum("type_credit"),
+    objetCredit: text("objet_credit").notNull(),
+
+    revenusMensuels: numeric("revenus_mensuels"),
+    revenuJournalier: numeric("revenu_journalier"),
+    chargesMensuelles: numeric("charges_mensuelles"),
+    scoreCredit: integer("score_credit"),
+    montantApprouve: numeric("montant_approuve"),
+
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    idxDemandesClient: index("idx_demandes_credit_client_id").on(t.clientId),
+    idxDemandesStatut: index("idx_demandes_credit_statut").on(t.statut),
+    idxDemandesCreatedAt: index("idx_demandes_credit_created_at").on(t.createdAt),
+  }),
+);
 
 export const insertDemandeCreditSchema = createInsertSchema(demandesCredit).omit({ id: true, createdAt: true });
 export type InsertDemandeCredit = z.infer<typeof insertDemandeCreditSchema>;
@@ -86,6 +108,9 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   montantDemande: numeric("montant_demande").notNull(),
   objetCredit: text("objet_credit").notNull(),
   revenuMensuel: numeric("revenu_mensuel"),
+  typeRevenu: typeRevenuEnum("type_revenu"),
+  revenuJournalier: numeric("revenu_journalier"),
+  joursTravailMois: integer("jours_travail_mois").default(26),
   chargesMensuelles: numeric("charges_mensuelles"),
   autrePrets: numeric("autre_prets").default("0"),
   personnesCharge: integer("personnes_charge").default(0),
@@ -106,22 +131,54 @@ export type InsertEnqueteCredit = z.infer<typeof insertEnqueteCreditSchema>;
 export type EnqueteCredit = typeof enquetesCredit.$inferSelect;
 
 // Remboursements
-export const remboursements = pgTable("remboursements", {
+export const remboursements = pgTable(
+  "remboursements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    creditId: uuid("credit_id").notNull().references(() => credits.id),
+
+    montant: numeric("montant").notNull(),
+    dateRemboursement: timestamp("date_remboursement").notNull(),
+
+    methodePaiement: methodePaiementEnum("methode_paiement"),
+
+    numeroTransaction: text("numero_transaction"),
+    recu: text("recu"),
+    observations: text("observations"),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    idxRembCredit: index("idx_remboursements_credit_id").on(t.creditId),
+    idxRembDate: index("idx_remboursements_date").on(t.dateRemboursement),
+  }),
+);
+
+// Durees suggerees
+export const dureesSuggerees = pgTable("durees_suggerees", {
   id: uuid("id").primaryKey().defaultRandom(),
-  creditId: uuid("credit_id").notNull().references(() => credits.id),
-  montant: numeric("montant").notNull(),
-  dateRemboursement: timestamp("date_remboursement").notNull(),
-  methodePaiement: text("methode_paiement").notNull().default("Espèces"),
-  numeroTransaction: text("numero_transaction"),
-  recu: text("recu"),
-  observations: text("observations"),
-  createdBy: uuid("created_by"),
+
+  frequence: frequenceRemboursementEnum("frequence").notNull(),
+
+  dureeValeur: integer("duree_valeur").notNull(),     // ex 15, 30, 3, 6
+  dureeUnite: dureeUniteEnum("duree_unite").notNull(),// Jour/Mois…
+
+  estRecommandee: integer("est_recommandee").notNull().default(0), // 0/1 simple
+  ordre: integer("ordre").notNull().default(0),
+  actif: integer("actif").notNull().default(1),
+
   createdAt: timestamp("created_at").defaultNow(),
 });
+
 
 export const insertRemboursementSchema = createInsertSchema(remboursements).omit({ id: true, createdAt: true });
 export type InsertRemboursement = z.infer<typeof insertRemboursementSchema>;
 export type Remboursement = typeof remboursements.$inferSelect;
+
+// Durees Suggerees types
+export const insertDureeSuggereeSchema = createInsertSchema(dureesSuggerees).omit({ id: true, createdAt: true });
+export type InsertDureeSuggeree = z.infer<typeof insertDureeSuggereeSchema>;
+export type DureeSuggeree = typeof dureesSuggerees.$inferSelect;
 
 // Comptes épargne
 export const comptesEpargne = pgTable("comptes_epargne", {

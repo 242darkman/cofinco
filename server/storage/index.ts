@@ -27,7 +27,8 @@ import {
     Compte, InsertCompte, Journal, InsertJournal, Ecriture, InsertEcriture, DeclarationTva, InsertDeclarationTva,
 
     InsertAvantage, ObjectifMensuel, InsertObjectifMensuel,
-    CaisseAssignation, InsertCaisseAssignation
+    CaisseAssignation, InsertCaisseAssignation,
+    DureeSuggeree, InsertDureeSuggeree
 } from "@shared/schema";
 
 export interface IStorage {
@@ -350,6 +351,13 @@ export interface IStorage {
     createBulletinPaie(data: any): Promise<any>;
     updateBulletinStatut(id: number, statut: string): Promise<any>;
     generateMonthlyPaie(mois: string, genereParId?: string): Promise<any[]>;
+
+    // Durees Suggerees (Credit)
+    getDureesSuggerees(frequence?: string): Promise<DureeSuggeree[]>;
+    getDureeSuggereeRecommandee(frequence: string): Promise<DureeSuggeree | undefined>;
+    createDureeSuggeree(duree: InsertDureeSuggeree): Promise<DureeSuggeree>;
+    updateDureeSuggeree(id: string, duree: Partial<InsertDureeSuggeree>): Promise<DureeSuggeree | undefined>;
+    deleteDureeSuggeree(id: string): Promise<boolean>;
 }
 
 // Aggregate all helper/modules into one object

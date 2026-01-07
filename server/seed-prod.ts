@@ -15,6 +15,7 @@ import {
   uiCustomization,
   smsTemplates,
   smsProviderSettings,
+  dureesSuggerees,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 
@@ -535,6 +536,38 @@ async function seedProd() {
       // Assuming schema definition for `users.agence` is text based on demo.
       statut: 'Actif',
     });
+
+
+    // SEED DUREES SUGGEREES (Credit)
+    console.log('\n📅 Seeding Durees Suggerees (Credit)...');
+
+    await db.delete(dureesSuggerees);
+
+    await db.insert(dureesSuggerees).values([
+      // Journalier
+      { frequence: 'Journalier', dureeValeur: 15, dureeUnite: 'Jour', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 30, dureeUnite: 'Jour', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 60, dureeUnite: 'Jour', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 90, dureeUnite: 'Jour', estRecommandee: 0, ordre: 3, actif: 1 },
+      // Hebdomadaire
+      { frequence: 'Hebdomadaire', dureeValeur: 1, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Hebdomadaire', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Hebdomadaire', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      // Mensuel
+      { frequence: 'Mensuel', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Mensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Mensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      // Bimensuel
+      { frequence: 'Bimensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Bimensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Bimensuel', dureeValeur: 18, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      // Trimestriel
+      { frequence: 'Trimestriel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
+      { frequence: 'Trimestriel', dureeValeur: 24, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
+      { frequence: 'Trimestriel', dureeValeur: 36, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+    ]);
+
+    console.log('   ✅ Durees Suggerees created');
 
     console.log('\n✅ PRODUCTION SEED COMPLETE');
     console.log('Login: admin / Admin123!@#');

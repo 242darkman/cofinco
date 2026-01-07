@@ -9,6 +9,12 @@ import { requireAgenceAccess } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
 import { z } from "zod";
+import {
+  validerCoherenceFrequenceDuree,
+  calculerNombreEcheances,
+  type FrequenceRemboursement,
+  type DureeUnite
+} from "@shared/config/credit-durations";
 
 export function registerFinanceRoutes(app: Express) {
   // Credits
@@ -106,7 +112,7 @@ export function registerFinanceRoutes(app: Express) {
   // Create demande credit (roles: admin, chef, credit, superviseur, terrain)
   app.post("/api/demandes-credit", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur', 'terrain'), requireAgenceAccess(), async (req, res) => {
       const data = normalizeKeysDeep(req.body) as any;
-      
+
       // Auto-generate numeroDemande if not provided
       if (!data.numeroDemande) {
           // Format: DEM-YYYYMMDD-XXXX
@@ -115,8 +121,31 @@ export function registerFinanceRoutes(app: Express) {
           data.numeroDemande = `DEM-${dateStr}-${randomSuffix}`;
       }
 
+      // Validation coherence frequence/duree
+      if (data.frequenceRemboursement && data.dureeValeur && data.dureeUnite) {
+        const erreurValidation = validerCoherenceFrequenceDuree(
+          data.frequenceRemboursement as FrequenceRemboursement,
+          Number(data.dureeValeur),
+          data.dureeUnite as DureeUnite
+        );
+
+        if (erreurValidation) {
+          return res.status(400).json({
+            message: erreurValidation,
+            code: "INVALID_DURATION_FREQUENCY"
+          });
+        }
+
+        // Calculer automatiquement le nombre d'echeances
+        data.nombreEcheances = calculerNombreEcheances(
+          data.frequenceRemboursement as FrequenceRemboursement,
+          Number(data.dureeValeur),
+          data.dureeUnite as DureeUnite
+        );
+      }
+
       const parsed = insertDemandeCreditSchema.parse(data);
-      
+
       // Vérifier agence du client
       const agenceFilter = req.agenceFilter as { agence?: string } | null;
       if (agenceFilter) {
@@ -125,7 +154,7 @@ export function registerFinanceRoutes(app: Express) {
           return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
         }
       }
-      
+
       const demande = await storage.createDemandeCredit(parsed);
       
       
