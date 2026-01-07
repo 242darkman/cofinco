@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, User, Phone, MapPin, Briefcase, DollarSign, FileText, Camera, Image, Video, AlertTriangle } from 'lucide-react';
+import { X, Save, User, Phone, MapPin, Briefcase, DollarSign, FileText, Camera, Image, Video, AlertTriangle, TrendingUp } from 'lucide-react';
 import { prospectionApi } from '../../lib/api-client';
 import { toast } from 'sonner';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
@@ -27,6 +27,9 @@ export default function ProspectionForm({ agentId, onClose, onSuccess }: Prospec
     localisation: '',
     type_activite: '',
     description_activite: '',
+    type_revenu: 'Mensuel',
+    revenu_journalier: '',
+    jours_travail_mois: '26',
     revenu_estime: '',
     chiffre_affaires_mensuel: '',
     interet_credit: false,
@@ -96,6 +99,9 @@ export default function ProspectionForm({ agentId, onClose, onSuccess }: Prospec
         localisation: formData.localisation,
         typeActivite: formData.type_activite,
         descriptionActivite: formData.description_activite,
+        typeRevenu: formData.type_revenu,
+        revenuJournalier: parseFloat(formData.revenu_journalier) || 0,
+        joursTravailMois: parseInt(formData.jours_travail_mois) || 26,
         revenuEstime: parseFloat(formData.revenu_estime) || 0,
         chiffreAffairesMensuel: parseFloat(formData.chiffre_affaires_mensuel) || 0,
         interetCredit: formData.interet_credit,
@@ -287,7 +293,94 @@ export default function ProspectionForm({ agentId, onClose, onSuccess }: Prospec
               {errors.telephone_prospect && <p className="text-blue-400 text-xs mt-1">{errors.telephone_prospect}</p>}
             </div>
 
-            <div>
+            <div className="md:col-span-2 space-y-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+              <label className="block text-sm font-semibold text-slate-300">
+                <TrendingUp size={16} className="inline mr-2" />
+                Estimation des revenus *
+              </label>
+              
+              <div className="flex bg-slate-700/50 p-1 rounded-lg w-fit">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type_revenu: 'Mensuel' })}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                    formData.type_revenu === 'Mensuel'
+                      ? 'bg-cyan-500 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Estimation Mensuelle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type_revenu: 'Journalier' })}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                    formData.type_revenu === 'Journalier'
+                      ? 'bg-cyan-500 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Estimation Journalière
+                </button>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                {formData.type_revenu === 'Journalier' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1 font-medium">Revenu journalier (FCFA)</label>
+                      <input
+                        type="number"
+                        value={formData.revenu_journalier}
+                        onChange={(e) => {
+                          const journalier = e.target.value;
+                        const jours = '26';
+                          const mensuel = journalier ? (parseFloat(journalier) * parseInt(jours)).toString() : '';
+                          setFormData({ 
+                            ...formData, 
+                            revenu_journalier: journalier, 
+                            revenu_estime: mensuel 
+                          });
+                        }}
+                        className="w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        placeholder="Ex: 5000"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1 font-medium">Revenu mensuel estimé (FCFA)</label>
+                    <input
+                      type="number"
+                      value={formData.revenu_estime}
+                      onChange={(e) => handleChange('revenu_estime', e.target.value)}
+                      className="w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      placeholder="Ex: 150000"
+                    />
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 font-medium">Chiffre d'affaires mensuel (FCFA)</label>
+                  <input
+                    type="number"
+                    value={formData.chiffre_affaires_mensuel}
+                    onChange={(e) => handleChange('chiffre_affaires_mensuel', e.target.value)}
+                    className="w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 font-medium"
+                    placeholder="Ex: 500000"
+                  />
+                </div>
+              </div>
+
+              {formData.type_revenu === 'Journalier' && formData.revenu_journalier && (
+                <div className="bg-cyan-500/10 p-3 rounded-lg border border-cyan-500/20 text-sm text-cyan-400 flex items-center gap-2">
+                  <TrendingUp size={14} />
+                  <span>Calcul: {parseFloat(formData.revenu_journalier).toLocaleString()} × 26 jours = <span className="font-bold">{(parseFloat(formData.revenu_journalier) * 26).toLocaleString()} FCFA/mois</span></span>
+                </div>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-slate-300 mb-2">
                 <MapPin size={16} className="inline mr-2" />
                 Localisation

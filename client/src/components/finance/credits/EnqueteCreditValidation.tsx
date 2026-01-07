@@ -18,6 +18,9 @@ interface Enquete extends EnqueteCredit {
   risque_estime?: string;
   recommandation_evaluateur?: string;
   montant_recommande?: number;
+  type_revenu?: string;
+  revenu_journalier?: number;
+  jours_travail_mois?: number;
 }
 
 interface EnqueteCreditValidationProps {
@@ -36,7 +39,7 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
   const chargesMensuelles = enquete.charges_mensuelles || 0;
   const revenuMensuel = enquete.revenu_mensuel_declare || enquete.revenus_mensuels || 0;
   const capaciteRemboursement = (revenuMensuel - chargesMensuelles) * 0.4;
-  const montantMaxRecommande = capaciteRemboursement * 12; // Basé sur 12 mois
+  const montantMaxRecommande = capaciteRemboursement * 24; // Augmenté pour refléter le nouveau taux/durée moyen
 
   const handleSubmit = () => {
     if (!decision) return;
@@ -142,7 +145,14 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
                 </div>
                 <div className="flex justify-between items-center p-2 bg-slate-900/50 rounded">
                   <span className="text-slate-400">Revenu mensuel:</span>
-                  <span className="text-green-400 font-medium">{(enquete.revenu_mensuel_declare || 0).toLocaleString()} FCFA</span>
+                  <div className="text-right">
+                    <span className="text-green-400 font-medium">{(enquete.revenu_mensuel_declare || enquete.revenus_mensuels || 0).toLocaleString()} FCFA</span>
+                    {enquete.type_revenu === 'Journalier' && (
+                      <p className="text-[10px] text-green-300/60 italic">
+                        {(enquete.revenu_journalier || 0).toLocaleString()} FCFA/j x {enquete.jours_travail_mois || 26}j
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between items-center p-2 bg-slate-900/50 rounded">
                   <span className="text-slate-400">Charges mensuelles:</span>

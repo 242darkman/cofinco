@@ -14,15 +14,21 @@ interface Demande {
   client_id: string;
   montant_demande: number;
   montant_approuve?: number | null;
-  duree_mois: number;
+  // V2 duration fields
+  duree_valeur: number;
+  duree_unite: 'Jour' | 'Semaine' | 'Mois';
+  nombre_echeances?: number;
   taux_interet: number;
   type_credit: string | null;
   objet_credit: string;
   statut: string;
   score_credit: number | null;
   revenus_mensuels?: number;
+  type_revenu?: string;
+  revenu_journalier?: number;
   charges_mensuelles?: number;
   capacite_remboursement?: number;
+  frequence_remboursement: string;
   date_demande: string;
   clients: {
     nom: string;
@@ -69,22 +75,64 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
   const [showConfirmReject, setShowConfirmReject] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Memoized financial calculations
-  const { montantBase, mensualite, montantTotal, tauxEndettement, revenus } = useMemo(() => {
-    const base = demande.montant_approuve ?? demande.montant_demande;
-    const taux = demande.taux_interet / 100 / 12;
-    const duree = demande.duree_mois;
-    const rev = demande.revenus_mensuels ?? 1;
+  // Helper: convert V2 duration to days
+  const convertDureeEnJours = (valeur: number, unite: string): number => {
+    switch (unite) {
+      case 'Jour': return valeur;
+      case 'Semaine': return valeur * 7;
+      case 'Mois': return valeur * 30;
+      default: return valeur;
+    }
+  };
 
-    // Mensualité avec formule de prêt amortissable
-    const mens = base * (taux * Math.pow(1 + taux, duree)) / (Math.pow(1 + taux, duree) - 1);
-    const total = base * (1 + (demande.taux_interet / 100) * (duree / 12));
-    const endettement = (mens / rev) * 100;
+  // Helper: calculate number of payments from V2 duration + frequency
+  const calculerNombreEcheances = (frequence: string, dureeValeur: number, dureeUnite: string): number => {
+    const joursTotal = convertDureeEnJours(dureeValeur, dureeUnite);
+    switch (frequence) {
+      case 'Journalier': return joursTotal;
+      case 'Hebdomadaire': return Math.ceil(joursTotal / 7);
+      case 'Bimensuel': return Math.ceil(joursTotal / 15);
+      case 'Mensuel': return Math.ceil(joursTotal / 30);
+      case 'Trimestriel': return Math.ceil(joursTotal / 90);
+      default: return joursTotal;
+    }
+  };
+
+  // Memoized financial calculations - V2
+  const { montantBase, mensualite, montantTotal, nombreEcheancesCalc, tauxEndettement, revenus } = useMemo(() => {
+    const base = demande.montant_demande;
+    const rev = demande.revenus_mensuels ?? 0;
+    
+    // V2: Use duree_valeur and duree_unite
+    const dureeValeur = demande.duree_valeur || 0;
+    const dureeUnite = demande.duree_unite || 'Mois';
+    const frequence = demande.frequence_remboursement;
+
+    // Calculate number of payments
+    const nombreEcheances = demande.nombre_echeances || calculerNombreEcheances(frequence, dureeValeur, dureeUnite);
+
+    // Simple interest calculation (matching CreditRequestForm)
+    const total = base * (1 + demande.taux_interet / 100);
+    const mens = nombreEcheances > 0 ? total / nombreEcheances : 0;
+    
+    // Calculate debt ratio (convert to monthly equivalent)
+    let montantMensuelEquivalent = mens;
+    if (frequence === 'Journalier') {
+      montantMensuelEquivalent = mens * 30;
+    } else if (frequence === 'Hebdomadaire') {
+      montantMensuelEquivalent = mens * 4;
+    } else if (frequence === 'Bimensuel') {
+      montantMensuelEquivalent = mens * 2;
+    } else if (frequence === 'Trimestriel') {
+      montantMensuelEquivalent = mens / 3;
+    }
+    const endettement = rev > 0 ? (montantMensuelEquivalent / rev) * 100 : 0;
 
     return {
       montantBase: base,
       mensualite: isFinite(mens) ? mens : 0,
       montantTotal: total,
+      nombreEcheancesCalc: nombreEcheances,
       tauxEndettement: isFinite(endettement) ? endettement : 0,
       revenus: rev,
     };
@@ -139,11 +187,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
       const numeroCredit = `CRD-${numeroSequence}`;
 
       const dateDeblocage = new Date();
+      const frequence = demande.frequence_remboursement;
+      const joursTotal = convertDureeEnJours(demande.duree_valeur, demande.duree_unite);
+      
       const datePremiereEcheance = new Date(dateDeblocage);
-      datePremiereEcheance.setMonth(datePremiereEcheance.getMonth() + 1);
+      if (frequence === 'Journalier') {
+          datePremiereEcheance.setDate(datePremiereEcheance.getDate() + 1);
+      } else if (frequence === 'Hebdomadaire') {
+          datePremiereEcheance.setDate(datePremiereEcheance.getDate() + 7);
+      } else {
+          datePremiereEcheance.setMonth(datePremiereEcheance.getMonth() + 1);
+      }
 
       const dateDerniereEcheance = new Date(dateDeblocage);
-      dateDerniereEcheance.setMonth(dateDerniereEcheance.getMonth() + demande.duree_mois);
+      dateDerniereEcheance.setDate(dateDerniereEcheance.getDate() + joursTotal);
 
       // Sanitize and validate guarantees
       const garantiesPayload = guarantees.map((g) => ({
@@ -157,10 +214,11 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
         clientId: demande.client_id,
         montant: montantBase,
         taux: demande.taux_interet,
-        duree: demande.duree_mois,
+        duree: nombreEcheancesCalc, // Store as number of payments
         typeCredit: demande.type_credit || 'Standard',
         objetCredit: sanitizeInput(demande.objet_credit),
         statut: 'Actif',
+        echeance: frequence,
         dateDebut: dateDeblocage.toISOString().split('T')[0],
         dateFin: dateDerniereEcheance.toISOString().split('T')[0],
         dateSolvabilite: dateDerniereEcheance.toISOString().split('T')[0],
@@ -328,14 +386,18 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-slate-400">Durée:</dt>
-                    <dd className="text-white">{demande.duree_mois} mois</dd>
+                    <dd className="text-white">{demande.duree_valeur} {demande.duree_unite === 'Jour' ? 'jours' : demande.duree_unite === 'Semaine' ? 'semaines' : 'mois'}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-400">Échéances:</dt>
+                    <dd className="text-white">{nombreEcheancesCalc} paiements ({demande.frequence_remboursement})</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-slate-400">Taux:</dt>
                     <dd className="text-white">{demande.taux_interet}%</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">Mensualité:</dt>
+                    <dt className="text-slate-400">Mensualité/Quotidien:</dt>
                     <dd className="text-green-400 font-bold">{formatMoney(mensualite)}</dd>
                   </div>
                 </dl>
@@ -362,6 +424,11 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                 <div className="text-xl md:text-2xl font-bold text-white break-words">
                   {formatMoney(demande.revenus_mensuels ?? 0)}
                 </div>
+                {demande.type_revenu === 'Journalier' && demande.revenu_journalier && (
+                  <div className="text-[10px] text-green-300/70 mt-1 italic">
+                    {formatMoney(demande.revenu_journalier)}/j (26j/mois)
+                  </div>
+                )}
               </div>
 
               <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/50 rounded-lg p-4">
@@ -595,7 +662,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
       <ConfirmDialog
         isOpen={showConfirmApprove}
         title="Confirmer l'approbation du crédit"
-        message={`Vous êtes sur le point d'approuver et débourser un crédit de ${formatMoney(montantBase)} pour ${safeClientName}. Le montant total à rembourser sera de ${formatMoney(montantTotal)} sur ${demande.duree_mois} mois. Cette action est irréversible.`}
+        message={`Vous êtes sur le point d'approuver et débourser un crédit de ${formatMoney(montantBase)} pour ${safeClientName}. Le montant total à rembourser sera de ${formatMoney(montantTotal)} en ${nombreEcheancesCalc} paiements (${demande.frequence_remboursement}). Cette action est irréversible.`}
         confirmText="Approuver et débourser"
         cancelText="Annuler"
         onConfirm={handleApprove}

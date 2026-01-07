@@ -306,7 +306,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-slate-400">Durée:</dt>
-                  <dd className="text-white">{credit.duree || 0} mois</dd>
+                  <dd className="text-white">{credit.duree || 0} {credit.echeance === 'Journalier' ? 'jours' : credit.echeance === 'Hebdomadaire' ? 'semaines' : 'mois'} ({credit.echeance || 'Mensuel'})</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-slate-400">Échéance:</dt>

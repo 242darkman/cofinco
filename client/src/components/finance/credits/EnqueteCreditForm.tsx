@@ -70,6 +70,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     revenu_journalier: '',
     jours_travail_mois: '26',
     revenu_mensuel_declare: '',
+    type_revenu: 'Mensuel', // 'Mensuel' or 'Journalier'
     charges_mensuelles: '',
     autres_credits: [] as any[],
     garanties_proposees: [] as any[],
@@ -375,6 +376,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
         revenu_journalier: parseFloat(formData.revenu_journalier) || 0,
         jours_travail_mois: parseInt(formData.jours_travail_mois) || 26,
         revenu_mensuel_declare: parseFloat(formData.revenu_mensuel_declare),
+        type_revenu: formData.type_revenu,
         charges_mensuelles: parseFloat(formData.charges_mensuelles) || 0,
         geo_latitude: geoLocation.latitude,
         geo_longitude: geoLocation.longitude,
@@ -623,7 +625,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border ${
                   errors.anciennete_activite ? 'border-blue-500' : 'border-slate-600'
                 } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                placeholder="Ex: 12"
+                placeholder="Ex: 30"
               />
               {errors.anciennete_activite && <p className="text-blue-400 text-xs mt-1">{errors.anciennete_activite}</p>}
             </div>
@@ -635,65 +637,99 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               Calcul du Revenu Mensuel
             </label>
             
+            <div className="flex bg-slate-700/50 p-1 rounded-lg w-fit mb-4">
+              <button
+                type="button"
+                onClick={() => handleChange('type_revenu', 'Mensuel')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  formData.type_revenu === 'Mensuel'
+                    ? 'bg-cyan-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Revenu Mensuel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChange('type_revenu', 'Journalier')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  formData.type_revenu === 'Journalier'
+                    ? 'bg-cyan-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Revenu Journalier
+              </button>
+            </div>
+
             <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Revenu journalier (FCFA)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="500"
-                  value={formData.revenu_journalier}
-                  onChange={(e) => handleChange('revenu_journalier', e.target.value)}
-                  className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  placeholder="10000"
-                  data-testid="input-revenu-journalier"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  <Calendar size={12} className="inline mr-1" />
-                  Jours travaillés/mois
-                </label>
-                <select
-                  value={formData.jours_travail_mois}
-                  onChange={(e) => handleChange('jours_travail_mois', e.target.value)}
-                  className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  data-testid="select-jours-travail"
-                >
-                  {[20, 22, 24, 25, 26, 28, 30].map(jours => (
-                    <option key={jours} value={jours}>{jours} jours</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Revenu mensuel calculé (FCFA) *</label>
-                <div className="relative">
+              {formData.type_revenu === 'Journalier' ? (
+                <>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Revenu journalier (FCFA)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="500"
+                      value={formData.revenu_journalier}
+                      onChange={(e) => {
+                        const journalier = e.target.value;
+                        const jours = '26';
+                        const mensuel = journalier ? (parseFloat(journalier) * parseInt(jours)).toString() : '';
+                        setFormData(prev => ({
+                          ...prev,
+                          revenu_journalier: journalier,
+                          revenu_mensuel_declare: mensuel
+                        }));
+                      }}
+                      className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      placeholder="10000"
+                      data-testid="input-revenu-journalier"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Revenu mensuel calculé (FCFA) *</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        readOnly
+                        value={formData.revenu_mensuel_declare}
+                        className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-700 focus:outline-none font-semibold cursor-not-allowed`}
+                        placeholder="260000"
+                        data-testid="input-revenu-mensuel"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-cyan-400">
+                        Auto
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="md:col-span-3">
+                  <label className="block text-xs text-slate-400 mb-1">Revenu mensuel fixe (FCFA) *</label>
                   <input
                     type="number"
                     min="0"
+                    step="1000"
                     value={formData.revenu_mensuel_declare}
                     onChange={(e) => handleChange('revenu_mensuel_declare', e.target.value)}
                     className={`w-full bg-slate-700 text-white px-4 py-3 rounded-lg border ${
                       errors.revenu_mensuel_declare ? 'border-blue-500' : 'border-cyan-500'
                     } focus:outline-none focus:ring-2 focus:ring-cyan-500 font-semibold`}
                     placeholder="260000"
-                    data-testid="input-revenu-mensuel"
+                    data-testid="input-revenu-mensuel-fixe"
                   />
-                  {formData.revenu_journalier && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-cyan-400">
-                      Auto
-                    </span>
-                  )}
+                  {errors.revenu_mensuel_declare && <p className="text-blue-400 text-xs mt-1">{errors.revenu_mensuel_declare}</p>}
                 </div>
-                {errors.revenu_mensuel_declare && <p className="text-blue-400 text-xs mt-1">{errors.revenu_mensuel_declare}</p>}
-              </div>
+              )}
             </div>
             
-            {formData.revenu_journalier && (
-              <div className="mt-3 text-sm text-slate-400 bg-slate-700/30 p-2 rounded">
-                💡 Calcul: {parseFloat(formData.revenu_journalier).toLocaleString()} FCFA × {formData.jours_travail_mois} jours = <span className="text-cyan-400 font-semibold">{(parseFloat(formData.revenu_journalier) * parseInt(formData.jours_travail_mois)).toLocaleString()} FCFA/mois</span>
+            {formData.type_revenu === 'Journalier' && formData.revenu_journalier && (
+              <div className="mt-3 text-sm text-slate-400 bg-slate-700/30 p-2 rounded flex items-center gap-2">
+                <TrendingUp size={14} className="text-cyan-400" />
+                <span>Calcul: {parseFloat(formData.revenu_journalier).toLocaleString()} FCFA × {formData.jours_travail_mois} jours = <span className="text-cyan-400 font-semibold">{(parseFloat(formData.revenu_journalier) * parseInt(formData.jours_travail_mois)).toLocaleString()} FCFA/mois</span></span>
               </div>
             )}
             {/* Live Scoring Visualization (Simplified) */}
@@ -710,7 +746,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                       const montant = parseFloat(formData.montant_demande) || 0;
                       const revenuNet = rev - charges;
                       
-                      const echeance = montant / 6; 
+                      const echeance = montant / 30; // Estimation journalière sur 30 jours
                       const tauxEndettement = revenuNet > 0 ? (echeance / revenuNet) * 100 : 100;
                       
                       let scoreColor = 'text-red-400';
