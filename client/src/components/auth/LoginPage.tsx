@@ -275,15 +275,22 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
 
               {error && (
                 <div
-                  className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 sm:p-4 mb-4 sm:mb-5 flex items-start gap-3"
+                  className="group relative overflow-hidden bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-5 flex items-start gap-4 animate-in slide-in-from-top-2 duration-300"
                   data-testid="status-error"
                 >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                    <AlertCircle className="text-red-400" size={20} />
+                  {/* Decorative background pulse */}
+                  <div className="absolute inset-0 bg-red-500/5 animate-pulse" />
+                  
+                  <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/10">
+                    <AlertCircle className="text-red-400 drop-shadow-md" size={20} />
                   </div>
-                  <p className="text-red-300 text-sm leading-relaxed" data-testid="text-error-message">
-                    {error}
-                  </p>
+                  
+                  <div className="relative flex-1 py-0.5">
+                     <h4 className="text-red-400 font-bold text-sm mb-0.5">Erreur de connexion</h4>
+                     <p className="text-red-300/90 text-sm leading-relaxed" data-testid="text-error-message">
+                      {error}
+                     </p>
+                  </div>
                 </div>
               )}
 
