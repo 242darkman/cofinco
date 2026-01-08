@@ -17,7 +17,7 @@ export type Sexe = 'M' | 'F';
 export type Statut = 'Actif' | 'Inactif' | 'Suspendu';
 export type TypeContrat = 'CDI' | 'CDD' | 'Stage' | 'Intérim';
 export type ModeCalculPaie = 'Mensuel' | 'Horaire' | 'Journalier';
-export type RoleSystem = 'admin' | 'chef_agence' | 'comptable' | 'caissier' | 'agent' | 'terrain' | 'credit';
+export type RoleSystem = 'admin' | 'chef_agence' | 'comptable' | 'caissier' | 'agent' | 'terrain' | 'credit' | 'superviseur';
 
 // ============================================
 // USER - Source de vérité identité
@@ -229,6 +229,7 @@ export interface CreateEmployeWithUserData {
   sexe?: Sexe;
   username?: string;
   password?: string;
+  photoProfile?: string;
 
   // Données employé
   matricule?: string;

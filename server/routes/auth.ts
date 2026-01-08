@@ -462,7 +462,10 @@ export function registerAuthRoutes(app: Express) {
   });
 
   app.delete("/api/users/:id", requireRole("admin"), async (req, res) => {
-      await db.delete(users).where(eq(users.id, req.params.id));
+    try {
+      await db.update(users)
+        .set({ deletedAt: new Date(), statut: 'Inactif' })
+        .where(eq(users.id, req.params.id));
       
       await logAudit(
         req,
@@ -475,6 +478,10 @@ export function registerAuthRoutes(app: Express) {
       );
 
       res.sendStatus(200);
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Erreur lors de la suppression de l'utilisateur" });
+    }
   });
 
   app.post("/api/users/:id/reset-password", requireRole("admin"), async (req, res) => {

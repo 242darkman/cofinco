@@ -195,9 +195,14 @@ export function registerEmployesRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
-      if (wsInstance) {
-          wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_new', id: result.employe.id } });
+      try {
+        const { getWsInstance } = await import("../ws-server");
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_new', id: result.employe.id } });
+        }
+      } catch (wsError) {
+        console.error("Failed to notify via WebSocket:", wsError);
       }
 
       // Retourner l'employé avec ses données user

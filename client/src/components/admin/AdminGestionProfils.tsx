@@ -1,22 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Card, Button, IconButton, ResponsiveTable } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { userApi } from '../../lib/api-client';
+import { userApi, employeApi } from '../../lib/api-client';
+import { useAgence } from '../../contexts/AgenceContext';
+import { ObjectUploader } from '../storage/ObjectUploader';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
-interface User {
-  id: string;
-  nom: string;
-  prenom: string;
-  email: string;
-  phone: string;
-  role: string;
-  statut: 'Actif' | 'Inactif' | 'Suspendu';
-  created_at: string;
-}
+// Local types removed to use shared entities or any for flexibility
 
 interface ModulePermission {
   id: string;
@@ -44,15 +37,22 @@ export default function AdminGestionProfils() {
   const canDeleteUsers = hasPermission('users', 'delete');
   const canManageUsers = hasPermission('users', 'manage');
 
+  // Agence context
+  const { agences: userAgences, selectedAgence: contextAgence } = useAgence();
+  
+  const availableAgences = useMemo(() => 
+    userAgences.filter(ua => ua.agenceId !== 'all').map(ua => ua.agence),
+  [userAgences]);
+
   // Confirmation dialog
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [permissions, setPermissions] = useState<ModulePermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [userAccess, setUserAccess] = useState<Record<string, UserAccess>>({});
   const [allUsersAccess, setAllUsersAccess] = useState<Record<string, Record<string, UserAccess>>>({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,6 +63,7 @@ export default function AdminGestionProfils() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const permissionTypes = [
     { key: 'peut_voir', label: 'Voir', icon: '👁️' },
@@ -80,18 +81,38 @@ export default function AdminGestionProfils() {
     phone: '',
     password: '',
     confirmPassword: '',
-    role: 'Caissier'
+    role: 'Caissier',
+    agenceId: '',
+    photoProfile: ''
   });
 
+  const roleMap: Record<string, string> = {
+    'Administrateur': 'admin',
+    'Chef Agence': 'chef_agence',
+    'Comptable': 'comptable',
+    'Caissier': 'caissier',
+    'Agent Caisse': 'caissier',
+    'Agent Terrain': 'terrain',
+    'Superviseur': 'superviseur',
+    'Agent': 'agent'
+  };
+
   const roles = [
-    'Caissier',
-    'Agent Terrain',
-    'Agent Caisse',
-    'Chef Agence',
-    'Comptable',
-    'Superviseur',
-    'Administrateur'
+    'Caissier', 'Chef Agence', 'Comptable', 'Superviseur', 'Administrateur', 'Agent Terrain', 'Agent'
   ];
+
+  const passwordValidation = useMemo(() => {
+    const pwd = formData.password;
+    return {
+      length: pwd.length >= 8,
+      uppercase: /[A-Z]/.test(pwd),
+      number: /[0-9]/.test(pwd),
+      match: pwd === formData.confirmPassword && pwd !== ''
+    };
+  }, [formData.password, formData.confirmPassword]);
+
+  const isPasswordSecure = passwordValidation.length && passwordValidation.uppercase && passwordValidation.number;
+  const isFormValid = isPasswordSecure && passwordValidation.match && formData.nom && formData.email;
 
   const modules = [
     'Caisse',
@@ -108,11 +129,12 @@ export default function AdminGestionProfils() {
   }, []);
 
   const loadUsers = useCallback(async () => {
+    setLoading(true);
     try {
-      const data = await userApi.getAll();
+      const data = await employeApi.getAll();
       setUsers(data || []);
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement des utilisateurs'));
+      toast.error(handleApiError(error, 'Erreur lors du chargement des profils'));
     } finally {
       setLoading(false);
     }
@@ -121,28 +143,32 @@ export default function AdminGestionProfils() {
   const handleCreateUser = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      toast.warning('Les mots de passe ne correspondent pas');
+    if (!isPasswordSecure) {
+      toast.warning('Le mot de passe ne respecte pas la politique de sécurité');
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast.warning('Le mot de passe doit contenir au moins 6 caractères');
-      return;
-    }
-
+    setIsSubmitting(true);
     try {
-      await userApi.create({
+      // Mapper le rôle UI vers le rôle système
+      const systemRole = roleMap[formData.role] || 'agent';
+
+      await employeApi.create({
         nom: formData.nom,
         prenom: formData.prenom,
         email: formData.email,
-        phone: formData.phone,
+        telephone: formData.phone,
         password: formData.password,
-        role: formData.role,
-        statut: 'Actif'
-      });
+        username: formData.email, // Par défaut on utilise l'email comme username
+        roleSystem: systemRole as any,
+        agenceId: formData.agenceId || undefined,
+        photoProfile: formData.photoProfile || undefined,
+        // Données employé par défaut
+        typeContrat: 'CDI',
+        modeCalculPaie: 'Mensuel'
+      } as any);
 
-      toast.success(`Utilisateur ${formData.nom} ${formData.prenom} créé avec succès`);
+      toast.success(`Profil ${formData.nom} ${formData.prenom} créé avec succès`);
 
       setFormData({
         nom: '',
@@ -151,14 +177,47 @@ export default function AdminGestionProfils() {
         phone: '',
         password: '',
         confirmPassword: '',
-        role: 'Caissier'
+        role: 'Caissier',
+        agenceId: '',
+        photoProfile: ''
       });
       setShowCreateForm(false);
       loadUsers();
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors de la création'));
+    } finally {
+      setIsSubmitting(false);
     }
   }, [formData, loadUsers]);
+
+  const handleGetUploadParams = async (file: any) => {
+    const response = await fetch('/api/uploads/request-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Erreur lors de la demande d\'URL d\'upload');
+    }
+    
+    const { uploadURL, objectPath } = await response.json();
+    
+    // On garde l'objectPath pour l'enregistrer dans l'utilisateur après l'upload
+    setFormData(prev => ({ ...prev, photoProfile: objectPath }));
+    
+    return {
+      method: 'PUT' as const,
+      url: uploadURL,
+      headers: {
+        'Content-Type': file.type,
+      },
+    };
+  };
 
   const getDefaultAccessForRole = (role: string): Record<string, UserAccess> => {
     const defaults: Record<string, UserAccess> = {};
@@ -188,28 +247,46 @@ export default function AdminGestionProfils() {
     return defaults;
   };
 
-  const toggleUserStatus = useCallback(async (user: User) => {
-    const newStatus = user.statut === 'Actif' ? 'Inactif' : 'Actif';
+  const toggleUserStatus = useCallback(async (emp: any) => {
+    const user = emp.user || emp;
+    const isActive = user.statut === 'Actif';
+    const newStatus = isActive ? 'Inactif' : 'Actif';
 
-    try {
-      await userApi.update(user.id, { statut: newStatus });
-      toast.success(`Utilisateur ${newStatus === 'Actif' ? 'activé' : 'désactivé'}`);
-      loadUsers();
-    } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du changement de statut'));
-    }
-  }, [loadUsers]);
-
-  const deleteUser = useCallback((user: User) => {
     openConfirm({
-      title: 'Supprimer cet utilisateur ?',
+      title: isActive ? 'Désactiver le profil ?' : 'Activer le profil ?',
+      message: isActive 
+        ? `Êtes-vous sûr de vouloir désactiver le profil de ${user.nom} ${user.prenom} ? L'utilisateur ne pourra plus se connecter.`
+        : `Voulez-vous réactiver le profil de ${user.nom} ${user.prenom} ?`,
+      variant: isActive ? 'warning' : 'info',
+      confirmText: isActive ? 'Désactiver' : 'Activer',
+      onConfirm: async () => {
+        try {
+          await userApi.update(user.id, { statut: newStatus });
+          toast.success(`Profil ${newStatus === 'Actif' ? 'activé' : 'désactivé'} avec succès`);
+          loadUsers();
+        } catch (error) {
+          toast.error(handleApiError(error, 'Erreur lors du changement de statut'));
+        }
+      },
+    });
+  }, [openConfirm, loadUsers]);
+
+  const deleteUser = useCallback((emp: any) => {
+    const user = emp.user || emp;
+    openConfirm({
+      title: 'Supprimer ce profil ?',
       message: `Êtes-vous sûr de vouloir supprimer ${user.nom} ${user.prenom} ? Cette action est irréversible.`,
       variant: 'danger',
       confirmText: 'Supprimer',
       onConfirm: async () => {
         try {
-          await userApi.delete(user.id);
-          toast.success('Utilisateur supprimé avec succès');
+          // Utiliser employeApi.delete si c'est un employé pour un soft delete propre
+          if (emp.id && emp.userId) {
+            await employeApi.delete(emp.id);
+          } else {
+            await userApi.delete(user.id);
+          }
+          toast.success('Profil supprimé avec succès');
           loadUsers();
         } catch (error) {
           toast.error(handleApiError(error, 'Erreur lors de la suppression'));
@@ -221,7 +298,8 @@ export default function AdminGestionProfils() {
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
-  const openPermissionsModal = useCallback(async (user: User) => {
+  const openPermissionsModal = useCallback(async (emp: any) => {
+    const user = emp.user || emp;
     setSelectedUser(user);
     setPermissionsLoading(true);
     setShowPermissionsModal(true);
@@ -258,14 +336,24 @@ export default function AdminGestionProfils() {
     }
   }, [selectedUser, userAccess]);
 
-  const filteredUsers = users.filter(u => {
-    const matchesSearch = (u.nom || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (u.prenom || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (u.phone || '').includes(searchQuery);
-    const matchesRole = roleFilter === 'all' || u.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter(emp => {
+      const user = emp.user || emp;
+      const fullName = `${user.nom} ${user.prenom}`.toLowerCase();
+      const email = (user.email || '').toLowerCase();
+      const phone = (user.telephone || user.phone || '').toLowerCase();
+      const role = emp.roleSystem || user.role || '';
+      
+      const matchesSearch = fullName.includes(searchQuery.toLowerCase()) || 
+                          email.includes(searchQuery.toLowerCase()) ||
+                          phone.includes(searchQuery.toLowerCase());
+      
+      const targetSystemRole = roleFilter === 'all' ? 'all' : (roleMap[roleFilter] || roleFilter);
+      const matchesRole = targetSystemRole === 'all' || role === targetSystemRole;
+      
+      return matchesSearch && matchesRole;
+    });
+  }, [users, searchQuery, roleFilter, roleMap]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredUsers.length / pageSize);
@@ -308,7 +396,9 @@ export default function AdminGestionProfils() {
                 icon={Plus}
                 onClick={() => {
                   setFormData({
-                    nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '', role: 'Caissier'
+                    nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '', role: 'Caissier',
+                    agenceId: (contextAgence && contextAgence.id !== 'all') ? contextAgence.id : '',
+                    photoProfile: ''
                   });
                   setShowCreateForm(true);
                 }}
@@ -358,7 +448,7 @@ export default function AdminGestionProfils() {
         ) : (
           <>
             {/* Scrollable Table Container */}
-            <div className="overflow-auto max-h-[400px] custom-scrollbar">
+            <div className="overflow-auto max-h-[600px] custom-scrollbar">
               <ResponsiveTable
                 data={paginatedUsers}
                 columns={[
@@ -366,84 +456,116 @@ export default function AdminGestionProfils() {
                     key: 'identity',
                     label: 'Identité',
                     primary: true,
-                    format: (_, user) => (
-                      <div className="flex items-center gap-3 py-1">
-                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 shrink-0">
-                          <span className="text-xs sm:text-sm font-bold text-primary max-w-full truncate px-1">
-                            {getInitials(user.nom, user.prenom)}
-                          </span>
+                    format: (_, emp) => {
+                      const user = emp.user || emp;
+                      return (
+                        <div className="flex items-center gap-3 py-1">
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 shrink-0 overflow-hidden">
+                            {user.photoProfile ? (
+                              <img 
+                                src={`/api/uploads/files/${user.photoProfile}`} 
+                                alt={`${user.nom} ${user.prenom}`} 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs sm:text-sm font-bold text-primary max-w-full truncate px-1">
+                                {getInitials(user.nom, user.prenom)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-content-primary truncate max-w-[140px] sm:max-w-xs">{user.nom} {user.prenom}</p>
+                            <p className="text-[10px] text-content-muted truncate">{user.email}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-content-primary truncate max-w-[140px] sm:max-w-xs">{user.nom} {user.prenom}</p>
-                          <p className="text-[10px] text-content-muted truncate">{user.email}</p>
-                        </div>
-                      </div>
-                    )
+                      );
+                    }
                   },
                   {
-                    key: 'role',
+                    key: 'agence',
+                    label: 'Agence',
+                    format: (_, emp) => {
+                      if (!emp.agenceId) return <span className="text-content-muted text-[10px]">Aucune</span>;
+                      const agence = availableAgences.find(a => a.id === emp.agenceId);
+                      return (
+                        <span className="text-xs font-medium text-content-secondary">
+                          {agence ? agence.nom : 'Inconnue'}
+                        </span>
+                      );
+                    }
+                  },
+                  {
+                    key: 'roleSystem',
                     label: 'Rôle',
-                    format: (role) => (
-                      <span className="px-2 py-1 rounded-md bg-surface-muted border border-edge text-[10px] sm:text-xs font-medium text-content-secondary whitespace-nowrap">
-                        {role}
-                      </span>
-                    )
+                    format: (role, emp) => {
+                      // Reverse map or just show role
+                      const uiRole = Object.keys(roleMap).find(key => roleMap[key] === role) || role || (emp.user && emp.user.role);
+                      return (
+                        <span className="px-2 py-1 rounded-md bg-surface-muted border border-edge text-[10px] sm:text-xs font-medium text-content-secondary whitespace-nowrap">
+                          {uiRole}
+                        </span>
+                      );
+                    }
                   },
                   {
                     key: 'status',
                     label: 'Statut',
-                    format: (_, user) => (
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
-                        user.statut === 'Actif'
-                          ? 'bg-success/10 text-success border-success/20'
-                          : 'bg-content-muted/10 text-content-muted border-edge'
-                      }`}>
-                        {user.statut === 'Actif' ? <CheckCircle size={10} /> : <XCircle size={10} />}
-                        {user.statut}
-                      </span>
-                    )
+                    format: (_, emp) => {
+                      const status = emp.user ? emp.user.statut : emp.statut;
+                      return (
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                          status === 'Actif'
+                            ? 'bg-success/10 text-success border-success/20'
+                            : 'bg-content-muted/10 text-content-muted border-edge'
+                        }`}>
+                          {status === 'Actif' ? <CheckCircle size={10} /> : <XCircle size={10} />}
+                          {status}
+                        </span>
+                      );
+                    }
                   }
                 ]}
-                actions={(user) => (
-                  <>
-                    {canEditUsers && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleUserStatus(user); }}
-                        className={`p-2 rounded-lg transition-colors ${
-                          user.statut === 'Actif'
-                            ? 'text-amber-400 hover:bg-amber-500/10'
-                            : 'text-success hover:bg-success/10'
-                        }`}
-                        title={user.statut === 'Actif' ? 'Désactiver' : 'Activer'}
-                        aria-label={user.statut === 'Actif' ? 'Désactiver' : 'Activer'}
-                      >
-                        {user.statut === 'Actif' ? <XCircle size={18} /> : <CheckCircle size={18} />}
-                      </button>
-                    )}
-                    {canManageUsers && (
-                      <IconButton
-                        icon={Shield}
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); openPermissionsModal(user); }}
-                        className="text-blue-400 hover:bg-blue-500/10"
-                        title="Permissions"
-                        aria-label="Gérer les permissions"
-                      />
-                    )}
-                    {canDeleteUsers && (
-                      <IconButton
-                        icon={Trash2}
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); deleteUser(user); }}
-                        className="text-red-400 hover:bg-red-500/10"
-                        title="Supprimer"
-                        aria-label="Supprimer le profil"
-                      />
-                    )}
-                  </>
-                )}
+                actions={(emp) => {
+                  const user = emp.user || emp;
+                  const isActive = user.statut === 'Actif';
+                  return (
+                    <div className="flex items-center gap-1">
+                      {canEditUsers && (
+                        <IconButton
+                          icon={isActive ? XCircle : CheckCircle}
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); toggleUserStatus(emp); }}
+                          className={isActive ? 'text-amber-500 hover:bg-amber-500/10' : 'text-success hover:bg-success/10'}
+                          title={isActive ? 'Désactiver' : 'Activer'}
+                          aria-label={isActive ? 'Désactiver' : 'Activer'}
+                        />
+                      )}
+                      {canManageUsers && (
+                        <IconButton
+                          icon={Shield}
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); openPermissionsModal(emp); }}
+                          className="text-blue-400 hover:bg-blue-500/10"
+                          title="Permissions"
+                          aria-label="Gérer les permissions"
+                        />
+                      )}
+                      {canDeleteUsers && (
+                        <IconButton
+                          icon={Trash2}
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); deleteUser(emp); }}
+                          className="text-red-400 hover:bg-red-500/10"
+                          title="Supprimer"
+                          aria-label="Supprimer le profil"
+                        />
+                      )}
+                    </div>
+                  );
+                }}
                 mobileBreakpoint="md"
               />
             </div>
@@ -593,6 +715,36 @@ export default function AdminGestionProfils() {
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-content-secondary">Photo de profil</label>
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 bg-surface-muted border border-edge rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                    {formData.photoProfile ? (
+                      <img 
+                        src={`/api/uploads/files/${formData.photoProfile}`} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-6 h-6 text-content-muted" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <ObjectUploader
+                      onGetUploadParameters={handleGetUploadParams}
+                      onComplete={() => toast.success('Photo uploadée avec succès')}
+                      buttonClassName="w-full"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Upload size={14} />
+                        <span>{formData.photoProfile ? 'Changer la photo' : 'Ajouter une photo'}</span>
+                      </div>
+                    </ObjectUploader>
+                    <p className="text-[10px] text-content-muted mt-1">Format recommandé: carré, max 2Mo</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                  <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-content-secondary">Téléphone</label>
@@ -608,14 +760,29 @@ export default function AdminGestionProfils() {
                   <select
                     value={formData.role}
                     onChange={(e) => setFormData({...formData, role: e.target.value})}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-slate-400"
+                    className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
                     required
                   >
                     {roles.map(role => (
-                      <option key={role} value={role} className="bg-slate-800 text-white py-2">{role}</option>
+                      <option key={role} value={role}>{role}</option>
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-content-secondary">Agence d'affectation</label>
+                <select
+                  value={formData.agenceId}
+                  onChange={(e) => setFormData({...formData, agenceId: e.target.value})}
+                  className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
+                >
+                  <option value="">-- Sélectionner une agence --</option>
+                  {availableAgences.map(agence => (
+                    <option key={agence.id} value={agence.id}>{agence.nom}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-content-muted">L'employé sera rattaché à cette agence pour ses opérations.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -636,10 +803,35 @@ export default function AdminGestionProfils() {
                     type="password"
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                    className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
+                    className={`w-full px-3 py-2 bg-surface-muted border rounded-lg text-sm text-content-primary outline-none focus:ring-1 ${
+                      formData.confirmPassword && !passwordValidation.match ? 'border-red-500 focus:ring-red-500' : 'border-edge focus:border-primary focus:ring-primary'
+                    }`}
                     required
-                    minLength={6}
                   />
+                  {formData.confirmPassword && !passwordValidation.match && (
+                    <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                      <XCircle size={10} /> Les mots de passe ne correspondent pas
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Politique de sécurité */}
+              <div className="bg-surface-muted/50 rounded-lg p-3 space-y-2 border border-edge/50">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-content-muted">Politique de sécurité</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.length ? 'text-success' : 'text-content-muted'}`}>
+                    {passwordValidation.length ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
+                    <span>Min. 8 caractères</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.uppercase ? 'text-success' : 'text-content-muted'}`}>
+                    {passwordValidation.uppercase ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
+                    <span>Une majuscule</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.number ? 'text-success' : 'text-content-muted'}`}>
+                    {passwordValidation.number ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
+                    <span>Un chiffre</span>
+                  </div>
                 </div>
               </div>
 
@@ -647,8 +839,21 @@ export default function AdminGestionProfils() {
                 <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowCreateForm(false)}>
                   Annuler
                 </Button>
-                <Button type="submit" variant="primary" className="flex-1">
-                  Créer Profil
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  className="flex-1"
+                  disabled={isSubmitting || !isFormValid}
+                  icon={isSubmitting ? undefined : Plus}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Création...</span>
+                    </div>
+                  ) : (
+                    'Créer Profil'
+                  )}
                 </Button>
               </div>
             </form>
