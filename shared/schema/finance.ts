@@ -1,4 +1,4 @@
-import { pgTable, text, uniqueIndex, integer, numeric, boolean, timestamp, uuid, json, index } from "drizzle-orm/pg-core";
+import { pgTable, text, uniqueIndex, integer, numeric, boolean, timestamp, uuid, json, jsonb, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -597,6 +597,9 @@ export const operationsCaisse = pgTable(
 
     description: text("description"),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+
+    // Traçabilité de la vérification de présence du titulaire (pour retraits sans OTP)
+    presenceVerification: jsonb("presence_verification"),
 
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),

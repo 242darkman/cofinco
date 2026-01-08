@@ -9,6 +9,11 @@ import {
   type FrequenceRemboursement,
   type DureeUnite
 } from "@shared/config/credit-durations";
+import {
+  SECURITY_CONFIG,
+  requiresAccountHolderPresence,
+  isOtpRequired
+} from "@shared/config/security";
 
 export function registerConfigRoutes(app: Express) {
   /**
@@ -229,4 +234,57 @@ function getFrequenceLabel(frequence: string): string {
     default:
       return frequence;
   }
+}
+
+/**
+ * Routes de configuration de sécurité
+ */
+export function registerSecurityConfigRoutes(app: Express) {
+  /**
+   * GET /api/config/security
+   * Retourne la configuration de sécurité actuelle
+   */
+  app.get("/api/config/security", requireAuth, async (_req, res) => {
+    try {
+      res.json({
+        otpEnabled: SECURITY_CONFIG.OTP_ENABLED,
+        requireAccountHolderPresence: SECURITY_CONFIG.REQUIRE_ACCOUNT_HOLDER_PRESENCE,
+        operationsRequiringPresence: SECURITY_CONFIG.OPERATIONS_REQUIRING_PRESENCE,
+        presenceVerificationThreshold: SECURITY_CONFIG.PRESENCE_VERIFICATION_THRESHOLD
+      });
+    } catch (error) {
+      console.error("Error fetching security config:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération de la configuration de sécurité" });
+    }
+  });
+
+  /**
+   * POST /api/config/security/check-presence-required
+   * Vérifie si une opération nécessite la présence du titulaire
+   */
+  app.post("/api/config/security/check-presence-required", requireAuth, async (req, res) => {
+    try {
+      const { operationType, subType, amount } = req.body;
+
+      if (!operationType) {
+        return res.status(400).json({ message: "operationType est requis" });
+      }
+
+      const presenceRequired = requiresAccountHolderPresence(operationType, subType, amount);
+      const otpRequired = isOtpRequired();
+
+      res.json({
+        presenceRequired,
+        otpRequired,
+        message: presenceRequired
+          ? "La présence du titulaire du compte est requise pour cette opération"
+          : otpRequired
+            ? "Validation OTP requise"
+            : "Aucune validation supplémentaire requise"
+      });
+    } catch (error) {
+      console.error("Error checking presence requirement:", error);
+      res.status(500).json({ message: "Erreur lors de la vérification" });
+    }
+  });
 }

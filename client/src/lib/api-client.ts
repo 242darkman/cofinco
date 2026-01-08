@@ -986,3 +986,33 @@ export const dashboardApi = {
   getStats: () => request<any>('/dashboard/stats'),
   getBalanceHistory: (period: string = '30d') => request<any[]>(`/dashboard/balance-history?period=${period}`),
 };
+
+// Security Config API
+export interface SecurityConfigResponse {
+  otpEnabled: boolean;
+  requireAccountHolderPresence: boolean;
+  operationsRequiringPresence: string[];
+  presenceVerificationThreshold: number;
+}
+
+export interface PresenceCheckResponse {
+  presenceRequired: boolean;
+  otpRequired: boolean;
+  message: string;
+}
+
+export const securityConfigApi = {
+  /**
+   * Récupérer la configuration de sécurité actuelle
+   */
+  getConfig: () => request<SecurityConfigResponse>('/config/security'),
+
+  /**
+   * Vérifier si une opération nécessite la présence du titulaire ou un OTP
+   */
+  checkPresenceRequired: (data: { operationType: string; subType?: string; amount?: number }) =>
+    request<PresenceCheckResponse>('/config/security/check-presence-required', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};

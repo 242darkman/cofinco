@@ -18,7 +18,7 @@ import { registerAgencesRoutes } from "./routes/agences";
 import { registerEmployesRoutes } from "./routes/employes";
 import loyaltyRouter from "./routes/loyalty";
 import { registerOtpRoutes } from "./routes/otp";
-import { registerConfigRoutes } from "./routes/config";
+import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/config";
 import { registerComptesRoutes } from "./routes/comptes";
 
 export function registerRoutes(app: Express): Server {
@@ -53,6 +53,9 @@ export function registerRoutes(app: Express): Server {
 
   // Config Module (Durees suggerees, frequences)
   registerConfigRoutes(app);
+
+  // Security Config Module (OTP bypass, presence verification)
+  registerSecurityConfigRoutes(app);
 
   // External Services
   registerMobileMoneyRoutes(app);

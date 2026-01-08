@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins, Printer } from 'lucide-react';
 import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
+import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
 import { Card, Button, Badge } from '@/components/ui';
-import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi } from '../../../lib/api-client';
+import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi, securityConfigApi, SecurityConfigResponse } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
@@ -68,6 +69,11 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [lastOperationData, setLastOperationData] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
 
+  // Security configuration states
+  const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
+  const [showPresenceModal, setShowPresenceModal] = useState(false);
+  const [presenceVerified, setPresenceVerified] = useState<PresenceConfirmationData | null>(null);
+
   // Receipt Printer Hook
   const { componentRef, printData, print, isPrinting } = usePrinter();
 
@@ -95,6 +101,26 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
 
   const reinitialiserBilletage = useCallback(() => {
     setBilletage({});
+  }, []);
+
+  // Charger la configuration de sécurité au montage
+  useEffect(() => {
+    const loadSecurityConfig = async () => {
+      try {
+        const config = await securityConfigApi.getConfig();
+        setSecurityConfig(config);
+      } catch (error) {
+        console.error('Erreur chargement config sécurité:', error);
+        // Par défaut: OTP désactivé, présence requise pour retraits
+        setSecurityConfig({
+          otpEnabled: false,
+          requireAccountHolderPresence: true,
+          operationsRequiringPresence: ['Retrait', 'Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine'],
+          presenceVerificationThreshold: 0
+        });
+      }
+    };
+    loadSecurityConfig();
   }, []);
 
   // Validation du montant
@@ -259,7 +285,16 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setShowConfirmDialog(true);
   }, [typeOperation, montant, typeDepot, typeRetrait, validateMontant]);
 
-  // Confirmer et lancer l'OTP
+  // Vérifier si l'opération nécessite une validation spéciale
+  const requiresPresenceVerification = useCallback((opType: string, subType?: string): boolean => {
+    if (!securityConfig?.requireAccountHolderPresence) return false;
+    const typeToCheck = subType || opType;
+    return securityConfig.operationsRequiringPresence.some(
+      op => op.toLowerCase() === typeToCheck.toLowerCase() || opType.toLowerCase() === 'retrait'
+    );
+  }, [securityConfig]);
+
+  // Confirmer et décider du type de validation (OTP, présence, ou bypass)
   const confirmerPreparation = useCallback(async () => {
     setShowConfirmDialog(false);
     setLoading(true);
@@ -291,24 +326,37 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       };
 
       setOtpData({ operation: operationData, type: 'caisse_especes' });
-      setShowOTP(true);
+
+      // Décider du type de validation selon la configuration
+      const isWithdrawal = requiresPresenceVerification(typeOperation!, typeDetaille || undefined);
+
+      if (securityConfig?.otpEnabled) {
+        // OTP activé - utiliser la validation OTP
+        setShowOTP(true);
+      } else if (isWithdrawal) {
+        // OTP désactivé mais c'est un retrait - exiger la présence du titulaire
+        setShowPresenceModal(true);
+      } else {
+        // OTP désactivé et c'est un dépôt - exécuter directement
+        setLoading(false);
+        await validerOperationDirect(operationData);
+      }
     } catch (error) {
       const errorMessage = handleApiError(error, 'Erreur lors de la préparation');
       toast.error(errorMessage);
-    } finally {
       setLoading(false);
+    } finally {
+      if (securityConfig?.otpEnabled || requiresPresenceVerification(typeOperation!, typeDepot || typeRetrait || undefined)) {
+        setLoading(false);
+      }
     }
-  }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, description, billetage, getCompteIdForOperation]);
+  }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, description, billetage, getCompteIdForOperation, securityConfig, requiresPresenceVerification]);
 
-  // Valider l'opération après OTP
-  const validerOperation = useCallback(async (code: string) => {
-    const loadingId = toast.loading('Traitement de l\'opération en cours...');
-
+  // Fonction centrale pour exécuter l'opération (utilisée par tous les modes de validation)
+  const executeOperation = useCallback(async (operationData: any, loadingId?: string | number) => {
     try {
-      setLoading(true);
-
       // Enregistrer l'opération via api-client
-      await operationCaisseApi.create(otpData.operation);
+      await operationCaisseApi.create(operationData);
 
       // Mettre à jour le solde de la session
       const montantAjout = typeOperation === 'Dépôt' ? parseFloat(montant) : -parseFloat(montant);
@@ -337,12 +385,12 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         });
       }
 
-      toast.dismiss(loadingId);
+      if (loadingId) toast.dismiss(loadingId);
       toast.success(`${typeOperation} de ${formatMoney(parseFloat(montant))} effectué avec succès !`);
 
       // Sauvegarder les données pour le reçu
       setLastOperationData({
-        reference: otpData.operation.reference,
+        reference: operationData.reference,
         typeOperation,
         typeDetaille: typeOperation === 'Dépôt' ? typeDepot : typeRetrait,
         montant: parseFloat(montant),
@@ -351,16 +399,60 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       });
 
       setSuccessMessage(`${typeOperation} effectué avec succès !`);
-      setShowPrintDialog(true); // Afficher le dialogue d'impression
+      setShowPrintDialog(true);
+      return true;
     } catch (error) {
-      toast.dismiss(loadingId);
+      if (loadingId) toast.dismiss(loadingId);
       const errorMessage = handleApiError(error, 'Erreur lors de l\'opération');
       toast.error(errorMessage);
+      return false;
+    }
+  }, [typeOperation, typeDepot, montant, sessionId, prochaineEcheance, creditSelectionne, tontineSelectionnee, selectedClient, typeRetrait]);
+
+  // Valider l'opération directement (bypass OTP pour dépôts quand OTP désactivé)
+  const validerOperationDirect = useCallback(async (operationData: any) => {
+    const loadingId = toast.loading('Traitement de l\'opération en cours...');
+    setLoading(true);
+
+    try {
+      await executeOperation(operationData, loadingId);
+    } finally {
+      setLoading(false);
+    }
+  }, [executeOperation]);
+
+  // Valider l'opération après confirmation de présence du titulaire
+  const validerOperationAvecPresence = useCallback(async (presenceData: PresenceConfirmationData) => {
+    const loadingId = toast.loading('Traitement du retrait en cours...');
+    setShowPresenceModal(false);
+    setPresenceVerified(presenceData); // Stocker pour affichage UI
+    setLoading(true);
+
+    try {
+      // Ajouter les données de confirmation de présence à l'opération (traçabilité)
+      const operationAvecPresence = {
+        ...otpData.operation,
+        presence_verification: presenceData  // Stocké en DB pour audit
+      };
+
+      await executeOperation(operationAvecPresence, loadingId);
+    } finally {
+      setLoading(false);
+    }
+  }, [otpData, executeOperation]);
+
+  // Valider l'opération après OTP
+  const validerOperation = useCallback(async (code: string) => {
+    const loadingId = toast.loading('Traitement de l\'opération en cours...');
+    setLoading(true);
+
+    try {
+      await executeOperation(otpData.operation, loadingId);
     } finally {
       setLoading(false);
       setShowOTP(false);
     }
-  }, [otpData, typeOperation, typeDepot, montant, sessionId, prochaineEcheance, creditSelectionne, tontineSelectionnee, selectedClient, onTransactionComplete]);
+  }, [otpData, executeOperation]);
 
   // Réinitialiser le formulaire
   const reinitialiserFormulaire = useCallback(() => {
@@ -379,6 +471,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setBilletage({});
     setShowBilletage(false);
     setMontantError(null);
+    setPresenceVerified(null);
   }, []);
 
   // Fonction pour imprimer le reçu
@@ -538,6 +631,36 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                       aria-live="polite"
                     >
                       <CheckCircle size={14} aria-hidden="true" /> {successMessage}
+                    </div>
+                  )}
+
+                  {/* Presence Verification Indicator */}
+                  {presenceVerified && typeOperation === 'Retrait' && (
+                    <div
+                      className="bg-blue-950/30 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2"
+                      role="status"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1 rounded-full bg-blue-500/20">
+                          <CheckCircle size={12} className="text-blue-400" />
+                        </div>
+                        <span className="text-xs font-semibold text-blue-300">Presence verifiee</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-[10px] text-blue-300 border border-blue-500/20">
+                          {presenceVerified.verificationMethod === 'piece_identite' && 'Piece d\'identite'}
+                          {presenceVerified.verificationMethod === 'reconnaissance_visuelle' && 'Client connu'}
+                          {presenceVerified.verificationMethod === 'signature' && 'Signature'}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-300 border border-emerald-500/20">
+                          Identite confirmee
+                        </span>
+                      </div>
+                      {presenceVerified.agentNotes && (
+                        <p className="text-[10px] text-slate-400 mt-2 italic">
+                          Note: {presenceVerified.agentNotes}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -846,8 +969,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         cancelText="Annuler"
       />
 
-      {/* OTP Validation */}
-      {showOTP && otpData && selectedClient && (
+      {/* OTP Validation (si OTP activé) */}
+      {showOTP && otpData && selectedClient && securityConfig?.otpEnabled && (
         <OTPValidationSimple
           isOpen={showOTP}
           onClose={() => setShowOTP(false)}
@@ -858,6 +981,20 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
           generatedCode="123456"
           operationType={typeOperation || ''}
           amount={parseFloat(montant)}
+        />
+      )}
+
+      {/* Account Holder Presence Modal (pour retraits quand OTP désactivé) */}
+      {showPresenceModal && otpData && selectedClient && (
+        <AccountHolderPresenceModal
+          isOpen={showPresenceModal}
+          onClose={() => setShowPresenceModal(false)}
+          onConfirm={validerOperationAvecPresence}
+          clientName={`${selectedClient.nom} ${selectedClient.prenom || ''}`}
+          clientPhone={selectedClient.telephone || selectedClient.phone}
+          operationType={typeRetrait || typeOperation || 'Retrait'}
+          amount={parseFloat(montant)}
+          isLoading={loading}
         />
       )}
 
