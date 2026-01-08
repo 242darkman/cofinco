@@ -69,25 +69,40 @@ export function registerOperationsRoutes(app: Express) {
   
 
   // Create Paiement Terrain (roles: admin, chef, terrain, superviseur)
+  // Now using atomic ledger flow
   app.post("/api/paiements-terrain", requireAuth, requireRole('admin', 'chef', 'terrain', 'superviseur'), async (req, res) => {
       try {
-        const data = normalizeKeysDeep(req.body);
-        const parsed = insertPaiementTerrainSchema.parse(data);
-        const paiement = await storage.createPaiementTerrain(parsed);
+        const data = normalizeKeysDeep(req.body) as any;
+        const user = req.session.user;
+
+        // Use atomic ledger function
+        const { paiement, mouvement } = await storage.createPaiementTerrainWithLedger({
+          agentId: data.agentId,
+          clientId: data.clientId,
+          creditId: data.creditId,
+          compteId: data.compteId,
+          montant: data.montant,
+          typePaiement: data.typePaiement || 'Paiement Crédit',
+          latitude: data.latitude,
+          longitude: data.longitude,
+          idempotencyKey: data.idempotencyKey,
+        }, user?.id);
         
-        // Notify
+        // WebSocket notifications managed by outbox worker
+        // Additional backward compatible notifications if needed
         const wsInstance = require("../ws-server").getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_new', id: paiement.id } });
             
-            // Notify specific client channel if implemented
+            // Notify specific client channel
              if (paiement.clientId) {
                wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: paiement.clientId } });
             }
         }
         
-        res.status(201).json(addSnakeCaseAliasesDeep(paiement));
+        res.status(201).json(addSnakeCaseAliasesDeep({ ...paiement, mouvement_id: mouvement.id }));
       } catch (error: any) {
+        console.error('Error creating paiement terrain:', error);
         res.status(400).json({ error: error.message || "Invalid data" });
       }
   });

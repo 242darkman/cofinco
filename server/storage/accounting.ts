@@ -1,23 +1,23 @@
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db";
 import { 
-  comptes, InsertCompte, Compte,
+  planComptable, InsertCompteComptable, CompteComptable,
   journaux, InsertJournal, Journal,
   ecritures, InsertEcriture, Ecriture,
   lignesEcritures, InsertLigneEcriture,
   declarationsTva, InsertDeclarationTva, DeclarationTva
 } from "@shared/schema";
 
-export async function getAllComptes(): Promise<Compte[]> {
-  return await db.select().from(comptes).orderBy(comptes.numeroCompte);
+export async function getAllComptesComptables(): Promise<CompteComptable[]> {
+  return await db.select().from(planComptable).orderBy(planComptable.numeroCompte);
 }
 
-export async function getComptesByClasse(classe: number): Promise<Compte[]> {
-  return await db.select().from(comptes).where(eq(comptes.classe, classe));
+export async function getComptesComptablesByClasse(classe: number): Promise<CompteComptable[]> {
+  return await db.select().from(planComptable).where(eq(planComptable.classe, classe));
 }
 
-export async function createCompte(compte: InsertCompte): Promise<Compte> {
-  const [newCompte] = await db.insert(comptes).values(compte).returning();
+export async function createCompteComptable(compte: InsertCompteComptable): Promise<CompteComptable> {
+  const [newCompte] = await db.insert(planComptable).values(compte).returning();
   return newCompte;
 }
 
@@ -118,7 +118,7 @@ export async function getBalance(dateDebut: string, dateFin: string): Promise<an
   .groupBy(lignesEcritures.compteId);
 
   // Get all accounts to map names and types
-  const allComptes = await getAllComptes();
+  const allComptes = await getAllComptesComptables();
   const balance = [];
 
   for (const compte of allComptes) {

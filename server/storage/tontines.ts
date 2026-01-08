@@ -159,11 +159,14 @@ export async function createMembreTontine(insertMembre: InsertMembreTontine): Pr
 
 // Contributions
 export async function getContributionsByTontine(tontineId: string): Promise<ContributionTontine[]> {
-  return db.select().from(contributionsTontine).where(eq(contributionsTontine.tontineId, tontineId)).orderBy(desc(contributionsTontine.dateContribution));
+  return db.select().from(contributionsTontine).where(eq(contributionsTontine.tontineId, tontineId)).orderBy(desc(contributionsTontine.createdAt));
 }
 
 export async function getContributionsByMembre(membreId: string): Promise<ContributionTontine[]> {
-  return db.select().from(contributionsTontine).where(eq(contributionsTontine.membreId, membreId)).orderBy(desc(contributionsTontine.dateContribution));
+  // Actually, wait, if it's getContributionsByMembre, it should filter by a member ref.
+  // But our contributions_tontine table has clientId and tontineId, not membreId directly.
+  // So we filter by clientId if we want contributions for a specific client in tontines.
+  return db.select().from(contributionsTontine).where(eq(contributionsTontine.clientId, membreId)).orderBy(desc(contributionsTontine.createdAt));
 }
 
 export async function createContributionTontine(insertContribution: InsertContributionTontine): Promise<ContributionTontine> {

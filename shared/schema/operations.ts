@@ -1,11 +1,13 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, bigint, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { clients } from "./clients";
 import { agences } from "./agences";
-import { sessionsCaisse, operationsCaisse } from "./finance";
+import { sessionsCaisse, operationsCaisse, mouvementsFinanciers } from "./finance";
 import { employes } from "./employes";
+import { methodePaiementEnum, statutTransactionEnum, typePaiementTerrainEnum } from "@shared/enum/enums";
+import { sql } from "drizzle-orm";
 
 /**
  * Table Agents de terrain - Données métier spécifiques aux agents terrain
@@ -58,6 +60,42 @@ export const insertAgentTerrainSchema = createInsertSchema(agentsTerrain).omit({
 export type InsertAgentTerrain = z.infer<typeof insertAgentTerrainSchema>;
 export type AgentTerrain = typeof agentsTerrain.$inferSelect;
 
+
+export const remisesTerrain = pgTable(
+  "remises_terrain",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id, { onDelete: "restrict" }),
+    sessionCaisseId: uuid("session_caisse_id").references(() => sessionsCaisse.id, { onDelete: "set null" }),
+
+    reference: text("reference").notNull(), // ex: REM-2026-000123
+    montantDeclare: numeric("montant_declare").notNull(),  // montant remis
+    montantCalcule: numeric("montant_calcule").notNull().default("0"), // calculable depuis paiements liés
+
+    statut: text("statut").notNull().default("En attente"), // ou enum si tu veux (En attente, Validée, Rejetée)
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    validatedAt: timestamp("validated_at"),
+    validatedBy: uuid("validated_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"), // Soft delete
+
+    observations: text("observations"),
+  },
+  (t) => ({
+    uqRef: uniqueIndex("uq_remises_terrain_reference").on(t.reference),
+    idxAgentDate: index("idx_remises_terrain_agent_date").on(t.agentId, t.createdAt),
+    idxSession: index("idx_remises_terrain_session").on(t.sessionCaisseId),
+    idxStatut: index("idx_remises_terrain_statut").on(t.statut),
+  }),
+);
+
+export const insertRemiseTerrainSchema = createInsertSchema(remisesTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertRemiseTerrain = z.infer<typeof insertRemiseTerrainSchema>;
+export type RemiseTerrain = typeof remisesTerrain.$inferSelect;
+
+
 // Objectifs Mensuels (historique des objectifs par agent/mois)
 export const objectifsMensuels = pgTable("objectifs_mensuels", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -68,9 +106,10 @@ export const objectifsMensuels = pgTable("objectifs_mensuels", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertObjectifMensuelSchema = createInsertSchema(objectifsMensuels).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertObjectifMensuelSchema = createInsertSchema(objectifsMensuels).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertObjectifMensuel = z.infer<typeof insertObjectifMensuelSchema>;
 export type ObjectifMensuel = typeof objectifsMensuels.$inferSelect;
 
@@ -132,23 +171,66 @@ export type InsertVisiteTerrain = z.infer<typeof insertVisiteTerrainSchema>;
 export type VisiteTerrain = typeof visitesTerrain.$inferSelect;
 
 // Paiements terrain
-export const paiementsTerrain = pgTable("paiements_terrain", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id),
-  clientId: uuid("client_id").notNull().references(() => clients.id),
-  typePaiement: text("type_paiement").notNull(),
-  montant: numeric("montant").notNull(),
-  methodePaiement: text("methode_paiement").notNull(),
-  numeroTelephone: text("numero_telephone"),
-  reference: text("reference").notNull(),
-  statut: text("statut").notNull().default("En attente"),
-  validationOTP: text("validation_otp"),
-  dateValidation: timestamp("date_validation"),
-  observations: text("observations"),
-  latitude: numeric("latitude"), // GPS coordinates
-  longitude: numeric("longitude"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const paiementsTerrain = pgTable(
+  "paiements_terrain",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id, { onDelete: "restrict" }),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "restrict" }),
+
+    typePaiement: typePaiementTerrainEnum("type_paiement").notNull(),
+    montant: numeric("montant").notNull(),
+
+    methodePaiement: methodePaiementEnum("methode_paiement").notNull(),
+    numeroTelephone: text("numero_telephone"),
+
+    reference: text("reference").notNull(),
+    referenceExterne: text("reference_externe"),
+    idempotencyKey: text("idempotency_key"),
+
+    // Pivot ledger
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    // Statut standard
+    statut: statutTransactionEnum("statut").notNull().default("Pending"),
+
+    // OTP
+    validationOTP: text("validation_otp"),
+    dateValidation: timestamp("date_validation"),
+
+    // Remise agence (lot)
+    remiseId: uuid("remise_id").references(() => remisesTerrain.id, { onDelete: "set null" }),
+    sessionCaisseRemiseId: uuid("session_caisse_remise_id").references(() => sessionsCaisse.id, { onDelete: "set null" }),
+    dateRemise: timestamp("date_remise"),
+
+    observations: text("observations"),
+    latitude: numeric("latitude"),
+    longitude: numeric("longitude"),
+
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxAgentDate: index("idx_paiements_terrain_agent_date").on(t.agentId, t.createdAt),
+    idxAgentStatutDate: index("idx_paiements_terrain_agent_statut_date").on(t.agentId, t.statut, t.createdAt),
+
+    idxClientDate: index("idx_paiements_terrain_client_date").on(t.clientId, t.createdAt),
+    idxTypeDate: index("idx_paiements_terrain_type_date").on(t.typePaiement, t.createdAt),
+
+    idxRemise: index("idx_paiements_terrain_remise").on(t.remiseId),
+    idxSessionRemise: index("idx_paiements_terrain_session_remise").on(t.sessionCaisseRemiseId),
+
+    idxMvt: index("idx_paiements_terrain_mouvement").on(t.mouvementId),
+
+    uqRef: uniqueIndex("uq_paiements_terrain_reference").on(t.reference),
+    uqIdempotency: uniqueIndex("uq_paiements_terrain_idempotency").on(t.idempotencyKey),
+    uqRefExt: uniqueIndex("uq_paiements_terrain_reference_externe").on(t.referenceExterne),
+
+    chkMontantPos: sql`CONSTRAINT chk_paiements_terrain_montant_pos CHECK (${t.montant} > 0)`,
+  }),
+);
+
 
 export const insertPaiementTerrainSchema = createInsertSchema(paiementsTerrain).omit({ id: true, createdAt: true });
 export type InsertPaiementTerrain = z.infer<typeof insertPaiementTerrainSchema>;

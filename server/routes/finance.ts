@@ -1,7 +1,13 @@
 import type { Express } from "express";
-import { insertCreditSchema, insertDemandeCreditSchema, insertEnqueteCreditSchema, insertRemboursementSchema,
-  insertCompteEpargneSchema, insertTransactionEpargneSchema, insertObjectifEpargneSchema, insertPlanEpargneSchema,
-  insertFactureSchema, insertLigneFactureSchema, insertModeleFactureSchema, insertSessionCaisseSchema, insertOperationCaisseSchema, insertShiftCaisseSchema, insertComptageBilletsSchema, insertCaisseSchema, insertCaisseTransfertSchema
+import {
+  insertCreditSchema,
+  insertDemandeCreditSchema,
+  insertEnqueteCreditSchema,
+  insertFactureSchema,
+  insertSessionCaisseSchema,
+  insertOperationCaisseSchema,
+  insertCaisseSchema,
+  insertCaisseTransfertSchema
 } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
@@ -15,6 +21,7 @@ import {
   type FrequenceRemboursement,
   type DureeUnite
 } from "@shared/config/credit-durations";
+import { getWsInstance } from "../ws-server";
 
 export function registerFinanceRoutes(app: Express) {
   // Credits
@@ -72,7 +79,7 @@ export function registerFinanceRoutes(app: Express) {
        );
 
        // Notify Credit Update
-       const wsInstance = require("../ws-server").getWsInstance();
+       const wsInstance = getWsInstance();
        if (wsInstance) {
           wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'credit_new', id: credit.id } });
        }
@@ -159,8 +166,7 @@ export function registerFinanceRoutes(app: Express) {
       
       
       // Notify Admins
-      const wsServer = require("../ws-server");
-      const wsInstance = wsServer.getWsInstance();
+       const wsInstance = getWsInstance();
       const userAgence = req.session.user?.agence;
 
       if (wsInstance && userAgence) {
@@ -191,14 +197,120 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(demande));
   });
 
+  app.delete("/api/demandes-credit/:id", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+      const success = await storage.deleteDemandeCredit(req.params.id);
+      if (!success) return res.status(404).json({ message: "Demande non trouvée" });
+      
+       const wsInstance = getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_deleted', id: req.params.id } });
+      }
+      
+      res.json({ success: true });
+  });
+
+  app.post("/api/demandes-credit/:id/payer-frais", requireAuth, requireRole('admin', 'chef', 'caisse', 'credit'), async (req, res) => {
+      try {
+          const data = normalizeKeysDeep(req.body) as any;
+          const user = req.session.user;
+          
+          let sessionCaisseId: string | undefined;
+          let activeSession: any = undefined;
+
+          if (user) {
+              // Admin override
+              if (data.sessionCaisseId && ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role)) {
+                  activeSession = await storage.getSessionCaisse(data.sessionCaisseId);
+                  if (activeSession && activeSession.statut === 'Ouverte') {
+                      sessionCaisseId = activeSession.id;
+                  }
+              }
+
+              // Default to user's active session if not overridden or invalid
+              if (!sessionCaisseId) {
+                  activeSession = await storage.getActiveSessionForUser(user.id);
+                  if (activeSession) {
+                      sessionCaisseId = activeSession.id;
+                  }
+              }
+          }
+
+          if (!sessionCaisseId) {
+              return res.status(400).json({ message: "Aucune caisse ouverte. Vous devez ouvrir votre caisse pour encaisser des frais." });
+          }
+
+          // Validation Agence: Le client doit payer dans SON agence
+          const demande = await storage.getDemandeCredit(req.params.id);
+          if (!demande) return res.status(404).json({ message: "Demande introuvable" });
+
+          const client = await storage.getClient(demande.clientId);
+          if (client) {
+             // Vérification stricte de l'agence (ID ou Nom legacy)
+             // On compare l'agence de la session avec l'agence du client
+             const sessionAgenceId = activeSession.agenceId;
+             const clientAgenceId = client.agenceId;
+
+             if (sessionAgenceId && clientAgenceId && sessionAgenceId !== clientAgenceId) {
+                 return res.status(403).json({ message: "Le client est affilié à une autre agence. Encaissement refusé." });
+             } 
+             
+             // Fallback Legacy (Comparaison par nom si les IDs manquent)
+             if ((!sessionAgenceId || !clientAgenceId) && activeSession.agence && client.agence && activeSession.agence !== client.agence) {
+                  return res.status(403).json({ message: "Le client est affilié à une autre agence (" + client.agence + ")." });
+             }
+          }
+
+          const result = await storage.payerFraisEngagement({
+              demandeId: req.params.id,
+              montant: data.montant.toString(),
+              methodePaiement: data.methodePaiement || 'Espèces',
+              sessionCaisseId,
+              idempotencyKey: data.idempotencyKey
+          }, user?.id);
+
+          const wsInstance = getWsInstance();
+          if (wsInstance) {
+              wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_frais_payes', id: req.params.id } });
+              if (user?.agence) {
+                  wsInstance.broadcastToAgency(user.agence, { type: "DASHBOARD_UPDATE", payload: {} });
+              }
+          }
+
+          res.json(addSnakeCaseAliasesDeep(result));
+      } catch (error: any) {
+          console.error("Erreur paiement frais:", error);
+          res.status(400).json({ message: error.message });
+      }
+  });
+
+  app.get("/api/demandes-credit/:id/enquete", requireAuth, async (req, res) => {
+      const enquete = await storage.getEnqueteByDemandeId(req.params.id);
+      if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
+      res.json(addSnakeCaseAliasesDeep(enquete));
+  });
+
   // Enquetes (roles: admin, chef, credit, superviseur)
+  app.get("/api/enquetes-credit", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur', 'agent_terrain'), async (req, res) => {
+      // Return both completed/in-progress enquetes AND demandes ready for investigation
+      // Actually, for now, let's just return enquetes. Frontend can merge if needed, 
+      // or we can handle it here.
+      // But standard pattern is:
+      const enquetes = await storage.getAllEnquetes();
+      res.json(addSnakeCaseAliasesDeep(enquetes));
+  });
+
   app.post("/api/enquetes-credit", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur'), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertEnqueteCreditSchema.parse(data);
       const enquete = await storage.createEnqueteCredit(parsed);
       
+      // Update Demande Status
+      if (enquete.demandeId) {
+          await storage.updateDemandeCredit(enquete.demandeId, { statut: 'En enquête' as any });
+      }
+
       // Notify Credit Update
-      const wsInstance = require("../ws-server").getWsInstance();
+       const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'enquete_new', demandeId: parsed.demandeId } });
       }
@@ -206,32 +318,93 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enquete));
   });
 
-  // Remboursements (roles: admin, chef, caisse, credit)
-  app.post("/api/remboursements", requireAuth, requireRole('admin', 'chef', 'caisse', 'credit'), async (req, res) => {
-      const data = normalizeKeysDeep(req.body);
-      const parsed = insertRemboursementSchema.parse(data);
-      const remb = await storage.createRemboursement(parsed);
+  app.post("/api/enquetes-credit/:id/valider", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+      const { decision, montant_approuve, commentaire, raison } = req.body;
       
-      // Update Dashboard (Revenue/Collectes updated)
-      const wsInstance = require("../ws-server").getWsInstance();
-      const userAgence = req.session.user?.agence;
+      const enquete = await storage.getEnqueteCredit(req.params.id);
+      if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
 
-      if (wsInstance && userAgence) {
-          wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
-          
-          // Activité en temps réel
-          wsInstance.broadcastToAgency(userAgence, {
-            type: "LIVE_ACTIVITY",
-            payload: {
-              action: `Remboursement: ${Number(parsed.montant).toLocaleString()} FCFA`,
-              user: req.session.user?.nom || 'Système',
-              type: 'payment',
-              timestamp: new Date().toISOString()
-            }
+      const updatedEnquete = await storage.updateEnqueteCredit(req.params.id, {
+          statut: decision === 'approuve' ? 'Approuvé' : decision === 'rejete' ? 'Rejeté' : 'Réduit',
+          recommandation: commentaire || raison // Store comment
+      });
+
+      // Update Demande status if enquete is approved/rejected
+      if (enquete.demandeId) {
+          let nouveauStatutDemande = 'En enquête'; // Default
+          if (decision === 'approuve' || decision === 'reduit') {
+              nouveauStatutDemande = 'Enquête terminée'; // Prêt pour décision finale
+          } else if (decision === 'rejete') {
+              nouveauStatutDemande = 'Rejetée'; // Rejetée suite enquête
+          }
+
+          await storage.updateDemandeCredit(enquete.demandeId, {
+              statut: nouveauStatutDemande as any,
+              montantApprouve: montant_approuve ? montant_approuve.toString() : undefined,
+              motifRejet: decision === 'rejete' ? raison : undefined
           });
+
+          // Notify
+          const wsInstance = getWsInstance();
+          if (wsInstance) {
+               wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_updated', id: enquete.demandeId, statut: nouveauStatutDemande } });
+          }
       }
 
-      res.json(addSnakeCaseAliasesDeep(remb));
+      res.json(addSnakeCaseAliasesDeep(updatedEnquete));
+  });
+
+  // Remboursements (roles: admin, chef, caisse, credit)
+  // Now using atomic ledger flow
+  app.post("/api/remboursements", requireAuth, requireRole('admin', 'chef', 'caisse', 'credit'), async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body) as any;
+        const user = req.session.user;
+        
+        // Get active session if user is caissier
+        let sessionCaisseId: string | undefined;
+        if (user) {
+          const activeSession = await storage.getActiveSessionForUser(user.id);
+          if (activeSession) {
+            sessionCaisseId = activeSession.id;
+          }
+        }
+        
+        // Use atomic ledger function
+        const { remboursement, mouvement } = await storage.createRemboursementWithLedger({
+          creditId: data.creditId,
+          montant: data.montant,
+          methodePaiement: data.methodePaiement || 'Espèces',
+          sessionCaisseId,
+          observations: data.observations,
+          idempotencyKey: data.idempotencyKey,
+        }, user?.id);
+        
+        // WebSocket notifications are now handled by outbox worker
+        // But we still broadcast dashboard update for backward compatibility
+        const wsInstance = getWsInstance();
+        const userAgence = user?.agence;
+
+        if (wsInstance && userAgence) {
+            wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
+            
+            // Activité en temps réel
+            wsInstance.broadcastToAgency(userAgence, {
+              type: "LIVE_ACTIVITY",
+              payload: {
+                action: `Remboursement: ${Number(data.montant).toLocaleString()} FCFA`,
+                user: user?.nom || 'Système',
+                type: 'payment',
+                timestamp: new Date().toISOString()
+              }
+            });
+        }
+
+        res.json(addSnakeCaseAliasesDeep({ ...remboursement, mouvement_id: mouvement.id }));
+      } catch (error: any) {
+        console.error('Error creating remboursement:', error);
+        res.status(400).json({ message: error.message || 'Erreur lors du remboursement' });
+      }
   });
 
   app.get("/api/credits/:id/remboursements", requireAuth, async (req, res) => {
@@ -239,103 +412,11 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(rembs));
   });
 
-  // Epargne
-  app.get("/api/comptes-epargne", requireAuth, requireAgenceAccess(), async (req, res) => {
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
-      const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
-      
-      const comptes = await storage.getAllComptesEpargne(filter);
-      
-      res.json(addSnakeCaseAliasesDeep(comptes));
-  });
-
-  // Create compte épargne (roles: admin, chef, caisse)
-  app.post("/api/comptes-epargne", requireAuth, requireRole('admin', 'chef', 'caisse'), requireAgenceAccess(), async (req, res) => {
-      const data = normalizeKeysDeep(req.body);
-      const parsed = insertCompteEpargneSchema.parse(data);
-      
-      // Vérifier agence du client
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
-      if (agenceFilter) {
-        const client = await storage.getClient(parsed.clientId);
-        if (!client || client.agence !== agenceFilter.agence) {
-          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-        }
-      }
-      
-      const compte = await storage.createCompteEpargne(parsed);
-      
-      // Update Dashboard
-      const wsModule = await import("../ws-server");
-      const wsInstance = wsModule.getWsInstance();
-      const userAgence = req.session.user?.agence;
-
-      if (wsInstance && userAgence) {
-          wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
-          
-          // Activité en temps réel
-          wsInstance.broadcastToAgency(userAgence, {
-            type: "LIVE_ACTIVITY",
-            payload: {
-              action: `Nouveau compte épargne ouvert`,
-              user: req.session.user?.nom || 'Système',
-              type: 'savings',
-              timestamp: new Date().toISOString()
-            }
-          });
-      }
-      
-      res.json(addSnakeCaseAliasesDeep(compte));
-  });
-
-  app.get("/api/comptes-epargne/:id/transactions", requireAuth, async (req, res) => {
-      const trans = await storage.getTransactionsByCompte(req.params.id);
-      res.json(addSnakeCaseAliasesDeep(trans));
-  });
-
-  // Transaction épargne (roles: admin, chef, caisse)
-  app.post("/api/transactions-epargne", requireAuth, requireRole('admin', 'chef', 'caisse'), async (req, res) => {
-      const data = normalizeKeysDeep(req.body);
-      const parsed = insertTransactionEpargneSchema.parse(data);
-      const trans = await storage.createTransactionEpargne(parsed);
-      
-      // Notify Admins on Withdrawal & Update Dashboard
-      const wsInstance = require("../ws-server").getWsInstance();
-      const userAgence = req.session.user?.agence;
-
-      if (wsInstance && userAgence) {
-          if (parsed.typeTransaction === 'retrait') {
-             wsInstance.broadcastToAgency(userAgence, {
-                type: "NOTIFICATION",
-                payload: {
-                   message: `Nouveau retrait de ${parsed.montant} FCFA`,
-                   targetRole: "admin"
-                }
-             });
-          }
-          wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
-          
-          // Activité en temps réel
-          const actionLabel = parsed.typeTransaction === 'depot' ? 'Dépôt' : 'Retrait';
-          wsInstance.broadcastToAgency(userAgence, {
-            type: "LIVE_ACTIVITY",
-            payload: {
-              action: `${actionLabel}: ${Number(parsed.montant).toLocaleString()} FCFA`,
-              user: req.session.user?.nom || 'Système',
-              type: parsed.typeTransaction === 'depot' ? 'savings' : 'payment',
-              timestamp: new Date().toISOString()
-            }
-          });
-
-          // Notify client data update for real-time refresh
-          wsInstance.broadcastToAgency(userAgence, { 
-            type: "CLIENT_UPDATE", 
-            payload: { clientId: parsed.compteId } 
-          });
-      }
-
-      res.json(addSnakeCaseAliasesDeep(trans));
-  });
+  // ============================================================================
+  // COMPTES ENDPOINTS - See /api/comptes in server/routes/comptes.ts
+  // All account operations (create, deposit, withdrawal, block, unblock, transfer)
+  // are now handled by the unified comptes routes.
+  // ============================================================================
 
   // Caisse Management
   app.get("/api/agences/:id/caisses", requireAuth, requireAgenceAccess(), async (req, res) => {
@@ -356,11 +437,22 @@ export function registerFinanceRoutes(app: Express) {
             
             for (const op of ops) {
                 const montant = Number(op.montant || 0);
-                // "Versement" / "Depot" = IN, "Retrait" = OUT
-                if (['Versement', 'Depot', 'Encaissement'].includes(op.typeOperation)) {
+                
+                // Logic In/Out expanded for new Enum types
+                const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit'];
+                const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais'];
+
+                if (IN_TYPES.includes(op.typeOperation)) {
                     solde += montant;
-                } else if (['Retrait', 'Decaissement'].includes(op.typeOperation)) {
+                } else if (OUT_TYPES.includes(op.typeOperation)) {
                     solde -= montant;
+                } else if (op.typeOperation === 'Transfert caisse') {
+                    // Check reference/description to determine direction for Transfer
+                    if (op.reference?.includes('TRF-IN') || op.description?.includes('Réception')) {
+                        solde += montant;
+                    } else {
+                        solde -= montant;
+                    }
                 }
             }
             currentSolde = solde.toString();
@@ -485,7 +577,15 @@ export function registerFinanceRoutes(app: Express) {
 
   app.get("/api/sessions-caisse", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence', 'superviseur'), requireAgenceAccess(), async (req, res) => {
       const agenceFilter = req.agenceFilter as { agence?: string } | null;
-      const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+      // Allow filtering by agenceId from query if not restricted by role (admin)
+      // If restricted, req.agenceFilter takes precedence
+      const requestedAgenceId = req.query.agenceId as string;
+      const requestedStatut = req.query.statut as string;
+
+      const filter = { 
+        agence: agenceFilter ? agenceFilter.agence : requestedAgenceId,
+        statut: requestedStatut
+      };
       
       const sessions = await storage.getAllSessionsCaisse(filter);
       res.json(addSnakeCaseAliasesDeep(sessions));
@@ -565,7 +665,7 @@ export function registerFinanceRoutes(app: Express) {
       const session = await storage.createSessionCaisse(parsed);
       
       // Update UI real-time
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: parsed.caisseId } });
           wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
@@ -616,14 +716,20 @@ export function registerFinanceRoutes(app: Express) {
       // Add Operations
       for (const op of ops) {
           const montant = Number(op.montant);
-          // Assuming 'Versement' is IN, 'Retrait' is OUT. 
-          // Need to verify operation types in your system.
-          // Caisse logic usually: Encaissement (+) / Decaissement (-)
-          // Checking typical types...
-          if (['Versement', 'Depot', 'Encaissement'].includes(op.typeOperation)) {
+          
+          const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit'];
+          const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais'];
+
+          if (IN_TYPES.includes(op.typeOperation)) {
               soldeTheorique += montant;
-          } else if (['Retrait', 'Decaissement'].includes(op.typeOperation)) {
+          } else if (OUT_TYPES.includes(op.typeOperation)) {
               soldeTheorique -= montant;
+          } else if (op.typeOperation === 'Transfert caisse') {
+               if (op.reference?.includes('TRF-IN') || op.description?.includes('Réception')) {
+                   soldeTheorique += montant;
+               } else {
+                   soldeTheorique -= montant;
+               }
           }
       }
 
@@ -644,13 +750,19 @@ export function registerFinanceRoutes(app: Express) {
       });
 
       // Update UI real-time
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
           wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
       }
 
       res.json(addSnakeCaseAliasesDeep(closedSession));
+  });
+
+  app.get("/api/caisses/status", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+    const agenceId = req.query.agenceId as string;
+    const caisses = await storage.getCaissesWithStatus(agenceId);
+    res.json(addSnakeCaseAliasesDeep(caisses));
   });
 
   // Opération caisse (roles: admin, chef, caisse)
@@ -672,29 +784,29 @@ export function registerFinanceRoutes(app: Express) {
         const op = await storage.createOperationCaisse(parsed);
 
         // Update account balance and create transaction history
-        let targetCompteId = parsed.compteId;
+        let targetCompteId = data.compteId;
         
         // If no specific account provided, try to find the client's default savings account
         if (!targetCompteId && parsed.clientId) {
              const clientAccounts = await storage.getComptesByClient(parsed.clientId);
-             const defaultAccount = clientAccounts.find(c => c.typeCompte === 'Epargne' && c.statut === 'Actif') || clientAccounts[0];
+             const defaultAccount = clientAccounts.find(c => c.typeCompte === 'Épargne' && c.statut === 'Actif') || clientAccounts[0];
              if (defaultAccount) {
                  targetCompteId = defaultAccount.id;
              }
         }
 
-        if (targetCompteId && parsed.montant) {
-            const compte = await storage.getCompteEpargne(targetCompteId);
+            if (targetCompteId && parsed.montant) {
+            const compte = await storage.getCompte(targetCompteId);
             if (compte) {
                 const montant = Number(parsed.montant);
-                const currentSolde = Number(compte.solde) || 0;
+                const currentSolde = Number(compte.soldeCourant) || 0;
                 let newSolde: number;
                 let transactionType = 'Dépôt';
 
                 // Versement/Dépôt = add to balance, Retrait = subtract from balance
                 const opType = (parsed.typeOperation || '').toLowerCase();
-                const isDeposit = ['versement', 'dépôt', 'depot', 'depôt'].includes(opType);
-                const isWithdrawal = ['retrait'].includes(opType);
+                const isDeposit = ['versement', 'dépôt', 'depot', 'depôt', 'dépôt épargne'].includes(opType);
+                const isWithdrawal = ['retrait', 'retrait épargne'].includes(opType);
 
                 if (isDeposit) {
                     newSolde = currentSolde + montant;
@@ -708,23 +820,28 @@ export function registerFinanceRoutes(app: Express) {
 
                 if (newSolde !== currentSolde) {
                     // 1. Update Balance
-                    await storage.updateCompteEpargne(targetCompteId, { solde: String(newSolde) });
+                    await storage.updateCompte(targetCompteId, { soldeCourant: String(newSolde) });
 
                     // 2. Create Transaction Record (CRUCIAL for History)
-                    await storage.createTransactionEpargne({
+                    // Map transaction type to valid typePaiement
+                    const typePaiement = transactionType === 'Dépôt' 
+                        ? (compte.typeCompte === 'Courant' ? 'Dépôt Courant' : 'Dépôt Épargne')
+                        : (compte.typeCompte === 'Courant' ? 'Retrait Courant' : 'Retrait Épargne');
+
+                    await storage.createTransactionCompte({
                         compteId: targetCompteId,
-                        typeTransaction: transactionType,
+                        typePaiement: typePaiement as any,
                         montant: String(montant),
                         soldeApres: String(newSolde),
                         methodePaiement: 'Espèces',
-                        reference: op.reference || `OP-${Date.now()}`,
+                        referenceExterne: op.reference || `OP-${Date.now()}`,
                         observations: `Opération Caisse: ${parsed.typeOperation}`,
                         createdBy: user.id
-                    });
+                    } as any);
 
                     // 3. Broadcast account update
                     try {
-                        const wsInstance = require("../ws-server").getWsInstance();
+                        const wsInstance = getWsInstance();
                         if (wsInstance) {
                             wsInstance.broadcast({ type: "COMPTE_UPDATE", payload: { compteId: targetCompteId, newSolde } });
                         }
@@ -737,7 +854,7 @@ export function registerFinanceRoutes(app: Express) {
 
         try {
             // Loyalty Points: Award points for deposits
-            if (parsed.clientId && parsed.typeOperation === 'Versement' && parsed.montant) {
+            if (parsed.clientId && parsed.typeOperation === 'Dépôt épargne' && parsed.montant) {
                 const points = Math.floor(Number(parsed.montant) / 1000); // 1 point per 1000 FCFA
                 await storage.addLoyaltyPoints(
                     parsed.clientId,
@@ -752,7 +869,7 @@ export function registerFinanceRoutes(app: Express) {
             
             // Notify Client Update for Limits Real-time Refresh
             if (parsed.clientId) {
-                const wsInstance = require("../ws-server").getWsInstance();
+                const wsInstance = getWsInstance();
                 if (wsInstance) {
                     wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: parsed.clientId } });
                     // Also update dashboard & Caisse List
@@ -785,7 +902,7 @@ export function registerFinanceRoutes(app: Express) {
         // Notify updates
         try {
              if (updated.clientId) {
-                const wsInstance = require("../ws-server").getWsInstance();
+                const wsInstance = getWsInstance();
                 if (wsInstance) {
                     wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: updated.clientId } });
                     wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
@@ -867,7 +984,7 @@ export function registerFinanceRoutes(app: Express) {
       const transfert = await storage.createCaisseTransfert(rawData);
 
       // Notification WS à l'agence de destination
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           // Trouver le nom de l'agence destination pour cibler (TODO: mapper ID vers Nom ou utiliser ID dans WS)
           // Pour l'instant on broadcast global ou on essaie de cibler.
@@ -892,43 +1009,43 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       const transfert = await storage.getCaisseTransfert(id);
-      if (!transfert || transfert.statut !== 'en_attente') {
+      if (!transfert || transfert.statut !== 'En attente') {
           return res.status(400).json({ message: "Transfert non disponible" });
       }
 
       // Valider
       const updated = await storage.updateCaisseTransfert(id, {
-          statut: 'valide',
+          statut: 'Validé',
           sessionDestId: sessionDest.id,
           dateValidation: new Date(),
           validatedBy: req.session.user!.id
       });
 
       // Créer les opérations miroirs
-      // 1. Sortie chez l'expéditeur
+      // 1. Sortie chez l'expéditeur (Transfert caisse - Sortant)
       await storage.createOperationCaisse({
           sessionId: transfert.sessionSourceId,
-          typeOperation: 'retrait',
+          typeOperation: 'Transfert caisse',
           montant: transfert.montant,
           reference: `TRF-OUT-${transfert.reference}`,
           description: `Transfert vers ${sessionDest.agenceId} (Ref: ${transfert.reference})`,
-          modePaiement: 'Virement Interne',
+          methodePaiement: 'Virement',
           createdBy: req.session.user!.id
       });
 
-      // 2. Entrée chez le destinataire
+      // 2. Entrée chez le destinataire (Transfert caisse - Entrant)
       await storage.createOperationCaisse({
           sessionId: sessionDest.id,
-          typeOperation: 'depot',
+          typeOperation: 'Transfert caisse',
           montant: transfert.montant, 
           reference: `TRF-IN-${transfert.reference}`,
           description: `Réception transfert de ${transfert.sessionSourceId} (Ref: ${transfert.reference})`,
-          modePaiement: 'Virement Interne',
+          methodePaiement: 'Virement',
           createdBy: req.session.user!.id
       });
 
       // Notify users
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { type: 'transfert_validated', id } });
       }
@@ -941,7 +1058,7 @@ export function registerFinanceRoutes(app: Express) {
       const { id } = req.params;
       const transfert = await storage.getCaisseTransfert(id);
       
-      if (!transfert || transfert.statut !== 'en_attente') {
+      if (!transfert || transfert.statut !== 'En attente') {
           return res.status(400).json({ message: "Transfert ne peut pas être annulé" });
       }
       
@@ -949,14 +1066,88 @@ export function registerFinanceRoutes(app: Express) {
       // Implementation simplifiée...
       
       const updated = await storage.updateCaisseTransfert(id, {
-          statut: 'annule'
+          statut: 'Annulé'
       });
       
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { type: 'transfert_cancelled', id } });
       }
       
       res.json(addSnakeCaseAliasesDeep(updated));
+  });
+
+  // ============================================================================
+  // MOUVEMENTS FINANCIERS API (Phase 3 - Unified Ledger Endpoints)
+  // ============================================================================
+
+  /**
+   * GET /api/mouvements - Global ledger feed with filtering
+   */
+  app.get("/api/mouvements", requireAuth, requireAgenceAccess(), async (req, res) => {
+    try {
+      const { sourceModule, clientId, compteId, creditId, sessionCaisseId, from, to, limit } = req.query;
+
+      const filter: any = {};
+      if (sourceModule) filter.sourceModule = sourceModule as string;
+      if (clientId) filter.clientId = clientId as string;
+      if (compteId) filter.compteId = compteId as string;
+      if (creditId) filter.creditId = creditId as string;
+      if (sessionCaisseId) filter.sessionCaisseId = sessionCaisseId as string;
+      if (from) filter.from = new Date(from as string);
+      if (to) filter.to = new Date(to as string);
+      if (limit) filter.limit = parseInt(limit as string, 10);
+
+      const mouvements = await storage.getMouvementsFinanciers(filter);
+      res.json(addSnakeCaseAliasesDeep(mouvements));
+    } catch (error: any) {
+      console.error('Error fetching mouvements:', error);
+      res.status(500).json({ message: error.message || 'Erreur serveur' });
+    }
+  });
+
+  /**
+   * GET /api/comptes/:id/mouvements - Movements for a specific savings account
+   */
+  app.get("/api/comptes/:id/mouvements", requireAuth, async (req, res) => {
+    try {
+      const mouvements = await storage.getMouvementsFinanciers({
+        compteId: req.params.id,
+        limit: 100
+      });
+      res.json(addSnakeCaseAliasesDeep(mouvements));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * GET /api/credits/:id/mouvements - Movements for a specific credit
+   */
+  app.get("/api/credits/:id/mouvements", requireAuth, async (req, res) => {
+    try {
+      const mouvements = await storage.getMouvementsFinanciers({
+        creditId: req.params.id,
+        limit: 100
+      });
+      res.json(addSnakeCaseAliasesDeep(mouvements));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * GET /api/sessions-caisse/:id/mouvements - Movements for a cash session
+   */
+  app.get("/api/sessions-caisse/:id/mouvements", requireAuth, async (req, res) => {
+    try {
+      const mouvements = await storage.getMouvementsFinanciers({
+        sessionCaisseId: req.params.id,
+        limit: 100
+      });
+      res.json(addSnakeCaseAliasesDeep(mouvements));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 }

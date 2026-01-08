@@ -338,3 +338,154 @@ export async function createOrUpdateObjectifMensuel(data: InsertObjectifMensuel)
     }
 }
 
+// ============================================================================
+// ATOMIC LEDGER-BASED TERRAIN OPERATIONS
+// All terrain payments go through mouvementsFinanciers + evenementsOutbox
+// ============================================================================
+
+import { 
+  executeWithLedger, 
+  updateCreditSolde,
+  type SensMouvement,
+  type MouvementFinancier
+} from "../services/ledger";
+import { credits } from "@shared/schema";
+
+/**
+ * Create a terrain payment with full ledger flow
+ * - Creates mouvement_financier
+ * - Updates credit solde if applicable
+ * - Updates agent stats
+ * - Creates paiement_terrain with mouvement_id
+ * - Publishes outbox events
+ */
+export async function createPaiementTerrainWithLedger(data: {
+  agentId: string;
+  clientId: string;
+  creditId?: string;
+  compteId?: string;
+  montant: string;
+  typePaiement: string;
+  latitude?: string;
+  longitude?: string;
+  idempotencyKey?: string;
+}, userId?: string): Promise<{ paiement: PaiementTerrain; mouvement: MouvementFinancier }> {
+  
+  return executeWithLedger(
+    "TERRAIN",
+    {
+      montant: data.montant,
+      sens: "Crédit" as SensMouvement, // Money coming in
+      clientId: data.clientId,
+      creditId: data.creditId,
+      compteId: data.compteId,
+      agentId: data.agentId,
+      methodePaiement: "Espèces",
+      typePaiement: data.typePaiement as any,
+      idempotencyKey: data.idempotencyKey,
+    },
+    async (tx, mouvement) => {
+      // 1. Update credit solde if this is a credit repayment
+      let nouveauSoldeCredit: string | undefined;
+      if (data.creditId) {
+        nouveauSoldeCredit = await updateCreditSolde(tx, data.creditId, -parseFloat(data.montant));
+      }
+
+      // 2. Update agent stats (totalPaiements)
+      await tx.update(agentsTerrain)
+        .set({ 
+          totalPaiements: sql`COALESCE(${agentsTerrain.totalPaiements}, '0')::numeric + ${data.montant}::numeric`,
+          updatedAt: new Date()
+        })
+        .where(eq(agentsTerrain.id, data.agentId));
+
+      // 3. Create paiement terrain
+      const [paiement] = await tx.insert(paiementsTerrain).values({
+        agentId: data.agentId,
+        clientId: data.clientId,
+        creditId: data.creditId,
+        compteId: data.compteId,
+        mouvementId: mouvement.id,
+        montant: data.montant,
+        typePaiement: data.typePaiement as any,
+        methodePaiement: "Espèces",
+        reference: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Simple generation or reuse mouvement reference? Mouvement ref is unique for ledger.
+        // datePaiement removed, using createdAt default
+        latitude: data.latitude,
+        longitude: data.longitude,
+        statut: "Validé",
+      } as any).returning();
+
+      return {
+        result: paiement,
+        additionalEventData: {
+          nouveauSoldeCredit,
+          agentId: data.agentId,
+        },
+      };
+    },
+    userId
+  ).then(({ result, mouvement }) => ({ paiement: result, mouvement }));
+}
+
+/**
+ * Get agent statistics for real-time dashboard
+ */
+export async function getAgentStats(agentId: string, options?: { 
+  dateFrom?: Date; 
+  dateTo?: Date 
+}): Promise<{
+  totalCollecte: number;
+  nombrePaiements: number;
+  collectesJour: number;
+  collectesSemaine: number;
+  collectesMois: number;
+}> {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfDay);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [totalResult] = await db.select({
+    total: sql<string>`COALESCE(SUM(${paiementsTerrain.montant}::numeric), 0)`,
+    count: sql<number>`COUNT(*)`,
+  })
+    .from(paiementsTerrain)
+    .where(eq(paiementsTerrain.agentId, agentId));
+
+  const [dayResult] = await db.select({
+    total: sql<string>`COALESCE(SUM(${paiementsTerrain.montant}::numeric), 0)`,
+  })
+    .from(paiementsTerrain)
+    .where(and(
+      eq(paiementsTerrain.agentId, agentId),
+      gte(paiementsTerrain.createdAt, startOfDay)
+    ));
+
+  const [weekResult] = await db.select({
+    total: sql<string>`COALESCE(SUM(${paiementsTerrain.montant}::numeric), 0)`,
+  })
+    .from(paiementsTerrain)
+    .where(and(
+      eq(paiementsTerrain.agentId, agentId),
+      gte(paiementsTerrain.createdAt, startOfWeek)
+    ));
+
+  const [monthResult] = await db.select({
+    total: sql<string>`COALESCE(SUM(${paiementsTerrain.montant}::numeric), 0)`,
+  })
+    .from(paiementsTerrain)
+    .where(and(
+      eq(paiementsTerrain.agentId, agentId),
+      gte(paiementsTerrain.createdAt, startOfMonth)
+    ));
+
+  return {
+    totalCollecte: parseFloat(totalResult?.total || '0'),
+    nombrePaiements: totalResult?.count || 0,
+    collectesJour: parseFloat(dayResult?.total || '0'),
+    collectesSemaine: parseFloat(weekResult?.total || '0'),
+    collectesMois: parseFloat(monthResult?.total || '0'),
+  };
+}

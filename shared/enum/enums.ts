@@ -15,9 +15,11 @@ export const dureeUniteEnum = pgEnum("duree_unite_enum", [
 ]);
 
 export const statutDemandeEnum = pgEnum("statut_demande_enum", [
-  "En attente",
-  "En cours",
-  "Approuvée",
+  "En attente",       // Attente paiement frais
+  "A enquêter",       // Frais payés, prêt pour enquête
+  "En enquête",        // En cours d'enquête
+  "Enquête terminée",  // Enquête soumise, attente validation investigation
+  "Approuvée",        // Investigation validée, prêt pour décision finale
   "Rejetée",
   "Annulée",
   "Décaissée",
@@ -78,6 +80,7 @@ export const typeOperationCaisseEnum = pgEnum("type_operation_caisse_enum", [
   "Retrait épargne",
   "Décaissement crédit",
   "Remboursement crédit",
+  "Frais Engagement",
   "Frais",
   "Ajustement",
   "Transfert caisse",
@@ -95,4 +98,77 @@ export const interestRateTypeEnum = pgEnum("interest_rate_type_enum", [
   "credit",
   "epargne",
   "autre",
+]);
+
+export const sensMouvementEnum = pgEnum("sens_mouvement_enum", ["Débit", "Crédit"]);
+
+export const sourceModuleEnum = pgEnum("source_module_enum", [
+  "CAISSE",
+  "EPARGNE",
+  "CREDIT",
+  "TONTINE",
+  "TERRAIN",
+  "TRANSFERT",
+  "SYSTEME",
+]);
+
+export const typeEvenementEnum = pgEnum("type_evenement_enum", [
+  "MOUVEMENT_CREE",
+  "MOUVEMENT_STATUT_CHANGE",
+  "SOLDE_COMPTE_CHANGE",
+  "CREDIT_SOLDE_CHANGE",
+  "SESSION_CAISSE_CHANGE",
+  "TRANSFERT_CAISSE_CHANGE",
+  // Compte-specific events
+  "COMPTE_CREE",
+  "COMPTE_BLOQUE",
+  "COMPTE_DEBLOQUE",
+  "COMPTE_TRANSFERE_AGENCE",
+]);
+
+export const typeTauxInteretEnum = pgEnum("type_taux_interet_enum", [
+  "credit",
+  "epargne",
+  "autre",
+]);
+
+export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
+  // Dépôts (par type de compte)
+  "Dépôt Épargne",
+  "Dépôt Courant",
+  "Dépôt Bloqué",
+
+  // Retraits (par type de compte)
+  "Retrait Épargne",
+  "Retrait Courant",
+  "Retrait Bloqué",
+
+  // Crédit
+  "Remboursement Crédit",
+  "Frais Engagement",
+
+  // Tontine
+  "Versement Tontine",
+  "Retrait Tontine",
+]);
+
+export const typeCompteEnum = pgEnum("type_compte_enum", [
+  "Épargne",
+  "Courant",
+  "Bloqué",
+]);
+
+export const statutCompteEnum = pgEnum("statut_compte_enum", [
+  "Actif",
+  "Suspendu",
+  "Clôturé",
+]);
+
+export const motifBlocageEnum = pgEnum("motif_blocage_enum", [
+  "Garantie crédit",
+  "Garantie tontine",
+  "Épargne forcée",
+  "Décision interne",
+  "Litige",
+  "Autre",
 ]);

@@ -19,7 +19,7 @@ export type InsertExercice = z.infer<typeof insertExerciceSchema>;
 export type Exercice = typeof exercices.$inferSelect;
 
 // Plan Comptable OHADA
-export const comptes = pgTable("plan_comptable", {
+export const planComptable = pgTable("plan_comptable", {
   id: uuid("id").primaryKey().defaultRandom(),
   numeroCompte: text("numero_compte").notNull().unique(),
   intitule: text("intitule").notNull(),
@@ -34,9 +34,9 @@ export const comptes = pgTable("plan_comptable", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertCompteSchema = createInsertSchema(comptes).omit({ id: true, createdAt: true });
-export type InsertCompte = z.infer<typeof insertCompteSchema>;
-export type Compte = typeof comptes.$inferSelect;
+export const insertCompteComptableSchema = createInsertSchema(planComptable).omit({ id: true, createdAt: true });
+export type InsertCompteComptable = z.infer<typeof insertCompteComptableSchema>;
+export type CompteComptable = typeof planComptable.$inferSelect;
 
 // Journaux Comptables
 export const journaux = pgTable("journaux_comptables", {
@@ -76,7 +76,7 @@ export type Ecriture = typeof ecritures.$inferSelect;
 export const lignesEcritures = pgTable("lignes_ecritures", {
   id: uuid("id").primaryKey().defaultRandom(),
   ecritureId: uuid("ecriture_id").notNull().references(() => ecritures.id, { onDelete: "cascade" }),
-  compteId: uuid("compte_id").notNull().references(() => comptes.id),
+  compteId: uuid("compte_id").notNull().references(() => planComptable.id),
   numeroCompte: text("numero_compte").notNull(), // Denormalized for speed
   libelle: text("libelle"),
   debit: numeric("debit").notNull().default("0"),

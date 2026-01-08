@@ -1,0 +1,678 @@
+/**
+ * Routes API pour les comptes microfinance
+ *
+ * Endpoints:
+ * - POST   /api/comptes              - Créer un compte (avec validation unique par type)
+ * - GET    /api/comptes              - Lister les comptes (filtré par agence)
+ * - GET    /api/comptes/:id          - Détails d'un compte
+ * - POST   /api/comptes/:id/depot    - Effectuer un dépôt
+ * - POST   /api/comptes/:id/retrait  - Effectuer un retrait
+ * - POST   /api/comptes/:id/bloquer  - Bloquer un compte
+ * - POST   /api/comptes/:id/debloquer - Débloquer un compte
+ * - POST   /api/comptes/:id/transfert-agence - Transférer vers une autre agence
+ * - GET    /api/comptes/:id/historique-agences - Historique des transferts d'agence
+ * - GET    /api/comptes/:id/transactions - Transactions du compte
+ * - GET    /api/clients/:id/portfolio - Portfolio complet du client
+ */
+
+import type { Express } from "express";
+import { requireAuth, requireRole } from "../auth";
+import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
+import { logAudit } from "../audit";
+import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { z } from "zod";
+import comptesService, { CompteError } from "../services/comptes";
+import { storage } from "../storage";
+
+// Validation schemas
+const createCompteSchema = z.object({
+  clientId: z.string().uuid(),
+  typeCompte: z.enum(["Épargne", "Courant", "Bloqué"]),
+  agenceId: z.string().uuid(),
+  produitId: z.string().uuid().optional(),
+  soldeInitial: z.number().min(0).optional(),
+  blocageActif: z.boolean().optional(),
+  blocageMotif: z
+    .enum([
+      "Garantie crédit",
+      "Garantie tontine",
+      "Épargne forcée",
+      "Décision interne",
+      "Litige",
+      "Autre",
+    ])
+    .optional(),
+  blocageReference: z.string().optional(),
+});
+
+const depotRetraitSchema = z.object({
+  montant: z.number().positive("Le montant doit être positif"),
+  methodePaiement: z.string().default("Espèces"),
+  sessionCaisseId: z.string().uuid().optional(),
+  observations: z.string().optional(),
+  idempotencyKey: z.string().optional(),
+});
+
+const blocageSchema = z.object({
+  motif: z.enum([
+    "Garantie crédit",
+    "Garantie tontine",
+    "Épargne forcée",
+    "Décision interne",
+    "Litige",
+    "Autre",
+  ]),
+  reference: z.string().optional(),
+  dateFin: z.string().datetime().optional(),
+});
+
+const deblocageSchema = z.object({
+  motif: z.string().optional(),
+});
+
+const transfertAgenceSchema = z.object({
+  nouvelleAgenceId: z.string().uuid(),
+  motif: z.string().optional(),
+});
+
+export function registerComptesRoutes(app: Express) {
+  // ============================================================================
+  // CREATE COMPTE
+  // ============================================================================
+
+  /**
+   * POST /api/comptes - Créer un nouveau compte
+   * Validation: Un client ne peut avoir qu'un seul compte par type
+   */
+  app.post(
+    "/api/comptes",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = createCompteSchema.parse(data);
+        const user = req.session.user;
+
+        // Vérifier que le client appartient à l'agence de l'utilisateur (si pas admin)
+        if (user?.agenceId && user.role !== "admin") {
+          const client = await storage.getClient(parsed.clientId);
+          if (!client) {
+            return res.status(404).json({ message: "Client non trouvé" });
+          }
+          // Note: Le client peut être créé dans n'importe quelle agence,
+          // mais le compte sera lié à l'agence spécifiée
+        }
+
+        const compte = await comptesService.createCompte(
+          {
+            clientId: parsed.clientId,
+            typeCompte: parsed.typeCompte,
+            agenceId: parsed.agenceId,
+            produitId: parsed.produitId,
+            soldeInitial: parsed.soldeInitial,
+            blocageActif: parsed.blocageActif,
+            blocageMotif: parsed.blocageMotif,
+            blocageReference: parsed.blocageReference,
+          },
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "CREATE_COMPTE",
+          "compte",
+          compte.id,
+          undefined,
+          "success",
+          "medium"
+        );
+
+        // Broadcast pour mise à jour UI
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance) {
+          wsInstance.broadcast({
+            type: "DASHBOARD_UPDATE",
+            payload: {},
+          });
+        }
+
+        res.status(201).json(addSnakeCaseAliasesDeep(compte));
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        if (error.name === "ZodError") {
+          return res.status(400).json({
+            message: "Données invalides",
+            details: error.errors,
+          });
+        }
+        console.error("Error creating compte:", error);
+        res.status(500).json({ message: "Erreur serveur" });
+      }
+    }
+  );
+
+  // ============================================================================
+  // LIST & GET COMPTES
+  // ============================================================================
+
+  /**
+   * GET /api/comptes - Lister les comptes (filtré par agence)
+   */
+  app.get(
+    "/api/comptes",
+    requireAuth,
+    requireAgenceAccess(),
+    async (req, res) => {
+      try {
+        const agenceFilter = req.agenceFilter as { agence?: string } | null;
+        const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+
+        const comptes = await storage.getAllComptes(filter);
+        res.json(addSnakeCaseAliasesDeep(comptes));
+      } catch (error: any) {
+        console.error("Error listing comptes:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/:id - Détails d'un compte avec permissions
+   */
+  app.get("/api/comptes/:id", requireAuth, async (req, res) => {
+    try {
+      const compte = await storage.getCompte(req.params.id);
+      if (!compte) {
+        return res.status(404).json({ message: "Compte non trouvé" });
+      }
+
+      // Ajouter les informations de permission de retrait
+      const withdrawalCheck = comptesService.canWithdraw(compte);
+      const depositCheck = comptesService.canDeposit(compte);
+
+      res.json(
+        addSnakeCaseAliasesDeep({
+          ...compte,
+          permissions: {
+            canWithdraw: withdrawalCheck.allowed,
+            withdrawalBlockedReason: withdrawalCheck.reason,
+            canDeposit: depositCheck.allowed,
+            depositBlockedReason: depositCheck.reason,
+          },
+        })
+      );
+    } catch (error: any) {
+      console.error("Error getting compte:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
+  // DEPOT / RETRAIT
+  // ============================================================================
+
+  /**
+   * POST /api/comptes/:id/depot - Effectuer un dépôt
+   * Les dépôts sont toujours autorisés (même sur compte bloqué)
+   */
+  app.post(
+    "/api/comptes/:id/depot",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = depotRetraitSchema.parse(data);
+        const user = req.session.user;
+
+        // Si pas de sessionCaisseId fourni, essayer de récupérer la session active
+        let sessionCaisseId = parsed.sessionCaisseId;
+        if (!sessionCaisseId && user) {
+          const activeSession = await storage.getActiveSessionForUser(user.id);
+          if (activeSession) {
+            sessionCaisseId = activeSession.id;
+          }
+        }
+
+        const result = await comptesService.deposerSurCompte(
+          {
+            compteId: req.params.id,
+            montant: parsed.montant,
+            methodePaiement: parsed.methodePaiement,
+            sessionCaisseId,
+            observations: parsed.observations,
+            idempotencyKey: parsed.idempotencyKey,
+          },
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "DEPOT_COMPTE",
+          "compte",
+          req.params.id,
+          { montant: parsed.montant },
+          "success",
+          "medium"
+        );
+
+        // Broadcast temps réel (outbox worker gère le reste)
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance && user?.agence) {
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "LIVE_ACTIVITY",
+            payload: {
+              action: `Dépôt: ${parsed.montant.toLocaleString()} FCFA`,
+              user: user.nom || "Système",
+              type: "savings",
+              timestamp: new Date().toISOString(),
+            },
+          });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "DASHBOARD_UPDATE",
+            payload: {},
+          });
+        }
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            transaction: result.transaction,
+            mouvement_id: result.mouvement.id,
+            message: "Dépôt effectué avec succès",
+          })
+        );
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        if (error.message?.includes("Duplicate idempotency")) {
+          return res.status(409).json({
+            message: "Opération déjà effectuée (doublon détecté)",
+            code: "DUPLICATE_OPERATION",
+          });
+        }
+        console.error("Error depot:", error);
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/comptes/:id/retrait - Effectuer un retrait
+   * CRITIQUE: Vérifie les règles de blocage pour les comptes bloqués
+   */
+  app.post(
+    "/api/comptes/:id/retrait",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = depotRetraitSchema.parse(data);
+        const user = req.session.user;
+
+        // Si pas de sessionCaisseId fourni, essayer de récupérer la session active
+        let sessionCaisseId = parsed.sessionCaisseId;
+        if (!sessionCaisseId && user) {
+          const activeSession = await storage.getActiveSessionForUser(user.id);
+          if (activeSession) {
+            sessionCaisseId = activeSession.id;
+          }
+        }
+
+        const result = await comptesService.retirerDuCompte(
+          {
+            compteId: req.params.id,
+            montant: parsed.montant,
+            methodePaiement: parsed.methodePaiement,
+            sessionCaisseId,
+            observations: parsed.observations,
+            idempotencyKey: parsed.idempotencyKey,
+          },
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "RETRAIT_COMPTE",
+          "compte",
+          req.params.id,
+          { montant: parsed.montant },
+          "success",
+          "high"
+        );
+
+        // Broadcast temps réel
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance && user?.agence) {
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "NOTIFICATION",
+            payload: {
+              message: `Retrait de ${parsed.montant.toLocaleString()} FCFA effectué`,
+              targetRole: "admin",
+            },
+          });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "LIVE_ACTIVITY",
+            payload: {
+              action: `Retrait: ${parsed.montant.toLocaleString()} FCFA`,
+              user: user.nom || "Système",
+              type: "payment",
+              timestamp: new Date().toISOString(),
+            },
+          });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "DASHBOARD_UPDATE",
+            payload: {},
+          });
+        }
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            transaction: result.transaction,
+            mouvement_id: result.mouvement.id,
+            message: "Retrait effectué avec succès",
+          })
+        );
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          // Codes spécifiques pour le frontend
+          const statusCode =
+            error.code === "WITHDRAWAL_NOT_ALLOWED" ||
+            error.code === "INSUFFICIENT_BALANCE"
+              ? 403
+              : 400;
+          return res.status(statusCode).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        if (error.message?.includes("Duplicate idempotency")) {
+          return res.status(409).json({
+            message: "Opération déjà effectuée (doublon détecté)",
+            code: "DUPLICATE_OPERATION",
+          });
+        }
+        console.error("Error retrait:", error);
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  // ============================================================================
+  // BLOCAGE / DEBLOCAGE
+  // ============================================================================
+
+  /**
+   * POST /api/comptes/:id/bloquer - Bloquer un compte
+   */
+  app.post(
+    "/api/comptes/:id/bloquer",
+    requireAuth,
+    requireRole("admin", "chef"),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = blocageSchema.parse(data);
+        const user = req.session.user;
+
+        const compte = await comptesService.bloquerCompte(
+          req.params.id,
+          parsed.motif,
+          parsed.reference,
+          parsed.dateFin ? new Date(parsed.dateFin) : undefined,
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "BLOQUER_COMPTE",
+          "compte",
+          req.params.id,
+          { motif: parsed.motif },
+          "success",
+          "high"
+        );
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            ...compte,
+            message: "Compte bloqué avec succès",
+          })
+        );
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        console.error("Error bloquer compte:", error);
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/comptes/:id/debloquer - Débloquer un compte
+   * CRITIQUE: Tracé et événement temps réel obligatoire
+   */
+  app.post(
+    "/api/comptes/:id/debloquer",
+    requireAuth,
+    requireRole("admin", "chef"),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = deblocageSchema.parse(data);
+        const user = req.session.user;
+
+        const compte = await comptesService.debloquerCompte(
+          {
+            compteId: req.params.id,
+            motif: parsed.motif,
+          },
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "DEBLOQUER_COMPTE",
+          "compte",
+          req.params.id,
+          { motif: parsed.motif },
+          "success",
+          "high"
+        );
+
+        // Notification explicite (en plus de l'outbox)
+        const wsInstance = require("../ws-server").getWsInstance();
+        if (wsInstance && user?.agence) {
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "NOTIFICATION",
+            payload: {
+              message: `Compte ${compte.numeroCompte} débloqué`,
+              type: "success",
+            },
+          });
+        }
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            ...compte,
+            message: "Compte débloqué avec succès",
+          })
+        );
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        console.error("Error debloquer compte:", error);
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  // ============================================================================
+  // TRANSFERT INTER-AGENCE
+  // ============================================================================
+
+  /**
+   * POST /api/comptes/:id/transfert-agence - Transférer vers une autre agence
+   * Historisé via compte_agences_historique
+   */
+  app.post(
+    "/api/comptes/:id/transfert-agence",
+    requireAuth,
+    requireRole("admin", "chef"),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = transfertAgenceSchema.parse(data);
+        const user = req.session.user;
+
+        const compte = await comptesService.transfererCompteAgence(
+          {
+            compteId: req.params.id,
+            nouvelleAgenceId: parsed.nouvelleAgenceId,
+            motif: parsed.motif,
+          },
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "TRANSFERT_COMPTE_AGENCE",
+          "compte",
+          req.params.id,
+          { nouvelleAgenceId: parsed.nouvelleAgenceId },
+          "success",
+          "high"
+        );
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            ...compte,
+            message: "Compte transféré avec succès",
+          })
+        );
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          return res.status(400).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        console.error("Error transfert agence:", error);
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/:id/historique-agences - Historique des transferts d'agence
+   */
+  app.get(
+    "/api/comptes/:id/historique-agences",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const historique = await comptesService.getCompteAgenceHistorique(
+          req.params.id
+        );
+        res.json(addSnakeCaseAliasesDeep(historique));
+      } catch (error: any) {
+        console.error("Error getting historique agences:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // ============================================================================
+  // TRANSACTIONS & PORTFOLIO
+  // ============================================================================
+
+  /**
+   * GET /api/comptes/:id/transactions - Transactions du compte
+   */
+  app.get("/api/comptes/:id/transactions", requireAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const transactions = await comptesService.getCompteTransactions(
+        req.params.id,
+        limit
+      );
+      res.json(addSnakeCaseAliasesDeep(transactions));
+    } catch (error: any) {
+      console.error("Error getting transactions:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * GET /api/clients/:id/portfolio - Portfolio complet du client
+   * Retourne: comptes, crédits, tontines, totaux
+   */
+  app.get("/api/clients/:id/portfolio", requireAuth, async (req, res) => {
+    try {
+      const portfolio = await comptesService.getClientPortfolio(req.params.id);
+      res.json(addSnakeCaseAliasesDeep(portfolio));
+    } catch (error: any) {
+      console.error("Error getting portfolio:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
+  // VALIDATION ENDPOINT (pour le frontend)
+  // ============================================================================
+
+  /**
+   * GET /api/clients/:id/can-create-compte/:type - Vérifie si le client peut créer ce type de compte
+   */
+  app.get(
+    "/api/clients/:id/can-create-compte/:type",
+    requireAuth,
+    async (req, res) => {
+      try {
+        const { id, type } = req.params;
+        const typeCompte = type as "Épargne" | "Courant" | "Bloqué";
+
+        if (!["Épargne", "Courant", "Bloqué"].includes(typeCompte)) {
+          return res.status(400).json({
+            message: "Type de compte invalide",
+            allowed: false,
+          });
+        }
+
+        const hasExisting = await comptesService.clientHasCompteOfType(
+          id,
+          typeCompte
+        );
+
+        res.json({
+          allowed: !hasExisting,
+          reason: hasExisting
+            ? `Le client possède déjà un compte ${typeCompte}`
+            : null,
+        });
+      } catch (error: any) {
+        console.error("Error checking compte eligibility:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+}

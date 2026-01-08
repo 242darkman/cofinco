@@ -10,8 +10,8 @@ import * as employesStorage from "./employes";
 // Import types for IStorage interface definition
 import {
     User, InsertUser, Client, InsertClient, Credit, InsertCredit, DemandeCredit, InsertDemandeCredit,
-    EnqueteCredit, InsertEnqueteCredit, Remboursement, InsertRemboursement, CompteEpargne, InsertCompteEpargne,
-    TransactionEpargne, InsertTransactionEpargne, PlanEpargne, InsertPlanEpargne, ObjectifEpargne, InsertObjectifEpargne,
+    EnqueteCredit, InsertEnqueteCredit, Remboursement, InsertRemboursement, Compte, InsertCompte,
+    TransactionCompte, InsertTransactionCompte, PlanEpargne, InsertPlanEpargne, ObjectifEpargne, InsertObjectifEpargne,
     Tontine, InsertTontine, MembreTontine, InsertMembreTontine, ContributionTontine, InsertContributionTontine,
     TontineRegle, InsertTontineRegle, TontinePenalite, InsertTontinePenalite,
     SessionCaisse, InsertSessionCaisse, OperationCaisse, InsertOperationCaisse, AgentTerrain, InsertAgentTerrain,
@@ -24,7 +24,9 @@ import {
     ModeleFacture, InsertModeleFacture, Facture, InsertFacture, LigneFacture, InsertLigneFacture,
 
     PosDevice, InsertPosDevice, Employe, InsertEmploye, EmployeWithUser, Zone, InsertZone, Agence,
-    Compte, InsertCompte, Journal, InsertJournal, Ecriture, InsertEcriture, DeclarationTva, InsertDeclarationTva,
+    
+    // Accounting uses CompteComptable now
+    CompteComptable, InsertCompteComptable, Journal, InsertJournal, Ecriture, InsertEcriture, DeclarationTva, InsertDeclarationTva,
 
     InsertAvantage, ObjectifMensuel, InsertObjectifMensuel,
     CaisseAssignation, InsertCaisseAssignation,
@@ -61,9 +63,19 @@ export interface IStorage {
     getAllDemandes(filter?: { agence?: string }): Promise<DemandeCredit[]>;
     createDemandeCredit(demande: InsertDemandeCredit): Promise<DemandeCredit>;
     updateDemandeCredit(id: string, demande: Partial<InsertDemandeCredit>): Promise<DemandeCredit | undefined>;
+    deleteDemandeCredit(id: string): Promise<boolean>;
+    payerFraisEngagement(data: {
+      demandeId: string;
+      montant: string;
+      methodePaiement: string;
+      sessionCaisseId?: string;
+      idempotencyKey?: string;
+    }, userId?: string): Promise<{ demande: DemandeCredit; operation: OperationCaisse; mouvement: any }>;
+
 
     // Enquetes
     getEnqueteCredit(id: string): Promise<EnqueteCredit | undefined>;
+    getEnqueteByDemandeId(demandeId: string): Promise<EnqueteCredit[]>;
     getEnquetesByClient(clientId: string): Promise<EnqueteCredit[]>;
     getAllEnquetes(): Promise<EnqueteCredit[]>;
     createEnqueteCredit(enquete: InsertEnqueteCredit): Promise<EnqueteCredit>;
@@ -73,19 +85,57 @@ export interface IStorage {
     getRemboursement(id: string): Promise<Remboursement | undefined>;
     getRemboursementsByCredit(creditId: string): Promise<Remboursement[]>;
     createRemboursement(remboursement: InsertRemboursement): Promise<Remboursement>;
+    createRemboursementWithLedger(data: {
+      creditId: string;
+      montant: string;
+      methodePaiement: string;
+      sessionCaisseId?: string;
+      observations?: string;
+      idempotencyKey?: string;
+    }, userId?: string): Promise<{ remboursement: Remboursement; mouvement: any }>;
 
-    // Epargne
-    getCompteEpargne(id: string): Promise<CompteEpargne | undefined>;
-    getComptesByClient(clientId: string): Promise<CompteEpargne[]>;
-    getAllComptesEpargne(filter?: { agence?: string }): Promise<CompteEpargne[]>;
-    createCompteEpargne(compte: InsertCompteEpargne): Promise<CompteEpargne>;
-    updateCompteEpargne(id: string, compte: Partial<InsertCompteEpargne>): Promise<CompteEpargne | undefined>;
-    updateClientAccount(id: string, updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }): Promise<CompteEpargne | undefined>;
+    // Epargne (Comptes Bancaires)
+    getCompte(id: string): Promise<Compte | undefined>;
+    getComptesByClient(clientId: string): Promise<Compte[]>;
+    getAllComptes(filter?: { agence?: string }): Promise<Compte[]>;
+    createCompte(compte: InsertCompte): Promise<Compte>;
+    updateCompte(id: string, compte: Partial<InsertCompte>): Promise<Compte | undefined>;
+    createClientAccount(
+      clientId: string,
+      data: { typeCompte: string; soldeInitial: number; tauxInteret?: number; statut: string; methodePaiement?: string },
+      userId: string | undefined
+    ): Promise<Compte>;
+    updateClientAccount(id: string, updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }): Promise<Compte | undefined>;
 
-    getTransactionEpargne(id: string): Promise<TransactionEpargne | undefined>;
-    getTransactionsByCompte(compteId: string): Promise<TransactionEpargne[]>;
-    createTransactionEpargne(transaction: InsertTransactionEpargne): Promise<TransactionEpargne>;
+    getTransactionCompte(id: string): Promise<TransactionCompte | undefined>;
+    getTransactionsByCompte(compteId: string): Promise<TransactionCompte[]>;
+    createTransactionCompte(transaction: InsertTransactionCompte): Promise<TransactionCompte>;
+    createTransactionCompteWithLedger(data: {
+      compteId: string;
+      typeTransaction: "Dépôt" | "Retrait" | "Intérêt" | "Frais" | "Ajustement";
+      montant: string;
+      methodePaiement: string;
+      sessionCaisseId?: string;
+      observations?: string;
+      idempotencyKey?: string;
+    }, userId?: string): Promise<{ transaction: TransactionCompte; mouvement: any }>;
 
+    // Mouvements Financiers (Central Ledger)
+    getMouvementsFinanciers(filter?: {
+      sourceModule?: string;
+      clientId?: string;
+      compteId?: string;
+      creditId?: string;
+      sessionCaisseId?: string;
+      from?: Date;
+      to?: Date;
+      limit?: number;
+    }): Promise<any[]>;
+    getClientPortfolio(clientId: string): Promise<{
+      comptes: Compte[];
+      credits: Credit[];
+      tontines: any[];
+    }>;
     getPlanEpargne(id: string): Promise<PlanEpargne | undefined>;
     getPlansByCredit(creditId: string): Promise<PlanEpargne[]>;
     getPlansByClient(clientId: string): Promise<PlanEpargne[]>;
@@ -137,6 +187,7 @@ export interface IStorage {
     getAllOperationsCaisse(): Promise<OperationCaisse[]>;
     getOperationsCaisseByDateRange(start: Date, end: Date): Promise<OperationCaisse[]>;
     getOperationsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: string): Promise<OperationCaisse[]>;
+    getMouvementsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: 'retrait' | 'depot' | string): Promise<any[]>;
     createOperationCaisse(operation: InsertOperationCaisse): Promise<OperationCaisse>;
     updateOperationCaisse(id: string, operation: Partial<InsertOperationCaisse>): Promise<OperationCaisse | undefined>;
 
@@ -153,6 +204,13 @@ export interface IStorage {
     getAllAgentsTerrain(): Promise<any[]>;
     createAgentTerrain(agent: InsertAgentTerrain): Promise<AgentTerrain>;
     updateAgentTerrain(id: string, agent: Partial<InsertAgentTerrain>): Promise<AgentTerrain | undefined>;
+    getAgentStats(agentId: string, options?: { dateFrom?: Date; dateTo?: Date }): Promise<{
+        totalCollecte: number;
+        nombrePaiements: number;
+        collectesJour: number;
+        collectesSemaine: number;
+        collectesMois: number;
+    }>;
 
     // Prospections
     getProspection(id: string): Promise<Prospection | undefined>;
@@ -180,6 +238,17 @@ export interface IStorage {
     getPaiementsByAgent(agentId: string): Promise<PaiementTerrain[]>;
     getAllPaiementsTerrain(): Promise<PaiementTerrain[]>;
     createPaiementTerrain(paiement: InsertPaiementTerrain): Promise<PaiementTerrain>;
+    createPaiementTerrainWithLedger(data: {
+      agentId: string;
+      clientId: string;
+      creditId?: string;
+      compteId?: string;
+      montant: string;
+      typePaiement: string;
+      latitude?: string;
+      longitude?: string;
+      idempotencyKey?: string;
+    }, userId?: string): Promise<{ paiement: PaiementTerrain; mouvement: any }>;
     updatePaiementTerrain(id: string, paiement: Partial<InsertPaiementTerrain>): Promise<PaiementTerrain | undefined>;
 
     // Zones
@@ -237,11 +306,11 @@ export interface IStorage {
     getCaissesByAgence(agenceId: string): Promise<Caisse[]>;
     getAllCaisses(): Promise<Caisse[]>;
     createCaisse(caisse: InsertCaisse): Promise<Caisse>;
-    createCaisse(caisse: InsertCaisse): Promise<Caisse>;
     updateCaisse(id: string, caisse: Partial<InsertCaisse>): Promise<Caisse | undefined>;
     getCaisseAssignments(caisseId: string): Promise<CaisseAssignation[]>;
     getUserCaisseAssignments(userId: string): Promise<CaisseAssignation[]>;
     setCaisseAssignments(caisseId: string, userIds: string[], assignedBy: string): Promise<void>;
+    getCaissesWithStatus(agenceId?: string): Promise<any[]>;
 
     // Shifts
     getShiftCaisse(id: string): Promise<ShiftCaisse | undefined>;
@@ -298,9 +367,9 @@ export interface IStorage {
     deleteEmploye(id: string): Promise<boolean>;
 
     // Accounting
-    getAllComptes(): Promise<Compte[]>;
-    getComptesByClasse(classe: number): Promise<Compte[]>;
-    createCompte(compte: InsertCompte): Promise<Compte>;
+    getAllComptesComptables(): Promise<CompteComptable[]>;
+    getComptesComptablesByClasse(classe: number): Promise<CompteComptable[]>;
+    createCompteComptable(compte: InsertCompteComptable): Promise<CompteComptable>;
 
     getAllJournaux(): Promise<Journal[]>;
     createJournal(journal: InsertJournal): Promise<Journal>;

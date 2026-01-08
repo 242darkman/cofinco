@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { requireAuth } from "../auth";
 import { db } from "../db";
-import { 
-  clients, credits, comptesEpargne, tontines, users, sessionsCaisse,
-  transactionsEpargne, operationsCaisse, remboursements, agentsTerrain, employes
+import {
+  clients, credits, comptes, tontines, users, sessionsCaisse,
+  transactionsCompte, operationsCaisse, remboursements, agentsTerrain, employes
 } from "@shared/schema";
 import { storage } from "../storage";
 import { count, sql, and, gte, eq, desc, sum, ilike, or } from "drizzle-orm";
@@ -95,9 +95,9 @@ export function registerDashboardRoutes(app: Express) {
         // 3. Epargnes statistics
         db.select({
           total: count(),
-          actifs: sql<number>`COUNT(CASE WHEN ${comptesEpargne.statut} = 'actif' THEN 1 END)`,
-          montantTotal: sql<number>`COALESCE(SUM(${comptesEpargne.solde}), 0)`
-        }).from(comptesEpargne).where(withAgence(comptesEpargne)),
+          actifs: sql<number>`COUNT(CASE WHEN ${comptes.statut} = 'Actif' THEN 1 END)`,
+          montantTotal: sql<number>`COALESCE(SUM(${comptes.soldeCourant}::numeric), 0)`
+        }).from(comptes).where(withAgence(comptes)),
 
         // 4. Tontines statistics
         db.select({
@@ -156,11 +156,11 @@ export function registerDashboardRoutes(app: Express) {
 
         // 9. Monthly Evolution (Last 6 months) - Clients, Credits, Savings
         db.execute(sql`
-          SELECT 
+          SELECT
             TO_CHAR(d, 'Mon') as name,
             (SELECT COUNT(*) FROM clients c WHERE c.created_at <= d AND (${sqlAgenceFilter('c')})) as clients,
             (SELECT COUNT(*) FROM credits cr WHERE cr.created_at <= d AND (${sqlAgenceFilter('cr')})) as credits,
-            (SELECT COUNT(*) FROM comptes_epargne ce WHERE ce.created_at <= d AND (${sqlAgenceFilter('ce')})) as epargne
+            (SELECT COUNT(*) FROM comptes co WHERE co.created_at <= d AND (${sqlAgenceFilter('co')})) as epargne
           FROM generate_series(
             DATE_TRUNC('month', ${sixMonthsAgo.toISOString()}::date),
             DATE_TRUNC('month', ${now.toISOString()}::date),
@@ -170,10 +170,10 @@ export function registerDashboardRoutes(app: Express) {
 
         // 10. Weekly Activity (Last 7 days)
         db.execute(sql`
-          SELECT 
+          SELECT
             TO_CHAR(d, 'Dy') as name,
             (SELECT COUNT(*) FROM operations_caisse oc JOIN sessions_caisse sc ON oc.session_id = sc.id WHERE DATE_TRUNC('day', oc.created_at) = d AND (${sqlAgenceFilter('sc')})) +
-            (SELECT COUNT(*) FROM transactions_epargne te JOIN comptes_epargne ce ON te.compte_id = ce.id WHERE DATE_TRUNC('day', te.created_at) = d AND (${sqlAgenceFilter('ce')})) as transactions,
+            (SELECT COUNT(*) FROM transactions_compte tc JOIN comptes co ON tc.compte_id = co.id WHERE DATE_TRUNC('day', tc.created_at) = d AND (${sqlAgenceFilter('co')})) as transactions,
             (SELECT COUNT(*) FROM remboursements r JOIN credits cr ON r.credit_id = cr.id WHERE DATE_TRUNC('day', r.created_at) = d AND (${sqlAgenceFilter('cr')})) as collectes
           FROM generate_series(
             DATE_TRUNC('day', ${sevenDaysAgo.toISOString()}::date),
@@ -191,7 +191,7 @@ export function registerDashboardRoutes(app: Express) {
           db.select({
             type: sql<string>`'Épargnes'`,
             count: count()
-          }).from(comptesEpargne).where(withAgence(comptesEpargne))
+          }).from(comptes).where(withAgence(comptes))
         )
         .unionAll(
           db.select({
@@ -210,7 +210,7 @@ export function registerDashboardRoutes(app: Express) {
         db.execute(sql`
           (SELECT 'Nouveau crédit' as action, 'Admin' as user, created_at as time, 'credit' as type FROM credits WHERE DATE(created_at) = CURRENT_DATE AND (${sqlAgenceFilter('credits')}) ORDER BY created_at DESC LIMIT 10)
           UNION ALL
-          (SELECT 'Transaction épargne' as action, 'Caisse' as user, te.created_at as time, 'savings' as type FROM transactions_epargne te JOIN comptes_epargne ce ON te.compte_id = ce.id WHERE DATE(te.created_at) = CURRENT_DATE AND (${sqlAgenceFilter('ce')}) ORDER BY te.created_at DESC LIMIT 10)
+          (SELECT 'Transaction épargne' as action, 'Caisse' as user, tc.created_at as time, 'savings' as type FROM transactions_compte tc JOIN comptes co ON tc.compte_id = co.id WHERE DATE(tc.created_at) = CURRENT_DATE AND (${sqlAgenceFilter('co')}) ORDER BY tc.created_at DESC LIMIT 10)
           UNION ALL
           (SELECT 'Nouveau client' as action, 'Agent' as user, created_at as time, 'client' as type FROM clients WHERE DATE(created_at) = CURRENT_DATE AND (${sqlAgenceFilter('clients')}) ORDER BY created_at DESC LIMIT 10)
           ORDER BY time DESC LIMIT 15
@@ -424,10 +424,10 @@ export function registerDashboardRoutes(app: Express) {
           )::date AS day
         ),
         daily_credits AS (
-          SELECT 
+          SELECT
             day,
             COALESCE((
-              SELECT SUM(montant)::numeric 
+              SELECT SUM(montant)::numeric
               FROM credits c
               WHERE statut NOT IN ('Rejeté', 'rejeté', 'Annulé', 'annulé')
               AND DATE(created_at) <= day
@@ -436,17 +436,17 @@ export function registerDashboardRoutes(app: Express) {
           FROM date_series
         ),
         daily_epargnes AS (
-          SELECT 
+          SELECT
             day,
             COALESCE((
-              SELECT SUM(solde)::numeric 
-              FROM comptes_epargne ce
+              SELECT SUM(solde_courant)::numeric
+              FROM comptes co
               WHERE DATE(created_at) <= day
-              AND (${sqlAgenceFilter('ce')})
+              AND (${sqlAgenceFilter('co')})
             ), 0) as epargnes_total
           FROM date_series
         )
-        SELECT 
+        SELECT
           dc.day,
           dc.credits_total,
           de.epargnes_total,

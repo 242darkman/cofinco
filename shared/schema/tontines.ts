@@ -1,9 +1,12 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { clients } from "./clients";
 import { agences } from "./agences";
+import { mouvementsFinanciers } from "./finance";
+import { methodePaiementEnum, statutTransactionEnum } from "@shared/enum/enums";
+import { sql } from "drizzle-orm";
 
 // Tontines
 export const tontines = pgTable("tontines", {
@@ -83,18 +86,39 @@ export type InsertMembreTontine = z.infer<typeof insertMembreTontineSchema>;
 export type MembreTontine = typeof membresTontine.$inferSelect;
 
 // Contributions tontine
-export const contributionsTontine = pgTable("contributions_tontine", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
-  membreId: uuid("membre_id").notNull().references(() => membresTontine.id),
-  montant: numeric("montant").notNull(),
-  dateContribution: timestamp("date_contribution").defaultNow(),
-  methodePaiement: text("methode_paiement").default("Espèces"),
-  reference: text("reference"),
-  statut: text("statut").notNull().default("Validé"),
-  createdBy: uuid("created_by"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const contributionsTontine = pgTable(
+  "contributions_tontine",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    tontineId: uuid("tontine_id").notNull(), // FK si tu as une table tontines
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+
+    // Pivot ledger
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    typeOperation: text("type_operation").notNull(), // "Versement" | "Retrait" (ou enum si tu veux)
+    montant: numeric("montant").notNull(),
+
+    methodePaiement: methodePaiementEnum("methode_paiement").notNull().default("Espèces"),
+    statutTransaction: statutTransactionEnum("statut_transaction").notNull().default("Posté"),
+
+    reference: text("reference").notNull(),
+    referenceExterne: text("reference_externe"),
+    idempotencyKey: text("idempotency_key"),
+
+    observations: text("observations"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxTontineDate: index("idx_contributions_tontine_tontine_date").on(t.tontineId, t.createdAt),
+    idxMvt: index("idx_contributions_tontine_mouvement").on(t.mouvementId),
+    uqIdempotency: uniqueIndex("uq_contributions_tontine_idempotency").on(t.idempotencyKey),
+    uqRefExt: uniqueIndex("uq_contributions_tontine_reference_externe").on(t.referenceExterne),
+    chkMontantPos: sql`CONSTRAINT chk_contributions_tontine_montant_pos CHECK (${t.montant} > 0)`,
+  }),
+);
 
 export const insertContributionTontineSchema = createInsertSchema(contributionsTontine).omit({ id: true, createdAt: true });
 export type InsertContributionTontine = z.infer<typeof insertContributionTontineSchema>;

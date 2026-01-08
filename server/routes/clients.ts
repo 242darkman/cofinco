@@ -96,9 +96,10 @@ export function registerClientRoutes(app: Express) {
     // Début de mois
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const withdrawalsToday = await storage.getOperationsByClientAndDateRange(client.id, startToday, endToday, 'retrait');
-    const withdrawalsWeek = await storage.getOperationsByClientAndDateRange(client.id, startWeek, endToday, 'retrait');
-    const withdrawalsMonth = await storage.getOperationsByClientAndDateRange(client.id, startMonth, endToday, 'retrait');
+    // Use mouvementsFinanciers (source of truth) to track all withdrawal types
+    const withdrawalsToday = await storage.getMouvementsByClientAndDateRange(client.id, startToday, endToday, 'retrait');
+    const withdrawalsWeek = await storage.getMouvementsByClientAndDateRange(client.id, startWeek, endToday, 'retrait');
+    const withdrawalsMonth = await storage.getMouvementsByClientAndDateRange(client.id, startMonth, endToday, 'retrait');
 
     const sum = (ops: any[]) => ops.reduce((acc, op) => acc + Number(op.montant), 0);
     const usedToday = sum(withdrawalsToday);
@@ -177,7 +178,8 @@ export function registerClientRoutes(app: Express) {
             typeCompte: z.enum(['Courant', 'Épargne']),
             soldeInitial: z.coerce.number().min(0, "Le solde initial ne peut pas être négatif"),
             tauxInteret: z.coerce.number().min(0).default(0),
-            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).default('Actif')
+            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).default('Actif'),
+            methodePaiement: z.enum(['Espèces', 'Mobile Money', 'Virement', 'Carte']).optional()
         });
 
         const parsed = schema.parse(req.body);
@@ -254,21 +256,21 @@ export function registerClientRoutes(app: Express) {
         const parsed = schema.parse(req.body);
         
         // Fetch current account to compare balance
-        const currentAccount = await storage.getCompteEpargne(accountId);
+        const currentAccount = await storage.getCompte(accountId);
         if (!currentAccount) return res.status(404).json({ message: "Compte introuvable" });
 
         // Handle Balance Correction (Safe Mode)
-        if (parsed.solde !== undefined && parsed.solde !== Number(currentAccount.solde)) {
-            const difference = parsed.solde - Number(currentAccount.solde);
+        if (parsed.solde !== undefined && parsed.solde !== Number(currentAccount.soldeCourant)) {
+            const difference = parsed.solde - Number(currentAccount.soldeCourant);
             
             // Create automatic transaction line
-            await storage.createTransactionEpargne({
+            await storage.createTransactionCompte({
                 compteId: accountId,
-                typeTransaction: difference > 0 ? 'DEPOT' : 'RETRAIT', // Or specific 'AJUSTEMENT' if enum allows
+                typePaiement: (difference > 0 ? `Dépôt ${currentAccount.typeCompte}` : `Retrait ${currentAccount.typeCompte}`) as any,
                 montant: Math.abs(difference).toString(),
                 soldeApres: parsed.solde.toString(),
-                methodePaiement: 'Ajustement',
-                reference: `CORRECTION-${Date.now()}`,
+                methodePaiement: 'Espèces',
+                referenceExterne: `CORRECTION-${Date.now()}`,
                 observations: `Correction manuelle de solde par ${req.session.user?.username || 'Admin'}`,
                 createdBy: req.session.user?.id
             });

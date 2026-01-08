@@ -1,16 +1,16 @@
 import { relations } from "drizzle-orm";
 import { users, loginAttempts } from "./auth";
 import { clients } from "./clients";
-import { credits, remboursements, comptesEpargne, transactionsEpargne, plansEpargne, sessionsCaisse, operationsCaisse } from "./finance";
+import { credits, remboursements, comptes, transactionsCompte, plansEpargne, sessionsCaisse, operationsCaisse, mouvementsFinanciers } from "./finance";
 import { tontines, membresTontine, contributionsTontine, tontineAlertes, tontinePenalites } from "./tontines";
-import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures, lignesFactures } from "./operations";
+import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures, lignesFactures, remisesTerrain } from "./operations";
 import { notifications, pushSubscriptions } from "./settings";
 import { transferts } from "./transferts";
 import { clientTags, clientActivities } from "./clients";
 
 export const clientsRelations = relations(clients, ({ many }) => ({
   credits: many(credits),
-  comptesEpargne: many(comptesEpargne),
+  comptes: many(comptes),
   membresTontine: many(membresTontine),
 }));
 
@@ -22,12 +22,12 @@ export const creditsRelations = relations(credits, ({ one, many }) => ({
   remboursements: many(remboursements),
 }));
 
-export const comptesEpargneRelations = relations(comptesEpargne, ({ one, many }) => ({
+export const comptesRelations = relations(comptes, ({ one, many }) => ({
   client: one(clients, {
-    fields: [comptesEpargne.clientId],
+    fields: [comptes.clientId],
     references: [clients.id],
   }),
-  transactions: many(transactionsEpargne),
+  transactions: many(transactionsCompte),
 }));
 
 export const tontinesRelations = relations(tontines, ({ many }) => ({
@@ -115,6 +115,105 @@ export const clientActivitiesRelations = relations(clientActivities, ({ one }) =
   }),
 }));
 
+export const mouvementsFinanciersRelations = relations(mouvementsFinanciers, ({ one, many }) => ({
+  client: one(clients, {
+    fields: [mouvementsFinanciers.clientId],
+    references: [clients.id],
+  }),
+  compte: one(comptes, {
+    fields: [mouvementsFinanciers.compteId],
+    references: [comptes.id],
+  }),
+  credit: one(credits, {
+    fields: [mouvementsFinanciers.creditId],
+    references: [credits.id],
+  }),
+  sessionCaisse: one(sessionsCaisse, {
+    fields: [mouvementsFinanciers.sessionCaisseId],
+    references: [sessionsCaisse.id],
+  }),
+
+  // Détails “canaux / modules”
+  remboursements: many(remboursements),
+  transactionsCompte: many(transactionsCompte),
+  operationsCaisse: many(operationsCaisse),
+
+  // si tu as une relation vers tontine/terrain :
+  contributionsTontine: many(contributionsTontine),
+  paiementsTerrain: many(paiementsTerrain),
+}));
+
+export const transactionsCompteRelations = relations(transactionsCompte, ({ one }) => ({
+  compte: one(comptes, {
+    fields: [transactionsCompte.compteId],
+    references: [comptes.id],
+  }),
+  mouvement: one(mouvementsFinanciers, {
+    fields: [transactionsCompte.mouvementId],
+    references: [mouvementsFinanciers.id],
+  }),
+}));
+
+
+export const remboursementsRelations = relations(remboursements, ({ one }) => ({
+  credit: one(credits, {
+    fields: [remboursements.creditId],
+    references: [credits.id],
+  }),
+  mouvement: one(mouvementsFinanciers, {
+    fields: [remboursements.mouvementId],
+    references: [mouvementsFinanciers.id],
+  }),
+}));
+
+
+export const operationsCaisseRelations = relations(operationsCaisse, ({ one }) => ({
+  session: one(sessionsCaisse, {
+    fields: [operationsCaisse.sessionId],
+    references: [sessionsCaisse.id],
+  }),
+  mouvement: one(mouvementsFinanciers, {
+    fields: [operationsCaisse.mouvementId],
+    references: [mouvementsFinanciers.id],
+  }),
+}));
+
+
+export const paiementsTerrainRelations = relations(paiementsTerrain, ({ one }) => ({
+  client: one(clients, {
+    fields: [paiementsTerrain.clientId],
+    references: [clients.id],
+  }),
+  agent: one(agentsTerrain, {
+    fields: [paiementsTerrain.agentId],
+    references: [agentsTerrain.id],
+  }),
+  mouvement: one(mouvementsFinanciers, {
+    fields: [paiementsTerrain.mouvementId],
+    references: [mouvementsFinanciers.id],
+  }),
+}));
+
+
+export const contributionsTontineRelations = relations(contributionsTontine, ({ one }) => ({
+  mouvement: one(mouvementsFinanciers, {
+    fields: [contributionsTontine.mouvementId],
+    references: [mouvementsFinanciers.id],
+  }),
+}));
+
+export const remisesTerrainRelations = relations(remisesTerrain, ({ one }) => ({
+  agent: one(agentsTerrain, {
+    fields: [remisesTerrain.agentId],
+    references: [agentsTerrain.id],
+  }),
+  sessionCaisse: one(sessionsCaisse, {
+    fields: [remisesTerrain.sessionCaisseId],
+    references: [sessionsCaisse.id],
+  }),
+}));
+
+
 // Notifications
 export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
   user: one(users, {
@@ -122,3 +221,6 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
     references: [users.id],
   }),
 }));
+
+
+

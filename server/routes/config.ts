@@ -82,7 +82,7 @@ export function registerConfigRoutes(app: Express) {
       }));
 
       // Find recommended
-      const recommandee = dureesWithLabels.find(d => d.estRecommandee === 1) || dureesWithLabels[0] || null;
+      const recommandee = dureesWithLabels.find(d => d.estRecommandee === true) || dureesWithLabels[0] || null;
 
       res.json({
         durees: addSnakeCaseAliasesDeep(dureesWithLabels),

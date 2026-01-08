@@ -1,14 +1,14 @@
 import {
     credits, demandesCredit, enquetesCredit, remboursements,
-    comptesEpargne, transactionsEpargne, plansEpargne, objectifsEpargne,
+    comptes, transactionsCompte, plansEpargne, objectifsEpargne,
     sessionsCaisse, operationsCaisse, shiftsCaisse, caisseSecurityCodes, caisseCodeUsages, comptageBillets,
     factures, lignesFactures, modelesFactures, caisses, clients, agences, caisseAssignations, users,
-    dureesSuggerees
+    dureesSuggerees, mouvementsFinanciers, evenementsOutbox
   } from "@shared/schema";
   import {
     type Credit, type InsertCredit, type DemandeCredit, type InsertDemandeCredit,
     type EnqueteCredit, type InsertEnqueteCredit, type Remboursement, type InsertRemboursement,
-    type CompteEpargne, type InsertCompteEpargne, type TransactionEpargne, type InsertTransactionEpargne,
+    type Compte, type InsertCompte, type TransactionCompte, type InsertTransactionCompte,
     type PlanEpargne, type InsertPlanEpargne, type ObjectifEpargne, type InsertObjectifEpargne,
     type SessionCaisse, type InsertSessionCaisse, type OperationCaisse, type InsertOperationCaisse,
     type ShiftCaisse, type InsertShiftCaisse, type ComptageBillets, type InsertComptageBillets,
@@ -19,7 +19,7 @@ import {
     type DureeSuggeree, type InsertDureeSuggeree
   } from "@shared/schema";
   import { db } from "../db";
-import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, aliasedTable } from "drizzle-orm";
 
 
   
@@ -50,33 +50,82 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     }
     
     const results = await baseQuery.orderBy(desc(credits.createdAt));
-    const creditIds = results.map(({ credit }) => credit.id);
-    const remboursementCounts = creditIds.length
-      ? await db.select({
-          creditId: remboursements.creditId,
-          count: count()
-        })
-        .from(remboursements)
-        .where(inArray(remboursements.creditId, creditIds))
-        .groupBy(remboursements.creditId)
-      : [];
-    const remboursementCountByCreditId = new Map(
-      remboursementCounts.map((row) => [row.creditId, Number(row.count)])
-    );
 
-    return results.map(({ credit, client }) => ({
-      ...credit,
-      numero_credit: credit.numeroCredit,
-      montant_principal: Number(credit.montant),
-      nombre_echeances_total: credit.duree,
-      nombre_echeances_payees: remboursementCountByCreditId.get(credit.id) ?? 0,
-      clients: client ? {
-        nom: client.nom,
-        prenom: client.prenom,
-        phone: client.telephone,
-        photo_url: client.photoProfile
-      } : undefined
-    }));
+    return results.map(({ credit, client }) => {
+      let jours_retard = 0;
+      let nombre_echeances_payees = 0;
+
+      // Calcul basé sur le soldeRestant stocké (cohérent avec le frontend)
+      const principal = Number(credit.montant) || 0;
+      const taux = Number(credit.taux) || 0;
+      const totalEcheances = credit.duree || 1;
+      const totalWithInterest = principal * (1 + taux / 100);
+      const installmentAmount = totalWithInterest / totalEcheances;
+
+      // Utiliser soldeRestant comme source de vérité (comme le frontend)
+      const soldeRestant = Number(credit.soldeRestant) || totalWithInterest;
+      const totalPaid = Math.max(0, totalWithInterest - soldeRestant);
+
+      // Nombre d'échéances complètement payées = montant total payé / montant échéance
+      if (installmentAmount > 0) {
+        nombre_echeances_payees = Math.floor(totalPaid / installmentAmount);
+      }
+
+      // Calcul du retard uniquement pour les crédits actifs non soldés
+      if (credit.dateDebut && ['Actif', 'En retard', 'En cours'].includes(credit.statut)) {
+          // Normaliser les dates à minuit pour éviter les problèmes de timezone
+          const start = new Date(credit.dateDebut);
+          start.setHours(0, 0, 0, 0);
+
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+
+          // Convertir la fréquence en jours
+          let frequencyDays = 30; // Par défaut Mensuel
+          switch (credit.echeance) {
+            case 'Journalier': frequencyDays = 1; break;
+            case 'Hebdomadaire': frequencyDays = 7; break;
+            case 'Bimensuel': frequencyDays = 15; break;
+            case 'Trimestriel': frequencyDays = 90; break;
+          }
+
+          // Si crédit totalement remboursé, pas de retard
+          if (totalPaid >= totalWithInterest - 0.01 || nombre_echeances_payees >= totalEcheances) {
+            jours_retard = 0;
+          } else {
+            // Calcul PAR (Portfolio at Risk) standard microfinance:
+            // Échéance #N tombe à: dateDebut + (N × frequencyDays) jours
+            // La prochaine échéance due est celle après les échéances déjà payées
+            const nextInstallmentNumber = nombre_echeances_payees + 1;
+
+            // Calcul de la date de la prochaine échéance
+            const nextDueDate = new Date(start);
+            nextDueDate.setDate(nextDueDate.getDate() + (nextInstallmentNumber * frequencyDays));
+
+            // Retard = nombre de jours depuis que l'échéance est passée
+            // Si nextDueDate est dans le futur ou aujourd'hui, pas de retard
+            if (now > nextDueDate) {
+              const diffTime = now.getTime() - nextDueDate.getTime();
+              jours_retard = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            }
+          }
+      }
+
+      return {
+        ...credit,
+        numero_credit: credit.numeroCredit,
+        montant_principal: principal,
+        nombre_echeances_total: totalEcheances,
+        nombre_echeances_payees,
+        jours_retard,
+        clients: client ? {
+          nom: client.nom,
+          prenom: client.prenom,
+          phone: client.telephone,
+          photo_url: client.photoProfile
+        } : undefined
+      };
+    });
   }
   
   export async function createCredit(insertCredit: InsertCredit): Promise<Credit> {
@@ -91,16 +140,18 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
   
   // Demandes Credit
   export async function getDemandeCredit(id: string): Promise<DemandeCredit | undefined> {
-    const [demande] = await db.select().from(demandesCredit).where(eq(demandesCredit.id, id));
+    const [demande] = await db.select().from(demandesCredit).where(and(eq(demandesCredit.id, id), sql`${demandesCredit.deletedAt} IS NULL`));
     return demande || undefined;
   }
   
   export async function getDemandesByClient(clientId: string): Promise<DemandeCredit[]> {
-    return db.select().from(demandesCredit).where(eq(demandesCredit.clientId, clientId)).orderBy(desc(demandesCredit.createdAt));
+    return db.select().from(demandesCredit)
+      .where(and(eq(demandesCredit.clientId, clientId), sql`${demandesCredit.deletedAt} IS NULL`))
+      .orderBy(desc(demandesCredit.createdAt));
   }
   
   export async function getAllDemandes(filter: { agence?: string } = {}): Promise<DemandeCredit[]> {
-    const conditions = [];
+    const conditions = [sql`${demandesCredit.deletedAt} IS NULL`];
 
     if (filter.agence && filter.agence !== "all") {
       conditions.push(eq(clients.agence, filter.agence));
@@ -127,7 +178,9 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
         nom: client.nom,
         prenom: client.prenom,
         phone: client.telephone,
-        photo_url: client.photoProfile
+        photo_url: client.photoProfile,
+        agence: client.agence,
+        agenceId: client.agenceId
       } : undefined
     }));
   }
@@ -141,11 +194,20 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     const [demande] = await db.update(demandesCredit).set(updateData).where(eq(demandesCredit.id, id)).returning();
     return demande || undefined;
   }
+
+  export async function deleteDemandeCredit(id: string): Promise<boolean> {
+    const [demande] = await db.update(demandesCredit).set({ deletedAt: new Date() }).where(eq(demandesCredit.id, id)).returning();
+    return !!demande;
+  }
   
   // Enquêtes
   export async function getEnqueteCredit(id: string): Promise<EnqueteCredit | undefined> {
     const [enquete] = await db.select().from(enquetesCredit).where(eq(enquetesCredit.id, id));
     return enquete || undefined;
+  }
+
+  export async function getEnqueteByDemandeId(demandeId: string): Promise<EnqueteCredit[]> {
+    return db.select().from(enquetesCredit).where(eq(enquetesCredit.demandeId, demandeId)).orderBy(desc(enquetesCredit.createdAt));
   }
   
   export async function getEnquetesByClient(clientId: string): Promise<EnqueteCredit[]> {
@@ -198,44 +260,44 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     return remboursement;
   }
   
-  // Comptes Epargne
-  export async function getCompteEpargne(id: string): Promise<CompteEpargne | undefined> {
-    const [compte] = await db.select().from(comptesEpargne).where(eq(comptesEpargne.id, id));
+  // Comptes
+  export async function getCompte(id: string): Promise<Compte | undefined> {
+    const [compte] = await db.select().from(comptes).where(eq(comptes.id, id));
     return compte || undefined;
   }
   
-  export async function getComptesByClient(clientId: string): Promise<CompteEpargne[]> {
-    return db.select().from(comptesEpargne).where(eq(comptesEpargne.clientId, clientId));
+  export async function getComptesByClient(clientId: string): Promise<Compte[]> {
+    return db.select().from(comptes).where(eq(comptes.clientId, clientId));
   }
   
-  export async function getAllComptesEpargne(filter: { agence?: string } = {}): Promise<CompteEpargne[]> {
+  export async function getAllComptes(filter: { agence?: string } = {}): Promise<Compte[]> {
     if (filter.agence) {
-      const results = await db.select({ compte: comptesEpargne })
-        .from(comptesEpargne)
-        .innerJoin(clients, eq(comptesEpargne.clientId, clients.id))
+      const results = await db.select({ compte: comptes })
+        .from(comptes)
+        .innerJoin(clients, eq(comptes.clientId, clients.id))
         .where(eq(clients.agence, filter.agence))
-        .orderBy(desc(comptesEpargne.dateOuverture));
+        .orderBy(desc(comptes.createdAt));
       return results.map(r => r.compte);
     }
-    return db.select().from(comptesEpargne).orderBy(desc(comptesEpargne.dateOuverture));
+    return db.select().from(comptes).orderBy(desc(comptes.createdAt));
   }
   
-  export async function createCompteEpargne(insertCompte: InsertCompteEpargne): Promise<CompteEpargne> {
-    const [compte] = await db.insert(comptesEpargne).values(insertCompte).returning();
+  export async function createCompte(insertCompte: InsertCompte): Promise<Compte> {
+    const [compte] = await db.insert(comptes).values(insertCompte).returning();
     return compte;
   }
   
-  export async function updateCompteEpargne(id: string, updateData: Partial<InsertCompteEpargne>): Promise<CompteEpargne | undefined> {
-    const [compte] = await db.update(comptesEpargne).set({ ...updateData, updatedAt: new Date() }).where(eq(comptesEpargne.id, id)).returning();
+  export async function updateCompte(id: string, updateData: Partial<InsertCompte>): Promise<Compte | undefined> {
+    const [compte] = await db.update(comptes).set({ ...updateData, updatedAt: new Date() }).where(eq(comptes.id, id)).returning();
     return compte || undefined;
   }
 
   // Atomic Account Creation with Initial Transaction
   export async function createClientAccount(
     clientId: string,
-    data: { typeCompte: string; soldeInitial: number; tauxInteret: number; statut: string },
+    data: { typeCompte: string; soldeInitial: number; tauxInteret?: number; statut: string; methodePaiement?: string },
     userId: string | undefined
-  ): Promise<CompteEpargne> {
+  ): Promise<Compte> {
     return await db.transaction(async (tx) => {
       // 1. Generate unique account number
       const prefix = data.typeCompte === 'Courant' ? 'CC' : 'CE';
@@ -244,27 +306,26 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
       const numeroCompte = `${prefix}-${timestamp}-${random}`;
 
       // 2. Create Account
-      const [compte] = await tx.insert(comptesEpargne).values({
+      const [compte] = await tx.insert(comptes).values({
         clientId,
         numeroCompte,
-        typeCompte: data.typeCompte,
-        solde: data.soldeInitial.toString(),
-        tauxInteret: data.tauxInteret.toString(),
-        statut: data.statut,
-        dateOuverture: new Date(),
+        typeCompte: data.typeCompte as any,
+        soldeCourant: data.soldeInitial.toString(),
+        // tauxInteret: data.tauxInteret?.toString() || "0", // Removed from schema?
+        statut: data.statut as any,
+        // dateOuverture: new Date(), // CreatedAt is enough
       }).returning();
 
       // 3. Create Initial Transaction if needed
       if (data.soldeInitial > 0) {
-        await tx.insert(transactionsEpargne).values({
+        await tx.insert(transactionsCompte).values({
           compteId: compte.id,
-          typeTransaction: 'DEPOT_INITIAL',
+          // typeTransaction removed as it does not exist in schema
           montant: data.soldeInitial.toString(),
-          soldeApres: data.soldeInitial.toString(), 
-          methodePaiement: 'Report',
-          reference: `INIT-${numeroCompte}`,
+          methodePaiement: (data.methodePaiement || 'Espèces') as any,
           observations: 'Solde initial à la création',
           createdBy: userId,
+          typePaiement: (data.typeCompte === 'Courant' ? 'Dépôt Courant' : 'Dépôt Épargne') as any,
         });
       }
 
@@ -275,26 +336,26 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
   export async function updateClientAccount(
     id: string,
     updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }
-  ): Promise<CompteEpargne | undefined> {
-    const [compte] = await db.update(comptesEpargne)
-      .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(comptesEpargne.id, id))
+  ): Promise<Compte | undefined> {
+    const [compte] = await db.update(comptes)
+      .set({ ...updateData, updatedAt: new Date() } as any)
+      .where(eq(comptes.id, id))
       .returning();
     return compte || undefined;
   }
   
-  // Transactions Epargne
-  export async function getTransactionEpargne(id: string): Promise<TransactionEpargne | undefined> {
-    const [transaction] = await db.select().from(transactionsEpargne).where(eq(transactionsEpargne.id, id));
+  // Transactions Compte
+  export async function getTransactionCompte(id: string): Promise<TransactionCompte | undefined> {
+    const [transaction] = await db.select().from(transactionsCompte).where(eq(transactionsCompte.id, id));
     return transaction || undefined;
   }
   
-  export async function getTransactionsByCompte(compteId: string): Promise<TransactionEpargne[]> {
-    return db.select().from(transactionsEpargne).where(eq(transactionsEpargne.compteId, compteId)).orderBy(desc(transactionsEpargne.createdAt));
+  export async function getTransactionsByCompte(compteId: string): Promise<TransactionCompte[]> {
+    return db.select().from(transactionsCompte).where(eq(transactionsCompte.compteId, compteId)).orderBy(desc(transactionsCompte.createdAt));
   }
   
-  export async function createTransactionEpargne(insertTransaction: InsertTransactionEpargne): Promise<TransactionEpargne> {
-    const [transaction] = await db.insert(transactionsEpargne).values(insertTransaction).returning();
+  export async function createTransactionCompte(insertTransaction: InsertTransactionCompte): Promise<TransactionCompte> {
+    const [transaction] = await db.insert(transactionsCompte).values(insertTransaction).returning();
     return transaction;
   }
   
@@ -391,24 +452,37 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     return db.select().from(sessionsCaisse).where(eq(sessionsCaisse.statut, 'Ouverte'));
   }
 
-  export async function getAllSessionsCaisse(filter: { agence?: string } = {}): Promise<any[]> {
+  export async function getAllSessionsCaisse(filter: { agence?: string; statut?: string } = {}): Promise<any[]> {
     let query = db.select({
       session: sessionsCaisse,
       caissier_nom: users.nom,
-      caissier_prenom: users.prenom
+      caissier_prenom: users.prenom,
+      caisse_nom: caisses.nom
     })
     .from(sessionsCaisse)
-    .leftJoin(users, eq(sessionsCaisse.caissierId, users.id));
+    .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
+    .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id));
+
+    const conditions = [];
 
     if (filter.agence) {
-      query = query.where(eq(sessionsCaisse.agenceId, filter.agence)) as any;
+      conditions.push(eq(sessionsCaisse.agenceId, filter.agence));
+    }
+
+    if (filter.statut) {
+      conditions.push(eq(sessionsCaisse.statut, filter.statut as any));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
     }
 
     const results = await query.orderBy(desc(sessionsCaisse.dateOuverture));
 
     return results.map(r => ({
       ...r.session,
-      caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu'
+      caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu',
+      caisse_nom: r.caisse_nom
     }));
   }
 
@@ -461,14 +535,75 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
       gte(operationsCaisse.createdAt, start),
       lte(operationsCaisse.createdAt, end)
     ];
-    
+
     if (type) {
-      conditions.push(eq(operationsCaisse.typeOperation, type));
+      // Handle generic type filters by mapping to actual typeOperationCaisseEnum values
+      if (type === 'retrait') {
+        // For operationsCaisse table, only "Retrait épargne" exists as withdrawal type
+        conditions.push(eq(operationsCaisse.typeOperation, 'Retrait épargne'));
+      } else if (type === 'depot') {
+        // For operationsCaisse table, only "Dépôt épargne" exists as deposit type
+        conditions.push(eq(operationsCaisse.typeOperation, 'Dépôt épargne'));
+      } else {
+        // Direct enum value (e.g., "Décaissement crédit", "Remboursement crédit", etc.)
+        conditions.push(eq(operationsCaisse.typeOperation, type as any));
+      }
     }
 
     return db.select().from(operationsCaisse)
       .where(and(...conditions))
       .orderBy(desc(operationsCaisse.createdAt));
+  }
+
+  // Withdrawal types from typePaiementTerrainEnum
+  const WITHDRAWAL_TYPES = [
+    'Retrait Épargne',
+    'Retrait Courant',
+    'Retrait Bloqué',
+    'Retrait Tontine',
+  ] as const;
+
+  // Deposit types from typePaiementTerrainEnum
+  const DEPOSIT_TYPES = [
+    'Dépôt Épargne',
+    'Dépôt Courant',
+    'Dépôt Bloqué',
+    'Versement Tontine',
+  ] as const;
+
+  /**
+   * Get movements by client and date range from mouvementsFinanciers (source of truth)
+   * Supports generic type filters: 'retrait' for all withdrawals, 'depot' for all deposits
+   */
+  export async function getMouvementsByClientAndDateRange(
+    clientId: string,
+    start: Date,
+    end: Date,
+    type?: 'retrait' | 'depot' | string
+  ) {
+    const conditions = [
+      eq(mouvementsFinanciers.clientId, clientId),
+      gte(mouvementsFinanciers.dateOperation, start),
+      lte(mouvementsFinanciers.dateOperation, end),
+      eq(mouvementsFinanciers.statut, 'Posté'), // Only count posted transactions
+    ];
+
+    if (type) {
+      if (type === 'retrait') {
+        // All withdrawal types
+        conditions.push(inArray(mouvementsFinanciers.typePaiement, [...WITHDRAWAL_TYPES]));
+      } else if (type === 'depot') {
+        // All deposit types
+        conditions.push(inArray(mouvementsFinanciers.typePaiement, [...DEPOSIT_TYPES]));
+      } else {
+        // Direct enum value
+        conditions.push(eq(mouvementsFinanciers.typePaiement, type as any));
+      }
+    }
+
+    return db.select().from(mouvementsFinanciers)
+      .where(and(...conditions))
+      .orderBy(desc(mouvementsFinanciers.dateOperation));
   }
 
   export async function createOperationCaisse(insertOperation: InsertOperationCaisse): Promise<OperationCaisse> {
@@ -494,6 +629,34 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
 
   export async function getAllCaisses(): Promise<Caisse[]> {
     return db.select().from(caisses);
+  }
+
+  export async function getCaissesWithStatus(agenceId?: string): Promise<any[]> {
+    let query = db.select({
+      caisse: caisses,
+      session: sessionsCaisse,
+      caissier_nom: users.nom,
+      caissier_prenom: users.prenom
+    })
+    .from(caisses)
+    .leftJoin(sessionsCaisse, and(
+      eq(caisses.id, sessionsCaisse.caisseId),
+      eq(sessionsCaisse.statut, 'Ouverte')
+    ))
+    .leftJoin(users, eq(sessionsCaisse.caissierId, users.id));
+
+    if (agenceId) {
+      query = query.where(eq(caisses.agenceId, agenceId)) as any;
+    }
+
+    const results = await query;
+    return results.map(r => ({
+      ...r.caisse,
+      active_session: r.session ? {
+        ...r.session,
+        caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim()
+      } : null
+    }));
   }
 
   export async function createCaisse(caisse: InsertCaisse): Promise<Caisse> {
@@ -676,23 +839,36 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
         return transfert || undefined;
     }
 
-    export async function getCaisseTransferts(agenceId?: string): Promise<CaisseTransfert[]> {
+    export async function getCaisseTransferts(agenceId?: string): Promise<any[]> {
+        const sourceAgence = aliasedTable(agences, "source_agence");
+        const destAgence = aliasedTable(agences, "dest_agence");
+
+        const selection = {
+            ...getTableColumns(caisseTransferts),
+            created_by_username: users.username,
+            created_by_nom: users.nom,
+            created_by_prenom: users.prenom,
+            agence_source_nom: sourceAgence.nom,
+            agence_dest_nom: destAgence.nom
+        };
+
+        let query = db.select(selection)
+            .from(caisseTransferts)
+            .leftJoin(users, eq(caisseTransferts.createdBy, users.id))
+            .leftJoin(sourceAgence, eq(caisseTransferts.agenceSourceId, sourceAgence.id))
+            .leftJoin(destAgence, eq(caisseTransferts.agenceDestId, destAgence.id));
+
         if (agenceId) {
-            return db.select()
-                .from(caisseTransferts)
-                .where(or(
-                    eq(caisseTransferts.agenceSourceId, agenceId), 
-                    eq(caisseTransferts.agenceDestId, agenceId)
-                ))
-                .orderBy(desc(caisseTransferts.dateCreation));
+            query = query.where(or(
+                eq(caisseTransferts.agenceSourceId, agenceId), 
+                eq(caisseTransferts.agenceDestId, agenceId)
+            )) as any;
         }
         
-        return db.select()
-            .from(caisseTransferts)
-            .orderBy(desc(caisseTransferts.dateCreation));
+        return query.orderBy(desc(caisseTransferts.dateCreation));
     }
 
-    export async function getCaisseTransfertsByAgence(agenceId: string): Promise<CaisseTransfert[]> {
+    export async function getCaisseTransfertsByAgence(agenceId: string): Promise<any[]> {
          return getCaisseTransferts(agenceId);
     }
 
@@ -769,12 +945,12 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
 
     // Durees Suggerees
     export async function getDureesSuggerees(frequence?: string): Promise<DureeSuggeree[]> {
-        let query = db.select().from(dureesSuggerees).where(eq(dureesSuggerees.actif, 1));
+        let query = db.select().from(dureesSuggerees).where(eq(dureesSuggerees.actif, true));
 
         if (frequence) {
             query = db.select().from(dureesSuggerees).where(
                 and(
-                    eq(dureesSuggerees.actif, 1),
+                    eq(dureesSuggerees.actif, true),
                     eq(dureesSuggerees.frequence, frequence as any)
                 )
             );
@@ -786,9 +962,9 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
     export async function getDureeSuggereeRecommandee(frequence: string): Promise<DureeSuggeree | undefined> {
         const [duree] = await db.select().from(dureesSuggerees).where(
             and(
-                eq(dureesSuggerees.actif, 1),
+                eq(dureesSuggerees.actif, true),
                 eq(dureesSuggerees.frequence, frequence as any),
-                eq(dureesSuggerees.estRecommandee, 1)
+                eq(dureesSuggerees.estRecommandee, true)
             )
         );
         return duree || undefined;
@@ -808,3 +984,381 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray } from "drizzle-orm";
         const result = await db.delete(dureesSuggerees).where(eq(dureesSuggerees.id, id));
         return true;
     }
+
+// ============================================================================
+// ATOMIC LEDGER-BASED OPERATIONS (Phase 2)
+// All financial operations go through mouvementsFinanciers + evenementsOutbox
+// ============================================================================
+
+import { 
+  executeWithLedger, 
+  updateCompteSolde, 
+  updateCreditSolde, 
+  updateSessionSolde,
+  type SensMouvement,
+  type MouvementFinancier
+} from "../services/ledger";
+
+/**
+ * Create a transaction épargne with full ledger flow
+ * - Creates mouvement_financier
+ * - Updates compte solde
+ * - Creates transaction_epargne with mouvement_id
+ * - Publishes outbox events
+ */
+export async function createTransactionCompteWithLedger(data: {
+  compteId: string;
+  typeTransaction: "Dépôt" | "Retrait" | "Intérêt" | "Frais" | "Ajustement";
+  montant: string;
+  methodePaiement: string;
+  sessionCaisseId?: string;
+  observations?: string;
+  idempotencyKey?: string;
+}, userId?: string): Promise<{ transaction: TransactionCompte; mouvement: MouvementFinancier }> {
+  
+  // Determine sens based on transaction type
+  const isDebit = ["Retrait", "Frais"].includes(data.typeTransaction);
+  const sens: SensMouvement = isDebit ? "Débit" : "Crédit";
+  const delta = isDebit ? -parseFloat(data.montant) : parseFloat(data.montant);
+
+  // Get compte for clientId
+  const [compte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
+  if (!compte) throw new Error(`Compte ${data.compteId} not found`);
+
+  // Map typeTransaction to typePaiement for terrain enum
+  const typePaiementMap: Record<string, string> = {
+    "Dépôt": compte.typeCompte === "Courant" ? "Dépôt Courant" : "Dépôt Épargne",
+    "Retrait": compte.typeCompte === "Courant" ? "Retrait Courant" : "Retrait Épargne",
+  };
+  const typePaiement = typePaiementMap[data.typeTransaction];
+
+  return executeWithLedger(
+    "EPARGNE",
+    {
+      montant: data.montant,
+      sens,
+      clientId: compte.clientId,
+      compteId: data.compteId,
+      sessionCaisseId: data.sessionCaisseId,
+      methodePaiement: data.methodePaiement,
+      typePaiement: typePaiement as any,
+      idempotencyKey: data.idempotencyKey,
+    },
+    async (tx, mouvement) => {
+      // 1. Update compte solde
+      const nouveauSolde = await updateCompteSolde(tx, data.compteId, delta);
+
+      // 2. Update session caisse solde if applicable
+      let nouveauSoldeSession: string | undefined;
+      if (data.sessionCaisseId) {
+        // For deposits, cash comes in; for withdrawals, cash goes out
+        const sessionDelta = isDebit ? -parseFloat(data.montant) : parseFloat(data.montant);
+        nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, sessionDelta);
+      }
+
+      // 3. Create transaction épargne
+      const [transaction] = await tx.insert(transactionsCompte).values({
+        compteId: data.compteId,
+        mouvementId: mouvement.id,
+        typePaiement: typePaiement as any,
+        montant: data.montant,
+        soldeApres: nouveauSolde,
+        methodePaiement: data.methodePaiement as any,
+        observations: data.observations,
+        createdBy: userId,
+      }).returning();
+
+      return {
+        result: transaction,
+        additionalEventData: {
+          nouveauSoldeCompte: nouveauSolde,
+          nouveauSoldeSession,
+        },
+      };
+    },
+    userId
+  ).then(({ result, mouvement }) => ({ transaction: result, mouvement }));
+}
+
+/**
+ * Create an operation caisse with full ledger flow
+ */
+export async function createOperationCaisseWithLedger(data: {
+  sessionId: string;
+  typeOperation: string;
+  montant: string;
+  methodePaiement: string;
+  clientId?: string;
+  description?: string;
+  idempotencyKey?: string;
+}, userId?: string): Promise<{ operation: OperationCaisse; mouvement: MouvementFinancier }> {
+  
+  // Determine sens based on operation type
+  const isDebit = ["Retrait épargne", "Décaissement crédit"].includes(data.typeOperation);
+  const sens: SensMouvement = isDebit ? "Débit" : "Crédit";
+  const sessionDelta = isDebit ? -parseFloat(data.montant) : parseFloat(data.montant);
+
+  // Get session for agenceId
+  const [session] = await db.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, data.sessionId));
+  if (!session) throw new Error(`Session ${data.sessionId} not found`);
+
+  // Generate reference
+  const timestamp = Date.now().toString().slice(-8);
+  const reference = `OP-${timestamp}-${Math.floor(Math.random() * 1000)}`;
+
+  return executeWithLedger(
+    "CAISSE",
+    {
+      montant: data.montant,
+      sens,
+      clientId: data.clientId,
+      sessionCaisseId: data.sessionId,
+      agenceId: session.agenceId || undefined,
+      methodePaiement: data.methodePaiement,
+      idempotencyKey: data.idempotencyKey,
+    },
+    async (tx, mouvement) => {
+      // 1. Update session solde théorique
+      const nouveauSolde = await updateSessionSolde(tx, data.sessionId, sessionDelta);
+
+      // 2. Create operation caisse
+      const [operation] = await tx.insert(operationsCaisse).values({
+        sessionId: data.sessionId,
+        mouvementId: mouvement.id,
+        typeOperation: data.typeOperation as any,
+        montant: data.montant,
+        methodePaiement: data.methodePaiement as any,
+        reference,
+        description: data.description,
+        clientId: data.clientId,
+        createdBy: userId,
+        idempotencyKey: data.idempotencyKey,
+      }).returning();
+
+      return {
+        result: operation,
+        additionalEventData: {
+          nouveauSoldeSession: nouveauSolde,
+        },
+      };
+    },
+    userId
+  ).then(({ result, mouvement }) => ({ operation: result, mouvement }));
+}
+
+/**
+ * Create a remboursement with full ledger flow
+ */
+export async function createRemboursementWithLedger(data: {
+  creditId: string;
+  montant: string;
+  methodePaiement: string;
+  sessionCaisseId?: string;
+  observations?: string;
+  idempotencyKey?: string;
+}, userId?: string): Promise<{ remboursement: Remboursement; mouvement: MouvementFinancier }> {
+  
+  // Get credit for clientId
+  const [credit] = await db.select().from(credits).where(eq(credits.id, data.creditId));
+  if (!credit) throw new Error(`Credit ${data.creditId} not found`);
+
+  return executeWithLedger(
+    "CREDIT",
+    {
+      montant: data.montant,
+      sens: "Crédit", // Money coming in
+      clientId: credit.clientId,
+      creditId: data.creditId,
+      sessionCaisseId: data.sessionCaisseId,
+      methodePaiement: data.methodePaiement,
+      typePaiement: "Remboursement Crédit" as any,
+      idempotencyKey: data.idempotencyKey,
+    },
+    async (tx, mouvement) => {
+      // 1. Update credit solde restant (decrease by payment amount)
+      const nouveauSolde = await updateCreditSolde(tx, data.creditId, -parseFloat(data.montant));
+
+      // 2. Update session caisse if applicable
+      let nouveauSoldeSession: string | undefined;
+      if (data.sessionCaisseId) {
+        nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, parseFloat(data.montant));
+      }
+
+      // 3. Create remboursement
+      const [remboursement] = await tx.insert(remboursements).values({
+        creditId: data.creditId,
+        mouvementId: mouvement.id,
+        montant: data.montant,
+        dateRemboursement: new Date(),
+        methodePaiement: data.methodePaiement as any,
+        observations: data.observations,
+        createdBy: userId,
+        idempotencyKey: data.idempotencyKey,
+      }).returning();
+
+      return {
+        result: remboursement,
+        additionalEventData: {
+          nouveauSoldeCredit: nouveauSolde,
+          nouveauSoldeSession,
+        },
+      };
+    },
+    userId
+  ).then(({ result, mouvement }) => ({ remboursement: result, mouvement }));
+}
+
+/**
+ * Payer les frais d'engagement pour une demande de crédit
+ */
+export async function payerFraisEngagement(data: {
+  demandeId: string;
+  montant: string;
+  methodePaiement: string;
+  sessionCaisseId?: string;
+  idempotencyKey?: string;
+}, userId?: string): Promise<{ demande: DemandeCredit; operation: OperationCaisse; mouvement: MouvementFinancier }> {
+  
+  // 1. Récupérer la demande
+  const [demande] = await db.select().from(demandesCredit).where(eq(demandesCredit.id, data.demandeId));
+  if (!demande) throw new Error(`Demande ${data.demandeId} non trouvée`);
+  if (demande.fraisEngagementPayes) throw new Error(`Les frais ont déjà été payés pour cette demande`);
+
+  return executeWithLedger(
+    "CREDIT",
+    {
+      montant: data.montant,
+      sens: "Crédit", // L'argent entre dans l'institution
+      clientId: demande.clientId,
+      sessionCaisseId: data.sessionCaisseId,
+      methodePaiement: data.methodePaiement,
+      typePaiement: "Frais Engagement" as any,
+      idempotencyKey: data.idempotencyKey,
+    },
+    async (tx, mouvement) => {
+      // 2. Mettre à jour la demande
+      const [updatedDemande] = await tx.update(demandesCredit)
+        .set({ 
+          fraisEngagementPayes: true, 
+          montantFraisEngagement: data.montant,
+          statut: "A enquêter" as any // Passe automatiquement à l'étape suivante
+        })
+        .where(eq(demandesCredit.id, data.demandeId))
+        .returning();
+
+      // 3. Mettre à jour la session caisse si applicable
+      let nouveauSoldeSession: string | undefined;
+      if (data.sessionCaisseId) {
+        nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, parseFloat(data.montant));
+      }
+
+      // 4. Créer l'opération caisse
+      const reference = `FRAIS-${demande.numeroDemande}-${Date.now()}`;
+      const [operation] = await tx.insert(operationsCaisse).values({
+        sessionId: data.sessionCaisseId!,
+        mouvementId: mouvement.id,
+        typeOperation: "Frais Engagement" as any,
+        montant: data.montant,
+        methodePaiement: data.methodePaiement as any,
+        reference,
+        description: `Paiement frais d'engagement demande ${demande.numeroDemande}`,
+        clientId: demande.clientId,
+        createdBy: userId,
+        idempotencyKey: data.idempotencyKey,
+      }).returning();
+
+      return {
+        result: { demande: updatedDemande, operation },
+        additionalEventData: {
+          nouveauSoldeSession,
+        },
+      };
+    },
+    userId
+  ).then(({ result, mouvement }) => ({ ...result, mouvement }));
+}
+
+/**
+ * Get mouvements financiers with filtering
+ */
+export async function getMouvementsFinanciers(filter: {
+  sourceModule?: string;
+  clientId?: string;
+  compteId?: string;
+  creditId?: string;
+  sessionCaisseId?: string;
+  from?: Date;
+  to?: Date;
+  limit?: number;
+} = {}): Promise<MouvementFinancier[]> {
+  const conditions = [];
+
+  if (filter.sourceModule) {
+    conditions.push(eq(mouvementsFinanciers.sourceModule, filter.sourceModule as any));
+  }
+  if (filter.clientId) {
+    conditions.push(eq(mouvementsFinanciers.clientId, filter.clientId));
+  }
+  if (filter.compteId) {
+    conditions.push(eq(mouvementsFinanciers.compteId, filter.compteId));
+  }
+  if (filter.creditId) {
+    conditions.push(eq(mouvementsFinanciers.creditId, filter.creditId));
+  }
+  if (filter.sessionCaisseId) {
+    conditions.push(eq(mouvementsFinanciers.sessionCaisseId, filter.sessionCaisseId));
+  }
+  if (filter.from) {
+    conditions.push(gte(mouvementsFinanciers.dateOperation, filter.from));
+  }
+  if (filter.to) {
+    conditions.push(lte(mouvementsFinanciers.dateOperation, filter.to));
+  }
+
+  let query = db.select().from(mouvementsFinanciers).$dynamic();
+
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions));
+  }
+
+  query = query.orderBy(desc(mouvementsFinanciers.dateOperation));
+
+  if (filter.limit) {
+    query = query.limit(filter.limit);
+  }
+
+  return query;
+}
+
+/**
+ * Get client portfolio (accounts, credits, tontines)
+ */
+export async function getClientPortfolio(clientId: string): Promise<{
+  comptes: Compte[];
+  credits: Credit[];
+  tontines: any[];
+}> {
+  const [clientsComptes, creditsResult] = await Promise.all([
+    db.select().from(comptes).where(eq(comptes.clientId, clientId)),
+    db.select().from(credits).where(eq(credits.clientId, clientId)),
+  ]);
+
+  // Get tontines via membresTontine
+  const { membresTontine, tontines } = await import("@shared/schema");
+  const memberships = await db.select({
+    membre: membresTontine,
+    tontine: tontines,
+  })
+    .from(membresTontine)
+    .leftJoin(tontines, eq(membresTontine.tontineId, tontines.id))
+    .where(eq(membresTontine.clientId, clientId));
+
+  return {
+    comptes: clientsComptes,
+    credits: creditsResult,
+    tontines: memberships.map(m => ({
+      ...m.tontine,
+      membre: m.membre,
+    })),
+  };
+}

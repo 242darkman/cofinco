@@ -1,8 +1,11 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { clients } from "./clients";
+import { mouvementsFinanciers } from "./finance";
+import { methodePaiementEnum, statutTransactionEnum } from "@shared/enum/enums";
+import { sql } from "drizzle-orm";
 
 // Niveaux KYC pour les clients
 export const kycLevels = pgTable("kyc_levels", {
@@ -23,78 +26,43 @@ export type InsertKycLevel = z.infer<typeof insertKycLevelSchema>;
 export type KycLevel = typeof kycLevels.$inferSelect;
 
 // Transferts d'argent
-export const transferts = pgTable("transferts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  reference: text("reference").notNull().unique(),
-  idempotencyKey: text("idempotency_key").unique(),
-  type: text("type").notNull(),
-  statut: text("statut").notNull().default("pending"),
-  
-  expediteurNom: text("expediteur_nom").notNull(),
-  expediteurTelephone: text("expediteur_telephone").notNull(),
-  expediteurEmail: text("expediteur_email"),
-  expediteurTypeDocument: text("expediteur_type_document"),
-  expediteurNumeroDocument: text("expediteur_numero_document"),
-  expediteurAdresse: text("expediteur_adresse"),
-  expediteurPays: text("expediteur_pays").notNull().default("CG"),
-  expediteurKycLevel: integer("expediteur_kyc_level").default(1),
-  
-  beneficiaireNom: text("beneficiaire_nom").notNull(),
-  beneficiaireTelephone: text("beneficiaire_telephone").notNull(),
-  beneficiaireEmail: text("beneficiaire_email"),
-  beneficiairePays: text("beneficiaire_pays").notNull(),
-  beneficiaireVille: text("beneficiaire_ville"),
-  beneficiaireAdresse: text("beneficiaire_adresse"),
-  
-  montantEnvoye: numeric("montant_envoye").notNull(),
-  deviseEnvoi: text("devise_envoi").notNull().default("XAF"),
-  montantRecu: numeric("montant_recu").notNull(),
-  deviseReception: text("devise_reception").notNull(),
-  tauxChange: numeric("taux_change").notNull(),
-  fraisTransfert: numeric("frais_transfert").notNull(),
-  fraisOperateur: numeric("frais_operateur").default("0"),
-  montantTotal: numeric("montant_total").notNull(),
-  
-  operateurId: text("operateur_id").notNull(),
-  operateurNom: text("operateur_nom").notNull(),
-  modeReception: text("mode_reception").notNull(), 
-  modePaiement: text("mode_paiement").notNull(), 
-  
-  motifTransfert: text("motif_transfert"),
-  codeSecret: text("code_secret"),
-  codeSecretHash: text("code_secret_hash"),
-  
-  referenceOperateur: text("reference_operateur"),
-  messageOperateur: text("message_operateur"),
-  delaiEstime: text("delai_estime"),
-  
-  otpCode: text("otp_code"),
-  otpExpiration: timestamp("otp_expiration"),
-  otpVerifie: boolean("otp_verifie").default(false),
-  tentativesOtp: integer("tentatives_otp").default(0),
-  
-  riskScore: integer("risk_score").default(0),
-  riskFlags: text("risk_flags").array(),
-  fraudCheck: boolean("fraud_check").default(false),
-  amlCheck: boolean("aml_check").default(false),
-  sanctionsCheck: boolean("sanctions_check").default(false),
-  
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  deviceFingerprint: text("device_fingerprint"),
-  geoLocation: text("geo_location"),
-  
-  agentId: uuid("agent_id").references(() => users.id),
-  approuveParId: uuid("approuve_par_id").references(() => users.id),
-  dateApprobation: timestamp("date_approbation"),
-  
-  dateCreation: timestamp("date_creation").defaultNow(),
-  dateTraitement: timestamp("date_traitement"),
-  dateCompletion: timestamp("date_completion"),
-  dateExpiration: timestamp("date_expiration"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+export const transferts = pgTable(
+  "transferts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Pivot ledger
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+
+    montant: numeric("montant").notNull(),
+    methodePaiement: methodePaiementEnum("methode_paiement"),
+    statut: statutTransactionEnum("statut").notNull().default("Posté"),
+
+    reference: text("reference").notNull(),
+    referenceExterne: text("reference_externe"),
+    idempotencyKey: text("idempotency_key"),
+
+    sens: text("sens").notNull(), // "Entrée" | "Sortie" (ou enum si tu veux)
+    destinataire: text("destinataire"),
+    numeroTelephone: text("numero_telephone"),
+    motif: text("motif"),
+    observations: text("observations"),
+
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxClientDate: index("idx_transferts_client_date").on(t.clientId, t.createdAt),
+    idxMvt: index("idx_transferts_mouvement").on(t.mouvementId),
+    uqRef: uniqueIndex("uq_transferts_reference").on(t.reference),
+    uqIdempotency: uniqueIndex("uq_transferts_idempotency").on(t.idempotencyKey),
+    uqRefExt: uniqueIndex("uq_transferts_reference_externe").on(t.referenceExterne),
+    chkMontantPos: sql`CONSTRAINT chk_transferts_montant_pos CHECK (${t.montant} > 0)`,
+  }),
+);
 
 export const insertTransfertSchema = createInsertSchema(transferts).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTransfert = z.infer<typeof insertTransfertSchema>;
