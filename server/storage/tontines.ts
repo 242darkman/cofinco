@@ -1,11 +1,45 @@
-import { tontines, membresTontine, contributionsTontine, clients, users, tontineRegles, tontinePenalites, tontineDistributions } from "@shared/schema";
+import { tontines, membresTontine, contributionsTontine, clients, users, tontineRegles, tontinePenalites, tontineDistributions, tontinePlans } from "@shared/schema";
 import { type Tontine, type InsertTontine, type MembreTontine, type InsertMembreTontine, type ContributionTontine, type InsertContributionTontine,
-    type TontineRegle, type InsertTontineRegle, type TontinePenalite, type InsertTontinePenalite
+    type TontineRegle, type InsertTontineRegle, type TontinePenalite, type InsertTontinePenalite,
+    type TontinePlan, type InsertTontinePlan
  } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, sql, getTableColumns } from "drizzle-orm";
 
-// Tontines
+
+// Tontine Plans
+export async function getTontinePlan(id: string): Promise<TontinePlan | undefined> {
+  const [plan] = await db.select().from(tontinePlans).where(eq(tontinePlans.id, id));
+  return plan || undefined;
+}
+
+export async function getAllTontinePlans(filter: { agenceId?: string; actif?: boolean } = {}): Promise<TontinePlan[]> {
+  let conditions = [];
+  if (filter.agenceId) conditions.push(eq(tontinePlans.agenceId, filter.agenceId));
+  if (filter.actif !== undefined) conditions.push(eq(tontinePlans.actif, filter.actif));
+
+  let query = db.select().from(tontinePlans);
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as any;
+  }
+  
+  return query.orderBy(desc(tontinePlans.createdAt));
+}
+
+export async function createTontinePlan(plan: InsertTontinePlan): Promise<TontinePlan> {
+  const [newPlan] = await db.insert(tontinePlans).values(plan).returning();
+  return newPlan;
+}
+
+export async function updateTontinePlan(id: string, updateData: Partial<InsertTontinePlan>): Promise<TontinePlan | undefined> {
+  const [updated] = await db.update(tontinePlans).set({ ...updateData, updatedAt: new Date() }).where(eq(tontinePlans.id, id)).returning();
+  return updated || undefined;
+}
+
+export async function deleteTontinePlan(id: string): Promise<boolean> {
+  const result = await db.delete(tontinePlans).where(eq(tontinePlans.id, id));
+  return result.rowCount ? result.rowCount > 0 : false;
+}
 export async function getTontine(id: string): Promise<any | undefined> {
   const [result] = await db
     .select({
@@ -158,8 +192,39 @@ export async function createMembreTontine(insertMembre: InsertMembreTontine): Pr
 }
 
 // Contributions
-export async function getContributionsByTontine(tontineId: string): Promise<ContributionTontine[]> {
-  return db.select().from(contributionsTontine).where(eq(contributionsTontine.tontineId, tontineId)).orderBy(desc(contributionsTontine.createdAt));
+export async function getContributionsByTontine(tontineId: string): Promise<any[]> {
+  const rows = await db
+    .select()
+    .from(contributionsTontine)
+    .leftJoin(clients, eq(contributionsTontine.clientId, clients.id))
+    .where(eq(contributionsTontine.tontineId, tontineId))
+    .orderBy(desc(contributionsTontine.createdAt));
+
+  return rows.map(({ contributions_tontine, clients }) => {
+    // Mapping des valeurs pour le frontend
+    let mode = 'Cash';
+    if (contributions_tontine.methodePaiement === 'Mobile Money') mode = 'Mobile Money';
+    else if (contributions_tontine.methodePaiement === 'Virement') mode = 'Virement';
+    else if (contributions_tontine.methodePaiement === 'Chèque') mode = 'Chèque';
+    
+    // Mapping du statut
+    let statut = 'Validée'; // Par défaut pour l'instant si "Posté"
+    if (contributions_tontine.statutTransaction === 'Pending') statut = 'En attente';
+    else if (contributions_tontine.statutTransaction === 'Annulé' || contributions_tontine.statutTransaction === 'Reversé') statut = 'Rejetée';
+
+    return {
+      ...contributions_tontine,
+      client: clients,
+      // Alias for frontend compatibility 
+      date_contribution: contributions_tontine.createdAt,
+      mode_paiement: mode,
+      statut: statut,
+      tour_numero: contributions_tontine.tourNumero || 1,
+      // Ensure original fields are also available if needed by other components using snake_case alias middleware
+      methode_paiement: contributions_tontine.methodePaiement,
+      statut_transaction: contributions_tontine.statutTransaction
+    };
+  });
 }
 
 export async function getContributionsByMembre(membreId: string): Promise<ContributionTontine[]> {

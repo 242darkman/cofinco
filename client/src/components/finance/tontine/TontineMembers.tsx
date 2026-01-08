@@ -31,17 +31,18 @@ interface TontineMembre {
   a_recu_benefice: boolean;
   date_benefice: string | null;
   date_adhesion: string;
-  clients: Client;
+  client: Client;
 }
 
 interface TontineMembersProps {
   tontineId: string;
+  maxMembres: number;
   onUpdate: () => void;
 }
 
 const ITEMS_PER_PAGE = 10;
 
-export default function TontineMembers({ tontineId, onUpdate }: TontineMembersProps) {
+export default function TontineMembers({ tontineId, maxMembres, onUpdate }: TontineMembersProps) {
   const [membres, setMembres] = useState<TontineMembre[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,7 +130,7 @@ export default function TontineMembers({ tontineId, onUpdate }: TontineMembersPr
 
   const handleRemoveMembre = useCallback(
     (membre: TontineMembre) => {
-      const memberName = membre.clients?.nom || 'ce membre';
+      const memberName = membre.client?.nom || 'ce membre';
 
       openConfirm({
         title: 'Retirer le membre',
@@ -195,21 +196,31 @@ export default function TontineMembers({ tontineId, onUpdate }: TontineMembersPr
     setSearchQuery('');
   }, []);
 
+  const isFull = membres.length >= maxMembres;
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-bold text-white" id="membres-heading">
-          Membres de la tontine
-        </h3>
+        <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-white" id="membres-heading">
+            Membres de la tontine
+            </h3>
+            <span className={`text-xs px-2 py-0.5 rounded-full border ${isFull ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>
+                {membres.length} / {maxMembres}
+            </span>
+        </div>
         <Button
           onClick={() => setShowAddForm(true)}
           variant="success"
           size="sm"
           icon={UserPlus}
+          disabled={isFull}
+          title={isFull ? "La tontine est complète" : "Ajouter un membre"}
+          className={isFull ? "opacity-50 cursor-not-allowed" : ""}
           aria-describedby="membres-heading"
         >
-          Ajouter
+          {isFull ? 'Complet' : 'Ajouter'}
         </Button>
       </div>
 
@@ -242,9 +253,9 @@ export default function TontineMembers({ tontineId, onUpdate }: TontineMembersPr
                   {/* Avatar / Position */}
                   <div className="shrink-0 relative">
                     <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold border border-slate-600">
-                      {membre.clients?.photoUrl ? (
+                      {membre.client?.photoUrl ? (
                         <img
-                          src={membre.clients.photoUrl}
+                          src={membre.client.photoUrl}
                           alt=""
                           className="w-full h-full object-cover rounded-lg"
                           loading="lazy"
@@ -271,7 +282,7 @@ export default function TontineMembers({ tontineId, onUpdate }: TontineMembersPr
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h4 className="font-bold text-white text-sm truncate leading-tight">
-                          {escapeHtml(membre.clients?.nom) || 'Inconnu'}
+                          {escapeHtml(membre.client?.nom) || 'Inconnu'}
                         </h4>
                         <div className="flex items-center gap-2 text-[10px] mt-0.5">
                           <span
@@ -288,7 +299,7 @@ export default function TontineMembers({ tontineId, onUpdate }: TontineMembersPr
                       <button
                         onClick={() => handleRemoveMembre(membre)}
                         className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
-                        aria-label={`Retirer ${escapeHtml(membre.clients?.nom || 'ce membre')}`}
+                        aria-label={`Retirer ${escapeHtml(membre.client?.nom || 'ce membre')}`}
                         type="button"
                       >
                         <Trash2 size={14} aria-hidden="true" />

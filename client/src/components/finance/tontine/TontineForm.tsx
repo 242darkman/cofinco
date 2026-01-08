@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Calendar, DollarSign, Users, FileText, UserPlus, Search, Info } from 'lucide-react';
-import { tontineApi, clientApi } from '../../../lib/api-client';
-import { Modal, FormField, SelectField, Button, Card, Badge, IconButton, TextareaField } from '../../ui';
+import { X, Check, Calendar, DollarSign, Users, FileText, UserPlus, Search, Info, TrendingUp } from 'lucide-react';
+import { tontineApi, clientApi, tontinePlanApi } from '../../../lib/api-client';
+import { Modal, FormField, SelectField, Button, Card, Badge, IconButton, TextareaField, LoadingSpinner } from '../../ui';
 
 interface Tontine {
   id: string;
@@ -44,9 +44,39 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showMemberSelection, setShowMemberSelection] = useState(false);
+  const [tontinePlans, setTontinePlans] = useState<any[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+
+  const fetchPlans = async () => {
+    setLoadingPlans(true);
+    try {
+      const data = await tontinePlanApi.getAll();
+      setTontinePlans(data?.filter((p: any) => p.actif) || []);
+    } catch (error) {
+      console.error('Erreur:', error);
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
+  const applyPlan = (planId: string) => {
+    const plan = tontinePlans.find(p => p.id === planId);
+    if (!plan) return;
+
+    setFormData(prev => ({
+      ...prev,
+      nom: prev.nom || plan.nom,
+      description: prev.description || plan.description || '',
+      montantCotisation: plan.montant_cotisation,
+      nombreMembres: plan.nombre_membres,
+      tauxPlateforme: plan.taux_plateforme,
+      frequence: plan.frequence,
+    }));
+  };
 
   useEffect(() => {
     fetchClients();
+    fetchPlans();
     if (tontine) {
       setFormData({
         nom: tontine.nom,
@@ -193,6 +223,31 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
         {errors.general && (
           <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
             {errors.general}
+          </div>
+        )}
+
+        {/* Section: Modèles (Uniquement lors de la création) */}
+        {!tontine && tontinePlans.length > 0 && (
+          <div className="bg-cyan-500/10 p-4 rounded-xl border border-cyan-500/20 mb-2">
+            <div className="flex items-center gap-2 mb-3">
+                <div className="p-1.5 bg-cyan-500/20 rounded-lg">
+                    <TrendingUp size={16} className="text-cyan-400" />
+                </div>
+                <div>
+                    <h4 className="text-sm font-bold text-white">Démarrage Rapide</h4>
+                    <p className="text-[10px] text-slate-400">Appliquez un modèle pour gagner du temps</p>
+                </div>
+            </div>
+            <SelectField
+                label=""
+                name="plan_selection"
+                value=""
+                onChange={(e) => applyPlan(e.target.value)}
+                options={[
+                  { value: '', label: '-- Sélectionner un modèle --' },
+                  ...tontinePlans.map(p => ({ value: p.id, label: `${p.nom} (${p.montant_cotisation.toLocaleString()} FCFA)` }))
+                ]}
+            />
           </div>
         )}
 

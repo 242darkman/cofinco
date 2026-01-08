@@ -240,7 +240,7 @@ export default function Tontines() {
         />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-           <StatCard title="Membres" value={`${selectedTontine.nombreMembresActuel || 0}/${selectedTontine.nombreMembresMax || 0}`} icon={Users} color="primary" />
+           <StatCard title="Membres" value={`${selectedTontine.nombreMembresActuel || 0}/${selectedTontine.nombreMembresMax || selectedTontine.nombreMembres || 0}`} icon={Users} color="primary" />
            <StatCard title="Contribution" value={`${(selectedTontine.montantCotisation || 0).toLocaleString()} FCFA`} icon={DollarSign} color="success" />
            <StatCard title="Total Collecté" value={`${((selectedTontine.montantCotisation || 0) * (selectedTontine.nombreMembresActuel || 0)).toLocaleString()} FCFA`} icon={TrendingUp} color="warning" />
            <StatCard title="Tour Actuel" value={selectedTontine.tourActuel || 1} icon={Calendar} color="primary" />
@@ -314,7 +314,7 @@ export default function Tontines() {
                     </div>
                  </Card>
               )}
-              {activeTab === 'membres' && <TontineMembers tontineId={selectedTontine.id} onUpdate={fetchTontines} />}
+              {activeTab === 'membres' && <TontineMembers tontineId={selectedTontine.id} maxMembres={selectedTontine.nombreMembres} onUpdate={fetchTontines} />}
               {activeTab === 'contributions' && <TontineContributions tontineId={selectedTontine.id} />}
               {activeTab === 'distributions' && (
                 <TontineDistributions

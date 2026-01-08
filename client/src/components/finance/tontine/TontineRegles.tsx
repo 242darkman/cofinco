@@ -153,11 +153,11 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'penalite_retard': return <AlertTriangle size={18} />;
-      case 'frais_adhesion': return <FileText size={18} />;
-      case 'frais_sortie': return <X size={18} />;
-      case 'amende': return <Gavel size={18} />;
-      default: return <Scale size={18} />;
+      case 'penalite_retard': return <AlertTriangle size={24} />;
+      case 'frais_adhesion': return <FileText size={24} />;
+      case 'frais_sortie': return <X size={24} />;
+      case 'amende': return <Gavel size={24} />;
+      default: return <Scale size={24} />;
     }
   };
 
@@ -174,74 +174,114 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Section Règles */}
-        <div className="space-y-4">
+      <div className="grid lg:grid-cols-12 gap-6">
+        {/* Section Règles (Main Column) */}
+        <div className="lg:col-span-8 space-y-6">
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Scale className="text-cyan-400" size={20} />
-                    Règles et Frais
-                </h3>
+                <div>
+                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                       <Scale className="text-cyan-400" size={24} />
+                       Règles et Frais
+                   </h3>
+                   <p className="text-slate-400 text-sm mt-1">Gérez les pénalités et frais de cette tontine</p>
+                </div>
                 <Button 
                     size="sm" 
                     icon={Plus} 
                     onClick={() => setShowAddForm(true)}
                     variant="primary"
+                    className="shadow-lg shadow-cyan-500/20"
                 >
-                    Ajouter
+                    Nouvelle Règle
                 </Button>
             </div>
 
             {regles.length === 0 ? (
                 <EmptyState 
                     icon={Scale}
-                    title="Aucune règle"
-                    description="Configurez des frais ou des pénalités pour cette tontine."
+                    title="Aucune règle définie"
+                    description="Commencez par ajouter des règles pour encadrer votre tontine (retards, absences, etc.)"
+                    action={{
+                        label: "Ajouter une règle",
+                        onClick: () => setShowAddForm(true)
+                    }}
                 />
             ) : (
-                <div className="grid gap-3">
+                <div className="grid sm:grid-cols-2 gap-4">
                     {regles.map((regle) => (
-                        <Card key={regle.id} className="p-4 flex items-start gap-4">
-                            <div className={`p-3 rounded-xl shrink-0 ${regle.actif ? 'bg-cyan-500/10 text-cyan-400' : 'bg-slate-700/50 text-slate-500'}`}>
-                                {getTypeIcon(regle.typeRegle)}
+                        <Card 
+                            key={regle.id} 
+                            className={`relative overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl ${
+                                regle.actif 
+                                ? 'border-cyan-500/30 bg-slate-800/80 hover:border-cyan-500/50' 
+                                : 'border-slate-700 bg-slate-800/40 opacity-75 grayscale-[0.5]'
+                            }`}
+                        >
+                            {/* Status Indicator */}
+                            <div className={`absolute top-0 right-0 w-16 h-16 pointer-events-none overflow-hidden`}>
+                                <div className={`absolute top-[10px] right-[-25px] rotate-45 text-[10px] font-bold py-1 px-8 text-center text-white shadow-sm
+                                    ${regle.actif ? 'bg-cyan-500 shadow-cyan-500/20' : 'bg-slate-600'}
+                                `}>
+                                    {regle.actif ? 'ON' : 'OFF'}
+                                </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div>
-                                        <div className="font-bold text-white mb-0.5">{getTypeLabel(regle.typeRegle)}</div>
-                                        <div className="text-2xl font-bold text-white tracking-tight">
-                                            {Number(regle.montantPenalite).toLocaleString()} <span className="text-sm font-normal text-slate-400">FCFA</span>
-                                        </div>
-                                    </div>
-                                    <Badge 
-                                        value={regle.actif ? 'Active' : 'Inactive'} 
-                                        variant={regle.actif ? 'success' : 'neutral'}
-                                    />
-                                </div>
-                                
-                                {regle.description && (
-                                    <p className="text-sm text-slate-400 mt-2">{regle.description}</p>
-                                )}
 
-                                <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-slate-700/50">
-                                    <Button
-                                        size="sm"
-                                        variant={regle.actif ? 'secondary' : 'success'}
-                                        onClick={() => handleToggleRegle(regle)}
-                                        icon={regle.actif ? X : Check}
-                                        className={regle.actif ? '!bg-amber-500/10 !text-amber-400 hover:!bg-amber-500/20' : '!bg-green-500/10 !text-green-400 hover:!bg-green-500/20'}
-                                    >
-                                        {regle.actif ? 'Désactiver' : 'Activer'}
-                                    </Button>
-                                    <IconButton
-                                        size="sm"
-                                        variant="ghost"
-                                        icon={Trash2}
-                                        onClick={() => handleDeleteRegle(regle)}
-                                        className="text-slate-400 hover:text-red-400"
-                                        aria-label={`Supprimer la règle ${getTypeLabel(regle.typeRegle)}`}
-                                    />
+                            <div className="p-5 space-y-4">
+                                {/* Header & Icon */}
+                                <div className="flex justify-between items-start">
+                                    <div className={`p-3 rounded-2xl ${
+                                        regle.typeRegle === 'penalite_retard' ? 'bg-orange-500/10 text-orange-400' :
+                                        regle.typeRegle === 'frais_adhesion' ? 'bg-blue-500/10 text-blue-400' :
+                                        regle.typeRegle === 'frais_sortie' ? 'bg-purple-500/10 text-purple-400' :
+                                        'bg-red-500/10 text-red-400'
+                                    }`}>
+                                        {getTypeIcon(regle.typeRegle)}
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <IconButton
+                                            size="sm"
+                                            variant="ghost"
+                                            icon={regle.actif ? X : Check}
+                                            onClick={() => handleToggleRegle(regle)}
+                                            className={`rounded-full w-8 h-8 ${
+                                                regle.actif 
+                                                ? 'hover:bg-amber-500/20 hover:text-amber-400 text-slate-400' 
+                                                : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                                            }`}
+                                            title={regle.actif ? "Désactiver" : "Activer"}
+                                            aria-label={regle.actif ? "Désactiver" : "Activer"}
+                                        />
+                                        <IconButton
+                                            size="sm"
+                                            variant="ghost"
+                                            icon={Trash2}
+                                            onClick={() => handleDeleteRegle(regle)}
+                                            className="rounded-full w-8 h-8 hover:bg-red-500/20 hover:text-red-400 text-slate-400"
+                                            title="Supprimer"
+                                            aria-label="Supprimer"
+                                        />
+                                    </div>
                                 </div>
+
+                                {/* Content */}
+                                <div>
+                                    <h4 className="font-semibold text-slate-200 text-lg mb-1 leading-tight">{getTypeLabel(regle.typeRegle)}</h4>
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className={`text-2xl font-bold tracking-tight ${regle.actif ? 'text-white' : 'text-slate-400'}`}>
+                                            {Number(regle.montantPenalite).toLocaleString()}
+                                        </span>
+                                        <span className="text-xs font-medium text-slate-500 uppercase">FCFA</span>
+                                    </div>
+                                </div>
+
+                                {/* Description */}
+                                {regle.description && (
+                                    <div className="pt-3 border-t border-slate-700/50">
+                                        <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">
+                                            {regle.description}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </Card>
                     ))}
@@ -249,29 +289,29 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
             )}
         </div>
 
-        {/* Section Pénalités */}
-        <div className="space-y-4">
+        {/* Section Pénalités (Sidebar) */}
+        <div className="lg:col-span-4 space-y-6">
              <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <AlertCircle className="text-red-400" size={20} />
-                    Pénalités Appliquées
+                    Pénalités
                 </h3>
             </div>
 
             {totalPenalitesEnAttente > 0 && (
-                <Card className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border-red-500/20 p-4">
-                    <div className="flex items-center justify-between">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 to-orange-600 p-5 shadow-lg shadow-red-900/20 text-white">
+                    <div className="relative z-10 flex items-center gap-4">
+                        <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                            <AlertTriangle size={24} className="text-white" />
+                        </div>
                         <div>
-                            <div className="text-sm text-red-300 font-medium mb-1">Total en attente</div>
-                            <div className="text-3xl font-bold text-white">
-                                {totalPenalitesEnAttente.toLocaleString()} <span className="text-lg font-normal text-red-300">FCFA</span>
+                            <div className="text-red-100 text-xs font-semibold uppercase tracking-wider">Total Impayé</div>
+                            <div className="text-2xl font-bold">
+                                {totalPenalitesEnAttente.toLocaleString()} <span className="text-sm font-normal text-red-100">FCFA</span>
                             </div>
                         </div>
-                        <div className="p-3 bg-red-500/20 rounded-full text-red-400">
-                             <AlertTriangle size={24} />
-                        </div>
                     </div>
-                </Card>
+                </div>
             )}
 
             <div className="space-y-3">
@@ -280,44 +320,50 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
                     </div>
                 ) : penalites.length === 0 ? (
-                    <EmptyState
-                        icon={Check}
-                        title="Aucune pénalité"
-                        description="Tout est en ordre, aucune pénalité n'a été appliquée."
-                    />
+                    <div className="text-center py-8 px-4 rounded-xl border border-slate-800 bg-slate-900/50">
+                        <div className="mx-auto w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-3">
+                            <Check size={20} />
+                        </div>
+                        <p className="text-slate-400 text-sm">Aucune pénalité en cours.</p>
+                    </div>
                 ) : (
-                    penalites.map((penalite) => (
-                        <Card key={penalite.id} className="p-4">
-                            <div className="flex justify-between items-start gap-3">
-                                <div>
-                                    <div className="font-bold text-white">{penalite.tontine_membres.clients.nom}</div>
-                                    <div className="text-sm text-slate-400 mt-0.5">{penalite.motif}</div>
+                    <div className="bg-slate-900/50 rounded-xl border border-slate-800 divide-y divide-slate-800 overflow-hidden">
+                        {penalites.map((penalite) => (
+                            <div key={penalite.id} className="p-4 hover:bg-slate-800/50 transition-colors">
+                                <div className="flex justify-between items-start gap-3 mb-2">
+                                    <div className="font-medium text-white text-sm">{penalite.tontine_membres.clients.nom}</div>
+                                    <div className="text-right">
+                                         <span className={`text-sm font-bold ${
+                                            penalite.statut === 'Payée' ? 'text-green-400' : 
+                                            penalite.statut === 'Annulée' ? 'text-slate-400' : 'text-red-400'
+                                         }`}>
+                                            {Number(penalite.montant).toLocaleString()} F
+                                         </span>
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                     <div className="font-bold text-red-400">{Number(penalite.montant).toLocaleString()} FCFA</div>
-                                     <div className="text-xs text-slate-500 mt-1">
+                                
+                                <div className="flex items-center justify-between text-xs">
+                                     <div className="text-slate-500">{penalite.motif}</div>
+                                     <div className="text-slate-600">
                                         {new Date(penalite.dateFaute).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                                      </div>
                                 </div>
-                            </div>
-                            
-                            <div className="mt-3 flex items-center justify-between pt-3 border-t border-slate-700/50">
-                                <Badge value={penalite.statut} variant={penalite.statut === 'Payée' ? 'success' : penalite.statut === 'Annulée' ? 'neutral' : 'warning'} />
-                                
+
                                 {penalite.statut === 'En attente' && (
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="bg-green-500/10 text-green-400 hover:bg-green-500/20"
-                                        icon={Check}
-                                        onClick={() => handleMarquerPenalitePaye(penalite.id)}
-                                    >
-                                        Marquer payée
-                                    </Button>
+                                    <div className="mt-3 text-right">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20 px-2.5"
+                                            onClick={() => handleMarquerPenalitePaye(penalite.id)}
+                                        >
+                                            Marquer payée
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
-                        </Card>
-                    ))
+                        ))}
+                    </div>
                 )}
             </div>
         </div>

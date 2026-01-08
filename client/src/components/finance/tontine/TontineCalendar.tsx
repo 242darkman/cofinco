@@ -74,7 +74,17 @@ export default function TontineCalendar({
         echeanceDate.setDate(startDate.getDate() + ((i - 1) * joursFrequence));
 
         const membre = membres.find((m: any) => m.position_ordre === i);
-        const contributionsTour = contributions.filter((c: any) => c.tour_numero === i).length;
+
+        // Count unique members who contributed to this tour
+        const contributors = new Set();
+        contributions.forEach((c: any) => {
+           if (c.tour_numero === i) {
+               // Handle both camelCase and snake_case just in case
+               const id = c.clientId || c.client_id || c.client?.id;
+               if (id) contributors.add(id);
+           }
+        });
+        const contributionsTour = contributors.size;
 
         let statut: 'complete' | 'en_cours' | 'a_venir';
         if (i < currentTour) {

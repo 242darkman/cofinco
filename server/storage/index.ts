@@ -14,6 +14,7 @@ import {
     TransactionCompte, InsertTransactionCompte, PlanEpargne, InsertPlanEpargne, ObjectifEpargne, InsertObjectifEpargne,
     Tontine, InsertTontine, MembreTontine, InsertMembreTontine, ContributionTontine, InsertContributionTontine,
     TontineRegle, InsertTontineRegle, TontinePenalite, InsertTontinePenalite,
+    TontinePlan, InsertTontinePlan,
     SessionCaisse, InsertSessionCaisse, OperationCaisse, InsertOperationCaisse, AgentTerrain, InsertAgentTerrain,
     CaisseTransfert, InsertCaisseTransfert,
     Prospection, InsertProspection, VisiteTerrain, InsertVisiteTerrain, PaiementTerrain, InsertPaiementTerrain,
@@ -171,6 +172,13 @@ export interface IStorage {
 
     getTontinePenalites(tontineId: string): Promise<any[]>;
     updateTontinePenalite(id: string, penalite: Partial<InsertTontinePenalite>): Promise<TontinePenalite | undefined>;
+
+    // Tontine Plans
+    getTontinePlan(id: string): Promise<TontinePlan | undefined>;
+    getAllTontinePlans(filter?: { agenceId?: string; actif?: boolean }): Promise<TontinePlan[]>;
+    createTontinePlan(plan: InsertTontinePlan): Promise<TontinePlan>;
+    updateTontinePlan(id: string, plan: Partial<InsertTontinePlan>): Promise<TontinePlan | undefined>;
+    deleteTontinePlan(id: string): Promise<boolean>;
 
     // Sessions Caisse
     getSessionCaisse(id: string): Promise<SessionCaisse | undefined>;

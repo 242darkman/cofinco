@@ -1,11 +1,14 @@
 import type { Express } from "express";
+import { z } from "zod";
 import { insertTontineSchema, insertMembreTontineSchema, insertContributionTontineSchema, insertTontineAlerteSchema,
-    insertTontineRegleSchema, insertTontinePenaliteSchema, insertTontineDistributionSchema
+    insertTontineRegleSchema, insertTontinePenaliteSchema, insertTontineDistributionSchema,
+    insertTontinePlanSchema
 } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { requireAgenceAccess } from "../middleware";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { getWsInstance } from "../ws-server";
 
 export function registerTontineRoutes(app: Express) {
   app.get("/api/tontines", requireAuth, requireAgenceAccess(), async (req, res) => {
@@ -39,7 +42,7 @@ export function registerTontineRoutes(app: Express) {
       const tontine = await storage.createTontine(parsed);
       
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'tontine_new', id: tontine.id } });
       }
@@ -50,7 +53,7 @@ export function registerTontineRoutes(app: Express) {
   app.get("/api/tontines/:id", requireAuth, requireAgenceAccess(), async (req, res) => {
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
-      
+
       // Vérifier accès via gestionnaire
       const agenceFilter = req.agenceFilter as { agence?: string } | null;
       if (agenceFilter && tontine.gestionnaireId) {
@@ -59,8 +62,46 @@ export function registerTontineRoutes(app: Express) {
           return res.status(403).json({ message: "Accès refusé : tontine d'une autre agence" });
         }
       }
-      
+
       res.json(addSnakeCaseAliasesDeep(tontine));
+  });
+
+  // Update tontine (roles: admin, chef, superviseur)
+  app.patch("/api/tontines/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+      const data = normalizeKeysDeep(req.body);
+      const tontine = await storage.getTontine(req.params.id);
+      if (!tontine) return res.status(404).json({ message: "Tontine not found" });
+
+      // Convert date strings to Date objects for timestamp columns
+      const updateData: Record<string, any> = { ...(data as Record<string, any>) };
+      if (updateData.dateDebut && typeof updateData.dateDebut === 'string') {
+        updateData.dateDebut = new Date(updateData.dateDebut);
+      }
+      if (updateData.dateFin && typeof updateData.dateFin === 'string') {
+        updateData.dateFin = new Date(updateData.dateFin);
+      }
+      if (updateData.prochainTour && typeof updateData.prochainTour === 'string') {
+        updateData.prochainTour = new Date(updateData.prochainTour);
+      }
+
+      const updated = await storage.updateTontine(req.params.id, updateData);
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'tontine_updated', id: req.params.id } });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(updated));
+  });
+
+  // Delete tontine (roles: admin, chef)
+  app.delete("/api/tontines/:id", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+      const tontine = await storage.getTontine(req.params.id);
+      if (!tontine) return res.status(404).json({ message: "Tontine not found" });
+
+      const success = await storage.deleteTontine(req.params.id);
+      res.json({ success });
   });
 
   app.get("/api/tontines/:id/membres", requireAuth, async (req, res) => {
@@ -71,16 +112,31 @@ export function registerTontineRoutes(app: Express) {
   // Add membre to tontine (roles: admin, chef, superviseur)
   app.post("/api/tontines/:id/membres", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
+      const tontine = await storage.getTontine(req.params.id);
+      if (!tontine) return res.status(404).json({ message: "Tontine not found" });
+
+      const currentMembres = await storage.getMembresTontine(req.params.id);
+      if (currentMembres.length >= tontine.nombreMembres) {
+          return res.status(400).json({ message: "Le nombre maximum de membres pour cette tontine est atteint." });
+      }
+
       const parsed = insertMembreTontineSchema.parse(Object.assign({}, data, { tontineId: req.params.id }));
       const membre = await storage.createMembreTontine(parsed);
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'membre_added', tontineId: req.params.id } });
       }
 
       res.json(addSnakeCaseAliasesDeep(membre));
+  });
+
+  // Remove membre from tontine
+  app.delete("/api/tontines/:id/membres/:membreId", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+      // In a real app, we might want to check if the membre belongs to the tontine
+      const success = await storage.updateMembreTontine(req.params.membreId, { statut: 'Retiré' } as any);
+      res.json({ success: !!success });
   });
 
   app.get("/api/tontines/:id/contributions", requireAuth, async (req, res) => {
@@ -95,7 +151,7 @@ export function registerTontineRoutes(app: Express) {
       const contrib = await storage.createContributionTontine(parsed);
       
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'contribution_new', tontineId: parsed.tontineId } });
       }
@@ -121,7 +177,7 @@ export function registerTontineRoutes(app: Express) {
     const regle = await storage.createTontineRegle(parsed);
     
     // Notify
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_new', tontineId: parsed.tontineId } });
     }
@@ -134,7 +190,7 @@ export function registerTontineRoutes(app: Express) {
     const updated = await storage.updateTontineRegle(req.params.id, data as any);
     
     // Notify
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_updated', id: req.params.id } });
     }
@@ -159,11 +215,45 @@ export function registerTontineRoutes(app: Express) {
     const updated = await storage.updateTontinePenalite(req.params.id, parsed);
     
     // Notify
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'penalite_updated', id: req.params.id } });
     }
 
     res.json(addSnakeCaseAliasesDeep(updated));
+  });
+
+  // Tontine Plans
+  app.get("/api/tontine-plans", requireAuth, async (req, res) => {
+    const plans = await storage.getAllTontinePlans();
+    res.json(addSnakeCaseAliasesDeep(plans));
+  });
+
+  app.post("/api/tontine-plans", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+    try {
+      const data = normalizeKeysDeep(req.body);
+      const parsed = insertTontinePlanSchema.parse(data);
+      const plan = await storage.createTontinePlan(parsed);
+      res.json(addSnakeCaseAliasesDeep(plan));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Erreur de validation", 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Erreur interne du serveur lors de la création du plan" });
+    }
+  });
+
+  app.patch("/api/tontine-plans/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+    const data = normalizeKeysDeep(req.body);
+    const updated = await storage.updateTontinePlan(req.params.id, data as any);
+    res.json(addSnakeCaseAliasesDeep(updated));
+  });
+
+  app.delete("/api/tontine-plans/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+    const success = await storage.deleteTontinePlan(req.params.id);
+    res.json({ success });
   });
 }

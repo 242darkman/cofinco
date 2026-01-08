@@ -27,7 +27,7 @@ export const tontines = pgTable("tontines", {
   solde: numeric("solde").default("0"),
   prochainTour: timestamp("prochain_tour"),
   ordreDistribution: json("ordre_distribution"),
-  regles: text("regles"),
+  regles: json("regles"),
   gestionnaireId: uuid("gestionnaire_id").references(() => users.id), // Gestionnaire de la tontine
   agenceId: uuid("agence_id").references(() => agences.id), // Agence de la tontine
   createdBy: uuid("created_by"),
@@ -61,6 +61,9 @@ export const insertTontineSchema = createInsertSchema(tontines, {
       },
       schema,
     ),
+  montantCotisation: z.coerce.string(),
+  tauxPlateforme: z.coerce.string(),
+  solde: z.coerce.string(),
 }).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertTontine = z.infer<typeof insertTontineSchema>;
 export type Tontine = typeof tontines.$inferSelect;
@@ -99,6 +102,7 @@ export const contributionsTontine = pgTable(
 
     typeOperation: text("type_operation").notNull(), // "Versement" | "Retrait" (ou enum si tu veux)
     montant: numeric("montant").notNull(),
+    tourNumero: integer("tour_numero").default(1),
 
     methodePaiement: methodePaiementEnum("methode_paiement").notNull().default("Espèces"),
     statutTransaction: statutTransactionEnum("statut_transaction").notNull().default("Posté"),
@@ -188,3 +192,26 @@ export const tontineAlertes = pgTable("tontine_alertes", {
 export const insertTontineAlerteSchema = createInsertSchema(tontineAlertes).omit({ id: true, createdAt: true });
 export type InsertTontineAlerte = z.infer<typeof insertTontineAlerteSchema>;
 export type TontineAlerte = typeof tontineAlertes.$inferSelect;
+// Tontine Plans (Presets)
+export const tontinePlans = pgTable("tontine_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  montantCotisation: numeric("montant_cotisation").notNull(),
+  nombreMembres: integer("nombre_membres").notNull(),
+  frequence: text("frequence").notNull(),
+  typeDistribution: text("type_distribution").notNull(),
+  tauxPlateforme: numeric("taux_plateforme").notNull().default("0"),
+  intervalleCotisation: integer("intervalle_cotisation").default(1),
+  agenceId: uuid("agence_id").references(() => agences.id),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTontinePlanSchema = createInsertSchema(tontinePlans, {
+  montantCotisation: z.coerce.string(),
+  tauxPlateforme: z.coerce.string(),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTontinePlan = z.infer<typeof insertTontinePlanSchema>;
+export type TontinePlan = typeof tontinePlans.$inferSelect;

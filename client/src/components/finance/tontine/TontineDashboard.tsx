@@ -116,8 +116,8 @@ export default function TontineDashboard({
         .map((c: any) => ({
           type: 'contribution',
           montant: Number(c.montant),
-          date: c.date_contribution,
-          nom: c.tontine_membres?.clients?.nom || 'Inconnu'
+          date: c.date_contribution || c.created_at || c.createdAt, 
+          nom: c.client?.nom || c.tontine_membres?.clients?.nom || 'Inconnu'
         }))
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

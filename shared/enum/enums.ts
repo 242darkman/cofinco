@@ -42,6 +42,7 @@ export const methodePaiementEnum = pgEnum("methode_paiement_enum", [
   "Mobile Money",
   "Virement",
   "Carte",
+  "Chèque",
 ]);
 
 

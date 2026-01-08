@@ -293,10 +293,30 @@ export const tontineApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  deleteMembre: (tontineId: string, membreId: string) => request<void>(`/tontines/${tontineId}/membres/${membreId}`, {
+    method: 'DELETE',
+  }),
   getContributions: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/contributions`),
   addContribution: (tontineId: string, data: any) => request<any>(`/tontines/${tontineId}/contributions`, {
     method: 'POST',
     body: JSON.stringify(data),
+  }),
+};
+
+// Tontine Plans API
+export const tontinePlanApi = {
+  getAll: () => request<any[]>('/tontine-plans'),
+  getById: (id: string) => request<any>(`/tontine-plans/${id}`),
+  create: (data: any) => request<any>('/tontine-plans', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id: string, data: any) => request<any>(`/tontine-plans/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  delete: (id: string) => request<void>(`/tontine-plans/${id}`, {
+    method: 'DELETE',
   }),
 };
 

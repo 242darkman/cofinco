@@ -32,11 +32,9 @@ interface TontineContribution {
   reference_paiement: string | null;
   statut: 'Validée' | 'En attente' | 'Rejetée';
   notes: string | null;
-  tontine_membres: {
-    clients: {
-      nom: string;
-      prenom?: string;
-    };
+  client: {
+    nom: string;
+    prenom?: string;
   };
 }
 
@@ -63,7 +61,110 @@ interface FormErrors {
   general?: string;
 }
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 10;
+
+// Modal de détails de contribution
+const ContributionDetailsModal = ({ contribution, onClose }: { contribution: TontineContribution; onClose: () => void }) => {
+  if (!contribution) return null;
+
+  const getModeLabel = (mode: string) => {
+    switch (mode) {
+      case 'Cash': return 'Espèces';
+      case 'Mobile Money': return 'Mobile Money';
+      case 'Virement': return 'Virement Bancaire';
+      case 'Chèque': return 'Chèque';
+      default: return mode;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+          <h3 className="font-bold text-white flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Banknote size={18} />
+            </span>
+            Détails de la contribution
+          </h3>
+          <IconButton icon={X} onClick={onClose} size="sm" />
+        </div>
+        
+        <div className="p-6 space-y-6">
+          <div className="text-center">
+             <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Montant versé</div>
+             <div className="text-3xl font-bold text-emerald-400">{formatMoney(contribution.montant)}</div>
+             <div className="text-sm text-slate-500 mt-1">Tour #{contribution.tour_numero}</div>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-xl p-4 space-y-3 border border-slate-700/50">
+             <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
+                <span className="text-slate-400 text-sm">Membre</span>
+                <span className="text-white font-medium text-right">
+                  {contribution.client?.nom} {contribution.client?.prenom}
+                </span>
+             </div>
+             
+             <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
+                <span className="text-slate-400 text-sm">Date</span>
+                <span className="text-white font-medium text-right">
+                  {new Date(contribution.date_contribution).toLocaleDateString('fr-FR', { 
+                    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })}
+                </span>
+             </div>
+
+             <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
+                <span className="text-slate-400 text-sm">Mode</span>
+                <span className="text-white font-medium text-right flex items-center gap-2">
+                  {getModeLabel(contribution.mode_paiement)}
+                </span>
+             </div>
+
+             {/* Afficher l'opérateur uniquement si Mobile Money */}
+             {contribution.mode_paiement === 'Mobile Money' && (
+                // Note: Si l'opérateur n'est pas stocké explicitement dans le type TontineContribution actuel, 
+                // on pourrait avoir besoin de modifier le type ou le backend. 
+                // Mais s'il est dans 'notes' ou un champ dédié que j'aurais manqué...
+                // Pour l'instant on suppose qu'il n'est pas là ou qu'on l'affiche s'il existe.
+                 <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
+                    <span className="text-slate-400 text-sm">Référence</span>
+                    <span className="text-cyan-400 font-mono text-sm text-right break-all max-w-[150px]">
+                      {contribution.reference_paiement || 'N/A'}
+                    </span>
+                 </div>
+             )}
+             
+             {contribution.reference_paiement && contribution.mode_paiement !== 'Mobile Money' && (
+                <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
+                  <span className="text-slate-400 text-sm">Référence</span>
+                  <span className="text-slate-200 font-mono text-sm text-right">
+                    {contribution.reference_paiement}
+                  </span>
+                </div>
+             )}
+          </div>
+          
+          {contribution.notes && (
+            <div className="bg-slate-800/30 rounded-lg p-3 text-sm text-slate-300 italic border border-slate-700/30">
+              "{contribution.notes}"
+            </div>
+          )}
+
+          <div className="flex justify-center">
+            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+              contribution.statut === 'Validée' ? 'bg-green-500/20 text-green-400' :
+              contribution.statut === 'En attente' ? 'bg-amber-500/20 text-amber-400' :
+              'bg-red-500/20 text-red-400'
+            }`}>
+              Statut: {contribution.statut}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function TontineContributions({ tontineId }: TontineContributionsProps) {
   // RBAC permissions
@@ -79,6 +180,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
   const [paymentModalType, setPaymentModalType] = useState<'mobile_money' | 'especes'>('especes');
   const [selectedOperator, setSelectedOperator] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
+  const [selectedContribution, setSelectedContribution] = useState<TontineContribution | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -245,7 +347,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
     if (searchQuery) {
       const query = sanitizeInput(searchQuery).toLowerCase();
       filtered = filtered.filter((c) => {
-        const memberName = `${c.tontine_membres?.clients?.nom || ''} ${c.tontine_membres?.clients?.prenom || ''}`.toLowerCase();
+        const memberName = `${c.client?.nom || ''} ${c.client?.prenom || ''}`.toLowerCase();
         return memberName.includes(query);
       });
     }
@@ -388,15 +490,22 @@ export default function TontineContributions({ tontineId }: TontineContributions
             {paginatedContributions.map((contribution) => (
               <Card
                 key={contribution.id}
-                className="bg-slate-800/40 border-slate-700/50 p-3 hover:border-slate-600 transition-colors"
-                role="listitem"
+                className="bg-slate-800/40 border-slate-700/50 p-4 hover:border-cyan-500/50 hover:bg-slate-800/60 transition-all cursor-pointer group relative overflow-hidden"
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedContribution(contribution)}
               >
+                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="bg-slate-700/80 p-1.5 rounded-lg text-xs text-slate-300 font-medium">
+                        Voir détails
+                    </div>
+                </div>
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h4 className="font-bold text-white text-sm truncate">
-                        {escapeHtml(contribution.tontine_membres?.clients?.nom || 'Inconnu')}{' '}
-                        {escapeHtml(contribution.tontine_membres?.clients?.prenom || '')}
+                        {escapeHtml(contribution.client?.nom || 'Inconnu')}{' '}
+                        {escapeHtml(contribution.client?.prenom || '')}
                       </h4>
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${getStatutColor(contribution.statut)}`}
@@ -668,6 +777,14 @@ export default function TontineContributions({ tontineId }: TontineContributions
         loading={submitting}
         initialOperator={selectedOperator}
       />
+
+      {/* Details Modal */}
+      {selectedContribution && (
+        <ContributionDetailsModal 
+          contribution={selectedContribution} 
+          onClose={() => setSelectedContribution(null)} 
+        />
+      )}
     </div>
   );
 }
