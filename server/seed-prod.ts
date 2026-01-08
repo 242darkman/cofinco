@@ -16,6 +16,9 @@ import {
   smsTemplates,
   smsProviderSettings,
   dureesSuggerees,
+  planComptable,
+  journaux,
+  exercices,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 
@@ -359,6 +362,9 @@ async function seedProd() {
     await db.delete(uiCustomization);
     await db.delete(smsTemplates);
     await db.delete(smsProviderSettings);
+    await db.delete(planComptable);
+    await db.delete(journaux);
+    await db.delete(exercices);
     
     // NOTE: We do NOT delete users, agences, or zones if they have data linked
     // But for a fresh install we might want to ensure they exist.
@@ -545,29 +551,103 @@ async function seedProd() {
 
     await db.insert(dureesSuggerees).values([
       // Journalier
-      { frequence: 'Journalier', dureeValeur: 15, dureeUnite: 'Jour', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Journalier', dureeValeur: 30, dureeUnite: 'Jour', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Journalier', dureeValeur: 60, dureeUnite: 'Jour', estRecommandee: 0, ordre: 2, actif: 1 },
-      { frequence: 'Journalier', dureeValeur: 90, dureeUnite: 'Jour', estRecommandee: 0, ordre: 3, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 15, dureeUnite: 'Jour', estRecommandee: false, ordre: 0, actif: true, label: '15 jours' },
+      { frequence: 'Journalier', dureeValeur: 30, dureeUnite: 'Jour', estRecommandee: true, ordre: 1, actif: true, label: '30 jours' },
+      { frequence: 'Journalier', dureeValeur: 60, dureeUnite: 'Jour', estRecommandee: false, ordre: 2, actif: true, label: '60 jours' },
+      { frequence: 'Journalier', dureeValeur: 90, dureeUnite: 'Jour', estRecommandee: false, ordre: 3, actif: true, label: '90 jours' },
       // Hebdomadaire
-      { frequence: 'Hebdomadaire', dureeValeur: 1, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Hebdomadaire', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Hebdomadaire', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Hebdomadaire', dureeValeur: 1, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '1 mois' },
+      { frequence: 'Hebdomadaire', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '3 mois' },
+      { frequence: 'Hebdomadaire', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '6 mois' },
       // Mensuel
-      { frequence: 'Mensuel', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Mensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Mensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Mensuel', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '3 mois' },
+      { frequence: 'Mensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '6 mois' },
+      { frequence: 'Mensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '12 mois' },
       // Bimensuel
-      { frequence: 'Bimensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Bimensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Bimensuel', dureeValeur: 18, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Bimensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '6 mois' },
+      { frequence: 'Bimensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '12 mois' },
+      { frequence: 'Bimensuel', dureeValeur: 18, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '18 mois' },
       // Trimestriel
-      { frequence: 'Trimestriel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Trimestriel', dureeValeur: 24, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Trimestriel', dureeValeur: 36, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
-    ]);
+      { frequence: 'Trimestriel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '12 mois' },
+      { frequence: 'Trimestriel', dureeValeur: 24, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '24 mois' },
+      { frequence: 'Trimestriel', dureeValeur: 36, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '36 mois' },
+    ] as any);
 
     console.log('   ✅ Durees Suggerees created');
+
+    // SEED ACCOUNTING PLAN (Standard OHADA)
+    console.log('\n📚 Seeding Accounting Plan (Prod base)...');
+    
+    // Create current exercise
+    const currentYear = new Date().getFullYear();
+    await db.insert(exercices).values({
+      code: `${currentYear}`,
+      dateDebut: `${currentYear}-01-01`,
+      dateFin: `${currentYear}-12-31`,
+      statut: 'Ouvert',
+      description: `Exercice comptable ${currentYear}`,
+    });
+
+    const planComptableData = [
+       // Classe 1: Capitaux
+       { num: '101', label: 'Capital social', classe: 1, type: 'Capitaux', sens: 'Crédit' },
+       { num: '12', label: 'Report à nouveau', classe: 1, type: 'Capitaux', sens: 'Crédit' },
+       { num: '13', label: 'Résultat net', classe: 1, type: 'Capitaux', sens: 'Crédit' },
+       
+       // Classe 2: Immobilisations
+       { num: '21', label: 'Immobilisations incorporelles', classe: 2, type: 'Actif', sens: 'Débit' },
+       { num: '22', label: 'Terrains', classe: 2, type: 'Actif', sens: 'Débit' },
+       { num: '23', label: 'Bâtiments', classe: 2, type: 'Actif', sens: 'Débit' },
+       { num: '24', label: 'Matériel', classe: 2, type: 'Actif', sens: 'Débit' },
+       
+       // Classe 3: Stocks
+       { num: '31', label: 'Marchandises', classe: 3, type: 'Actif', sens: 'Débit' },
+       
+       // Classe 4: Tiers
+       { num: '401', label: 'Fournisseurs', classe: 4, type: 'Passif', sens: 'Crédit' },
+       { num: '411', label: 'Clients', classe: 4, type: 'Actif', sens: 'Débit' },
+       { num: '42', label: 'Personnel', classe: 4, type: 'Passif', sens: 'Crédit' },
+       { num: '43', label: 'Sécurité Sociale', classe: 4, type: 'Passif', sens: 'Crédit' },
+       { num: '44', label: 'État', classe: 4, type: 'Passif', sens: 'Crédit' },
+       { num: '443', label: 'TVA Facturée', classe: 4, type: 'Passif', sens: 'Crédit' },
+       { num: '445', label: 'TVA Récupérable', classe: 4, type: 'Actif', sens: 'Débit' },
+
+       // Classe 5: Trésorerie
+       { num: '512', label: 'Banque', classe: 5, type: 'Actif', sens: 'Débit' },
+       { num: '521', label: 'Caisse', classe: 5, type: 'Actif', sens: 'Débit' },
+       
+       // Classe 6: Charges
+       { num: '601', label: 'Achats marchandises', classe: 6, type: 'Charge', sens: 'Débit' },
+       { num: '61', label: 'Transports', classe: 6, type: 'Charge', sens: 'Débit' },
+       { num: '62', label: 'Services extérieurs', classe: 6, type: 'Charge', sens: 'Débit' },
+       { num: '63', label: 'Impôts et taxes', classe: 6, type: 'Charge', sens: 'Débit' },
+       { num: '66', label: 'Charges personnel', classe: 6, type: 'Charge', sens: 'Débit' },
+       
+       // Classe 7: Produits
+       { num: '701', label: 'Ventes marchandises', classe: 7, type: 'Produit', sens: 'Crédit' },
+       { num: '706', label: 'Services vendus', classe: 7, type: 'Produit', sens: 'Crédit' },
+    ];
+
+    for (const cpt of planComptableData) {
+       await db.insert(planComptable).values({
+         numeroCompte: cpt.num,
+         intitule: cpt.label,
+         classe: cpt.classe,
+         typeCompte: cpt.type,
+         sensNormal: cpt.sens,
+         actif: true,
+       });
+    }
+
+    const journalsData = [
+      { code: 'CAISSE', intitule: 'Journal de Caisse', typeJournal: 'Caisse' },
+      { code: 'BANK', intitule: 'Journal de Banque', typeJournal: 'Banque' },
+      { code: 'ACHAT', intitule: 'Journal d\'Achats', typeJournal: 'Achats' },
+      { code: 'VENTE', intitule: 'Journal de Ventes', typeJournal: 'Ventes' },
+      { code: 'OD', intitule: 'Opérations Diverses', typeJournal: 'Opérations Diverses' },
+    ];
+    await db.insert(journaux).values(journalsData as any);
+    console.log('   ✅ Accounting plan seeded');
 
     console.log('\n✅ PRODUCTION SEED COMPLETE');
     console.log('Login: admin / Admin123!@#');

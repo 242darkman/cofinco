@@ -61,6 +61,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   const [geoError, setGeoError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
+    demandeId: initialData?.id || '',
     client_id: clientId || initialData?.client_id || '',
     montant_demande: initialData?.montant_demande || '',
     categorie_activite: initialData?.categorie_activite || '',
@@ -372,6 +373,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     if (validateForm()) {
       const payload = {
         ...formData,
+        demandeId: formData.demandeId || undefined,
         montant_demande: parseFloat(formData.montant_demande),
         revenu_journalier: parseFloat(formData.revenu_journalier) || 0,
         jours_travail_mois: parseInt(formData.jours_travail_mois) || 26,

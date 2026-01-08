@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle } from 'lucide-react';
 import { creditApi, demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -22,6 +22,7 @@ interface Demande {
   type_credit: string | null;
   objet_credit: string;
   statut: string;
+  motif_rejet?: string;
   score_credit: number | null;
   revenus_mensuels?: number;
   type_revenu?: string;
@@ -30,8 +31,10 @@ interface Demande {
   capacite_remboursement?: number;
   frequence_remboursement: string;
   date_demande: string;
+  created_at?: string;
   clients: {
     nom: string;
+    prenom?: string;
     email?: string;
     phone: string;
     score?: number;
@@ -74,6 +77,35 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
   const [showConfirmApprove, setShowConfirmApprove] = useState(false);
   const [showConfirmReject, setShowConfirmReject] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isReevaluating, setIsReevaluating] = useState(false);
+  const [enquetes, setEnquetes] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (demande?.id) {
+       fetch(`/api/demandes-credit/${demande.id}/enquete`)
+         .then(res => res.json())
+         .then(data => setEnquetes(Array.isArray(data) ? data : [data]))
+         .catch(err => console.warn("No enquete found", err));
+    }
+  }, [demande?.id]);
+
+  const latestEnquete = enquetes.length > 0 ? enquetes[0] : null;
+
+  const isFinished = (demande.statut.toLowerCase() === 'approuvée' || 
+                      demande.statut.toLowerCase() === 'décaissée' || 
+                      demande.statut.toLowerCase() === 'déboursé' ||
+                      demande.statut.toLowerCase() === 'approuve' ||
+                      demande.statut.toLowerCase() === 'approved');
+  
+  const isRejected = (demande.statut.toLowerCase() === 'rejetée' || 
+                      demande.statut.toLowerCase() === 'rejete' || 
+                      demande.statut.toLowerCase() === 'rejected');
+
+  const isCancelled = (demande.statut.toLowerCase() === 'annulée' || 
+                       demande.statut.toLowerCase() === 'annule' || 
+                       demande.statut.toLowerCase() === 'cancelled');
+
+  const showActions = (!isFinished && !isRejected && !isCancelled) || isReevaluating;
 
   // Helper: convert V2 duration to days
   const convertDureeEnJours = (valeur: number, unite: string): number => {
@@ -139,7 +171,10 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
   }, [demande]);
 
   // Safe escaped values
-  const safeClientName = useMemo(() => escapeHtml(demande.clients.nom), [demande.clients.nom]);
+  const safeClientName = useMemo(() => {
+    const full = `${demande.clients.nom} ${demande.clients.prenom || ''}`.trim();
+    return escapeHtml(full);
+  }, [demande.clients.nom, demande.clients.prenom]);
 
   const addGuarantee = useCallback(() => {
     setGuarantees(prev => [...prev, { type_garantie: 'Hypothèque', description: '', valeur_estimee: '' }]);
@@ -183,60 +218,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
     setLoading(true);
 
     try {
-      const numeroSequence = Date.now().toString().slice(-8);
-      const numeroCredit = `CRD-${numeroSequence}`;
-
-      const dateDeblocage = new Date();
-      const frequence = demande.frequence_remboursement;
-      const joursTotal = convertDureeEnJours(demande.duree_valeur, demande.duree_unite);
-      
-      const datePremiereEcheance = new Date(dateDeblocage);
-      if (frequence === 'Journalier') {
-          datePremiereEcheance.setDate(datePremiereEcheance.getDate() + 1);
-      } else if (frequence === 'Hebdomadaire') {
-          datePremiereEcheance.setDate(datePremiereEcheance.getDate() + 7);
-      } else {
-          datePremiereEcheance.setMonth(datePremiereEcheance.getMonth() + 1);
-      }
-
-      const dateDerniereEcheance = new Date(dateDeblocage);
-      dateDerniereEcheance.setDate(dateDerniereEcheance.getDate() + joursTotal);
-
-      // Sanitize and validate guarantees
-      const garantiesPayload = guarantees.map((g) => ({
-        type_garantie: g.type_garantie,
-        description: sanitizeInput(g.description),
-        valeur_estimee: parseFloat(g.valeur_estimee) || 0,
-        statut: 'Active'
-      }));
-
-      const creditData = {
-        clientId: demande.client_id,
-        montant: montantBase,
-        taux: demande.taux_interet,
-        duree: nombreEcheancesCalc, // Store as number of payments
-        typeCredit: demande.type_credit || 'Standard',
-        objetCredit: sanitizeInput(demande.objet_credit),
-        statut: 'Actif',
-        echeance: frequence,
-        dateDebut: dateDeblocage.toISOString().split('T')[0],
-        dateFin: dateDerniereEcheance.toISOString().split('T')[0],
-        dateSolvabilite: dateDerniereEcheance.toISOString().split('T')[0],
-        soldeRestant: montantTotal,
-        garanties: JSON.stringify(garantiesPayload),
-        observations: sanitizeInput(commentaire),
-        numero_credit: numeroCredit,
-        demande_id: demande.id,
-        montant_total: montantTotal,
-        montant_echeance: mensualite,
-        date_premiere_echeance: datePremiereEcheance.toISOString().split('T')[0],
+      // Prepare approval data to save on the demand
+      const updateData = {
+        statut: 'Approuvée',
+        montant_approuve: montantBase,
+        // We can store guarantees/comments if the backend schema supports it, 
+        // or just rely on the status change for now. 
+        // Ideally, we adds fields to Demande schema for approval details, 
+        // but for now we'll stick to updating the status and essentials.
         commentaire_approbation: sanitizeInput(commentaire)
       };
 
-      await creditApi.create(creditData);
-      await demandeCreditApi.update(demande.id, { statut: 'Déboursé' });
+      await demandeCreditApi.update(demande.id, updateData);
 
-      toast.success(`Crédit ${numeroCredit} approuvé et déboursé avec succès`);
+      toast.success(`Crédit approuvé. Dossier transféré à la Commission Crédit pour décaissement.`);
       onSuccess();
     } catch (error) {
       const errorMessage = handleApiError(error, "Erreur lors de l'approbation du crédit");
@@ -245,7 +240,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
       setLoading(false);
       setShowConfirmApprove(false);
     }
-  }, [demande, montantBase, montantTotal, mensualite, guarantees, commentaire, onSuccess]);
+  }, [demande, montantBase, commentaire, onSuccess]);
 
   const handleReject = useCallback(async () => {
     setLoading(true);
@@ -374,7 +369,13 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <dt className="text-slate-400">Date:</dt>
-                    <dd className="text-white">{new Date(demande.date_demande).toLocaleDateString('fr-FR')}</dd>
+                    <dd className="text-white">
+                      {new Date(demande.created_at || demande.date_demande).toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}
+                    </dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-slate-400">Type:</dt>
@@ -410,6 +411,16 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
               <p className="text-slate-300">{escapeHtml(demande.objet_credit)}</p>
             </div>
 
+            {/* Motif Rejet (si applicable) */}
+            {isRejected && demande.motif_rejet && !isReevaluating && (
+              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
+                <h3 className="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
+                   <XCircle size={18} /> Motif du Rejet Précédent
+                </h3>
+                <p className="text-slate-300 italic">"{demande.motif_rejet}"</p>
+              </div>
+            )}
+
             {/* Financial Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="Indicateurs financiers">
               <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/50 rounded-lg p-4">
@@ -426,7 +437,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                 </div>
                 {demande.type_revenu === 'Journalier' && demande.revenu_journalier && (
                   <div className="text-[10px] text-green-300/70 mt-1 italic">
-                    {formatMoney(demande.revenu_journalier)}/j (26j/mois)
+                    {formatMoney(demande.revenu_journalier)}/j
                   </div>
                 )}
               </div>
@@ -451,6 +462,36 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                 )}
               </div>
             </div>
+
+            {enquetes.length > 0 && (
+              <div className="space-y-4">
+                 <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2">
+                    <Shield size={18} /> Historique des Enquêtes ({enquetes.length})
+                 </h3>
+                 {enquetes.map((enquete, index) => (
+                   <div key={enquete.id || index} className={`bg-purple-500/10 border border-purple-500/50 rounded-lg p-4 ${index !== 0 ? 'opacity-75' : ''}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-xs font-bold text-purple-300 uppercase">Enquête #{enquetes.length - index}</span>
+                        <span className="text-xs text-slate-400">{new Date(enquete.created_at || Date.now()).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                      <dl className="grid md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                          <div className="flex justify-between">
+                              <dt className="text-slate-400">Statut:</dt>
+                              <dd className="text-white font-bold">{enquete.statut}</dd>
+                          </div>
+                          <div className="flex justify-between">
+                              <dt className="text-slate-400">Note Globale:</dt>
+                              <dd className="text-white font-bold">{enquete.score_global || '-'}/100</dd>
+                          </div>
+                          <div className="col-span-2 mt-2">
+                              <dt className="text-slate-400 block mb-1">Recommandation Agent:</dt>
+                              <dd className="text-white bg-slate-800/50 p-2 rounded italic">"{enquete.recommandation || enquete.evaluation_activite || 'Aucune recommandation'}"</dd>
+                          </div>
+                      </dl>
+                   </div>
+                 ))}
+              </div>
+            )}
 
             {/* Approval Form */}
             {action === 'approve' && (
@@ -595,63 +636,82 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
-              {!action ? (
-                canApproveCredits ? (
+            <div className="flex flex-col sm:flex-row gap-3">
+              {showActions ? (
+                !action ? (
+                  canApproveCredits ? (
+                    <>
+                      <button
+                        onClick={() => setAction('reject')}
+                        disabled={loading}
+                        className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                      >
+                        <XCircle size={20} aria-hidden="true" />
+                        Rejeter
+                      </button>
+                      <button
+                        onClick={() => setAction('approve')}
+                        disabled={loading}
+                        className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                      >
+                        <CheckCircle size={20} aria-hidden="true" />
+                        Approuver
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex-1 px-6 py-3 bg-slate-700 text-slate-400 rounded-lg text-center flex items-center justify-center gap-2">
+                      <AlertCircle size={20} aria-hidden="true" />
+                      Vous n'avez pas la permission d'approuver les crédits
+                    </div>
+                  )
+                ) : (
                   <>
                     <button
-                      onClick={() => setAction('reject')}
+                      onClick={handleCancel}
                       disabled={loading}
-                      className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                      className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50"
                     >
-                      <XCircle size={20} aria-hidden="true" />
-                      Rejeter
+                      Annuler
                     </button>
                     <button
-                      onClick={() => setAction('approve')}
+                      onClick={handleSubmitAction}
                       disabled={loading}
-                      className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                      className={`flex-1 px-6 py-3 ${
+                        action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+                      } text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 ${
+                        action === 'approve' ? 'focus:ring-green-500' : 'focus:ring-red-500'
+                      } flex items-center justify-center gap-2`}
                     >
-                      <CheckCircle size={20} aria-hidden="true" />
-                      Approuver
+                      {loading ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                          Traitement...
+                        </>
+                      ) : action === 'approve' ? (
+                        'Confirmer Approbation'
+                      ) : (
+                        'Confirmer Rejet'
+                      )}
                     </button>
                   </>
-                ) : (
-                  <div className="flex-1 px-6 py-3 bg-slate-700 text-slate-400 rounded-lg text-center flex items-center justify-center gap-2">
-                    <AlertCircle size={20} aria-hidden="true" />
-                    Vous n'avez pas la permission d'approuver les crédits
-                  </div>
                 )
               ) : (
-                <>
+                <div className="flex-1 flex flex-col sm:flex-row gap-3">
+                  {isRejected && canApproveCredits && (
+                    <button
+                      onClick={() => setIsReevaluating(true)}
+                      className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
+                    >
+                      <AlertTriangle size={20} /> Réévaluer cette demande
+                    </button>
+                  )}
                   <button
-                    onClick={handleCancel}
-                    disabled={loading}
-                    className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50"
+                    onClick={onClose}
+                    className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
                   >
-                    Annuler
+                    Fermer le dossier
                   </button>
-                  <button
-                    onClick={handleSubmitAction}
-                    disabled={loading}
-                    className={`flex-1 px-6 py-3 ${
-                      action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
-                    } text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 ${
-                      action === 'approve' ? 'focus:ring-green-500' : 'focus:ring-red-500'
-                    } flex items-center justify-center gap-2`}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 size={20} className="animate-spin" aria-hidden="true" />
-                        Traitement...
-                      </>
-                    ) : action === 'approve' ? (
-                      'Confirmer Approbation'
-                    ) : (
-                      'Confirmer Rejet'
-                    )}
-                  </button>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -662,8 +722,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
       <ConfirmDialog
         isOpen={showConfirmApprove}
         title="Confirmer l'approbation du crédit"
-        message={`Vous êtes sur le point d'approuver et débourser un crédit de ${formatMoney(montantBase)} pour ${safeClientName}. Le montant total à rembourser sera de ${formatMoney(montantTotal)} en ${nombreEcheancesCalc} paiements (${demande.frequence_remboursement}). Cette action est irréversible.`}
-        confirmText="Approuver et débourser"
+        message={`Vous êtes sur le point d'approuver un crédit de ${formatMoney(montantBase)} pour ${safeClientName}. Le dossier sera envoyé en Commission Crédit pour décaissement.`}
+        confirmText="Confirmer Approbation"
         cancelText="Annuler"
         onConfirm={handleApprove}
         onClose={() => setShowConfirmApprove(false)}

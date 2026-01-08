@@ -13,7 +13,7 @@ export interface EnqueteCredit {
   autres_credits?: boolean;
   montant_autres_credits?: number;
   patrimoine_estime?: number;
-  score_final?: number;
+  score_global?: number;
   recommandation?: string;
   commentaire?: string;
   date_enquete: string;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X } from 'lucide-react';
-import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton } from '../../ui';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign } from 'lucide-react';
+import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog } from '../../ui';
 import { useCredits } from '../../../hooks/credits/useCredits';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { useEnquetes } from '../../../hooks/credits/useEnquetes';
@@ -8,7 +8,10 @@ import { useCreditStats } from '../../../hooks/credits/useCreditStats';
 import CreditDetailModal from './CreditDetailModal';
 import CreditRequestForm from './CreditRequestForm';
 import EnqueteCreditForm from './EnqueteCreditForm';
-import EnqueteCreditValidation from './EnqueteCreditValidation';
+import CreditApprovalModal from './CreditApprovalModal';
+import CreditDisbursementModal from './CreditDisbursementModal';
+import CreditFeesPaymentModal from './CreditFeesPaymentModal';
+import EnqueteDetailModal from './EnqueteDetailModal';
 import ReferenceTable from './CreditRemboursement';
 import { TableColumn } from '../../ui/ResponsiveTable';
 import { ProtectedFeature } from '../../auth/ProtectedFeature';
@@ -16,31 +19,40 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 
-type TabId = 'dashboard' | 'credits' | 'demandes' | 'enquetes' | 'remboursements';
+type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'remboursements';
 
 const TABS = [
   { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
   { key: 'credits', label: 'Crédits', icon: CreditCard },
-  { key: 'demandes', label: 'Demandes', icon: FileText },
-  { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck },
+  { key: 'demandes', label: 'À traiter', icon: FileText }, // New demands, rejected, cancelled
+  { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck }, // Only "A enquêter" (ready for investigation)
+  { key: 'approbation', label: 'Approbation', icon: CheckCircle }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
+  { key: 'commission', label: 'Commission Crédit', icon: DollarSign }, // Approved demands waiting for disbursement
   { key: 'remboursements', label: 'Remboursements', icon: TrendingUp }
 ];
 
 interface CreditsProps {
   userRole?: string;
   activeView?: string;
+  onModuleChange?: (module: string) => void;
 }
 
-export default function CreditsRefactored({ userRole, activeView }: CreditsProps) {
+export default function CreditsRefactored({ userRole, activeView, onModuleChange }: CreditsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [demandeSubTab, setDemandeSubTab] = useState<'to_process' | 'approved'>('to_process');
   const [selectedCredit, setSelectedCredit] = useState<string | null>(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [showEnqueteForm, setShowEnqueteForm] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [selectedEnquete, setSelectedEnquete] = useState<string | null>(null);
   const [selectedDemande, setSelectedDemande] = useState<any>(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showDisbursementModal, setShowDisbursementModal] = useState(false); // New modal state
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showFeesModal, setShowFeesModal] = useState(false);
   const [creditsPage, setCreditsPage] = useState(1);
   const [demandesPage, setDemandesPage] = useState(1);
+  const [demandeToDelete, setDemandeToDelete] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -51,6 +63,9 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
           break;
         case 'credits-demandes':
           setActiveTab('demandes');
+          break;
+        case 'credits-commission':
+          setActiveTab('commission');
           break;
         case 'credits-remboursements':
           setActiveTab('remboursements');
@@ -104,9 +119,32 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
     return () => window.removeEventListener('online', handleOnline);
   }, [pendingCount, enquetes.createEnquete]);
 
-  const formatMoney = (amount: number | null | undefined) => {
+  const formatMoneyPlain = (amount: number | null | undefined) => {
     const value = amount || 0;
     return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
+  };
+
+  const formatMoney = (amount: number | null | undefined) => {
+    const value = amount || 0;
+    const isLarge = value >= 1000000;
+    
+    return (
+      <div className="flex items-baseline justify-end gap-1 font-mono tracking-tight leading-none group-hover:scale-105 transition-transform duration-200">
+        <span className={`text-sm font-bold ${
+          isLarge 
+            ? 'text-cyan-600 dark:text-cyan-400' 
+            : 'text-slate-900 dark:text-white'
+        }`}>
+          {new Intl.NumberFormat('fr-FR', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(value)}
+        </span>
+        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase select-none">
+          FCFA
+        </span>
+      </div>
+    );
   };
 
 
@@ -124,6 +162,11 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
 
   const isLoading = credits.loading || demandes.loading || enquetes.loading;
 
+  const isApprovedStatus = (status: string) => {
+    const s = status.toLowerCase().trim();
+    return ['approuve', 'approuvée', 'approved', 'décaissée', 'décaissé', 'decaissee', 'déboursé', 'debourse', 'déboursée', 'enquête terminée', 'enquete terminee'].includes(s);
+  };
+
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -132,16 +175,16 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
   const creditColumns: TableColumn<any>[] = [
     { key: 'numero_credit', label: 'Numéro', primary: true },
     { key: 'clients.nom', label: 'Client', format: (val, item) => `${item.clients?.nom || 'Client'} ${item.clients?.prenom || ''}`.trim() || 'Client Inconnu' },
-    { key: 'montant_principal', label: 'Montant', format: (val) => formatMoney(val) },
+    { key: 'montant_principal', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', badge: true },
     { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombre_echeances_payees || 0}/${item.nombre_echeances_total || 0}` },
-    { key: 'jours_retard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : '-' }
+    { key: 'jours_retard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : <span className="text-slate-500">0j</span> }
   ];
 
   const demandeColumns: TableColumn<any>[] = [
     { key: 'numero_demande', label: 'Numéro', primary: true },
     { key: 'clients.nom', label: 'Client', format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
-    { key: 'montant_demande', label: 'Montant Demandé', format: (val) => formatMoney(val) },
+    { key: 'montant_demande', label: 'Montant Demandé', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', badge: true },
     { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
@@ -149,9 +192,9 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
   const enqueteColumns: TableColumn<any>[] = [
     { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
     { key: 'type_activite', label: 'Activité' },
-    { key: 'montant_demande', label: 'Montant', format: (val) => formatMoney(val) },
+    { key: 'montant_demande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', badge: true },
-    { key: 'score_final', label: 'Score', hideOnMobile: true }
+    { key: 'score_global', label: 'Score', hideOnMobile: true }
   ];
 
   return (
@@ -195,68 +238,63 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
 
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-6">
-          {/* Top Stats - Horizontal Scroll on Mobile */}
-          <div className="flex overflow-x-auto pb-4 gap-4 snap-x md:grid md:grid-cols-4 md:gap-4 md:pb-0 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
-            <div className="min-w-[240px] snap-center">
-              <StatCard
-                title="Crédits Actifs"
-                value={stats.creditsActifs || 0}
-                icon={CheckCircle}
-                color="success"
-                subtitle={`sur ${stats.creditsTotal || 0} total`}
-              />
-            </div>
-            <div className="min-w-[240px] snap-center">
-              <StatCard
-                title="En Retard"
-                value={stats.creditsEnRetard || 0}
-                icon={AlertCircle}
-                color="danger"
-                subtitle="crédits"
-              />
-            </div>
-            <div className="min-w-[240px] snap-center">
-              <StatCard
-                title="Demandes"
-                value={stats.demandesEnAttente || 0}
-                icon={Clock}
-                color="warning"
-                subtitle="en attente"
-              />
-            </div>
-            <div className="min-w-[240px] snap-center">
-              <StatCard
-                title="Enquêtes"
-                value={stats.enquetesEnCours || 0}
-                icon={ClipboardCheck}
-                color="primary"
-                subtitle="en cours"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard title="Montant Crédits" value={formatCompactMoney(stats.montantTotalCredits)} icon={CreditCard} color="neutral" />
-            <StatCard 
-              title="Montant Demandes" 
-              value={formatCompactMoney(stats.montantTotalDemandes)} 
-              icon={FileText} 
-              color="neutral" 
-              subtitle={
-                <span className="flex gap-1.5 flex-wrap">
-                  <span className="text-amber-400">Att: {formatCompactMoney(stats.montantDemandesEnAttente)}</span>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-emerald-400">Acc: {formatCompactMoney(stats.montantDemandesAccorde)}</span>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-red-400">Rej: {formatCompactMoney(stats.montantDemandesRejete)}</span>
-                </span>
-              }
+        <div className="space-y-4">
+          {/* Primary Stats - 2x2 Grid on Mobile, 4 cols on Desktop */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <StatCard
+              title="Crédits Actifs"
+              value={stats.creditsActifs || 0}
+              icon={CheckCircle}
+              color="success"
+              subtitle={`sur ${stats.creditsTotal || 0} total`}
             />
-            <StatCard title="Montant Enquêtes" value={formatCompactMoney(stats.montantTotalEnquetes)} icon={ClipboardCheck} color="neutral" />
+            <StatCard
+              title="En Retard"
+              value={stats.creditsEnRetard || 0}
+              icon={AlertCircle}
+              color="danger"
+              subtitle="crédits"
+            />
+            <StatCard
+              title="Demandes"
+              value={stats.demandesEnAttente || 0}
+              icon={Clock}
+              color="warning"
+              subtitle="en attente"
+            />
+            <StatCard
+              title="Enquêtes"
+              value={stats.enquetesEnCours || 0}
+              icon={ClipboardCheck}
+              color="primary"
+              subtitle="en cours"
+            />
           </div>
 
-          {/* Recent List Previews could go here if needed, but keeping it simple for now */}
+          {/* Secondary Stats - Montants */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+            <StatCard
+              title="Montant Crédits"
+              value={formatCompactMoney(stats.montantTotalCredits)}
+              icon={CreditCard}
+              color="neutral"
+              variant="minimal"
+            />
+            <StatCard
+              title="Montant Demandes"
+              value={formatCompactMoney(stats.montantTotalDemandes)}
+              icon={FileText}
+              color="neutral"
+              variant="minimal"
+            />
+            <StatCard
+              title="Montant Enquêtes"
+              value={formatCompactMoney(stats.montantTotalEnquetes)}
+              icon={ClipboardCheck}
+              color="neutral"
+              variant="minimal"
+            />
+          </div>
         </div>
       )}
 
@@ -264,7 +302,9 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
       {activeTab === 'credits' && (
         <Card variant="default" padding="none" className="overflow-hidden">
           <ResponsiveTable
-            data={credits.credits.slice((creditsPage - 1) * ITEMS_PER_PAGE, creditsPage * ITEMS_PER_PAGE)}
+            data={credits.credits
+              .filter(c => ['Actif', 'En retard', 'Soldé'].includes(c.statut))
+              .slice((creditsPage - 1) * ITEMS_PER_PAGE, creditsPage * ITEMS_PER_PAGE)}
             columns={creditColumns}
             loading={isLoading}
             onRowClick={(item) => setSelectedCredit(item.id)}
@@ -279,67 +319,156 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
         </Card>
       )}
 
-      {/* Demandes Tab */}
-        <Card variant="default" padding="none" className="overflow-hidden">
+      {/* Approbation Tab (Enquêtes terminées) */}
+      {activeTab === 'approbation' && (
+        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
-            data={demandes.demandes.slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
+            data={demandes.demandes
+              .filter(d => d.statut === 'Enquête terminée')
+              .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={demandeColumns}
             loading={isLoading}
-            emptyMessage="Aucune demande trouvée"
-            maxHeight="calc(100vh - 300px)"
+            onRowClick={(item) => {
+              setSelectedDemande(item);
+              setShowApprovalModal(true); // Approve logic
+            }}
+            emptyMessage="Aucune demande en attente d'approbation"
+            maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === 'Enquête terminée').length / ITEMS_PER_PAGE),
+              onPageChange: setDemandesPage
+            }}
+            actions={(item) => (
+               <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
+                 <Button 
+                    size="sm" 
+                    variant="primary"
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      setSelectedDemande(item);
+                      setShowApprovalModal(true);
+                    }}
+                 >
+                   Analyser
+                 </Button>
+               </ProtectedFeature>
+            )}
+          />
+        </Card>
+      )}
+
+      {/* Commission Crédit Tab (Approuvées -> À décaisser) */}
+      {activeTab === 'commission' && (
+        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
+          <ResponsiveTable
+            data={demandes.demandes
+              .filter(d => d.statut === 'Approuvée')
+              .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
+            columns={demandeColumns}
+            loading={isLoading}
+            onRowClick={(item) => {
+              setSelectedDemande(item);
+              setShowDisbursementModal(true); // Disbursement logic
+            }}
+            emptyMessage="Aucune demande en attente de décaissement"
+            maxHeight="calc(100vh - 350px)"
+            pagination={{
+              page: demandesPage,
+              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === 'Approuvée').length / ITEMS_PER_PAGE),
+              onPageChange: setDemandesPage
+            }}
+            actions={(item) => (
+               <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
+                 <Button 
+                    size="sm" 
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      setSelectedDemande(item);
+                      setShowDisbursementModal(true);
+                    }}
+                 >
+                   <DollarSign size={16} className="mr-1" />
+                   Décaisser
+                 </Button>
+               </ProtectedFeature>
+            )}
+          />
+        </Card>
+      )}
+
+      {/* Demandes Tab (À traiter: En attente, Rejetée, Annulée) */}
+      {activeTab === 'demandes' && (
+        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
+          <ResponsiveTable
+            data={demandes.demandes
+              .filter(d => ['En attente', 'Rejetée', 'Annulée'].includes(d.statut))
+              .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
+            columns={demandeColumns}
+            loading={isLoading}
+            onRowClick={(item) => {
+              setSelectedDemande(item);
+              if (item.statut === 'En attente') {
+                setShowFeesModal(true);
+              } else {
+                // For Rejetée, Annulée
+                setShowApprovalModal(true);
+              }
+            }}
+            emptyMessage="Aucune demande à traiter"
+            maxHeight="calc(100vh - 350px)"
+            pagination={{
+              page: demandesPage,
+              totalPages: Math.ceil(demandes.demandes.filter(d => ['En attente', 'Rejetée', 'Annulée'].includes(d.statut)).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             actions={(item) => (
               <div className="flex gap-1">
-                 <IconButton 
+                 {item.statut === 'En attente' && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={(e) => { 
+                        e.stopPropagation();
+                        setSelectedDemande(item);
+                        setShowFeesModal(true);
+                      }}
+                    >
+                      Payer Frais
+                    </Button>
+                 )}
+                  <IconButton 
                     icon={Eye} 
                     size="sm" 
                     variant="ghost" 
-                    onClick={() => { setSelectedDemande(item); setShowEnqueteForm(true); }}
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      setSelectedDemande(item);
+                      setShowApprovalModal(true);
+                    }}
                     title="Voir Détails"
                     aria-label="Voir Détails"
                   />
-                  {item.statut === 'en_attente' && (
-                    <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
-                      <>
-                        <IconButton 
-                          icon={Check} 
-                          size="sm" 
-                          variant="success" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            if(confirm('Approuver cette demande ?')) {
-                                demandes.approuverDemande(item.id, item.montant_demande);
-                            }
-                          }}
-                          title="Approuver"
-                          aria-label="Approuver"
-                        />
-                        <IconButton 
-                          icon={X} 
-                          size="sm" 
-                          variant="danger" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            if(confirm('Rejeter cette demande ?')) {
-                                demandes.rejeterDemande(item.id, 'Rejetée par gestionnaire');
-                            }
-                          }}
-                          title="Rejeter"
-                          aria-label="Rejeter"
-                        />
-                      </>
-                    </ProtectedFeature>
-                  )}
+                 <IconButton 
+                    icon={Trash2} 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    onClick={(e) => { 
+                      e.stopPropagation();
+                      setDemandeToDelete(item.id);
+                    }}
+                    title="Supprimer"
+                    aria-label="Supprimer"
+                  />
               </div>
             )}
           />
         </Card>
+      )}
 
-      {/* Enquetes Tab */}
+      {/* Enquetes Tab (A enquêter) */}
       {activeTab === 'enquetes' && (
         <div className="space-y-4">
           <div className="flex justify-end">
@@ -351,23 +480,24 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
           </div>
           <Card variant="default" padding="none" className="overflow-hidden">
             <ResponsiveTable
-              data={enquetes.enquetes}
+              data={demandes.demandes
+                  .filter(d => d.statut === 'A enquêter')
+                  .map(d => ({
+                    ...d,
+                    id: d.id, 
+                    type_activite: d.objet_credit || 'À définir',
+                    statut: 'Prêt pour enquête', 
+                    isDemande: true
+                  }))
+              }
               columns={enqueteColumns}
               loading={isLoading}
-              emptyMessage="Aucune enquête trouvée"
-              actions={(item) => (
-                item.statut === 'en_attente' ? (
-                  <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
-                    <Button variant="primary" size="sm" onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedEnquete(item.id);
-                        setShowValidationModal(true);
-                      }}>
-                        Valider
-                      </Button>
-                  </ProtectedFeature>
-                ) : null
-              )}
+              emptyMessage="Aucune enquête en attente"
+              onRowClick={(item: any) => {
+                  setSelectedDemande(item);
+                  setShowEnqueteForm(true);
+              }}
+              actions={() => null} 
             />
           </Card>
         </div>
@@ -421,20 +551,72 @@ export default function CreditsRefactored({ userRole, activeView }: CreditsProps
         />
       )}
 
-      {showValidationModal && selectedEnquete && enquetes.enquetes.find(e => e.id === selectedEnquete) && (
-        <EnqueteCreditValidation
-          enquete={enquetes.enquetes.find(e => e.id === selectedEnquete)!}
+      {showApprovalModal && selectedDemande && (
+        <CreditApprovalModal
+          demande={selectedDemande}
           onClose={() => {
-            setShowValidationModal(false);
+            setShowApprovalModal(false);
+            setSelectedDemande(null);
+          }}
+          onSuccess={() => {
+            setShowApprovalModal(false);
+            setSelectedDemande(null);
+            demandes.fetchDemandes();
+          }}
+        />
+      )}
+
+      {showDisbursementModal && selectedDemande && (
+        <CreditDisbursementModal
+          demande={selectedDemande}
+          onClose={() => {
+            setShowDisbursementModal(false);
+            setSelectedDemande(null);
+          }}
+          onSuccess={() => {
+            setShowDisbursementModal(false);
+            setSelectedDemande(null);
+            demandes.fetchDemandes();
+            credits.fetchCredits();
+          }}
+        />
+      )}
+
+      {selectedEnquete && showDetailModal && (
+        <EnqueteDetailModal
+          enquete={enquetes.enquetes.find(e => e.id === selectedEnquete) as any}
+          onClose={() => {
+            setShowDetailModal(false);
             setSelectedEnquete(null);
           }}
-          onValidate={async (decision, montant, commentaire, raison) => {
-            if (selectedEnquete) {
-              await enquetes.validateEnquete(selectedEnquete, decision, montant, commentaire, raison);
-              setShowValidationModal(false);
-              setSelectedEnquete(null);
-            }
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={!!demandeToDelete}
+        onClose={() => setDemandeToDelete(null)}
+        onConfirm={() => {
+          if (demandeToDelete) {
+            demandes.deleteDemande(demandeToDelete);
+            setDemandeToDelete(null);
+          }
+        }}
+        title="Confirmer la suppression"
+        message="Voulez-vous supprimer cette demande ? Elle sera archivée dans l'historique du client concerné."
+        variant="danger"
+        confirmText="Supprimer"
+        cancelText="Annuler"
+      />
+
+       {selectedDemande && showFeesModal && (
+        <CreditFeesPaymentModal
+          demande={selectedDemande}
+          onClose={() => setShowFeesModal(false)}
+          onSuccess={() => {
+            demandes.fetchDemandes();
+            setShowFeesModal(false);
           }}
+          onNavigate={onModuleChange}
         />
       )}
     </div>

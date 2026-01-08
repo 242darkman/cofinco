@@ -6,7 +6,7 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import { ReceiptTemplate } from '../ui/printable/ReceiptTemplate';
-import { useReceiptPrinter } from '../../hooks/useReceiptPrinter';
+import { usePrinter } from '../../hooks/useReceiptPrinter';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <img src={airtelLogo} alt="Airtel Money" className={className} />
@@ -44,7 +44,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const { hasPermission } = usePermissions();
   const canCreatePayments = hasPermission('agent_terrain', 'create') || hasPermission('paiements', 'create');
 
-  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
+  const { componentRef, printData, print, isPrinting } = usePrinter();
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -396,7 +396,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     const agent = agents.find(a => a.id === lastPaymentInfo.agent_id);
     const agentName = agent ? `${agent.nom} ${agent.prenom}` : 'Agent Terrain';
 
-    printReceipt({
+    print({
       title: 'REÇU DE PAIEMENT TERRAIN',
       reference: lastPaymentInfo.reference || 'N/A',
       date: new Date(),
@@ -432,9 +432,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   return (
     <>
       {/* Hidden Receipt Template for Printing */}
-      {receiptData && (
+      {printData && (
         <div style={{ display: "none" }}>
-          <ReceiptTemplate ref={componentRef} data={receiptData} />
+          <ReceiptTemplate ref={componentRef} data={printData} />
         </div>
       )}
 

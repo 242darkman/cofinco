@@ -92,10 +92,105 @@ export const creditsApi = {
   update: (id: string | number, data: any) => api.patch<any>(`/credits/${id}`, data),
 };
 
+// Legacy API - use comptesApi instead
 export const epargnesApi = {
   getAll: () => api.get<any[]>('/comptes-epargne'),
   getByClient: (clientId: string | number) => api.get<any[]>(`/clients/${clientId}/comptes-epargne`),
   create: (data: any) => api.post<any>('/comptes-epargne', data),
+};
+
+// ============================================================================
+// Comptes Microfinance API (New unified accounts API)
+// ============================================================================
+
+export interface Compte {
+  id: string;
+  clientId: string;
+  agenceId: string;
+  typeCompte: 'Épargne' | 'Courant' | 'Bloqué';
+  numeroCompte: string;
+  soldeCourant: string;
+  tauxInteret?: number;
+  statut: 'Actif' | 'Suspendu' | 'Clôturé';
+  blocageActif?: boolean;
+  blocageMotif?: string;
+  blocageReference?: string;
+  blocageFin?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateCompteData {
+  clientId: string;
+  agenceId: string;
+  typeCompte: 'Épargne' | 'Courant' | 'Bloqué';
+  soldeInitial?: number;
+  tauxInteret?: number;
+  blocageActif?: boolean;
+  blocageMotif?: string;
+  blocageReference?: string;
+}
+
+export interface DepotRetraitData {
+  montant: number;
+  methodePaiement?: string;
+  sessionCaisseId?: string;
+  observations?: string;
+  idempotencyKey?: string;
+}
+
+export interface BlocageData {
+  motif: 'Garantie crédit' | 'Garantie tontine' | 'Épargne forcée' | 'Décision interne' | 'Litige' | 'Autre';
+  reference?: string;
+  dateFin?: string;
+}
+
+export interface TransfertAgenceData {
+  nouvelleAgenceId: string;
+  motif?: string;
+}
+
+export const comptesApi = {
+  /** Get all comptes (filtered by user's agency) */
+  getAll: () => api.get<Compte[]>('/comptes'),
+
+  /** Get a specific compte by ID */
+  getById: (id: string) => api.get<Compte>(`/comptes/${id}`),
+
+  /** Create a new compte */
+  create: (data: CreateCompteData) => api.post<Compte>('/comptes', data),
+
+  /** Deposit money into a compte */
+  depot: (compteId: string, data: DepotRetraitData) =>
+    api.post<any>(`/comptes/${compteId}/depot`, data),
+
+  /** Withdraw money from a compte */
+  retrait: (compteId: string, data: DepotRetraitData) =>
+    api.post<any>(`/comptes/${compteId}/retrait`, data),
+
+  /** Block a compte */
+  bloquer: (compteId: string, data: BlocageData) =>
+    api.post<Compte>(`/comptes/${compteId}/bloquer`, data),
+
+  /** Unblock a compte */
+  debloquer: (compteId: string, motif?: string) =>
+    api.post<Compte>(`/comptes/${compteId}/debloquer`, { motif }),
+
+  /** Transfer compte to another agency */
+  transfertAgence: (compteId: string, data: TransfertAgenceData) =>
+    api.post<Compte>(`/comptes/${compteId}/transfert-agence`, data),
+
+  /** Get agency transfer history for a compte */
+  getHistoriqueAgences: (compteId: string) =>
+    api.get<any[]>(`/comptes/${compteId}/historique-agences`),
+
+  /** Get transactions for a compte */
+  getTransactions: (compteId: string, limit?: number) =>
+    api.get<any[]>(`/comptes/${compteId}/transactions${limit ? `?limit=${limit}` : ''}`),
+
+  /** Check if client can create a compte of specific type */
+  canCreateCompte: (clientId: string, typeCompte: string) =>
+    api.get<{ allowed: boolean; reason: string | null }>(`/clients/${clientId}/can-create-compte/${typeCompte}`),
 };
 
 export const tontinesApi = {
@@ -118,6 +213,77 @@ export const dashboardApi = {
 
 export const notificationsApi = {
   getUnread: () => api.get<{ count: number }>('/notifications/unread'),
+};
+
+// ============================================================================
+// Unified Financial Ledger APIs
+// ============================================================================
+
+export interface MouvementFinancier {
+  id: string;
+  reference: string;
+  sourceModule: string;
+  sens: 'Débit' | 'Crédit';
+  montant: string;
+  dateOperation: string;
+  clientId?: string;
+  compteId?: string;
+  creditId?: string;
+  tontineId?: string;
+  sessionCaisseId?: string;
+  agentId?: string;
+  typePaiement?: string;
+  methodePaiement?: string;
+  createdAt: string;
+}
+
+export interface MouvementsFilter {
+  sourceModule?: string;
+  clientId?: string;
+  compteId?: string;
+  creditId?: string;
+  sessionCaisseId?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export const mouvementsApi = {
+  /** Get global ledger feed with filters */
+  getAll: (filter?: MouvementsFilter) => {
+    const params = new URLSearchParams();
+    if (filter) {
+      Object.entries(filter).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const queryString = params.toString();
+    return api.get<MouvementFinancier[]>(`/mouvements${queryString ? `?${queryString}` : ''}`);
+  },
+  
+  /** Get movements for a specific savings account */
+  getByCompte: (compteId: string) => 
+    api.get<MouvementFinancier[]>(`/comptes/${compteId}/mouvements`),
+  
+  /** Get movements for a specific credit */
+  getByCredit: (creditId: string) => 
+    api.get<MouvementFinancier[]>(`/credits/${creditId}/mouvements`),
+  
+  /** Get movements for a cash session */
+  getBySession: (sessionId: string) => 
+    api.get<MouvementFinancier[]>(`/sessions-caisse/${sessionId}/mouvements`),
+};
+
+export interface ClientPortfolio {
+  comptes: any[];
+  credits: any[];
+  tontines: any[];
+}
+
+export const portfolioApi = {
+  /** Get a client's complete portfolio (accounts, credits, tontines) */
+  getByClient: (clientId: string) => 
+    api.get<ClientPortfolio>(`/clients/${clientId}/portfolio`),
 };
 
 export default api;

@@ -1,23 +1,23 @@
 import { db } from "./db";
-import { clients, credits, comptesEpargne, transactionsEpargne } from "@shared/schema";
+import { clients, credits, comptes } from "@shared/schema";
 import { eq, and, gte, desc, sql } from "drizzle-orm";
 
 export async function calculateClientScore(clientId: string): Promise<{ score: number; segment: string }> {
   let score = 0;
-  
+
   // 1. Fetch Data
   const client = await db.query.clients.findFirst({
       where: eq(clients.id, clientId)
   });
-  
+
   if (!client) throw new Error("Client not found");
 
   const clientCredits = await db.query.credits.findMany({
       where: eq(credits.clientId, clientId)
   });
 
-  const clientSavings = await db.query.comptesEpargne.findMany({
-      where: eq(comptesEpargne.clientId, clientId)
+  const clientSavings = await db.query.comptes.findMany({
+      where: eq(comptes.clientId, clientId)
   });
 
   // 2. Repayment History (Max 40 pts)

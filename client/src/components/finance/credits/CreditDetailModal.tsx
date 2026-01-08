@@ -1,14 +1,21 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, User, DollarSign, Calendar, FileText, Shield, History, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, User, FileText, TrendingUp, Download, PieChart, Clock } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 import { creditApi, clientApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { Button, StatCard, TabGroup } from '../../ui';
+import { formatMoney, parseMoney } from '../../../lib/format';
 import { escapeHtml } from '../../../lib/sanitize';
+import { generateLoanSchedule } from '../../../lib/credit-logic';
+import { CreditSchedulePDF } from '../../ui/printable/CreditScheduleTemplate';
+import { fr } from 'date-fns/locale';
+import { format } from 'date-fns';
 import { SkeletonCard } from '../../ui/Skeleton';
 
 interface Credit {
   id: string;
   clientId: string;
+  numeroCredit: string;
   montant: string | number;
   taux: string | number;
   soldeRestant: string | number;
@@ -20,6 +27,8 @@ interface Credit {
   statut: string;
   observations?: string;
   garanties?: string;
+  nombre_echeances_total?: number;
+  nombre_echeances_payees?: number;
 }
 
 interface Client {
@@ -30,6 +39,7 @@ interface Client {
   telephone?: string;
   score?: number;
   segment?: string;
+  numeroCompte?: string;
 }
 
 interface CreditDetailModalProps {
@@ -41,10 +51,16 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
   const [credit, setCredit] = useState<Credit | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'schedule'>('overview');
+  const printRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Charger les détails du crédit via api-client
-  const loadCreditDetails = useCallback(async () => {
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Echeancier-${credit?.numeroCredit || 'Credit'}`,
+  });
+
+  const loadCreditDetails = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -52,13 +68,11 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
       const creditData = await creditApi.getById(creditId);
       setCredit(creditData);
 
-      // Charger les informations du client si disponible
       if (creditData.clientId) {
         try {
           const clientData = await clientApi.getById(creditData.clientId);
           setClient(clientData);
         } catch (clientError) {
-          // Ne pas bloquer si le client n'est pas trouvé
           console.warn('Client non trouvé:', clientError);
         }
       }
@@ -69,364 +83,322 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
     } finally {
       setLoading(false);
     }
-  }, [creditId]);
+  };
 
   useEffect(() => {
     loadCreditDetails();
-  }, [loadCreditDetails]);
+  }, [creditId]);
 
-  // Fermer avec Escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
-  // Calculs financiers mémorisés
   const financialData = useMemo(() => {
     if (!credit) return null;
 
-    const montant = parseFloat(String(credit.montant)) || 0;
-    const taux = parseFloat(String(credit.taux)) || 0;
-    const soldeRestant = parseFloat(String(credit.soldeRestant)) || montant;
+    const montant = parseMoney(credit.montant);
+    const taux = parseMoney(credit.taux);
+    const soldeRestantRaw = credit.soldeRestant !== undefined && credit.soldeRestant !== null 
+      ? parseMoney(credit.soldeRestant) 
+      : montant;
+    
+    const soldeRestant = soldeRestantRaw;
     const totalAvecInterets = montant * (1 + taux / 100);
     const totalPaye = Math.max(0, totalAvecInterets - soldeRestant);
     const progression = totalAvecInterets > 0 ? ((totalPaye / totalAvecInterets) * 100) : 0;
 
-    return {
-      montant,
-      taux,
-      soldeRestant,
-      totalAvecInterets,
-      totalPaye,
-      progression: Math.min(progression, 100)
+    const schedule = generateLoanSchedule({
+      principal: montant,
+      annualRate: taux,
+      frequency: (credit.echeance || 'Mensuel') as any,
+      startDate: credit.dateDebut ? new Date(credit.dateDebut) : new Date(),
+      totalInstallments: credit.duree || 0,
+      totalPaid: totalPaye
+    });
+
+    const installmentAmount = schedule.length > 0 ? schedule[0].amount : 0;
+
+    return { 
+      montant, 
+      taux, 
+      soldeRestant, 
+      totalAvecInterets, 
+      totalPaye, 
+      progression: Math.min(progression, 100),
+      schedule,
+      installmentAmount
     };
   }, [credit]);
 
-  // Nom complet du client mémorisé
-  const clientFullName = useMemo(() => {
-    if (!client) return 'Client';
-    return escapeHtml(`${client.nom} ${client.prenom || ''}`.trim());
-  }, [client]);
-
-  // État de chargement avec skeleton
   if (loading) {
     return (
-      <div
-        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Chargement du dossier crédit"
-      >
-        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-5xl p-6 space-y-6">
-          {/* Header skeleton */}
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl p-6 space-y-6">
           <div className="flex justify-between items-center">
-            <div>
-              <SkeletonCard className="h-8 w-48 mb-2" />
-              <SkeletonCard className="h-4 w-32" />
-            </div>
+            <SkeletonCard className="h-8 w-48" />
             <SkeletonCard className="h-8 w-8 rounded-full" />
           </div>
-
-          {/* Cards skeleton */}
-          <div className="grid md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <SkeletonCard key={i} className="h-24 rounded-lg" />
-            ))}
+          <div className="grid grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} className="h-24" />)}
           </div>
-
-          {/* Content skeleton */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <SkeletonCard className="h-48 rounded-lg" />
-            <SkeletonCard className="h-48 rounded-lg" />
-          </div>
-
-          {/* Progress skeleton */}
-          <SkeletonCard className="h-32 rounded-lg" />
+          <SkeletonCard className="h-64 h-full" />
         </div>
       </div>
     );
   }
 
-  // État d'erreur
   if (error || !credit) {
     return (
-      <div
-        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-        role="alertdialog"
-        aria-modal="true"
-        aria-label="Erreur de chargement"
-      >
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center max-w-md">
-          <p className="text-red-400 mb-4" role="alert">{error || 'Crédit non trouvé'}</p>
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-            aria-label="Fermer la boîte de dialogue"
-          >
-            Fermer
-          </button>
+          <p className="text-red-400 mb-4">{error || 'Crédit non trouvé'}</p>
+          <Button onClick={onClose} variant="primary">Fermer</Button>
         </div>
       </div>
     );
   }
 
-  const { montant, taux, soldeRestant, totalAvecInterets, totalPaye, progression } = financialData!;
+  const stats = financialData!;
+  const { montant, taux, soldeRestant, totalAvecInterets, totalPaye, progression } = stats;
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="credit-detail-title"
-    >
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
-        <header className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex justify-between items-center">
+        <div className="p-6 border-b border-slate-700 flex justify-between items-center shrink-0">
           <div>
-            <h2 id="credit-detail-title" className="text-2xl font-bold text-white">
-              Dossier Crédit
-            </h2>
-            <p className="text-slate-400 text-sm mt-1">{clientFullName}</p>
+            <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Dossier Crédit</h2>
+            <p className="text-slate-400 font-medium">#{credit.numeroCredit} - {client ? `${client.nom} ${client.prenom || ''}` : 'Sans client'}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-slate-700"
-            aria-label="Fermer le dossier crédit"
-            data-testid="button-close-credit-modal"
-          >
-            <X size={24} aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className="p-6 space-y-6">
-          {/* Cartes de résumé financier */}
-          <section aria-label="Résumé financier">
-            <div className="grid md:grid-cols-4 gap-4">
-              <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/50 rounded-lg p-4">
-                <div className="text-blue-400 text-sm mb-1">Montant Initial</div>
-                <div className="text-2xl font-bold text-white break-words">
-                  {formatMoney(montant)}
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/50 rounded-lg p-4">
-                <div className="text-emerald-400 text-sm mb-1">Solde Restant</div>
-                <div className="text-2xl font-bold text-white break-words">
-                  {formatMoney(soldeRestant)}
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/50 rounded-lg p-4">
-                <div className="text-green-400 text-sm mb-1">Total Payé</div>
-                <div className="text-2xl font-bold text-white break-words">
-                  {formatMoney(totalPaye)}
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/50 rounded-lg p-4">
-                <div className="text-cyan-400 text-sm mb-1">Taux d'intérêt</div>
-                <div className="text-2xl font-bold text-white break-words">{taux}%</div>
-              </div>
-            </div>
-          </section>
-
-          {/* Informations détaillées */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Section Client */}
-            {client && (
-              <section
-                className="bg-slate-700/50 rounded-lg p-6"
-                aria-labelledby="client-section-title"
-              >
-                <div className="flex items-center gap-2 mb-4">
-                  <User className="text-cyan-400" size={20} aria-hidden="true" />
-                  <h3 id="client-section-title" className="text-lg font-bold text-white">
-                    Client
-                  </h3>
-                </div>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Nom:</dt>
-                    <dd className="text-white font-semibold">{clientFullName}</dd>
-                  </div>
-                  {client.email && (
-                    <div className="flex justify-between">
-                      <dt className="text-slate-400">Email:</dt>
-                      <dd className="text-white">{escapeHtml(client.email)}</dd>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Téléphone:</dt>
-                    <dd className="text-white">{escapeHtml(client.telephone || '-')}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Score:</dt>
-                    <dd className="text-green-400 font-bold">{client.score || 50}/100</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Segment:</dt>
-                    <dd className="text-cyan-400">{escapeHtml(client.segment || 'Standard')}</dd>
-                  </div>
-                </dl>
-              </section>
-            )}
-
-            {/* Section Détails du Crédit */}
-            <section
-              className="bg-slate-700/50 rounded-lg p-6"
-              aria-labelledby="credit-details-title"
+          <div className="flex items-center gap-3">
+            <Button 
+               variant="ghost" 
+               size="sm" 
+               icon={Download}
+               onClick={() => handlePrint()}
+               className="text-slate-400 hover:text-white"
             >
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="text-blue-400" size={20} aria-hidden="true" />
-                <h3 id="credit-details-title" className="text-lg font-bold text-white">
-                  Détails du Crédit
-                </h3>
-              </div>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-slate-400">Type:</dt>
-                  <dd className="text-white">{escapeHtml(credit.typeCredit || 'Personnel')}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-400">Objet:</dt>
-                  <dd className="text-white">{escapeHtml(credit.objetCredit || '-')}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-400">Date début:</dt>
-                  <dd className="text-white">
-                    {credit.dateDebut
-                      ? new Date(credit.dateDebut).toLocaleDateString('fr-FR')
-                      : '-'}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-400">Durée:</dt>
-                  <dd className="text-white">{credit.duree || 0} {credit.echeance === 'Journalier' ? 'jours' : credit.echeance === 'Hebdomadaire' ? 'semaines' : 'mois'} ({credit.echeance || 'Mensuel'})</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-400">Échéance:</dt>
-                  <dd className="text-white">{escapeHtml(credit.echeance || 'Mensuel')}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-slate-400">Statut:</dt>
-                  <dd className={`font-bold ${
-                    credit.statut === 'Soldé' ? 'text-green-400' :
-                    credit.statut === 'Approuvé' || credit.statut === 'Actif' ? 'text-cyan-400' :
-                    credit.statut === 'En attente' ? 'text-yellow-400' :
-                    credit.statut === 'En retard' ? 'text-red-400' :
-                    'text-blue-400'
-                  }`}>
-                    {escapeHtml(credit.statut)}
-                  </dd>
-                </div>
-              </dl>
-            </section>
+              Échéancier PDF
+            </Button>
+            <button onClick={onClose} className="text-slate-400 hover:text-white transition p-2 hover:bg-slate-700 rounded-lg">
+              <X size={24} />
+            </button>
           </div>
+        </div>
 
-          {/* Section Progression */}
-          <section
-            className="bg-slate-700/50 rounded-lg p-6"
-            aria-labelledby="progression-title"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="text-emerald-400" size={20} aria-hidden="true" />
-              <h3 id="progression-title" className="text-lg font-bold text-white">
-                Progression du Remboursement
-              </h3>
-            </div>
+        {/* Tabs navigation */}
+        <div className="px-6 border-b border-slate-700 shrink-0 bg-slate-800/50">
+          <TabGroup
+            tabs={[
+              { key: 'overview', label: "Vue d'ensemble" },
+              { key: 'schedule', label: "Échéancier complet" }
+            ]}
+            activeTab={activeTab}
+            onTabChange={(key) => setActiveTab(key as any)}
+            variant="pills"
+            className="py-2"
+          />
+        </div>
 
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-slate-400">Avancement</span>
-                  <span className="text-white font-semibold">{progression.toFixed(1)}%</span>
+        <div className="p-6 overflow-y-auto flex-grow custom-scrollbar">
+          {activeTab === 'overview' ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {/* Financial Summary - Clean Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <StatCard
+                  title="Capital"
+                  value={<span className="tabular-nums">{formatMoney(montant)}</span>}
+                  color="primary"
+                  variant="glass"
+                />
+                <StatCard
+                  title="Reste à payer"
+                  value={<span className="tabular-nums">{formatMoney(soldeRestant)}</span>}
+                  color="warning"
+                  variant="glass"
+                />
+                <StatCard
+                  title="Déjà remboursé"
+                  value={<span className="tabular-nums">{formatMoney(totalPaye)}</span>}
+                  color="success"
+                  variant="glass"
+                />
+                <StatCard
+                  title="Taux d'intérêt"
+                  value={`${taux}%`}
+                  color="neutral"
+                  variant="glass"
+                />
+              </div>
+
+              {/* Two Column details - Clean Design */}
+              <div className="grid md:grid-cols-2 gap-4">
+                {client && (
+                  <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
+                    <div className="flex items-center gap-2 mb-4">
+                      <User size={16} className="text-blue-400" />
+                      <span className="text-slate-300 text-sm font-medium">Client</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 text-sm">Nom</span>
+                        <span className="text-white font-medium text-sm">{client.nom} {client.prenom}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 text-sm">Téléphone</span>
+                        <span className="text-slate-300 text-sm">{client.telephone || '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 text-sm">Score</span>
+                        <span className={`text-sm font-semibold ${client.score && client.score >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {client.score || 0}/100
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText size={16} className="text-blue-400" />
+                    <span className="text-slate-300 text-sm font-medium">Contrat</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 text-sm">Type</span>
+                      <span className="text-white font-medium text-sm">{credit.typeCredit || 'Standard'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 text-sm">Durée</span>
+                      <span className="text-slate-300 text-sm">
+                        {credit.duree} {credit.echeance === 'Journalier' ? 'jours' : credit.echeance === 'Hebdomadaire' ? 'semaines' : 'mois'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 text-sm">Échéance</span>
+                      <div className="text-right">
+                        <span className="text-white font-semibold text-sm">{formatMoney(stats.installmentAmount)}</span>
+                        <span className="text-slate-500 text-xs ml-1">
+                          /{credit.echeance === 'Journalier' ? 'jour' : credit.echeance === 'Hebdomadaire' ? 'sem' : 'mois'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div
-                  className="w-full bg-slate-600 rounded-full h-3"
-                  role="progressbar"
-                  aria-valuenow={progression}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label={`Progression du remboursement: ${progression.toFixed(1)}%`}
-                >
+              </div>
+
+              {/* Progress Section - Minimal Design */}
+              <div className="bg-slate-800/40 rounded-xl p-4 sm:p-5 border border-slate-700/30">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={16} className="text-emerald-400" />
+                    <span className="text-slate-300 text-sm font-medium">Progression</span>
+                  </div>
+                  <span className="text-2xl font-bold text-white tabular-nums">{progression.toFixed(0)}%</span>
+                </div>
+
+                {/* Progress Bar - Sleek Design */}
+                <div className="relative h-2 bg-slate-700/50 rounded-full overflow-hidden mb-5">
                   <div
-                    className="bg-gradient-to-r from-cyan-500 to-blue-600 h-3 rounded-full transition-all duration-500"
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700 ease-out"
                     style={{ width: `${progression}%` }}
                   />
                 </div>
-              </div>
 
-              <div className="grid md:grid-cols-3 gap-4 mt-4">
-                <div className="bg-slate-600/50 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">Montant Total</p>
-                  <p className="text-white font-bold">{formatMoney(totalAvecInterets)}</p>
-                </div>
-                <div className="bg-slate-600/50 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">Déjà Remboursé</p>
-                  <p className="text-green-400 font-bold">{formatMoney(totalPaye)}</p>
-                </div>
-                <div className="bg-slate-600/50 rounded-lg p-3 text-center">
-                  <p className="text-slate-400 text-xs">Reste à Payer</p>
-                  <p className="text-yellow-400 font-bold">{formatMoney(soldeRestant)}</p>
+                {/* Summary Row */}
+                <div className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="text-slate-500">Total dû</span>
+                    <span className="text-white font-semibold ml-2 tabular-nums">{formatMoney(totalAvecInterets)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-slate-500">Restant</span>
+                    <span className="text-amber-400 font-semibold ml-2 tabular-nums">{formatMoney(soldeRestant)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </section>
+          ) : (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+               <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-tight">
+                     <Clock className="text-blue-400" size={22} /> Plan de Remboursement
+                  </h3>
+               </div>
 
-          {/* Section Observations */}
-          {credit.observations && (
-            <section
-              className="bg-slate-700/50 rounded-lg p-6"
-              aria-labelledby="observations-title"
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="text-blue-400" size={20} aria-hidden="true" />
-                <h3 id="observations-title" className="text-lg font-bold text-white">
-                  Observations
-                </h3>
-              </div>
-              <p className="text-slate-300 whitespace-pre-wrap">
-                {escapeHtml(credit.observations)}
-              </p>
-            </section>
-          )}
+               <div className="overflow-x-auto rounded-xl border border-slate-700 bg-slate-900/30">
+                  <table className="w-full text-left min-w-[600px]">
+                     <thead>
+                        <tr className="bg-slate-800 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-700">
+                           <th className="px-4 py-4">N°</th>
+                           <th className="px-6 py-4">Date</th>
+                           <th className="px-6 py-4 text-right">Montant</th>
+                           <th className="px-6 py-4 text-right">Solde Progressif</th>
+                           <th className="px-4 py-4 text-center">État</th>
+                        </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-700/50">
+                        {stats.schedule.map((item) => (
+                           <tr key={item.number} className={`hover:bg-slate-700/20 transition-colors ${item.status === 'Soldé' ? 'opacity-30' : ''}`}>
+                              <td className="px-4 py-4 text-slate-500 font-mono text-xs">{item.number}</td>
+                              <td className="px-6 py-4 font-bold text-white whitespace-nowrap">
+                                 {format(item.dueDate, 'dd MMM yyyy', { locale: fr })}
+                              </td>
+                              <td className="px-6 py-4 text-right font-mono text-white whitespace-nowrap">
+                                 {formatMoney(item.amount)}
+                              </td>
+                              <td className="px-6 py-4 text-right font-mono text-blue-400 whitespace-nowrap">
+                                 {formatMoney(item.remainingBalance)}
+                              </td>
+                              <td className="px-4 py-4 text-center">
+                                 <span className={`
+                                    px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border
+                                    ${item.status === 'Payé' || item.status === 'Soldé' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
+                                      item.status === 'Retard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
+                                      'bg-slate-700/50 text-slate-500 border-slate-600'}
+                                 `}>
+                                    {item.status}
+                                 </span>
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
 
-          {/* Section Garanties */}
-          {credit.garanties && (
-            <section
-              className="bg-slate-700/50 rounded-lg p-6"
-              aria-labelledby="garanties-title"
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <Shield className="text-cyan-400" size={20} aria-hidden="true" />
-                <h3 id="garanties-title" className="text-lg font-bold text-white">
-                  Garanties
-                </h3>
-              </div>
-              <p className="text-slate-300 whitespace-pre-wrap">
-                {escapeHtml(credit.garanties)}
-              </p>
-            </section>
+               <div className="mt-8 p-6 bg-blue-500/5 rounded-xl border border-blue-500/10 flex gap-4">
+                  <PieChart className="text-blue-400 shrink-0" size={24} />
+                  <div className="text-sm text-slate-400 italic">
+                     Les échéances passées sont marquées comme <span className="text-green-400 font-bold">PAYÉ</span> si le capital correspondant a été amorti. Un remboursement total par anticipation solde l'ensemble de l'échéancier.
+                  </div>
+               </div>
+            </div>
           )}
         </div>
 
-        {/* Footer */}
-        <footer className="sticky bottom-0 bg-slate-800 border-t border-slate-700 p-6">
-          <button
-            onClick={onClose}
-            className="w-full px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            data-testid="button-close-credit-detail"
-            aria-label="Fermer le dossier crédit"
-          >
-            Fermer
-          </button>
-        </footer>
+        {/* Action Button Footer */}
+        <div className="p-6 border-t border-slate-700 shrink-0 bg-slate-800/80">
+          <Button onClick={onClose} variant="ghost" className="w-full uppercase font-black tracking-widest py-3">
+            Fermer le Dossier
+          </Button>
+        </div>
       </div>
+
+      {/* Hidden Download-ready Printable Schedule */}
+      {credit && client && (
+        <div style={{ display: 'none' }}>
+           <CreditSchedulePDF 
+              ref={printRef}
+              credit={credit}
+              client={client}
+              schedule={stats.schedule}
+           />
+        </div>
+      )}
     </div>
   );
 }

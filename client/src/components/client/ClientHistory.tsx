@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, DollarSign, FileText, Phone, Mail, MessageSquare, CheckCircle, TrendingUp, Users, Filter, Calendar, ArrowUpRight, ArrowDownLeft, Printer } from 'lucide-react';
 import { Card, Badge, Button } from '../ui';
-import { useReceiptPrinter } from '../../hooks/useReceiptPrinter';
+import { usePrinter } from '../../hooks/useReceiptPrinter';
 import { ReceiptTemplate } from '../ui/printable/ReceiptTemplate';
 
 interface ClientActivity {
@@ -24,7 +24,7 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
   const [filter, setFilter] = useState<string>('all');
   const [clientDetails, setClientDetails] = useState<any>(null);
 
-  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
+  const { componentRef, printData, print, isPrinting } = usePrinter();
 
   useEffect(() => {
     fetchActivities();
@@ -107,7 +107,7 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
       const isPayment = ['payment', 'epargne', 'tontine', 'credit'].includes(activity.activity_type);
       if (!isPayment || !activity.amount || !clientDetails) return;
 
-      printReceipt({
+      print({
           title: `REÇU - ${getActivityLabel(activity.activity_type).toUpperCase()}`,
           reference: (activity.metadata?.reference as string) || `ACT-${activity.id}`,
           date: new Date(activity.created_at),
@@ -156,11 +156,7 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
   return (
     <div className="space-y-4">
       {/* Hidden Receipt Template */}
-      {receiptData && (
-        <div style={{ display: "none" }}>
-          <ReceiptTemplate ref={componentRef} data={receiptData} />
-        </div>
-      )}
+      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
 
       {/* 1. Header & Stats - Compact Mobile First */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">

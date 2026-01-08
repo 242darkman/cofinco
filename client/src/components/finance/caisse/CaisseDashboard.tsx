@@ -4,6 +4,7 @@ import {
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
   PiggyBank, ArrowUpRight, ArrowDownRight, Shield
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { Button, Card, StatCard, TabGroup } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -53,6 +54,7 @@ interface CaisseProps {
   activeView?: string;
   initialShowPaiement?: boolean;
   onPaiementModalClose?: () => void;
+  initialState?: any;
 }
 
 const toNumber = (value: unknown) => {
@@ -68,7 +70,8 @@ export default function CaisseDashboard({
   onModuleChange, 
   activeView,
   initialShowPaiement = false,
-  onPaiementModalClose
+  onPaiementModalClose,
+  initialState
 }: CaisseProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -115,6 +118,13 @@ export default function CaisseDashboard({
     loadTransactionsJour();
     loadCaissesSeparees();
   }, []);
+
+  useEffect(() => {
+    if (initialState?.supervisedSession) {
+      setSupervisedSession(initialState.supervisedSession);
+      toast.success(`Supervision de la caisse ${initialState.supervisedSession.caisse_nom || ''} activée`);
+    }
+  }, [initialState]);
 
   const loadSessionActive = async () => {
     try {

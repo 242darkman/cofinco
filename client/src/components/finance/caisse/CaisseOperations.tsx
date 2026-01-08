@@ -10,7 +10,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
 import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
-import { useReceiptPrinter } from '../../../hooks/useReceiptPrinter';
+import { usePrinter } from '../../../hooks/useReceiptPrinter';
 
 // Types and Interfaces
 interface Client {
@@ -92,7 +92,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   const [montantError, setMontantError] = useState<string | null>(null);
   const [lastOperationReference, setLastOperationReference] = useState<string | null>(null);
 
-  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
+  const { componentRef, printData, print, isPrinting } = usePrinter();
 
   // Initial Load
   useEffect(() => {
@@ -228,7 +228,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   const confirmerOperation = useCallback(async () => {
     setShowConfirmDialog(false);
     setLoading(true);
-    const loadingId = toast.loading('Traitement...');
+    const loadingId = toast.loading(`Traitement du ${direction.toLowerCase()}...`);
 
     try {
       // Determine Type Operation String
@@ -288,20 +288,25 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
       }
     } catch (error) {
       toast.dismiss(loadingId);
-      handleApiError(error, 'Erreur création');
+      handleApiError(error, `Erreur lors du ${direction.toLowerCase()}`);
     } finally {
       setLoading(false);
     }
   }, [sessionId, selectedClient, selectedDestination, direction, montant, smsValidationEnabled]);
 
-  const finaliserOperationSansOTP = async (opId: string, typeOp: string) => {
+   const finaliserOperationSansOTP = async (opId: string, typeOp: string) => {
        try {
            await operationCaisseApi.update(opId, { statut_otp: 'Validé (sans SMS)' });
            await processDependentOperations(typeOp);
-           setSuccessMessage('Opération validée !');
-           toast.success('Succès');
-       } catch (e) { console.error(e); }
-  };
+           
+           const message = `${typeOp} de ${formatMoney(parseFloat(montant))} validé avec succès.`;
+           setSuccessMessage(message);
+           toast.success(message);
+       } catch (e) { 
+           console.error(e);
+           toast.error("Erreur lors de la finalisation de l'opération");
+       }
+   };
 
   const processDependentOperations = async (typeOp: string) => {
     // Credit Payments & Tontine Contributions logic
@@ -319,7 +324,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
      if (!selectedClient || !montant) return;
      let typeOp = selectedDestination?.type === 'Compte' ? (direction === 'Dépôt' ? 'Versement' : 'Retrait') : (selectedDestination?.type === 'Credit' ? 'Remboursement' : 'Cotisation');
      
-     printReceipt({
+     print({
        title: 'Reçu de Transaction',
        reference: lastOperationReference || `OP-${Date.now()}`,
        date: new Date(),
@@ -331,7 +336,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
        modePaiement: 'Espèces',
        devise: 'FCFA'
      });
-  }, [selectedClient, montant, selectedDestination, direction, lastOperationReference, printReceipt]);
+  }, [selectedClient, montant, selectedDestination, direction, lastOperationReference, print]);
 
 
   // Derived Data for UI
@@ -407,7 +412,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
 
   return (
     <div className="flex flex-col min-h-[85vh] font-sans selection:bg-cyan-500/30">
-      {receiptData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={receiptData} /></div>}
+      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
       <SuccessModal />
       <ConfirmDialog isOpen={showConfirmDialog} title="Confirmer" message={`Valider le ${direction.toLowerCase()} de ${formatMoney(parseFloat(montant || '0'))} ?`} onConfirm={confirmerOperation} onClose={() => setShowConfirmDialog(false)} />
       <OTPValidationSimple isOpen={showOTP} onClose={() => setShowOTP(false)} onValidate={async (val) => { if(val) { setShowOTP(false); await finaliserOperationSansOTP(otpData?.operationId, 'OTP Validated'); }}} phoneNumber={otpData?.telephone || ''} generatedCode={otpData?.codeOTP || ''} operationType={otpData?.operationType || ''} amount={otpData?.amount || 0} />

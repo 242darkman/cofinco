@@ -3,7 +3,22 @@
  * Centralized formatting functions for consistency
  */
 
-// Currency formatting
+// Safe currency parsing
+export function parseMoney(amount: number | string | null | undefined): number {
+  if (amount === null || amount === undefined) return 0;
+  if (typeof amount === 'number') return amount;
+  
+  // Clean string: remove spaces, replace comma with dot, remove currency symbol
+  const cleanStr = String(amount)
+    .replace(/FCFA/g, '')
+    .replace(/\s/g, '')
+    .replace(/,/g, '.');
+    
+  const num = parseFloat(cleanStr);
+  return isNaN(num) ? 0 : num;
+}
+
+// Currency formatting with improved readability
 export function formatMoney(amount: number | string | null | undefined, options?: {
   showCurrency?: boolean;
   compact?: boolean;
@@ -11,9 +26,7 @@ export function formatMoney(amount: number | string | null | undefined, options?
 }): string {
   const { showCurrency = true, compact = false, decimals = 0 } = options || {};
 
-  const num = typeof amount === 'string' ? parseFloat(amount) : (amount || 0);
-
-  if (isNaN(num)) return showCurrency ? '0 FCFA' : '0';
+  const num = parseMoney(amount);
 
   if (compact) {
     if (Math.abs(num) >= 1_000_000_000) {
@@ -27,12 +40,42 @@ export function formatMoney(amount: number | string | null | undefined, options?
     }
   }
 
-  const formatted = num.toLocaleString('fr-FR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+  // Format with explicit space grouping for maximum readability
+  // Replace narrow no-break space (U+202F) and non-breaking space (U+00A0) with regular space
+  const formatted = num
+    .toLocaleString('fr-FR', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })
+    .replace(/[\u00A0\u202F]/g, ' '); // Replace special spaces with regular space
 
   return showCurrency ? `${formatted} FCFA` : formatted;
+}
+
+/**
+ * Format money for display in cards/stats with smart abbreviation
+ * - Under 10K: full number (1 234 FCFA)
+ * - 10K-999K: with K suffix (150K FCFA)
+ * - 1M+: with M suffix (1.5M FCFA)
+ */
+export function formatMoneyShort(amount: number | string | null | undefined): string {
+  const num = parseMoney(amount);
+
+  if (Math.abs(num) >= 1_000_000_000) {
+    const value = num / 1_000_000_000;
+    return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}Md FCFA`;
+  }
+  if (Math.abs(num) >= 1_000_000) {
+    const value = num / 1_000_000;
+    return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}M FCFA`;
+  }
+  if (Math.abs(num) >= 100_000) {
+    const value = num / 1_000;
+    return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(0)}K FCFA`;
+  }
+
+  // For smaller amounts, show full number with spacing
+  return formatMoney(num);
 }
 
 // Date formatting

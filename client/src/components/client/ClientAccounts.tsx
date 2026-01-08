@@ -1,31 +1,67 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CreditCard, Wallet, X, Edit2, Trash2, Check, AlertCircle, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Plus, CreditCard, Wallet, Lock, X, Edit2, Trash2, Check, AlertCircle, TrendingUp, AlertTriangle, Unlock } from 'lucide-react';
 import { Card, Badge, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { useCompteSubscription } from '../../hooks/useRealTimeSubscription';
 
 interface CompteBancaire {
   id: string;
   clientId: string;
-  typeCompte: 'Courant' | 'Épargne';
+  client_id?: string;
+  typeCompte: 'Courant' | 'Épargne' | 'Bloqué';
+  type_compte?: string;
   numeroCompte: string;
-  solde: number;
-  tauxInteret: number;
-  dateOuverture: string;
-  statut: 'Actif' | 'Fermé' | 'Suspendu';
+  numero_compte?: string;
+  soldeCourant: string;
+  solde_courant?: string;
+  tauxInteret?: number;
+  taux_interet?: number;
+  dateOuverture?: string;
+  date_ouverture?: string;
+  statut: 'Actif' | 'Fermé' | 'Suspendu' | 'Clôturé';
+  blocageActif?: boolean;
+  blocage_actif?: boolean;
+  blocageMotif?: string;
+  blocage_motif?: string;
+  blocageFin?: string;
+  blocage_fin?: string;
   createdAt: string;
-  updatedAt: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 interface ClientAccountsProps {
   clientId: string;
+  agenceId?: string;
 }
 
-export default function ClientAccounts({ clientId }: ClientAccountsProps) {
+// Helper to normalize snake_case to camelCase response
+function normalizeCompte(c: any): CompteBancaire {
+  return {
+    id: c.id,
+    clientId: c.clientId || c.client_id,
+    typeCompte: c.typeCompte || c.type_compte,
+    numeroCompte: c.numeroCompte || c.numero_compte || '',
+    soldeCourant: c.soldeCourant || c.solde_courant || '0',
+    tauxInteret: c.tauxInteret || c.taux_interet || 0,
+    dateOuverture: c.dateOuverture || c.date_ouverture,
+    statut: c.statut || 'Actif',
+    blocageActif: c.blocageActif || c.blocage_actif || false,
+    blocageMotif: c.blocageMotif || c.blocage_motif,
+    blocageFin: c.blocageFin || c.blocage_fin,
+    createdAt: c.createdAt || c.created_at,
+    updatedAt: c.updatedAt || c.updated_at,
+  };
+}
+
+export default function ClientAccounts({ clientId, agenceId }: ClientAccountsProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreateAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'create');
   const canEditAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'edit');
   const canDeleteAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'delete');
+  const canBlockAccounts = hasPermission('comptes', 'edit') || hasPermission('admin', 'all');
 
   const [comptes, setComptes] = useState<CompteBancaire[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,13 +69,21 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [editingCompte, setEditingCompte] = useState<CompteBancaire | null>(null);
   const [formData, setFormData] = useState({
-    typeCompte: 'Courant' as 'Courant' | 'Épargne',
-    solde: 0,
+    typeCompte: 'Courant' as 'Courant' | 'Épargne' | 'Bloqué',
+    soldeInitial: 0,
     tauxInteret: 0,
-    statut: 'Actif' as 'Actif' | 'Fermé' | 'Suspendu'
+    statut: 'Actif' as 'Actif' | 'Fermé' | 'Suspendu',
+    methodePaiement: 'Espèces' as 'Espèces' | 'Mobile Money' | 'Virement' | 'Carte'
   });
-  
+
   const isSubmittingRef = useRef(false);
+
+  // Real-time subscription for updates
+  useCompteSubscription(comptes[0]?.id, {
+    onBalanceChange: () => fetchComptes(),
+    onBlocked: () => fetchComptes(),
+    onUnblocked: () => fetchComptes(),
+  });
 
   useEffect(() => {
     fetchComptes();
@@ -48,10 +92,13 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
   const fetchComptes = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}/accounts`, { credentials: 'include' });
+      // Use the portfolio endpoint to get client's accounts
+      const res = await fetch(`/api/clients/${clientId}/portfolio`, { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur chargement comptes');
       const data = await res.json();
-      setComptes(data.sort((a: CompteBancaire, b: CompteBancaire) => 
+      // Portfolio returns { comptes: [...], credits: [...], ... }
+      const comptesData = (data.comptes || []).map(normalizeCompte);
+      setComptes(comptesData.sort((a: CompteBancaire, b: CompteBancaire) =>
         new Date(b.dateOuverture || b.createdAt).getTime() - new Date(a.dateOuverture || a.createdAt).getTime()
       ));
     } catch (error) {
@@ -71,14 +118,26 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
     }
 
     try {
+      // First get current user's agenceId from session if not provided
+      let targetAgenceId = agenceId;
+      if (!targetAgenceId) {
+        const userRes = await fetch('/api/auth/me', { credentials: 'include' });
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          targetAgenceId = userData.agenceId || userData.agence_id;
+        }
+      }
+
       const payload = {
+        clientId,
+        agenceId: targetAgenceId,
         typeCompte: formData.typeCompte,
-        soldeInitial: formData.solde,
+        soldeInitial: formData.soldeInitial,
         tauxInteret: formData.tauxInteret,
-        statut: formData.statut
       };
 
-      const res = await fetch(`/api/clients/${clientId}/accounts`, {
+      // Use the new /api/comptes endpoint
+      const res = await fetch('/api/comptes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -91,7 +150,7 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
       }
 
       const newAccount = await res.json();
-      setComptes(prev => [newAccount, ...prev]);
+      setComptes(prev => [normalizeCompte(newAccount), ...prev]);
       resetForm();
     } catch (error) {
       console.error('Erreur souscription compte:', error);
@@ -106,28 +165,15 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
       isSubmittingRef.current = true;
 
       try {
-          const res = await fetch(`/api/clients/${clientId}/accounts/${editingCompte.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                  typeCompte: formData.typeCompte,
-                  tauxInteret: formData.tauxInteret,
-                  statut: formData.statut,
-                  solde: formData.solde
-              })
-          });
-
-          if (!res.ok) throw new Error('Erreur modification');
-          
-          const updated = await res.json();
-          setComptes(prev => prev.map(c => c.id === updated.id ? updated : c));
+          // Note: PATCH endpoint for comptes not yet implemented
+          // For now, show a message that editing requires admin action
+          alert("La modification des comptes nécessite une action administrative. Contactez votre superviseur.");
           resetForm();
           setShowConfirm(false);
       } catch (error) {
           console.error("Update error:", error);
           alert("Erreur lors de la modification");
-          setShowForm(true); // Re-open form on error
+          setShowForm(true);
           setShowConfirm(false);
       } finally {
           setLoading(false);
@@ -143,10 +189,11 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
   const handleEdit = (compte: CompteBancaire) => {
     setEditingCompte(compte);
     setFormData({
-      typeCompte: compte.typeCompte,
-      solde: compte.solde,
-      tauxInteret: compte.tauxInteret,
-      statut: compte.statut
+      typeCompte: compte.typeCompte as 'Courant' | 'Épargne' | 'Bloqué',
+      soldeInitial: Number(compte.soldeCourant) || 0,
+      tauxInteret: compte.tauxInteret || 0,
+      statut: compte.statut as 'Actif' | 'Fermé' | 'Suspendu',
+      methodePaiement: 'Espèces'
     });
     setShowForm(true);
   };
@@ -156,14 +203,20 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
     setEditingCompte(null);
     setFormData({
       typeCompte: 'Courant',
-      solde: 0,
+      soldeInitial: 0,
       tauxInteret: 0,
-      statut: 'Actif'
+      statut: 'Actif',
+      methodePaiement: 'Espèces'
     });
   };
 
   const getCompteIcon = (type: string) => {
+    if (type === 'Bloqué') return Lock;
     return type === 'Courant' ? CreditCard : Wallet;
+  };
+
+  const getSolde = (compte: CompteBancaire): number => {
+    return Number(compte.soldeCourant) || 0;
   };
 
   return (
@@ -239,16 +292,20 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
           {comptes.map((compte) => {
             const Icon = getCompteIcon(compte.typeCompte);
             const isEpargne = compte.typeCompte === 'Épargne';
+            const isBloque = compte.typeCompte === 'Bloqué' || compte.blocageActif;
+            const solde = getSolde(compte);
 
             return (
-              <Card 
+              <Card
                 key={compte.id}
                 variant="default"
-                padding="sm" // Compact padding
-                className="hover:border-cyan-500/30 transition-colors group relative overflow-hidden"
+                padding="sm"
+                className={`hover:border-cyan-500/30 transition-colors group relative overflow-hidden ${isBloque ? 'border-amber-500/30' : ''}`}
               >
                  {/* Decorative background gradient */}
-                 {isEpargne ? (
+                 {isBloque ? (
+                     <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
+                 ) : isEpargne ? (
                      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
                  ) : (
                      <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
@@ -256,28 +313,51 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
 
                 <div className="flex items-start justify-between mb-3 relative z-10">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${isEpargne ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
+                    <div className={`p-2 rounded-lg ${isBloque ? 'bg-amber-500/10 text-amber-400' : isEpargne ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
                       <Icon size={20} />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-white text-sm">{compte.typeCompte}</h4>
+                      <h4 className="font-semibold text-white text-sm flex items-center gap-1.5">
+                        {compte.typeCompte}
+                        {isBloque && <Lock size={12} className="text-amber-400" />}
+                      </h4>
                       <p className="text-[10px] text-slate-500 font-mono tracking-wider">{compte.numeroCompte}</p>
                     </div>
                   </div>
-                  <Badge value={compte.statut} size="sm" />
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge value={compte.statut} size="sm" />
+                    {isBloque && (
+                      <span className="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                        {compte.blocageMotif || 'Bloqué'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="relative z-10 mb-3">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-tight mb-0.5">Solde Disponible</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-tight mb-0.5">
+                      {isBloque ? 'Solde (Bloqué)' : 'Solde Disponible'}
+                    </p>
                     <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-bold text-white tracking-tight">{compte.solde.toLocaleString()}</span>
+                        <span className={`text-xl font-bold tracking-tight ${isBloque ? 'text-amber-300' : 'text-white'}`}>
+                          {solde.toLocaleString()}
+                        </span>
                         <span className="text-xs font-medium text-slate-500">FCFA</span>
                     </div>
-                    
-                    {isEpargne && compte.tauxInteret > 0 && (
+
+                    {isEpargne && (compte.tauxInteret || 0) > 0 && (
                         <div className="flex items-center gap-1 mt-1">
                             <TrendingUp size={10} className="text-emerald-500" />
                             <span className="text-[10px] text-emerald-500 font-medium">+{compte.tauxInteret}% d'intérêts</span>
+                        </div>
+                    )}
+
+                    {isBloque && compte.blocageFin && (
+                        <div className="flex items-center gap-1 mt-1">
+                            <Unlock size={10} className="text-amber-500" />
+                            <span className="text-[10px] text-amber-500 font-medium">
+                              Déblocage: {new Date(compte.blocageFin).toLocaleDateString('fr-FR')}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -330,7 +410,7 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase">Type de compte</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setFormData(prev => ({ ...prev, typeCompte: 'Courant' }))}
@@ -356,6 +436,19 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
                     <Wallet size={20} className={formData.typeCompte === 'Épargne' ? 'text-emerald-400' : 'text-slate-500'} />
                     <span className={`text-xs font-medium ${formData.typeCompte === 'Épargne' ? 'text-emerald-400' : 'text-slate-400'}`}>Épargne</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, typeCompte: 'Bloqué' }))}
+                    className={`p-3 rounded-lg border transition flex flex-col items-center gap-2 ${
+                      formData.typeCompte === 'Bloqué'
+                        ? 'border-amber-500 bg-amber-500/10'
+                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                    }`}
+                  >
+                    <Lock size={20} className={formData.typeCompte === 'Bloqué' ? 'text-amber-400' : 'text-slate-500'} />
+                    <span className={`text-xs font-medium ${formData.typeCompte === 'Bloqué' ? 'text-amber-400' : 'text-slate-400'}`}>Bloqué</span>
+                  </button>
                 </div>
               </div>
 
@@ -365,13 +458,29 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
                     <input
                     type="number"
                     min="0"
-                    value={formData.solde}
-                    onChange={(e) => setFormData(prev => ({ ...prev, solde: Number(e.target.value) }))}
+                    value={formData.soldeInitial}
+                    onChange={(e) => setFormData(prev => ({ ...prev, soldeInitial: Number(e.target.value) }))}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-12 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition"
                     />
                     <span className="absolute right-3 top-2.5 text-xs text-slate-500 font-medium">FCFA</span>
                 </div>
               </div>
+
+              {formData.soldeInitial > 0 && !editingCompte && (
+                  <div className="animate-in slide-in-from-top-2 duration-200">
+                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Méthode de paiement</label>
+                      <select
+                          value={formData.methodePaiement}
+                          onChange={(e) => setFormData(prev => ({ ...prev, methodePaiement: e.target.value as any }))}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition appearance-none"
+                      >
+                          <option value="Espèces">Espèces</option>
+                          <option value="Mobile Money">Mobile Money</option>
+                          <option value="Virement">Virement</option>
+                          <option value="Carte">Carte</option>
+                      </select>
+                  </div>
+              )}
 
               {formData.typeCompte === 'Épargne' && (
                 <div className="animate-in slide-in-from-top-2 duration-200">
@@ -388,18 +497,14 @@ export default function ClientAccounts({ clientId }: ClientAccountsProps) {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Statut</label>
-                <select
-                  value={formData.statut}
-                  onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition appearance-none"
-                >
-                  <option value="Actif">Actif</option>
-                  <option value="Suspendu">Suspendu</option>
-                  <option value="Fermé">Fermé</option>
-                </select>
-              </div>
+              {formData.typeCompte === 'Bloqué' && (
+                <div className="animate-in slide-in-from-top-2 duration-200 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="text-xs text-amber-400">
+                    <AlertTriangle size={12} className="inline mr-1" />
+                    Les comptes bloqués permettent les dépôts mais interdisent les retraits jusqu'au déblocage explicite.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4 border-t border-slate-700 mt-2">
                 <button

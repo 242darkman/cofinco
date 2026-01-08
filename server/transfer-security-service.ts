@@ -381,7 +381,7 @@ export async function analyzeTransferRisk(
   try {
     const previousTransfers = await db.select()
       .from(transferts)
-      .where(eq(transferts.expediteurTelephone, request.expediteurTelephone))
+      .where(eq(transferts.numeroTelephone, request.expediteurTelephone))
       .limit(1);
     
     if (previousTransfers.length === 0) {

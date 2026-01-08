@@ -12,7 +12,7 @@ import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
 import { Button } from '../../ui';
 import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
-import { useReceiptPrinter } from '../../../hooks/useReceiptPrinter';
+import { usePrinter } from '../../../hooks/useReceiptPrinter';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
@@ -66,7 +66,7 @@ interface Echeance {
 
 export default function CreditRemboursement() {
   const { mobileMoneyEnabled, mobileMoneyMessage } = useFeatureFlags();
-  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
+  const { componentRef, printData, print, isPrinting } = usePrinter();
 
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -336,7 +336,7 @@ export default function CreditRemboursement() {
   const handlePrint = useCallback(() => {
     if (!selectedCredit) return;
     
-    printReceipt({
+    print({
       title: 'REÇU DE REMBOURSEMENT',
       reference: lastPaymentRef || 'N/A',
       date: new Date(),
@@ -360,7 +360,7 @@ export default function CreditRemboursement() {
       total: lastPaymentAmount,
       modePaiement: paymentData.mode_paiement || 'Espèces'
     });
-  }, [selectedCredit, lastPaymentRef, lastPaymentAmount, printReceipt, paymentData]);
+  }, [selectedCredit, lastPaymentRef, lastPaymentAmount, print, paymentData]);
 
   const handleModeChange = useCallback((mode: string) => {
     setPaymentData(prev => ({ ...prev, mode_paiement: mode }));
@@ -386,11 +386,7 @@ export default function CreditRemboursement() {
     <div className="space-y-6 relative">
       
       {/* Hidden Receipt Template for Printing */}
-      {receiptData && (
-        <div style={{ display: "none" }}>
-          <ReceiptTemplate ref={componentRef} data={receiptData} />
-        </div>
-      )}
+      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
 
       {/* Success Modal */}
       {showSuccessModal && (

@@ -3,7 +3,7 @@ import { LucideIcon } from 'lucide-react';
 
 /**
  * StatCard Component - COFIN Platform
- * Mobile-first, theme-aware card for displaying statistics
+ * Mobile-first, clean & minimal card for displaying statistics
  *
  * @example
  * <StatCard
@@ -16,12 +16,14 @@ import { LucideIcon } from 'lucide-react';
  */
 
 export type StatCardColor = 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
+export type StatCardVariant = 'default' | 'minimal' | 'glass';
 
 export interface StatCardProps {
   title: string;
-  value: string | number;
-  icon: LucideIcon;
+  value: string | number | React.ReactNode;
+  icon?: LucideIcon;
   color?: StatCardColor;
+  variant?: StatCardVariant;
   trend?: string;
   trendUp?: boolean;
   subtitle?: React.ReactNode;
@@ -34,75 +36,97 @@ const StatCard: React.FC<StatCardProps> = ({
   value,
   icon: Icon,
   color = 'primary',
+  variant = 'default',
   trend,
   trendUp,
   subtitle,
   className = '',
   onClick,
 }) => {
-  // Color variants - Theme-aware using CSS variables where possible
-  const colorClasses = {
-    primary: 'bg-accent/10 border-accent/30',
-    success: 'bg-status-success/10 border-status-success/30',
-    warning: 'bg-status-warning/10 border-status-warning/30',
-    danger: 'bg-status-danger/10 border-status-danger/30',
-    neutral: 'bg-surface-muted border-edge',
+  // Accent colors for the left border indicator
+  const accentColors = {
+    primary: 'border-l-blue-500',
+    success: 'border-l-emerald-500',
+    warning: 'border-l-amber-500',
+    danger: 'border-l-red-500',
+    neutral: 'border-l-slate-500',
   };
 
-  const iconColorClasses = {
-    primary: 'text-accent bg-accent/20',
-    success: 'text-status-success bg-status-success/20',
-    warning: 'text-status-warning bg-status-warning/20',
-    danger: 'text-status-danger bg-status-danger/20',
-    neutral: 'text-content-muted bg-surface-subtle',
+  const iconColors = {
+    primary: 'text-blue-400',
+    success: 'text-emerald-400',
+    warning: 'text-amber-400',
+    danger: 'text-red-400',
+    neutral: 'text-slate-400',
   };
 
   const trendColorClass = trendUp
-    ? 'text-status-success'
+    ? 'text-emerald-400'
     : trendUp === false
-      ? 'text-status-danger'
-      : 'text-content-muted';
+      ? 'text-red-400'
+      : 'text-slate-500';
+
+  // Variant styles
+  const variantStyles = {
+    default: `
+      bg-slate-800/60 backdrop-blur-sm
+      border border-slate-700/50 border-l-[3px] ${accentColors[color]}
+      rounded-lg
+    `,
+    minimal: `
+      bg-transparent
+      border-l-2 ${accentColors[color]}
+      pl-3
+    `,
+    glass: `
+      bg-white/5 backdrop-blur-md
+      border border-white/10 border-l-[3px] ${accentColors[color]}
+      rounded-xl
+    `,
+  };
 
   return (
     <div
       onClick={onClick}
       className={`
-        ${colorClasses[color]}
-        border rounded-lg p-2.5 sm:p-3
-        transition-all duration-200 hover:scale-[1.02] hover:shadow-theme-md
+        ${variantStyles[variant]}
+        p-3 sm:p-4
+        transition-all duration-200
         min-w-0
-        ${onClick ? 'cursor-pointer active:scale-95' : ''}
+        ${onClick ? 'cursor-pointer hover:bg-slate-700/40 active:scale-[0.98]' : ''}
         ${className}
       `}
     >
-      {/* Header Row - Title + Icon */}
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-content-muted text-[10px] sm:text-xs font-medium truncate flex-1">
+      {/* Title Row */}
+      <div className="flex items-center gap-2 mb-1.5">
+        {Icon && (
+          <Icon size={14} className={`${iconColors[color]} opacity-70`} />
+        )}
+        <p className="text-slate-400 text-[11px] sm:text-xs font-medium tracking-wide uppercase">
           {title}
         </p>
-        <div className={`${iconColorClasses[color]} p-1.5 rounded-lg`}>
-          <Icon size={14} className="sm:w-4 sm:h-4" />
-        </div>
       </div>
 
-      {/* Value */}
-      <p className="text-xl sm:text-2xl font-bold text-content-primary truncate">
+      {/* Value - Clean & Bold */}
+      <div className="text-white text-lg sm:text-xl font-semibold tracking-tight">
         {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
-      </p>
-
-      {/* Subtitle & Trend - Inline compact */}
-      <div className="flex items-center justify-between mt-1 gap-1">
-        {subtitle && (
-          <p className="text-[9px] sm:text-[10px] text-content-muted truncate">
-            {subtitle}
-          </p>
-        )}
-        {trend && (
-          <p className={`text-[9px] sm:text-[10px] font-medium ${trendColorClass} whitespace-nowrap`}>
-            {trend}
-          </p>
-        )}
       </div>
+
+      {/* Subtitle & Trend */}
+      {(subtitle || trend) && (
+        <div className="flex items-center justify-between mt-1.5 gap-2">
+          {subtitle && (
+            <span className="text-[10px] sm:text-xs text-slate-500 truncate">
+              {subtitle}
+            </span>
+          )}
+          {trend && (
+            <span className={`text-[10px] sm:text-xs font-medium ${trendColorClass} whitespace-nowrap`}>
+              {trend}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };

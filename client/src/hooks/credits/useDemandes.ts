@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 export interface DemandeCredit {
   id: string;
   numero_demande: string;
   client_id: string;
   date_demande: string;
+  created_at?: string;
   montant_demande: number;
   montant_approuve?: number | null;
   duree_mois: number;
@@ -14,8 +16,11 @@ export interface DemandeCredit {
   score_credit: number | null;
   revenus_mensuels?: number;
   charges_mensuelles?: number;
+  objet_credit?: string;
+  description_activite?: string;
   clients?: {
     nom: string;
+    prenom?: string;
     phone: string;
     photo_url?: string;
   };
@@ -81,6 +86,47 @@ export function useDemandes() {
     }
   };
 
+  const deleteDemande = async (id: string) => {
+    try {
+      const response = await fetch(`/api/demandes-credit/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Erreur suppression');
+
+      await fetchDemandes();
+      return true;
+    } catch (err) {
+      console.error('Erreur suppression:', err);
+      setError(err instanceof Error ? err.message : 'Erreur suppression');
+      return false;
+    }
+  };
+
+  const payerFrais = async (id: string, montant: number, methodePaiement: string = 'Espèces', sessionCaisseId?: string) => {
+    try {
+      const response = await fetch(`/api/demandes-credit/${id}/payer-frais`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ montant, methode_paiement: methodePaiement, sessionCaisseId })
+      });
+
+      if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || 'Erreur paiement frais');
+      }
+
+      await fetchDemandes();
+      return true;
+    } catch (err) {
+      console.error('Erreur paiement frais:', err);
+      const message = err instanceof Error ? err.message : 'Erreur paiement frais';
+      setError(message);
+      toast.error(message);
+      return false;
+    }
+  };
+
   const getDemandesEnAttente = () => demandes.filter(d => d.statut === 'en_attente' || d.statut === 'pending');
 
   const getStatutColor = (statut: string) => {
@@ -113,7 +159,9 @@ export function useDemandes() {
     fetchDemandes,
     approuverDemande,
     rejeterDemande,
+    deleteDemande,
     getDemandesEnAttente,
-    getStatutColor
+    getStatutColor,
+    payerFrais
   };
 }

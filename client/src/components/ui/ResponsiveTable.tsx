@@ -30,6 +30,7 @@ export interface TableColumn<T> {
   format?: (value: any, item: T) => ReactNode;
   badge?: boolean;          // Render as badge
   icon?: LucideIcon;
+  align?: 'left' | 'center' | 'right';
 }
 
 export interface ResponsiveTableProps<T> {
@@ -191,9 +192,13 @@ function ResponsiveTable<T extends Record<string, any>>({
               {columns.map((column) => (
                 <th
                   key={column.key as string}
-                  className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 text-xs"
+                  className={`px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 text-xs ${
+                    column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'
+                  }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-2 ${
+                    column.align === 'right' ? 'justify-end' : column.align === 'center' ? 'justify-center' : 'justify-start'
+                  }`}>
                     {column.icon && <column.icon size={14} />}
                     {column.label}
                   </div>
@@ -216,7 +221,12 @@ function ResponsiveTable<T extends Record<string, any>>({
                 onClick={() => onRowClick?.(item, index)}
               >
                 {columns.map((column) => (
-                  <td key={column.key as string} className="px-4 py-3">
+                  <td 
+                    key={column.key as string} 
+                    className={`px-4 py-3 ${
+                      column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'
+                    }`}
+                  >
                     {column.badge ? (
                       <Badge value={getValue(item, column.key as string)} />
                     ) : (

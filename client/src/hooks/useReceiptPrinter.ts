@@ -2,14 +2,14 @@ import { useRef, useCallback, useState } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { ReceiptData } from '../components/ui/printable/ReceiptTemplate';
 
-export function useReceiptPrinter() {
+export function usePrinter() {
   const componentRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [printData, setPrintData] = useState<any | null>(null);
 
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
-    documentTitle: receiptData ? `Recu-${receiptData.reference}` : 'Recu-COFIN',
+    documentTitle: printData ? (printData.title ? `Print-${printData.title}` : `Document-${Date.now()}`) : 'Print-Document',
     onAfterPrint: () => {
       setIsPrinting(false);
     },
@@ -19,8 +19,8 @@ export function useReceiptPrinter() {
     }
   });
 
-  const printReceipt = useCallback((data: ReceiptData) => {
-    setReceiptData(data);
+  const print = useCallback((data: any) => {
+    setPrintData(data);
     setIsPrinting(true);
     // Use a timeout to allow state to update and render the hidden template before printing
     setTimeout(() => {
@@ -30,8 +30,8 @@ export function useReceiptPrinter() {
 
   return {
     componentRef,
-    receiptData,
-    printReceipt,
+    printData,
+    print,
     isPrinting
   };
 }

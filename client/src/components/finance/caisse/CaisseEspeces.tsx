@@ -9,7 +9,7 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
-import { useReceiptPrinter } from '../../../hooks/useReceiptPrinter';
+import { usePrinter } from '../../../hooks/useReceiptPrinter';
 import { ReceiptTemplate, ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
 
@@ -69,7 +69,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [showPrintDialog, setShowPrintDialog] = useState(false);
 
   // Receipt Printer Hook
-  const { componentRef, receiptData, printReceipt, isPrinting } = useReceiptPrinter();
+  const { componentRef, printData, print, isPrinting } = usePrinter();
 
   // Billetage State
   const [showBilletage, setShowBilletage] = useState(false);
@@ -413,8 +413,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       devise: 'FCFA'
     };
 
-    printReceipt(receiptData);
-  }, [lastOperationData, user, description, printReceipt]);
+     print(receiptData);
+  }, [lastOperationData, user, description, print]);
 
   // Fermer le dialogue d'impression et réinitialiser
   const handleClosePrintDialog = useCallback((shouldPrint: boolean) => {
@@ -877,9 +877,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       />
 
       {/* Hidden Receipt Template for Printing */}
-      {receiptData && (
-        <ReceiptTemplate ref={componentRef} data={receiptData} />
-      )}
+      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
     </div>
   );
 }

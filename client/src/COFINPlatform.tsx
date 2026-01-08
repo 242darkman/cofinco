@@ -68,6 +68,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
   );
   const [currentModule, setCurrentModule] = useState('dashboard');
   const [currentSubModule, setCurrentSubModule] = useState<string | undefined>();
+  const [moduleData, setModuleData] = useState<any>(null);
   
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -181,11 +182,12 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
     setNotification({ type, message });
   };
 
-  const handleModuleChange = (moduleName: string, subModuleName?: string) => {
+  const handleModuleChange = (moduleName: string, subModuleName?: string, data?: any) => {
     setModuleLoading(true);
     setTimeout(() => {
       setCurrentModule(moduleName);
       setCurrentSubModule(subModuleName);
+      if (data) setModuleData(data);
       setModuleLoading(false);
     }, 300);
   };
@@ -735,7 +737,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
       case 'tontines':
         return <Tontines />;
       case 'credits':
-        return <Credits userRole={currentUser?.role} activeView={currentSubModule} />;
+        return <Credits userRole={currentUser?.role} activeView={currentSubModule} onModuleChange={handleModuleChange} />;
       case 'epargnes':
         return <Epargnes activeView={currentSubModule} />;
       case 'agentTerrain':
@@ -748,6 +750,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
             activeView={currentSubModule} 
             initialShowPaiement={pendingCaissePayment}
             onPaiementModalClose={() => setPendingCaissePayment(false)}
+            initialState={moduleData}
           />
         );
       case 'transfert':

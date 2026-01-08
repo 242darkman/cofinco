@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 
-type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE";
+type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE" | "REALTIME_EVENT" | "SUBSCRIBED" | "UNSUBSCRIBED" | "COMPTE_UPDATE";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -275,6 +275,39 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
       case "LOYALTY_UPDATE":
          queryClient.invalidateQueries({ queryKey: ["/api/loyalty"] });
+         break;
+
+      case "REALTIME_EVENT":
+         // Ledger events from outbox worker - dispatch as custom event
+         // Individual components subscribe via useRealTimeSubscription hook
+         window.dispatchEvent(new CustomEvent('realtime-event', { detail: message.payload }));
+         
+         // Auto-invalidate relevant queries based on aggregate type
+         const { aggregateType, aggregateId } = message.payload;
+         if (aggregateType === 'compte') {
+           queryClient.invalidateQueries({ queryKey: ['compte', aggregateId] });
+           queryClient.invalidateQueries({ queryKey: ['transactions', aggregateId] });
+         } else if (aggregateType === 'credit') {
+           queryClient.invalidateQueries({ queryKey: ['credit', aggregateId] });
+           queryClient.invalidateQueries({ queryKey: ['remboursements', aggregateId] });
+         } else if (aggregateType === 'client') {
+           queryClient.invalidateQueries({ queryKey: ['client', aggregateId] });
+           queryClient.invalidateQueries({ queryKey: ['client-portfolio', aggregateId] });
+         } else if (aggregateType === 'session_caisse') {
+           queryClient.invalidateQueries({ queryKey: ['session', aggregateId] });
+           queryClient.invalidateQueries({ queryKey: ['operations', aggregateId] });
+         }
+         break;
+
+      case "COMPTE_UPDATE":
+         queryClient.invalidateQueries({ queryKey: ["comptes-epargne"] });
+         window.dispatchEvent(new CustomEvent('compte-update', { detail: message.payload }));
+         break;
+
+      case "SUBSCRIBED":
+      case "UNSUBSCRIBED":
+         // Acknowledgment messages - can be logged for debugging
+         console.log(`[WS] ${message.type}:`, message.payload?.aggregate || message);
          break;
     }
   };

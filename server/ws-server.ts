@@ -5,12 +5,16 @@ import { sessionMiddleware } from "./auth";
 import { storage } from "./storage";
 
 type GlobalMessage = {
-  type: "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY";
+  type: "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "REALTIME_EVENT" | "OPERATIONS_UPDATE" | "TONTINE_UPDATE" | "CAISSE_UPDATE" | "COMPTE_UPDATE";
   payload: any;
 };
 
 // Map userId -> WebSocket[] (user can have multiple tabs open)
 const clients = new Map<string, WebSocket[]>();
+
+// Map channel -> Set<WebSocket> for aggregate subscriptions
+// Channels: client:{id}, compte:{id}, credit:{id}, tontine:{id}, session_caisse:{id}, agent:{id}
+const subscriptions = new Map<string, Set<WebSocket>>();
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ noServer: true });
@@ -170,6 +174,37 @@ export function setupWebSocket(server: Server) {
          if (data.type === 'PING') {
              ws.send(JSON.stringify({ type: 'PONG' }));
          }
+
+         // Handle subscription to aggregate channels
+         if (data.type === 'SUBSCRIBE') {
+           const { aggregate } = data; // e.g., 'client:uuid-xxx' or 'compte:uuid-xxx'
+           if (aggregate && typeof aggregate === 'string') {
+             if (!subscriptions.has(aggregate)) {
+               subscriptions.set(aggregate, new Set());
+             }
+             subscriptions.get(aggregate)?.add(ws);
+             
+             // Track subscriptions on the WebSocket for cleanup
+             if (!(ws as any).subscriptions) {
+               (ws as any).subscriptions = new Set<string>();
+             }
+             (ws as any).subscriptions.add(aggregate);
+             
+             console.log(`[WebSocket] User ${userId} subscribed to ${aggregate}`);
+             ws.send(JSON.stringify({ type: 'SUBSCRIBED', aggregate }));
+           }
+         }
+
+         // Handle unsubscription
+         if (data.type === 'UNSUBSCRIBE') {
+           const { aggregate } = data;
+           if (aggregate && typeof aggregate === 'string') {
+             subscriptions.get(aggregate)?.delete(ws);
+             (ws as any).subscriptions?.delete(aggregate);
+             console.log(`[WebSocket] User ${userId} unsubscribed from ${aggregate}`);
+             ws.send(JSON.stringify({ type: 'UNSUBSCRIBED', aggregate }));
+           }
+         }
          
          if (data.type === 'TYPING') {
            // Forward typing status to receiver
@@ -220,6 +255,18 @@ export function setupWebSocket(server: Server) {
     });
 
     ws.on("close", () => {
+      // Clean up subscriptions
+      const wsSubscriptions = (ws as any).subscriptions as Set<string> | undefined;
+      if (wsSubscriptions) {
+        wsSubscriptions.forEach((channel) => {
+          subscriptions.get(channel)?.delete(ws);
+          // Clean up empty subscription sets
+          if (subscriptions.get(channel)?.size === 0) {
+            subscriptions.delete(channel);
+          }
+        });
+      }
+
       if (userId && clients.has(userId)) {
         const userSockets = clients.get(userId) || [];
         const index = userSockets.indexOf(ws);
@@ -274,6 +321,26 @@ export function setupWebSocket(server: Server) {
           client.send(JSON.stringify(message));
         }
       });
+    },
+    // Broadcast to all subscribers of a specific aggregate channel
+    broadcastToAggregate: (aggregateType: string, aggregateId: string, message: GlobalMessage) => {
+      const channel = `${aggregateType}:${aggregateId}`;
+      const channelSubs = subscriptions.get(channel);
+      if (channelSubs) {
+        channelSubs.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify(message));
+          }
+        });
+      }
+    },
+    // Get subscription stats (for debugging/monitoring)
+    getSubscriptionStats: () => {
+      const stats: Record<string, number> = {};
+      subscriptions.forEach((subs, channel) => {
+        stats[channel] = subs.size;
+      });
+      return stats;
     }
   };
 }

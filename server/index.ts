@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import { log, logError, logWarn } from "./logger";
 import { scheduleAuditPurge } from "./audit";
 import { sessionActivityMiddleware, scheduleSessionCleanup } from "./session-tracker";
+import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
 
 const app = express();
 // const httpServer = createServer(app); // Removed to avoid duplicate server creation
@@ -192,6 +193,10 @@ async function seedAdminUser() {
   scheduleSessionCleanup();
 
   const httpServer = registerRoutes(app);
+
+  // Start the outbox worker for reliable real-time event publishing
+  startOutboxWorker();
+  log('[Outbox] Real-time event worker started');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, FileText, Download, Calendar, TrendingUp, DollarSign, Activity } from 'lucide-react';
-import { Button, Card, StatCard } from '../../ui';
+import { Button, Card, StatCard, Pagination } from '../../ui';
 
 interface SessionCaisse {
   id: string;
@@ -19,12 +19,12 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   const [dateDebut, setDateDebut] = useState(new Date(new Date().setDate(1)).toISOString().slice(0, 10));
   const [dateFin, setDateFin] = useState(new Date().toISOString().slice(0, 10));
   const [typeRapport, setTypeRapport] = useState('journal');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-  useEffect(() => {
-    loadSessions();
-  }, [dateDebut, dateFin]);
-
-  const loadSessions = async () => {
+  const loadSessions = React.useCallback(async () => {
     try {
       const res = await fetch(`/api/sessions-caisse?dateDebut=${dateDebut}&dateFin=${dateFin}`, {
         credentials: 'include'
@@ -37,7 +37,19 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateDebut, dateFin]);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset page on filter change
+    loadSessions();
+
+    const handleRealTimeUpdate = () => {
+      loadSessions();
+    };
+
+    window.addEventListener('caisse-update', handleRealTimeUpdate);
+    return () => window.removeEventListener('caisse-update', handleRealTimeUpdate);
+  }, [loadSessions]);
 
   const exporterPDF = () => {
     alert('Export PDF en cours de développement');
@@ -58,6 +70,13 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
 
   const soldeNet = totalMouvements.entrees - totalMouvements.sorties;
   const totalEcarts = sessions.reduce((sum, s) => sum + Number(s.ecart || 0), 0);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(sessions.length / itemsPerPage);
+  const paginatedSessions = sessions.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+  );
 
   const setPeriode = (type: 'auj' | 'semaine' | 'mois') => {
       const today = new Date();
@@ -153,6 +172,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
       <Card className="bg-slate-900/80 backdrop-blur-xl border-slate-800 shadow-xl overflow-hidden mt-2">
         <div className="overflow-x-auto">
           {typeRapport === 'journal' && (
+            <>
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-950/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
                 <tr>
@@ -167,7 +187,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {sessions.map((session) => {
+                {paginatedSessions.map((session) => {
                    const mouvements = Number(session.solde_theorique) - Number(session.solde_initial);
                    const entrees = mouvements > 0 ? mouvements : 0;
                    const sorties = mouvements < 0 ? Math.abs(mouvements) : 0;
@@ -242,6 +262,22 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                 </tfoot>
               )}
             </table>
+            
+           {/* Pagination */}
+           {sessions.length > itemsPerPage && (
+             <div className="p-4 border-t border-slate-800 bg-slate-950/30">
+                 <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={sessions.length}
+                    canGoNext={currentPage < totalPages}
+                    canGoPrevious={currentPage > 1}
+                 />
+             </div>
+           )}
+           </>
           )}
 
           {typeRapport === 'synthese' && (

@@ -27,18 +27,18 @@ export function useCreditStats() {
     
     demandesEnAttente: demandes.filter(d => {
       const s = normalizeStatus(d.statut);
-      return s === 'en_attente' || s === 'pending' || s.includes('analyse');
+      return s === 'en_attente' || s === 'pending';
     }).length,
     demandesTotal: demandes.length,
     demandesApprouvees: demandes.filter(d => {
       const s = normalizeStatus(d.statut);
-      return s === 'approuve' || s === 'approved' || s === 'valide' || s === 'debourse';
+      return s === 'approuvee' || s === 'approuve' || s === 'approved' || s === 'decaissee' || s === 'debourse';
     }).length,
     
-    enquetesEnCours: enquetes.filter(e => {
-      const s = normalizeStatus(e.statut);
-      return s === 'en_cours';
-    }).length,
+    enquetesEnCours: demandes.filter(d => {
+      const s = normalizeStatus(d.statut);
+      return s === 'a_enqueter' || s === 'en_enquete';
+    }).length + enquetes.filter(e => normalizeStatus(e.statut) === 'en_cours').length,
     enquetesTotal: enquetes.length,
     enquetesApprouvees: enquetes.filter(e => {
       const s = normalizeStatus(e.statut);
@@ -52,11 +52,11 @@ export function useCreditStats() {
     montantTotalDemandes: demandes.reduce((sum, d) => sum + (d.montant_demande || 0), 0),
     montantDemandesEnAttente: demandes.filter(d => {
       const s = normalizeStatus(d.statut);
-      return s === 'en_attente' || s === 'pending' || s.includes('analyse');
+      return s === 'en_attente' || s === 'pending';
     }).reduce((sum, d) => sum + (d.montant_demande || 0), 0),
     montantDemandesAccorde: demandes.filter(d => {
       const s = normalizeStatus(d.statut);
-      return s === 'approuve' || s === 'approved' || s === 'valide' || s === 'debourse';
+      return s === 'approuvee' || s === 'approuve' || s === 'approved' || s === 'decaissee' || s === 'debourse';
     }).reduce((sum, d) => sum + (d.montant_demande || 0), 0),
     montantDemandesRejete: demandes.filter(d => {
       const s = normalizeStatus(d.statut);

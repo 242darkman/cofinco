@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ArrowLeft, ArrowRight, ArrowRightLeft, Plus, CheckCircle, Clock, X, AlertTriangle, Send, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowRightLeft, Plus, CheckCircle, Clock, X, AlertTriangle, Send, Wallet, Printer } from 'lucide-react';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { Button, Card, Badge } from '@/components/ui';
+import { Button, Card, Badge, Pagination, Modal, StatCard } from '@/components/ui';
 import { caisseTransfertApi, agenceApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -9,6 +9,8 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
+import { usePrinter } from '../../../hooks/useReceiptPrinter';
+import { TransferHistoryPrintTemplate, TransferHistoryData } from '../../ui/printable/TransferHistoryPrintTemplate';
 
 interface Transfert {
   id: string;
@@ -18,11 +20,17 @@ interface Transfert {
   statut: string;
   dateCreation: string;
   dateReception?: string;
+  dateValidation?: string;
   observations: string;
   agenceSourceId: string;
   agenceDestId: string;
   agenceSource?: { id: string; nom: string };
   agenceDest?: { id: string; nom: string };
+  agence_source_nom?: string;
+  agence_dest_nom?: string;
+  created_by_nom?: string;
+  created_by_prenom?: string;
+  created_by_username?: string;
 }
 
 interface CaisseTransfertsProps {
@@ -47,6 +55,15 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'receive' | 'cancel'; transfert: Transfert } | null>(null);
   const [montantError, setMontantError] = useState<string | null>(null);
+
+  // Pagination & Details
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [selectedTransfert, setSelectedTransfert] = useState<Transfert | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  // Printing
+  const { componentRef, print, isPrinting, printData } = usePrinter();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -226,13 +243,55 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
   }, [session?.agenceId]);
 
   // Statistiques mémorisées
-  const stats = useMemo(() => ({
-    total: transferts.length,
-    enAttente: transferts.filter(t => t.statut === 'en_attente').length,
-    montantTotal: transferts
-      .filter(t => t.statut === 'valide')
-      .reduce((sum, t) => sum + (Number(t.montant) || 0), 0)
-  }), [transferts]);
+  // Statistiques calculées
+  const stats = useMemo(() => {
+    const validTransferts = transferts.filter(t => t.statut === 'valide' || t.statut === 'Validé');
+    const pendingTransferts = transferts.filter(t => t.statut === 'en_attente' || t.statut === 'En attente');
+    
+    // Si on est Admin (pas de session.agenceId défini ou vue globale), on veut le volume TOTAL échangé
+    // Si on est une Agence, on veut seulement CE QUI NOUS CONCERNE
+    
+    let volumeEnvoye = 0;
+    let volumeRecu = 0;
+
+    if (session?.agenceId) {
+      // Vue Agence
+      volumeEnvoye = validTransferts
+        .filter(t => t.agenceSourceId === session.agenceId)
+        .reduce((sum, t) => sum + (Number(t.montant) || 0), 0);
+
+      volumeRecu = validTransferts
+        .filter(t => t.agenceDestId === session.agenceId)
+        .reduce((sum, t) => sum + (Number(t.montant) || 0), 0);
+    } else {
+      // Vue Admin / Globale : Volume Envoyé = Total des transferts validés (flux global)
+      // Volume Reçu = Idem (car tout ce qui est envoyé est reçu dans un système fermé validé)
+      // Ou on peut détailler autrement, mais pour l'instant : Flux Total
+      const totalVolume = validTransferts.reduce((sum, t) => sum + (Number(t.montant) || 0), 0);
+      volumeEnvoye = totalVolume; 
+      volumeRecu = totalVolume;
+    }
+
+    return {
+      total: transferts.length,
+      enAttente: pendingTransferts.length,
+      volumeEnvoye,
+      volumeRecu
+    };
+  }, [transferts, session?.agenceId]);
+
+  // Pagination Logic
+  const paginatedTransferts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return transferts.slice(startIndex, startIndex + itemsPerPage);
+  }, [transferts, currentPage]);
+
+  const totalPages = Math.ceil(transferts.length / itemsPerPage);
+
+  const openDetails = (t: Transfert) => {
+    setSelectedTransfert(t);
+    setShowDetailsModal(true);
+  };
 
   // Message de confirmation mémorisé
   const confirmationMessage = useMemo(() => {
@@ -243,6 +302,29 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
     }
     return `Êtes-vous sûr de vouloir annuler ce transfert de ${formatMoney(Number(transfert.montant))} ?`;
   }, [pendingAction]);
+
+  const handlePrintHistory = useCallback(() => {
+    const data: TransferHistoryData = {
+      title: 'Historique des Transferts',
+      agencyName: session?.agence?.nom || 'Agence (Vue Globale)',
+      generatedBy: session?.user?.nom ? `${session.user.nom} ${session.user.prenom || ''}` : 'Utilisateur',
+      date: new Date(),
+      transfers: transferts.map(t => ({
+        reference: t.reference,
+        date: t.dateCreation,
+        source: t.agence_source_nom || t.agenceSource?.nom || 'Source',
+        destination: t.agence_dest_nom || t.agenceDest?.nom || 'Dest',
+        montant: Number(t.montant),
+        initiator: t.created_by_nom ? `${t.created_by_nom} ${t.created_by_prenom || ''}` : '-',
+        statut: t.statut
+      })),
+      stats: {
+        totalCount: transferts.length,
+        totalAmount: transferts.reduce((acc, t) => acc + (Number(t.montant) || 0), 0)
+      }
+    };
+    print(data);
+  }, [transferts, session, print]);
 
   // État de chargement
   if (loading && transferts.length === 0) {
@@ -297,6 +379,17 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
             Nouveau Transfert
           </Button>
         )}
+
+        <Button
+            variant="outline"
+            onClick={handlePrintHistory}
+            className="w-full sm:w-auto border-slate-700 hover:bg-slate-800 text-slate-300"
+            disabled={isPrinting || transferts.length === 0}
+            title="Imprimer l'historique"
+        >
+            <Printer size={18} className="mr-2" />
+            Imprimer
+        </Button>
       </header>
 
       {/* Success Message */}
@@ -312,39 +405,41 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       )}
 
       {/* Stats Cards */}
+      {/* Stats Cards */}
       <section aria-label="Statistiques des transferts">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-          <Card className="p-4 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-indigo-500/10 rounded-lg">
-                <ArrowRightLeft size={18} className="text-indigo-400" aria-hidden="true" />
-              </div>
-              <p className="text-sm font-medium text-slate-400">Total Transferts</p>
-            </div>
-            <p className="text-3xl font-bold text-white">{stats.total}</p>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <StatCard
+            title="Total Transferts"
+            value={stats.total}
+            icon={ArrowRightLeft}
+            color="primary"
+            variant="default"
+          />
 
-          <Card className="p-4 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-amber-500/10 rounded-lg">
-                <Clock size={18} className="text-amber-400" aria-hidden="true" />
-              </div>
-              <p className="text-sm font-medium text-slate-400">En Attente</p>
-            </div>
-            <p className="text-3xl font-bold text-amber-400">{stats.enAttente}</p>
-          </Card>
+          <StatCard
+            title="En Attente"
+            value={stats.enAttente}
+            icon={Clock}
+            color="warning"
+            variant="default"
+          />
 
-          <Card className="p-4 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-emerald-500/10 rounded-lg">
-                <Wallet size={18} className="text-emerald-400" aria-hidden="true" />
-              </div>
-              <p className="text-sm font-medium text-slate-400">Volume Reçu</p>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-emerald-400 truncate">
-              {formatMoney(stats.montantTotal)}
-            </p>
-          </Card>
+          <StatCard
+            title="Volume Envoyé"
+            value={formatMoney(stats.volumeEnvoye)}
+            icon={Send}
+            color="primary"
+            variant="default" 
+            className="truncate-none" // Custom class if needed to force no truncate, but defaults are good
+          />
+
+          <StatCard
+            title="Volume Reçu"
+            value={formatMoney(stats.volumeRecu)}
+            icon={Wallet}
+            color="success"
+            variant="default"
+          />
         </div>
       </section>
 
@@ -356,14 +451,18 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
 
         {/* Mobile View: Cards List */}
         <div className="md:hidden divide-y divide-slate-800">
-          {transferts.length === 0 ? (
+          {paginatedTransferts.length === 0 ? (
             <div className="p-8 text-center text-slate-500" role="status">
               <ArrowRightLeft size={32} className="mx-auto mb-2 opacity-50" aria-hidden="true" />
               <p>Aucun transfert</p>
             </div>
           ) : (
-            transferts.map((t) => (
-              <article key={t.id} className="p-4 space-y-3">
+            paginatedTransferts.map((t) => (
+              <article 
+                key={t.id} 
+                className="p-4 space-y-3 cursor-pointer hover:bg-slate-800/20 active:bg-slate-800/40 transition-colors"
+                onClick={() => openDetails(t)}
+              >
                 <div className="flex items-start justify-between">
                   <div className="bg-slate-800 px-2 py-1 rounded text-xs font-mono text-slate-400">
                     {escapeHtml(t.reference)}
@@ -371,19 +470,20 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                   <Badge
                     value={t.statut}
                     variant={
-                      t.statut === 'valide' ? 'success' :
-                      t.statut === 'en_attente' ? 'warning' : 'neutral'
+                      (t.statut === 'valide' || t.statut === 'Validé') ? 'success' :
+                      (t.statut === 'en_attente' || t.statut === 'En attente') ? 'warning' : 
+                      (t.statut === 'annulé' || t.statut === 'Annulé') ? 'neutral' : 'neutral'
                     }
                   />
                 </div>
 
                 <div className="flex items-center gap-2 text-sm text-slate-300">
                   <span className="font-medium text-slate-400">
-                    {escapeHtml(t.agenceSource?.nom || 'Agence Source')}
+                    {escapeHtml(t.agence_source_nom || t.agenceSource?.nom || 'Agence Source')}
                   </span>
                   <ArrowRight size={14} className="text-slate-600" aria-hidden="true" />
                   <span className="font-medium text-white">
-                    {escapeHtml(t.agenceDest?.nom || 'Agence Dest')}
+                    {escapeHtml(t.agence_dest_nom || t.agenceDest?.nom || 'Agence Dest')}
                   </span>
                 </div>
 
@@ -391,13 +491,20 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                   <p className="text-xl font-bold text-white">
                     {formatMoney(Number(t.montant))}
                   </p>
-                  <time className="text-right text-xs text-slate-500" dateTime={t.dateCreation}>
-                    {new Date(t.dateCreation).toLocaleDateString('fr-FR')}
-                  </time>
+                  <div className="text-right">
+                    <time className="block text-xs text-slate-500" dateTime={t.dateCreation}>
+                      {new Date(t.dateCreation).toLocaleDateString('fr-FR')}
+                    </time>
+                    {t.created_by_nom && (
+                      <p className="text-xs text-slate-600 truncate max-w-[120px]">
+                        Par: {t.created_by_nom} {t.created_by_prenom?.charAt(0)}.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {t.statut === 'en_attente' && (
-                  <div className="flex gap-2 pt-2">
+                {(t.statut === 'en_attente' || t.statut === 'En attente') && (
+                  <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                     {canConfirmTransferts && getDirection(t) === 'IN' && (
                       <Button
                         size="sm"
@@ -434,37 +541,51 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 <th scope="col" className="px-6 py-4">Référence</th>
                 <th scope="col" className="px-6 py-4">Trajet</th>
                 <th scope="col" className="px-6 py-4 text-right">Montant</th>
+                <th scope="col" className="px-6 py-4">Initié par</th>
                 <th scope="col" className="px-6 py-4">Date</th>
                 <th scope="col" className="px-6 py-4">Statut</th>
                 <th scope="col" className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {transferts.length === 0 ? (
+              {paginatedTransferts.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     Aucun transfert enregistré
                   </td>
                 </tr>
               ) : (
-                transferts.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-800/30 transition-colors">
+                paginatedTransferts.map((t) => (
+                  <tr 
+                    key={t.id} 
+                    className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                    onClick={() => openDetails(t)}
+                  >
                     <td className="px-6 py-4 font-mono text-slate-400 text-xs">
                       {escapeHtml(t.reference)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className="text-slate-400">
-                          {escapeHtml(t.agenceSource?.nom || 'Agence Source')}
+                          {escapeHtml(t.agence_source_nom || t.agenceSource?.nom || 'Agence Source')}
                         </span>
                         <ArrowRight size={14} className="text-slate-600" aria-hidden="true" />
                         <span className="text-white font-medium">
-                          {escapeHtml(t.agenceDest?.nom || 'Agence Dest')}
+                          {escapeHtml(t.agence_dest_nom || t.agenceDest?.nom || 'Agence Dest')}
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-white">
                       {formatMoney(Number(t.montant))}
+                    </td>
+                    <td className="px-6 py-4 text-slate-400">
+                      {t.created_by_nom ? (
+                        <span title={t.created_by_username || ''}>
+                          {t.created_by_nom} {t.created_by_prenom}
+                        </span>
+                      ) : (
+                        <span className="italic opacity-50">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-slate-400">
                       <time dateTime={t.dateCreation}>
@@ -475,13 +596,13 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                       <Badge
                         value={t.statut}
                         variant={
-                          t.statut === 'valide' ? 'success' :
-                          t.statut === 'en_attente' ? 'warning' : 'neutral'
+                          (t.statut === 'valide' || t.statut === 'Validé') ? 'success' :
+                          (t.statut === 'en_attente' || t.statut === 'En attente') ? 'warning' : 'neutral'
                         }
                       />
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      {t.statut === 'en_attente' && (
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      {(t.statut === 'en_attente' || t.statut === 'En attente') ? (
                         <div className="flex items-center justify-end gap-2">
                           {canConfirmTransferts && getDirection(t) === 'IN' && (
                             <Button
@@ -504,6 +625,14 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                               <X size={14} aria-hidden="true" />
                             </Button>
                           )}
+                          {/* Fallback if no specific action matches despite being pending (e.g. wrong direction) */}
+                          {(!canConfirmTransferts || getDirection(t) !== 'IN') && (!canCancelTransferts || getDirection(t) !== 'OUT') && (
+                             <span className="text-xs text-slate-600 italic">Aucune action</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex justify-end">
+                            <span className="text-slate-600">-</span>
                         </div>
                       )}
                     </td>
@@ -513,7 +642,123 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {transferts.length > itemsPerPage && (
+          <div className="p-4 border-t border-slate-800">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              itemsPerPage={itemsPerPage}
+              totalItems={transferts.length}
+              canGoPrevious={currentPage > 1}
+              canGoNext={currentPage < totalPages}
+            />
+          </div>
+        )}
       </Card>
+
+      {/* Details Modal */}
+      <Modal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        title="Détails du transfert"
+        size="lg"
+      >
+        {selectedTransfert && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+              <div>
+                <p className="text-sm text-slate-400 mb-1">Montant</p>
+                <p className="text-3xl font-bold text-white">{formatMoney(Number(selectedTransfert.montant))}</p>
+              </div>
+              <Badge
+                value={selectedTransfert.statut}
+                variant={
+                  (selectedTransfert.statut === 'valide' || selectedTransfert.statut === 'Validé') ? 'success' :
+                  (selectedTransfert.statut === 'en_attente' || selectedTransfert.statut === 'En attente') ? 'warning' : 'neutral'
+                }
+                size="lg"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-slate-300 border-b border-slate-800 pb-2">Informations Générales</h4>
+                
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500 uppercase">Référence</p>
+                  <p className="font-mono text-white">{selectedTransfert.reference}</p>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500 uppercase">Date Création</p>
+                  <p className="text-white">
+                    {new Date(selectedTransfert.dateCreation).toLocaleString('fr-FR')}
+                  </p>
+                </div>
+
+                {selectedTransfert.dateValidation && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-500 uppercase">Date Validation</p>
+                    <p className="text-white">
+                      {new Date(selectedTransfert.dateValidation).toLocaleString('fr-FR')}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500 uppercase">Initié par</p>
+                  <p className="text-white">
+                    {selectedTransfert.created_by_nom 
+                      ? `${selectedTransfert.created_by_nom} ${selectedTransfert.created_by_prenom || ''}`
+                      : 'Inconnu'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-slate-300 border-b border-slate-800 pb-2">Trajet</h4>
+                
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500 uppercase">De (Source)</p>
+                  <p className="text-white font-medium">{selectedTransfert.agence_source_nom || selectedTransfert.agenceSource?.nom || 'Agence Source'}</p>
+                </div>
+                
+                <div className="pl-2 border-l-2 border-slate-700 my-2">
+                  <ArrowRight className="text-slate-500 my-1" size={16} />
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500 uppercase">Vers (Destination)</p>
+                  <p className="text-white font-medium">{selectedTransfert.agence_dest_nom || selectedTransfert.agenceDest?.nom || 'Agence Dest'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-slate-300 border-b border-slate-800 pb-2">Notes</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500 uppercase">Motif</p>
+                  <p className="text-slate-300">{selectedTransfert.motif || '-'}</p>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-500 uppercase">Observations</p>
+                  <p className="text-slate-300 italic">{selectedTransfert.observations || 'Aucune observation'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+               <Button onClick={() => setShowDetailsModal(false)}>Fermer</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* New Transfer Modal */}
       {showForm && (
@@ -679,6 +924,16 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
           </div>
         </div>
       )}
+
+      {/* Hidden Print Template */}
+      <div style={{ display: 'none' }}>
+         <TransferHistoryPrintTemplate 
+           ref={componentRef} 
+           data={printData || { 
+             title: '', agencyName: '', generatedBy: '', date: new Date(), transfers: [], stats: { totalCount: 0, totalAmount: 0 } 
+           }} 
+         />
+      </div>
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

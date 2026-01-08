@@ -372,7 +372,7 @@ export default function CaisseSupervision({ onTakeControl }: { onTakeControl?: (
                     <table className="w-full text-xs sm:text-sm text-left border-collapse">
                       <thead className="sticky top-0 bg-slate-950 z-10 text-[10px] sm:text-xs font-bold uppercase text-slate-500 tracking-wider">
                         <tr>
-                          <th className="p-2 sm:p-3 border-b border-slate-800">Heure</th>
+                          <th className="p-2 sm:p-3 border-b border-slate-800">Date & Heure</th>
                           <th className="p-2 sm:p-3 border-b border-slate-800">Type</th>
                           <th className="p-2 sm:p-3 border-b border-slate-800 text-right">Montant</th>
                         </tr>
@@ -381,7 +381,7 @@ export default function CaisseSupervision({ onTakeControl }: { onTakeControl?: (
                         {selectedSession.operations?.map((op: any) => (
                           <tr key={op.id} className="hover:bg-slate-800/20 active:bg-slate-800/30 transition-colors">
                             <td className="p-2 sm:p-3 text-slate-400 font-mono text-[10px] sm:text-xs whitespace-nowrap">
-                              {op.created_at ? new Date(op.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                              {op.created_at ? new Date(op.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                             </td>
                             <td className="p-2 sm:p-3">
                               <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap ${

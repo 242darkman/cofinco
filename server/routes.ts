@@ -19,12 +19,14 @@ import { registerEmployesRoutes } from "./routes/employes";
 import loyaltyRouter from "./routes/loyalty";
 import { registerOtpRoutes } from "./routes/otp";
 import { registerConfigRoutes } from "./routes/config";
+import { registerComptesRoutes } from "./routes/comptes";
 
 export function registerRoutes(app: Express): Server {
   // Register modular routes
   registerAuthRoutes(app);
   registerClientRoutes(app);
   registerFinanceRoutes(app);
+  registerComptesRoutes(app); // Comptes microfinance (dépôt, retrait, blocage, transfert)
   registerTontineRoutes(app);
   registerOperationsRoutes(app); // Agents, prospection
   registerDashboardRoutes(app); // Dashboard statistics
