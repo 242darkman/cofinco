@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Phone, User, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, Trash2, AlertTriangle, Printer, Check } from 'lucide-react';
-import OTPValidationModal from '../auth/OTPValidationModal';
+import { DollarSign, Phone, User, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, Trash2, AlertTriangle, Printer, Check, ShieldCheck, UserCheck } from 'lucide-react';
+import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
 import { Modal, Button, FormField, SelectField, TextareaField, Card } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import { ReceiptTemplate } from '../ui/printable/ReceiptTemplate';
 import { usePrinter } from '../../hooks/useReceiptPrinter';
+import { securityConfigApi, SecurityConfigResponse } from '../../lib/api-client';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <img src={airtelLogo} alt="Airtel Money" className={className} />
@@ -51,9 +52,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [agents, setAgents] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClient, setSelectedClient] = useState<any>(null);
-  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [pendingPaymentData, setPendingPaymentData] = useState<any>(null);
-  const [smsValidationEnabled, setSmsValidationEnabled] = useState(true);
+  const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
+  const [presenceVerified, setPresenceVerified] = useState<PresenceConfirmationData | null>(null);
   const [clientTontines, setClientTontines] = useState<ClientTontine[]>([]);
   const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
   const [loadingTontines, setLoadingTontines] = useState(false);
@@ -80,7 +82,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   useEffect(() => {
     loadAgents();
     loadClients();
-    loadSystemSettings();
+    loadSecurityConfig();
   }, []);
 
   useEffect(() => {
@@ -95,16 +97,24 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
   }, [formData.client_id, formData.type_paiement]);
 
-  const loadSystemSettings = async () => {
+  const loadSecurityConfig = async () => {
     try {
-      const response = await fetch('/api/system-settings', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setSmsValidationEnabled(data.sms_payment_validation_enabled !== false);
-      }
+      const config = await securityConfigApi.getConfig();
+      setSecurityConfig(config);
     } catch (error) {
-      console.error('Erreur chargement paramètres:', error);
+      console.error('Erreur chargement config sécurité:', error);
     }
+  };
+
+  // Détermine si une opération nécessite la vérification de présence du titulaire
+  const requiresPresenceVerification = (typePaiement: string): boolean => {
+    if (!securityConfig?.requireAccountHolderPresence) return false;
+    // Pour les agents terrain, seuls certains types de paiement requièrent la présence
+    // Par exemple: retrait d'épargne, décaissement crédit
+    const operationsRequiringPresence = ['Retrait Épargne', 'Décaissement Crédit'];
+    return operationsRequiringPresence.some(op =>
+      typePaiement.toLowerCase().includes(op.toLowerCase().replace('Retrait ', '').replace('Décaissement ', ''))
+    );
   };
 
   const loadAgents = async () => {
@@ -227,11 +237,23 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         membreId: selectedTontine?.id || null
       };
 
-      if (smsValidationEnabled) {
+      // Décider du type de validation selon la configuration de sécurité
+      // Note: Les paiements agents sont généralement des encaissements (dépôts)
+      // Seuls certains types (retrait épargne) nécessitent une présence
+      const needsPresenceVerification = requiresPresenceVerification(formData.type_paiement);
+
+      if (securityConfig?.otpEnabled) {
+        // OTP activé - ancienne logique (non utilisée car pas d'API SMS)
         setPendingPaymentData(paiementData);
-        setShowOTPModal(true);
+        // Note: OTP modal retiré car OTP désactivé
+        await finaliserPaiementDirect(paiementData);
+      } else if (needsPresenceVerification) {
+        // Opération nécessitant la présence du titulaire
+        setPendingPaymentData(paiementData);
+        setShowPresenceModal(true);
       } else {
-        await finaliserPaiementSansOTP(paiementData);
+        // Paiement standard (tontine, crédit, etc.) - exécuter directement
+        await finaliserPaiementDirect(paiementData);
       }
 
     } catch (error: any) {
@@ -241,7 +263,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
   };
 
-  const finaliserPaiementSansOTP = async (paiementData: any) => {
+  // Finaliser le paiement directement (sans validation OTP)
+  const finaliserPaiementDirect = async (paiementData: any, presenceData?: PresenceConfirmationData) => {
     try {
       const response = await fetch('/api/paiements-terrain', {
         method: 'POST',
@@ -249,8 +272,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         credentials: 'include',
         body: JSON.stringify({
           ...paiementData,
-          statut: 'Validé (sans SMS)',
-          validation_id: null
+          statut: presenceData ? 'Validé (présence titulaire)' : 'Validé',
+          validation_id: null,
+          presence_verification: presenceData || null
         })
       });
 
@@ -275,6 +299,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         }
       }
 
+      const validationMethod = presenceData
+        ? `Présence titulaire vérifiée (${presenceData.verificationMethod === 'piece_identite' ? 'Pièce d\'identité' : presenceData.verificationMethod === 'reconnaissance_visuelle' ? 'Client connu' : 'Signature'})`
+        : 'Validation directe';
+
       await fetch('/api/client-activities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -282,10 +310,15 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         body: JSON.stringify({
           client_id: paiementData.client_id,
           activity_type: 'paiement',
-          activity_description: `Paiement ${paiementData.type_paiement} - ${paiementData.montant.toLocaleString()} FCFA via ${paiementData.methode_paiement} (Agent terrain - Validé sans OTP)`,
+          activity_description: `Paiement ${paiementData.type_paiement} - ${paiementData.montant.toLocaleString()} FCFA via ${paiementData.methode_paiement} (Agent terrain - ${validationMethod})`,
           amount: paiementData.montant
         })
       });
+
+      // Stocker la vérification de présence pour affichage UI
+      if (presenceData) {
+        setPresenceVerified(presenceData);
+      }
 
       if (paiementData.visite_id) {
         await fetch(`/api/visites-terrain/${paiementData.visite_id}`, {
@@ -311,81 +344,21 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
   };
 
-  const handleOTPSuccess = async (validationData: any) => {
+  // Gestion de la confirmation de présence du titulaire
+  const handlePresenceConfirm = async (presenceData: PresenceConfirmationData) => {
+    if (!pendingPaymentData) return;
+
+    setShowPresenceModal(false);
+    setLoading(true);
+
     try {
-      if (!pendingPaymentData) return;
-
-      setLoading(true);
-
-      const response = await fetch('/api/paiements-terrain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ...pendingPaymentData,
-          statut: 'Validé',
-          validation_id: validationData.isValidation_id
-        })
-      });
-
-      if (!response.ok) throw new Error('Erreur lors de l\'enregistrement');
-
-      if (isTontinePayment && selectedTontine) {
-        const cotisationResponse = await fetch(`/api/tontines/${selectedTontine.tontineId}/cotisation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            clientId: pendingPaymentData.client_id,
-            montant: pendingPaymentData.montant,
-            methodePaiement: pendingPaymentData.methode_paiement,
-            reference: pendingPaymentData.reference
-          })
-        });
-        
-        if (!cotisationResponse.ok) {
-          const errorData = await cotisationResponse.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Erreur lors de l\'enregistrement de la cotisation tontine');
-        }
-      }
-
-      await fetch('/api/client-activities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          client_id: pendingPaymentData.client_id,
-          activity_type: 'paiement',
-          activity_description: `Paiement ${pendingPaymentData.type_paiement} - ${pendingPaymentData.montant.toLocaleString()} FCFA via ${pendingPaymentData.methode_paiement} (Agent terrain - Validé par OTP)`,
-          amount: pendingPaymentData.montant
-        })
-      });
-
-      if (pendingPaymentData.visite_id) {
-        await fetch(`/api/visites-terrain/${pendingPaymentData.visite_id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            montant_collecte: pendingPaymentData.montant,
-            statut: 'Effectuée'
-          })
-        });
-      }
-
-      setShowOTPModal(false);
-      setPendingPaymentData(null);
-      
-      // Store payment info (merged with validation status implicitly) and show success modal
-      setLastPaymentInfo(pendingPaymentData);
-      setShowSuccessModal(true);
-
+      await finaliserPaiementDirect(pendingPaymentData, presenceData);
     } catch (error: any) {
       console.error('Erreur:', error);
-      setErrors({ submit: error.error });
-      setShowOTPModal(false);
+      setErrors({ submit: error.message || 'Erreur lors du paiement' });
     } finally {
       setLoading(false);
+      setPendingPaymentData(null);
     }
   };
 
@@ -426,6 +399,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const handleCloseSuccess = () => {
     setShowSuccessModal(false);
     setLastPaymentInfo(null);
+    setPresenceVerified(null);
     onSuccess(); // Trigger parent close/refresh logic
   };
 
@@ -446,10 +420,30 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               <Check size={32} strokeWidth={3} />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">Paiement Validé !</h3>
-            <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+            <p className="text-slate-400 mb-4 text-sm leading-relaxed">
               Le paiement de <strong className="text-white font-mono text-base ml-1">{lastPaymentInfo?.montant?.toLocaleString()} FCFA</strong> a été enregistré avec succès.
             </p>
-            
+
+            {/* Indicateur de présence vérifiée */}
+            {presenceVerified && (
+              <div className="bg-blue-950/30 border border-blue-500/30 rounded-lg p-3 mb-4 text-left">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserCheck size={14} className="text-blue-400" />
+                  <span className="text-xs font-semibold text-blue-300">Présence titulaire vérifiée</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-[10px] text-blue-300 border border-blue-500/20">
+                    {presenceVerified.verificationMethod === 'piece_identite' && "Pièce d'identité"}
+                    {presenceVerified.verificationMethod === 'reconnaissance_visuelle' && 'Client connu'}
+                    {presenceVerified.verificationMethod === 'signature' && 'Signature'}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-300 border border-emerald-500/20">
+                    Identité confirmée
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
               <Button 
                 variant="secondary" 
@@ -725,23 +719,21 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         </form>
       </Modal>
 
-      {showOTPModal && pendingPaymentData && selectedClient && (
-        <OTPValidationModal
-          isOpen={showOTPModal}
+      {/* Modal de confirmation de présence du titulaire */}
+      {showPresenceModal && pendingPaymentData && selectedClient && (
+        <AccountHolderPresenceModal
+          isOpen={showPresenceModal}
           onClose={() => {
-            setShowOTPModal(false);
+            setShowPresenceModal(false);
             setPendingPaymentData(null);
             setLoading(false);
           }}
-          onSuccess={handleOTPSuccess}
-          transactionType={`PAIEMENT_${formData.type_paiement.toUpperCase()}`}
-          transactionReference={pendingPaymentData.reference}
-          clientId={formData.client_id}
-          clientName={selectedClient.nom}
-          clientPhone={selectedClient.phone || formData.numero_telephone}
-          montant={pendingPaymentData.montant}
-          createdBy={pendingPaymentData.userId}
-          createdByRole="AGENT_TERRAIN"
+          onConfirm={handlePresenceConfirm}
+          clientName={`${selectedClient.nom} ${selectedClient.prenom || ''}`}
+          clientPhone={selectedClient.phone || selectedClient.telephone}
+          operationType={formData.type_paiement}
+          amount={pendingPaymentData.montant}
+          isLoading={loading}
         />
       )}
     </>
