@@ -11,7 +11,7 @@ import { LucideIcon } from 'lucide-react';
  */
 
 export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'outline';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -43,6 +43,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     // Size classes (mobile-first with responsive scaling)
     const sizeClasses = {
+      xs: 'px-2 py-1 text-xs',
       sm: 'px-3 py-2 text-sm',
       md: 'px-4 py-2.5 text-sm sm:text-base',
       lg: 'px-6 py-3 text-base sm:text-lg',
@@ -116,6 +117,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     // Icon size based on button size
     const iconSize = {
+      xs: 14,
       sm: 16,
       md: 18,
       lg: 20,

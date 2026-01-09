@@ -69,48 +69,117 @@ export function registerOperationsRoutes(app: Express) {
   
 
   // Create Paiement Terrain (roles: admin, chef, terrain, superviseur)
-  // Now using atomic ledger flow
+  // Now creates a PENDING payment that needs validation
   app.post("/api/paiements-terrain", requireAuth, requireRole('admin', 'chef', 'terrain', 'superviseur'), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user;
 
-        // Use atomic ledger function
-        const { paiement, mouvement } = await storage.createPaiementTerrainWithLedger({
+        // Create PENDING payment
+        // Storage function now handles creating "En attente" payment without immediate ledger impact
+        const paiement = await storage.createPendingPaiementTerrain({
           agentId: data.agentId,
           clientId: data.clientId,
           creditId: data.creditId,
           compteId: data.compteId,
+          visiteId: data.visiteId,
           montant: data.montant,
           typePaiement: data.typePaiement || 'Paiement Crédit',
+          methodePaiement: data.methodePaiement || 'Espèces',
+          numeroTelephone: data.numeroTelephone,
+          numeroTransaction: data.numeroTransaction,
+          reference: data.reference || `PAY-${Date.now()}`,
+          notes: data.notes,
           latitude: data.latitude,
           longitude: data.longitude,
           idempotencyKey: data.idempotencyKey,
+          presenceVerification: data.presenceVerification,
+          tontineId: data.tontineId,
+          membreId: data.membreId
         }, user?.id);
         
-        // WebSocket notifications managed by outbox worker
-        // Additional backward compatible notifications if needed
+        // Notify admins/managers of new pending payment
         const wsInstance = require("../ws-server").getWsInstance();
         if (wsInstance) {
-            wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_new', id: paiement.id } });
-            
-            // Notify specific client channel
-             if (paiement.clientId) {
-               wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: paiement.clientId } });
-            }
+            wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_pending', id: paiement.id } });
         }
         
-        res.status(201).json(addSnakeCaseAliasesDeep({ ...paiement, mouvement_id: mouvement.id }));
+        res.status(201).json(addSnakeCaseAliasesDeep(paiement));
       } catch (error: any) {
         console.error('Error creating paiement terrain:', error);
         res.status(400).json({ error: error.message || "Invalid data" });
       }
   });
 
+  // Validate Paiement Terrain (roles: admin, chef, superviseur)
+  app.post("/api/paiements-terrain/:id/validate", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.session.user;
+
+      const { paiement, mouvement } = await storage.validatePaiementTerrain(id, user?.id || 'system');
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_validated', id: paiement.id } });
+          
+          if (paiement.clientId) {
+            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: paiement.clientId } });
+         }
+      }
+
+      res.json(addSnakeCaseAliasesDeep({ ...paiement, mouvement_id: mouvement.id }));
+    } catch (error: any) {
+      console.error('Error validating paiement terrain:', error);
+      res.status(400).json({ error: error.message || "Error validating payment" });
+    }
+  });
+
+  // Reject Paiement Terrain
+  app.post("/api/paiements-terrain/:id/reject", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      const paiement = await storage.rejectPaiementTerrain(id, reason || 'Rejeté par administrateur');
+
+      // Notify
+      const wsInstance = require("../ws-server").getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_rejected', id: paiement.id } });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(paiement));
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Error rejecting payment" });
+    }
+  });
+
   // Paiements
   app.get("/api/paiements-terrain", requireAuth, async (req, res) => {
-      const list = await storage.getAllPaiementsTerrain();
-      res.json(addSnakeCaseAliasesDeep(list));
+      try {
+        const user = req.session.user;
+        let agenceId: string | undefined;
+
+        // For chef d'agence, automatically filter by their agency
+        if (user?.role === 'chef' || user?.role === 'chef_agence') {
+          // Get employe record to find agenceId
+          const employe = await storage.getEmployeByUserId(user.id);
+          agenceId = employe?.agenceId || undefined;
+        } else if (user?.role === 'admin' || user?.role === 'admin_generale' || user?.role === 'Administrateur') {
+          // For admin, use query parameter (optional)
+          agenceId = req.query.agenceId as string | undefined;
+          if (agenceId === 'all') agenceId = undefined;
+        }
+
+        // Use the new getPendingPaiementsByAgence function
+        const list = await storage.getPendingPaiementsByAgence(agenceId);
+        res.json(addSnakeCaseAliasesDeep(list));
+      } catch (error: any) {
+        console.error('Error fetching paiements terrain:', error);
+        res.status(500).json({ error: 'Failed to fetch payments' });
+      }
   });
 
   // Zones

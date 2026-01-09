@@ -253,6 +253,7 @@ export interface IStorage {
     getPaiementTerrain(id: string): Promise<PaiementTerrain | undefined>;
     getPaiementsByAgent(agentId: string): Promise<PaiementTerrain[]>;
     getAllPaiementsTerrain(): Promise<PaiementTerrain[]>;
+    getPendingPaiementsByAgence(agenceId?: string): Promise<PaiementTerrain[]>;
     createPaiementTerrain(paiement: InsertPaiementTerrain): Promise<PaiementTerrain>;
     createPaiementTerrainWithLedger(data: {
       agentId: string;
@@ -266,6 +267,28 @@ export interface IStorage {
       idempotencyKey?: string;
     }, userId?: string): Promise<{ paiement: PaiementTerrain; mouvement: any }>;
     updatePaiementTerrain(id: string, paiement: Partial<InsertPaiementTerrain>): Promise<PaiementTerrain | undefined>;
+    createPendingPaiementTerrain(data: {
+      agentId: string;
+      clientId: string;
+      visiteId?: string;
+      creditId?: string;
+      compteId?: string;
+      tontineId?: string;
+      membreId?: string;
+      montant: string;
+      typePaiement: string;
+      methodePaiement: string;
+      numeroTelephone?: string;
+      numeroTransaction?: string;
+      reference: string;
+      notes?: string;
+      latitude?: string;
+      longitude?: string;
+      idempotencyKey?: string;
+      presenceVerification?: any;
+    }, userId?: string): Promise<PaiementTerrain>;
+    validatePaiementTerrain(paiementId: string, validatedBy: string): Promise<{ paiement: PaiementTerrain; mouvement: any }>;
+    rejectPaiementTerrain(id: string, reason: string): Promise<PaiementTerrain>;
 
     // Zones
     getZone(id: string): Promise<Zone | undefined>;

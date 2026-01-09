@@ -232,7 +232,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         type_paiement: formData.type_paiement,
         reference,
         notes: formData.notes.trim(),
-        statut: 'En attente',
+        statut: 'Pending',
         tontineId: selectedTontine?.tontineId || null,
         membreId: selectedTontine?.id || null
       };
@@ -272,7 +272,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         credentials: 'include',
         body: JSON.stringify({
           ...paiementData,
-          statut: presenceData ? 'Validé (présence titulaire)' : 'Validé',
+          // statut: 'Pending', // Already set in paiementData, server enforces it anyway
           validation_id: null,
           presence_verification: presenceData || null
         })
@@ -416,12 +416,12 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       {showSuccessModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center transform scale-100 animate-in zoom-in-95">
-            <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-green-500/10 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
-              <Check size={32} strokeWidth={3} />
+            <div className="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-amber-500/10 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+              <CheckCircle2 size={32} strokeWidth={3} />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Paiement Validé !</h3>
+            <h3 className="text-xl font-bold text-white mb-2">Paiement Enregistré</h3>
             <p className="text-slate-400 mb-4 text-sm leading-relaxed">
-              Le paiement de <strong className="text-white font-mono text-base ml-1">{lastPaymentInfo?.montant?.toLocaleString()} FCFA</strong> a été enregistré avec succès.
+              Le paiement de <strong className="text-white font-mono text-base ml-1">{lastPaymentInfo?.montant?.toLocaleString()} FCFA</strong> a été soumis et est <strong>en attente de validation</strong>.
             </p>
 
             {/* Indicateur de présence vérifiée */}
@@ -429,16 +429,13 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               <div className="bg-blue-950/30 border border-blue-500/30 rounded-lg p-3 mb-4 text-left">
                 <div className="flex items-center gap-2 mb-2">
                   <UserCheck size={14} className="text-blue-400" />
-                  <span className="text-xs font-semibold text-blue-300">Présence titulaire vérifiée</span>
+                  <span className="text-xs font-semibold text-blue-300">Présence vérifiée (Pour Validation)</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-[10px] text-blue-300 border border-blue-500/20">
                     {presenceVerified.verificationMethod === 'piece_identite' && "Pièce d'identité"}
                     {presenceVerified.verificationMethod === 'reconnaissance_visuelle' && 'Client connu'}
                     {presenceVerified.verificationMethod === 'signature' && 'Signature'}
-                  </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-300 border border-emerald-500/20">
-                    Identité confirmée
                   </span>
                 </div>
               </div>

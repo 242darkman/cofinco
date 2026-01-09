@@ -4,7 +4,7 @@ import { z } from "zod";
 import { users } from "./auth";
 import { clients } from "./clients";
 import { agences } from "./agences";
-import { sessionsCaisse, operationsCaisse, mouvementsFinanciers } from "./finance";
+import { sessionsCaisse, operationsCaisse, mouvementsFinanciers, credits, comptes } from "./finance";
 import { employes } from "./employes";
 import { methodePaiementEnum, statutTransactionEnum, typePaiementTerrainEnum } from "@shared/enum/enums";
 import { sql } from "drizzle-orm";
@@ -192,6 +192,11 @@ export const paiementsTerrain = pgTable(
     // Pivot ledger
     mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
 
+    // Links to specific financial products (Credit/Compte/Tontine)
+    creditId: uuid("credit_id").references(() => credits.id, { onDelete: "set null" }),
+    compteId: uuid("compte_id").references(() => comptes.id, { onDelete: "set null" }),
+    tontineId: uuid("tontine_id"), // Soft reference for now
+
     // Statut standard
     statut: statutTransactionEnum("statut").notNull().default("Pending"),
 
@@ -222,6 +227,8 @@ export const paiementsTerrain = pgTable(
     idxSessionRemise: index("idx_paiements_terrain_session_remise").on(t.sessionCaisseRemiseId),
 
     idxMvt: index("idx_paiements_terrain_mouvement").on(t.mouvementId),
+    idxCredit: index("idx_paiements_terrain_credit").on(t.creditId),
+    idxCompte: index("idx_paiements_terrain_compte").on(t.compteId),
 
     uqRef: uniqueIndex("uq_paiements_terrain_reference").on(t.reference),
     uqIdempotency: uniqueIndex("uq_paiements_terrain_idempotency").on(t.idempotencyKey),

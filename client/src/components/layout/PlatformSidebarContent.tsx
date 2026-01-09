@@ -150,31 +150,31 @@ export default function PlatformSidebarContent({
         aria-current={isActive ? 'page' : undefined}
         className={`
           group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-          transition-all duration-200 text-sm
+          transition-all duration-300 text-sm overflow-hidden
           ${!sidebarOpen ? 'justify-center' : ''}
           ${isActive
-            ? 'bg-accent/15 text-accent font-medium'
+            ? 'bg-gradient-to-r from-accent/15 via-accent/5 to-transparent text-accent font-semibold shadow-sm ring-1 ring-accent/10'
             : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover'
           }
           ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
       >
-        {/* Active indicator */}
+        {/* Active indicator with Glow */}
         {isActive && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-accent rounded-r-full" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-accent rounded-r-full shadow-[0_0_12px_rgba(var(--accent-primary),0.6)]" />
         )}
 
         {Icon && (
           <Icon
             size={20}
-            className={`shrink-0 transition-colors ${isActive ? 'text-accent' : ''}`}
+            className={`shrink-0 transition-colors duration-300 ${isActive ? 'text-accent drop-shadow-sm' : 'group-hover:text-sidebar-text-active'}`}
             aria-hidden="true"
           />
         )}
 
         {sidebarOpen && (
           <>
-            <span className="flex-1 text-left truncate">
+            <span className={`flex-1 text-left truncate transition-all duration-300 ${isActive ? 'translate-x-1' : ''}`}>
               {t(route.labelKey || route.key)}
             </span>
             {isDisabled && (

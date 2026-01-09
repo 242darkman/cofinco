@@ -1,7 +1,7 @@
-import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels } from "@shared/schema";
+import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels, clients, users } from "@shared/schema";
 import { type AgentTerrain, type InsertAgentTerrain, type Prospection, type InsertProspection, type VisiteTerrain, type InsertVisiteTerrain, type PaiementTerrain, type InsertPaiementTerrain, type Employe, type InsertEmploye, type PosDevice, type InsertPosDevice, type Notification, type InsertNotification, type OtpValidation, type InsertOtpValidation, type Zone, type InsertZone, type ObjectifMensuel, type InsertObjectifMensuel } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, sql, gte } from "drizzle-orm";
+import { eq, desc, and, or, sql, gte } from "drizzle-orm";
 
 // Agents Terrain
 export async function getAgentTerrain(id: string): Promise<AgentTerrain | undefined> {
@@ -136,7 +136,96 @@ export async function getPaiementsByAgent(agentId: string): Promise<PaiementTerr
 }
 
 export async function getAllPaiementsTerrain(): Promise<PaiementTerrain[]> {
-  return db.select().from(paiementsTerrain).orderBy(desc(paiementsTerrain.createdAt));
+  const results = await db
+    .select({
+      paiement: paiementsTerrain,
+      client: clients,
+      agent: agentsTerrain,
+      employe: employes,
+      user: users
+    })
+    .from(paiementsTerrain)
+    .leftJoin(clients, eq(paiementsTerrain.clientId, clients.id))
+    .leftJoin(agentsTerrain, eq(paiementsTerrain.agentId, agentsTerrain.id))
+    .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .leftJoin(users, eq(employes.userId, users.id))
+    .orderBy(desc(paiementsTerrain.createdAt));
+
+  return results.map(row => {
+    // Determine agent name: prefer User (via employe), fallback to Agent Legacy
+    const agentNom = row.user?.nom || row.agent?.nom || "Inconnu";
+    const agentPrenom = row.user?.prenom || row.agent?.prenom || "";
+    
+    return {
+      ...row.paiement,
+      clients: row.client ? { 
+        nom: row.client.nom, 
+        prenom: row.client.prenom, 
+        telephone: row.client.telephone,
+        photoProfile: row.client.photoProfile
+      } : undefined,
+      agents_terrain: row.agent ? { 
+        nom: agentNom, 
+        prenom: agentPrenom 
+      } : undefined
+    };
+  });
+}
+
+/**
+ * Get pending terrain payments filtered by agency
+ * Used for agency-based access control (chef d'agence sees only their agency)
+ */
+export async function getPendingPaiementsByAgence(agenceId?: string): Promise<PaiementTerrain[]> {
+  let query = db
+    .select({
+      paiement: paiementsTerrain,
+      client: clients,
+      agent: agentsTerrain,
+      employe: employes,
+      user: users
+    })
+    .from(paiementsTerrain)
+    .leftJoin(clients, eq(paiementsTerrain.clientId, clients.id))
+    .leftJoin(agentsTerrain, eq(paiementsTerrain.agentId, agentsTerrain.id))
+    .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .leftJoin(users, eq(employes.userId, users.id))
+    .$dynamic();
+
+  // Filter by pending status and optionally by agency
+  const conditions = [
+    eq(paiementsTerrain.statut, "Pending")
+  ];
+
+  if (agenceId) {
+    // Only include payments where employe exists AND matches the agency
+    conditions.push(sql`${employes.agenceId} IS NOT NULL`);
+    conditions.push(eq(employes.agenceId, agenceId));
+  }
+
+  query = query.where(and(...conditions));
+
+  const results = await query.orderBy(desc(paiementsTerrain.createdAt));
+
+  return results.map(row => {
+    // Determine agent name: prefer User (via employe), fallback to Agent Legacy
+    const agentNom = row.user?.nom || row.agent?.nom || "Inconnu";
+    const agentPrenom = row.user?.prenom || row.agent?.prenom || "";
+    
+    return {
+      ...row.paiement,
+      clients: row.client ? { 
+        nom: row.client.nom, 
+        prenom: row.client.prenom, 
+        telephone: row.client.telephone,
+        photoProfile: row.client.photoProfile
+      } : undefined,
+      agents_terrain: row.agent ? { 
+        nom: agentNom, 
+        prenom: agentPrenom 
+      } : undefined
+    };
+  });
 }
 
 export async function createPaiementTerrain(insertPaiement: InsertPaiementTerrain): Promise<PaiementTerrain> {
@@ -359,6 +448,173 @@ import { credits } from "@shared/schema";
  * - Creates paiement_terrain with mouvement_id
  * - Publishes outbox events
  */
+
+/**
+ * Create a pending terrain payment (Waiting for validation)
+ * - Creates paiement_terrain with status "Pending"
+ * - NO ledger movement created yet
+ */
+export async function createPendingPaiementTerrain(data: {
+  agentId: string;
+  clientId: string;
+  visiteId?: string;
+  creditId?: string; // Optionnel (pour remboursement crédit)
+  compteId?: string; // Optionnel (pour dépôt)
+  tontineId?: string; // Optionnel (pour tontine)
+  membreId?: string; // Optionnel (pour tontine)
+  montant: string;
+  typePaiement: string;
+  methodePaiement: string;
+  numeroTelephone?: string;
+  numeroTransaction?: string;
+  reference: string;
+  notes?: string;
+  latitude?: string;
+  longitude?: string;
+  idempotencyKey?: string;
+  presenceVerification?: any;
+}, userId?: string): Promise<PaiementTerrain> {
+  
+  // Check idempotency if key provided
+  if (data.idempotencyKey) {
+    const existing = await db.select().from(paiementsTerrain).where(eq(paiementsTerrain.idempotencyKey, data.idempotencyKey));
+    if (existing.length > 0) return existing[0];
+  }
+
+  const [paiement] = await db.insert(paiementsTerrain).values({
+    agentId: data.agentId,
+    clientId: data.clientId,
+    creditId: data.creditId,
+    compteId: data.compteId,
+    // mouvementId: null, // Pas d'impact financier immédiat
+    montant: data.montant.toString(),
+    typePaiement: data.typePaiement as any,
+    methodePaiement: data.methodePaiement as any,
+    numeroTelephone: data.numeroTelephone,
+    referenceExterne: data.numeroTransaction,
+    reference: data.reference,
+    observations: data.notes,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    idempotencyKey: data.idempotencyKey,
+    statut: "Pending", // En attente de validation
+    validationOTP: data.presenceVerification ? "REQUIRED" : null, // Marqueur simple pour indiquer verification requise
+    // Si présence déjà vérifiée à la soumission, on peut le stocker dans observations ou un champ dédié si ajouté
+    createdBy: userId
+  } as any).returning();
+
+  return paiement;
+}
+
+/**
+ * Validate a pending terrain payment
+ * - Creates the ledger movement (mouvement_financier)
+ * - Updates balances (Credit/Compte/Session/Agent)
+ * - Updates paiement_terrain status to "Posté" (Validé)
+ */
+export async function validatePaiementTerrain(
+  paiementId: string, 
+  validatedBy: string
+): Promise<{ paiement: PaiementTerrain; mouvement: MouvementFinancier }> {
+  
+  const paiement = await getPaiementTerrain(paiementId);
+  if (!paiement) throw new Error("Paiement non trouvé");
+  if (paiement.statut !== "Pending") throw new Error(`Paiement déjà traité (Statut: ${paiement.statut})`);
+
+  return executeWithLedger(
+    "TERRAIN",
+    {
+      montant: paiement.montant,
+      sens: "Crédit", // Entrée d'argent
+      clientId: paiement.clientId,
+      creditId: paiement.creditId || undefined,
+      compteId: paiement.compteId || undefined,
+      agentId: paiement.agentId,
+      methodePaiement: paiement.methodePaiement || "Espèces",
+      typePaiement: paiement.typePaiement || "Autre",
+      referenceExterne: paiement.referenceExterne || undefined,
+      // On utilise l'ID du paiement comme idempotency key pour le mouvement pour garantir 1-1
+      idempotencyKey: `val-${paiement.id}`, 
+      metadata: {
+        paiementId: paiement.id,
+        validatedBy
+      }
+    },
+    async (tx, mouvement) => {
+      // 1. Update credit solde if applicable
+      let nouveauSoldeCredit: string | undefined;
+      if (paiement.creditId) {
+        nouveauSoldeCredit = await updateCreditSolde(tx, paiement.creditId, -parseFloat(paiement.montant));
+      }
+
+      // 2. Update agent stats (totalPaiements) - C'est ici qu'on confirme la "performance" financière
+      await tx.update(agentsTerrain)
+        .set({ 
+          totalPaiements: sql`COALESCE(${agentsTerrain.totalPaiements}, '0')::numeric + ${paiement.montant}::numeric`,
+          updatedAt: new Date()
+        })
+        .where(eq(agentsTerrain.id, paiement.agentId));
+
+      // 3. Update paiement terrain status
+      const [updatedPaiement] = await tx.update(paiementsTerrain)
+        .set({
+          statut: "Posté", // Contrat: Posté = Validé avec impact financier
+          mouvementId: mouvement.id,
+          dateValidation: new Date(),
+          // Nous n'avons pas de champ validePar dans le schema actuel de paiementsTerrain, 
+          // on l'ajoute dans observations ou on suppose que le log d'activité suffit.
+          // Idéalement on ajouterait validePar au schema.
+        } as any)
+        .where(and(
+          eq(paiementsTerrain.id, paiementId),
+          eq(paiementsTerrain.statut, "Pending")
+        ))
+        .returning();
+
+      if (!updatedPaiement) {
+        throw new Error("Impossible de valider : le paiement n'est plus en attente (Conflit de modification)");
+      }
+
+      return {
+        result: updatedPaiement,
+        additionalEventData: {
+          nouveauSoldeCredit,
+          agentId: paiement.agentId,
+        },
+      };
+    },
+    validatedBy
+  ).then(({ result, mouvement }) => ({ paiement: result, mouvement }));
+}
+
+/**
+ * Rejeter un paiement
+ */
+export async function rejectPaiementTerrain(id: string, reason: string): Promise<PaiementTerrain> {
+  const [paiement] = await db.update(paiementsTerrain)
+    .set({
+      statut: "Annulé",
+      observations: sql`${paiementsTerrain.observations} || '\nRejeté: ' || ${reason}`
+    } as any)
+    .where(and(
+      eq(paiementsTerrain.id, id),
+      eq(paiementsTerrain.statut, "Pending")
+    ))
+    .returning();
+  
+  if (!paiement) {
+    const existing = await getPaiementTerrain(id);
+    if (!existing) throw new Error("Paiement non trouvé");
+    throw new Error(`Impossible de rejeter : le paiement est en statut '${existing.statut}'`);
+  }
+  
+  return paiement;
+}
+
+/**
+ * Wrapper for backward compatibility or direct calls if needed (e.g. tests)
+ * Replaces the old createPaiementTerrainWithLedger
+ */
 export async function createPaiementTerrainWithLedger(data: {
   agentId: string;
   clientId: string;
@@ -370,62 +626,15 @@ export async function createPaiementTerrainWithLedger(data: {
   longitude?: string;
   idempotencyKey?: string;
 }, userId?: string): Promise<{ paiement: PaiementTerrain; mouvement: MouvementFinancier }> {
-  
-  return executeWithLedger(
-    "TERRAIN",
-    {
-      montant: data.montant,
-      sens: "Crédit" as SensMouvement, // Money coming in
-      clientId: data.clientId,
-      creditId: data.creditId,
-      compteId: data.compteId,
-      agentId: data.agentId,
-      methodePaiement: "Espèces",
-      typePaiement: data.typePaiement as any,
-      idempotencyKey: data.idempotencyKey,
-    },
-    async (tx, mouvement) => {
-      // 1. Update credit solde if this is a credit repayment
-      let nouveauSoldeCredit: string | undefined;
-      if (data.creditId) {
-        nouveauSoldeCredit = await updateCreditSolde(tx, data.creditId, -parseFloat(data.montant));
-      }
+  // 1. Create pending
+  const pending = await createPendingPaiementTerrain({
+    ...data,
+    methodePaiement: "Espèces",
+    reference: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+  } as any, userId);
 
-      // 2. Update agent stats (totalPaiements)
-      await tx.update(agentsTerrain)
-        .set({ 
-          totalPaiements: sql`COALESCE(${agentsTerrain.totalPaiements}, '0')::numeric + ${data.montant}::numeric`,
-          updatedAt: new Date()
-        })
-        .where(eq(agentsTerrain.id, data.agentId));
-
-      // 3. Create paiement terrain
-      const [paiement] = await tx.insert(paiementsTerrain).values({
-        agentId: data.agentId,
-        clientId: data.clientId,
-        creditId: data.creditId,
-        compteId: data.compteId,
-        mouvementId: mouvement.id,
-        montant: data.montant,
-        typePaiement: data.typePaiement as any,
-        methodePaiement: "Espèces",
-        reference: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Simple generation or reuse mouvement reference? Mouvement ref is unique for ledger.
-        // datePaiement removed, using createdAt default
-        latitude: data.latitude,
-        longitude: data.longitude,
-        statut: "Validé",
-      } as any).returning();
-
-      return {
-        result: paiement,
-        additionalEventData: {
-          nouveauSoldeCredit,
-          agentId: data.agentId,
-        },
-      };
-    },
-    userId
-  ).then(({ result, mouvement }) => ({ paiement: result, mouvement }));
+  // 2. Validate immediately
+  return validatePaiementTerrain(pending.id, userId || 'system');
 }
 
 /**

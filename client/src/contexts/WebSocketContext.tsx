@@ -250,6 +250,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          queryClient.invalidateQueries({ queryKey: ["/api/prospections"] });
          queryClient.invalidateQueries({ queryKey: ["/api/zones"] });
          queryClient.invalidateQueries({ queryKey: ["/api/objectifs-mensuels"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/paiements-terrain"] });
          break;
 
       case "SETTINGS_UPDATE":

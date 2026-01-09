@@ -32,6 +32,7 @@ import AdminCreditsGestion from './AdminCreditsGestion';
 import RolesPermissionsManager from './permissions/RolesPermissionsManager';
 import ModulePermissionsView from './permissions/ModulePermissionsView';
 import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
+import AdminValidationTerrain from './AdminValidationTerrain';
 
 interface AdminModuleCompletProps {
   activeView?: string;
@@ -248,6 +249,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
             {activeTab === 'settings' && <AdminSystemSettings />}
             {activeTab === 'sms' && <AdminSmsSettings />}
             {activeTab === 'updates' && <AdminVersionInfo />}
+            {activeTab === 'validations' && <AdminValidationTerrain />}
 
             {activeTab === 'roles' && (
               <RolesPermissionsManager
