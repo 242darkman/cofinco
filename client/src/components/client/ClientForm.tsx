@@ -432,28 +432,39 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                             <Upload size={18} />
                             Importer
                          </div>
-                         <input type="file" multiple accept="image/*" onChange={handleDocUpload} className="hidden" />
+                         {/* ACCEPT PDF */}
+                         <input type="file" multiple accept="image/*,application/pdf" onChange={handleDocUpload} className="hidden" />
                      </label>
                 </div>
 
                 {pieceIdentite.length > 0 && (
                      <div className="grid grid-cols-3 gap-2 mt-2">
-                        {pieceIdentite.map((img, idx) => (
-                            <div key={idx} className="relative group">
-                                <img src={img} className="w-full h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm" />
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const newPieces = pieceIdentite.filter((_, i) => i !== idx);
-                                        setPieceIdentite(newPieces);
-                                        handleChange('photoUrl', JSON.stringify(newPieces));
-                                    }}
-                                    className="absolute -top-1.5 -right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                                >
-                                    <Trash2 size={12} />
-                                </button>
-                            </div>
-                        ))}
+                        {pieceIdentite.map((doc, idx) => {
+                            const isPdf = doc.startsWith('data:application/pdf');
+                            return (
+                                <div key={idx} className="relative group">
+                                    {isPdf ? (
+                                        <div className="w-full h-20 bg-red-500/10 border border-red-500/30 rounded-lg flex flex-col items-center justify-center p-2">
+                                            <FileText className="text-red-500 mb-1" size={24} />
+                                            <span className="text-[10px] text-red-500 font-medium">PDF</span>
+                                        </div>
+                                    ) : (
+                                        <img src={doc} className="w-full h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm" />
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const newPieces = pieceIdentite.filter((_, i) => i !== idx);
+                                            setPieceIdentite(newPieces);
+                                            handleChange('photoUrl', JSON.stringify(newPieces));
+                                        }}
+                                        className="absolute -top-1.5 -right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
+                            );
+                        })}
                      </div>
                 )}
              </div>
