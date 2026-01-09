@@ -28,7 +28,27 @@ export async function logAudit(
       status,
       riskLevel,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === '23503' && error.constraint === 'audit_logs_user_id_users_id_fk') {
+      // User likely deleted or invalid session, retry as anonymous
+      try {
+        await db.insert(auditLogs).values({
+          userId: null,
+          action,
+          resource,
+          resourceId,
+          details: { ...details, original_user_id: req.session?.userId },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
+          status,
+          riskLevel,
+        });
+        console.warn('Audit log logged as anonymous due to missing user:', req.session?.userId);
+        return;
+      } catch (retryError) {
+        console.error('Audit log retry error:', retryError);
+      }
+    }
     console.error('Audit log error:', error);
   }
 }
