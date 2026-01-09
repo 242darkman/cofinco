@@ -11,6 +11,10 @@ interface Client {
   taux_remboursement: number;
   credit_total: number;
   photo_url?: string;
+  // Champs pour clients éligibles au crédit
+  compteCourantId?: string;
+  compteCourantNumero?: string;
+  compteCourantSolde?: number;
 }
 
 interface DureeSuggeree {
@@ -258,21 +262,23 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
   const loadClients = async () => {
     try {
-      const data = await clientApi.getAll();
-      const activeClients = data
-        .filter((c: any) => c.status === 'Actif')
-        .map((c: any) => ({
-          id: c.id,
-          nom: `${c.nom} ${c.prenom || ''}`,
-          email: c.email || '',
-          score: c.score || 50,
-          taux_remboursement: parseFloat(c.tauxRemboursement) || 100,
-          credit_total: parseFloat(c.creditTotal) || 0,
-          photo_url: c.photoUrl
-        }));
-      setClients(activeClients);
+      // Charger uniquement les clients éligibles (avec compte courant actif)
+      const data = await clientApi.getEligibleForCredit();
+      const eligibleClients = data.map((c: any) => ({
+        id: c.id,
+        nom: `${c.nom} ${c.prenom || ''}`,
+        email: c.email || '',
+        score: c.score || 50,
+        taux_remboursement: parseFloat(c.tauxRemboursement || c.taux_remboursement) || 100,
+        credit_total: parseFloat(c.creditTotal || c.credit_total) || 0,
+        photo_url: c.photoUrl || c.photo_url,
+        compteCourantId: c.compteCourantId || c.compte_courant_id,
+        compteCourantNumero: c.compteCourantNumero || c.compte_courant_numero,
+        compteCourantSolde: parseFloat(c.compteCourantSolde || c.compte_courant_solde) || 0
+      }));
+      setClients(eligibleClients);
     } catch (error) {
-      console.error('Erreur chargement clients:', error);
+      console.error('Erreur chargement clients éligibles:', error);
     }
   };
 

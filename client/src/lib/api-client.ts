@@ -168,6 +168,8 @@ export const authApi = {
 export const clientApi = {
   getAll: () => request<any[]>('/clients'),
   getById: (id: string) => request<any>(`/clients/${id}`),
+  // Clients éligibles au crédit (avec compte courant actif dans l'agence)
+  getEligibleForCredit: () => request<any[]>('/clients/eligible-credit'),
   create: (data: any) => request<any>('/clients', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -197,6 +199,20 @@ export const creditApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  // Décaissement: crée le crédit et crédite le compte courant du client
+  decaissement: (data: {
+    demandeId: string;
+    duree?: number;
+    dateDebut?: string;
+    dateFin?: string;
+    dateSolvabilite?: string;
+    soldeRestant?: string;
+    decaissementImmediat?: boolean;
+  }) =>
+    request<any>('/credits/decaissement', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   update: (id: string, data: any) => request<any>(`/credits/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),

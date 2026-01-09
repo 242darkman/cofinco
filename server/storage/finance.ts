@@ -218,7 +218,13 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
   }
   
   export async function createDemandeCredit(insertDemande: InsertDemandeCredit): Promise<DemandeCredit> {
-    const [demande] = await db.insert(demandesCredit).values(insertDemande).returning();
+    // Forcer le statut "En attente" - les frais d'engagement sont obligatoires avant toute enquête
+    const demandeAvecStatut = {
+      ...insertDemande,
+      statut: 'En attente' as const, // Toujours "En attente" à la création
+      fraisEngagementPayes: false
+    };
+    const [demande] = await db.insert(demandesCredit).values(demandeAvecStatut).returning();
     return demande;
   }
   

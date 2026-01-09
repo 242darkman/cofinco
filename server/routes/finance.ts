@@ -8,9 +8,12 @@ import {
   insertOperationCaisseSchema,
   insertCaisseSchema,
   insertCaisseTransfertSchema,
-  insertCreditPlanSchema
+  insertCreditPlanSchema,
+  mouvementsFinanciers,
+  comptes
 } from "@shared/schema";
 import { storage } from "../storage";
+import { getComptesByClient } from "../storage/finance";
 import { requireAuth, requireRole } from "../auth";
 import { requireAgenceAccess } from "../middleware";
 import { logAudit } from "../audit";
@@ -23,6 +26,8 @@ import {
   type DureeUnite
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
 
 export function registerFinanceRoutes(app: Express) {
   // Credit Plans Routes
@@ -128,6 +133,175 @@ export function registerFinanceRoutes(app: Express) {
      } catch (e) {
        res.status(400).json({ message: "Invalid data" });
      }
+  });
+
+  // Décaissement de crédit (crée le crédit + crédite le compte courant du client)
+  app.post("/api/credits/decaissement", requireAuth, requireRole('admin', 'chef', 'credit'), requireAgenceAccess(), async (req, res) => {
+    try {
+      const data = normalizeKeysDeep(req.body) as any;
+      const user = req.session.user;
+
+      // Valider les données requises
+      if (!data.demandeId) {
+        return res.status(400).json({ message: "L'ID de la demande est requis" });
+      }
+
+      // 1. Récupérer la demande et vérifier son statut
+      const demande = await storage.getDemandeCredit(data.demandeId);
+      if (!demande) {
+        return res.status(404).json({ message: "Demande de crédit non trouvée" });
+      }
+
+      if (demande.statut !== 'Approuvée') {
+        return res.status(400).json({ message: `La demande doit être approuvée pour être décaissée (statut actuel: ${demande.statut})` });
+      }
+
+      // 2. Récupérer le compte courant du client
+      const comptesClient = await getComptesByClient(demande.clientId);
+      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+
+      const compteCourant = comptesClient.find((c: any) => {
+        const isCompteCourant = c.typeCompte === 'Courant' || c.type_compte === 'Courant';
+        const isActif = c.statut === 'Actif';
+
+        // Vérifier l'agence si nécessaire
+        if (agenceFilter?.agenceId) {
+          return isCompteCourant && isActif && c.agenceId === agenceFilter.agenceId;
+        }
+        return isCompteCourant && isActif;
+      });
+
+      if (!compteCourant) {
+        return res.status(400).json({
+          message: "Le client n'a pas de compte courant actif dans cette agence. Impossible de décaisser."
+        });
+      }
+
+      // 3. Générer les données du crédit
+      const { randomUUID } = await import('crypto');
+      const creditId = randomUUID();
+      const numeroCredit = `CRED-${creditId.substring(0, 8).toUpperCase()}`;
+      const montantDecaissement = parseFloat(demande.montantApprouve?.toString() || demande.montantDemande.toString());
+
+      // Déterminer si c'est un décaissement immédiat ou programmé
+      const decaissementImmediat = data.decaissementImmediat !== false; // true par défaut
+      const dateDecaissement = data.dateDebut || new Date().toISOString().split('T')[0];
+      const aujourdhui = new Date().toISOString().split('T')[0];
+      const estProgramme = !decaissementImmediat || dateDecaissement > aujourdhui;
+
+      // 4. Créer le crédit
+      const creditData = {
+        id: creditId,
+        clientId: demande.clientId,
+        numeroCredit,
+        montant: montantDecaissement.toString(),
+        taux: demande.tauxInteret,
+        duree: data.duree || demande.nombreEcheances || demande.dureeValeur,
+        typeCredit: demande.typeCredit || 'Personnel',
+        objetCredit: demande.objetCredit,
+        // Si programmé, le crédit est "En attente" (du décaissement), sinon "Actif"
+        statut: estProgramme ? 'En attente' as const : 'Actif' as const,
+        echeance: demande.frequenceRemboursement,
+        dateDebut: dateDecaissement,
+        dateFin: data.dateFin,
+        dateSolvabilite: data.dateSolvabilite,
+        soldeRestant: data.soldeRestant || (montantDecaissement * (1 + parseFloat(demande.tauxInteret.toString()) / 100)).toString(),
+        agenceId: compteCourant.agenceId,
+      };
+
+      const parsed = insertCreditSchema.parse(creditData);
+      const credit = await storage.createCredit(parsed);
+
+      let nouveauSolde = parseFloat(compteCourant.soldeCourant || '0');
+
+      // 5. Si décaissement immédiat: créditer le compte courant du client
+      if (!estProgramme) {
+        const mouvementData = {
+          compteId: compteCourant.id,
+          clientId: demande.clientId,
+          creditId: credit.id,
+          montant: montantDecaissement.toString(),
+          sens: 'Crédit' as const,
+          sourceModule: 'CREDIT' as const,
+          typeOperation: 'Décaissement crédit',
+          description: `Décaissement crédit ${numeroCredit}`,
+          reference: numeroCredit,
+          statut: 'Posté' as const,
+          createdBy: user?.id,
+        };
+
+        await db.insert(mouvementsFinanciers).values(mouvementData);
+
+        // 6. Mettre à jour le solde du compte courant
+        nouveauSolde = nouveauSolde + montantDecaissement;
+        await db.update(comptes)
+          .set({ soldeCourant: nouveauSolde.toString(), updatedAt: new Date() })
+          .where(eq(comptes.id, compteCourant.id));
+      }
+
+      // 7. Mettre à jour le statut de la demande
+      // Note: On met "Décaissée" dans les deux cas car le décaissement est engagé.
+      // L'information de programmation est stockée dans le crédit (statut "En attente de décaissement")
+      await storage.updateDemandeCredit(demande.id, { statut: 'Décaissée' });
+
+      // 8. Log audit
+      await logAudit(
+        req,
+        estProgramme ? "DECAISSEMENT_PROGRAMME" : "DECAISSEMENT_CREDIT",
+        "credit",
+        credit.id,
+        {
+          demandeId: demande.id,
+          montant: montantDecaissement,
+          compteId: compteCourant.id,
+          numeroCredit,
+          programme: estProgramme,
+          dateDecaissement: estProgramme ? dateDecaissement : null
+        },
+        "success",
+        "high"
+      );
+
+      // 9. Broadcast updates
+      const wsInstance = getWsInstance();
+      const userAgence = user?.agence;
+      if (wsInstance && userAgence) {
+        wsInstance.broadcastToAgency(userAgence, { type: "CREDIT_UPDATE", payload: { type: 'credit_decaissement', id: credit.id, programme: estProgramme } });
+        wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
+        wsInstance.broadcastToAgency(userAgence, {
+          type: "LIVE_ACTIVITY",
+          payload: {
+            action: estProgramme
+              ? `Décaissement programmé: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte} (${dateDecaissement})`
+              : `Décaissement: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte}`,
+            user: user?.nom || 'Système',
+            type: 'credit',
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+
+      // Message de réponse selon le type de décaissement
+      const message = estProgramme
+        ? `Décaissement programmé pour le ${new Date(dateDecaissement).toLocaleDateString('fr-FR')}. Crédit ${numeroCredit} créé en attente.`
+        : `Crédit ${numeroCredit} décaissé. ${montantDecaissement.toLocaleString()} FCFA crédités sur le compte ${compteCourant.numeroCompte}`;
+
+      res.status(201).json({
+        success: true,
+        credit: addSnakeCaseAliasesDeep(credit),
+        compteCourant: estProgramme ? null : {
+          id: compteCourant.id,
+          numero: compteCourant.numeroCompte,
+          nouveauSolde
+        },
+        programme: estProgramme,
+        dateDecaissement: estProgramme ? dateDecaissement : null,
+        message
+      });
+    } catch (error: any) {
+      console.error("Erreur décaissement crédit:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du décaissement" });
+    }
   });
 
   app.get("/api/credits/:id", requireAuth, requireAgenceAccess(), async (req, res) => {

@@ -15,6 +15,52 @@ import { eq } from "drizzle-orm";
 import { createClientAccount, getComptesByClient } from "../storage/finance";
 
 export function registerClientRoutes(app: Express) {
+  // CLIENTS ÉLIGIBLES AU CRÉDIT: Clients actifs avec un compte courant dans l'agence
+  // MUST BE REGISTERED BEFORE /:id ROUTE TO AVOID COLLISIONS
+  app.get("/api/clients/eligible-credit", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+      const filter = agenceFilter || {};
+
+      // Récupérer tous les clients de l'agence
+      const allClients = await storage.getAllClients(filter);
+      const activeClients = allClients.filter(c => c.status === 'Actif');
+
+      // Pour chaque client, vérifier s'il a un compte courant actif dans l'agence
+      const eligibleClients = [];
+
+      for (const client of activeClients) {
+        const accounts = await getComptesByClient(client.id);
+
+        // Chercher un compte courant actif dans l'agence de la demande
+        const compteCourant = accounts.find((acc: any) => {
+          const isCompteCourant = acc.typeCompte === 'Courant' || acc.type_compte === 'Courant';
+          const isActif = acc.statut === 'Actif';
+
+          // Vérifier l'agence du compte si un filtre agence est appliqué
+          if (agenceFilter?.agenceId) {
+            return isCompteCourant && isActif && acc.agenceId === agenceFilter.agenceId;
+          }
+          return isCompteCourant && isActif;
+        });
+
+        if (compteCourant) {
+          eligibleClients.push({
+            ...client,
+            compteCourantId: compteCourant.id,
+            compteCourantNumero: compteCourant.numeroCompte,
+            compteCourantSolde: compteCourant.soldeCourant
+          });
+        }
+      }
+
+      res.json(addSnakeCaseAliasesDeep(eligibleClients));
+    } catch (error) {
+      console.error("Error fetching eligible clients:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des clients éligibles" });
+    }
+  });
+
   // LISTE CLIENTS : Filtrée par agence (supporte agenceId via header ou agence legacy)
   app.get("/api/clients", requireAuth, requireAgenceIdAccess(), async (req, res) => {
     try {
@@ -66,8 +112,15 @@ export function registerClientRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(withLoc));
   });
 
+
+
   // GET ONE: Vérification manuelle de l'agence
   app.get("/api/clients/:id", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    // Validate UUID to avoid crashing DB with invalid syntax (e.g. "eligible-credit" fallthrough)
+    if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+    }
+
     const client = await storage.getClient(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
 
