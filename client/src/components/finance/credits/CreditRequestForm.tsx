@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DollarSign, Calendar, FileText, TrendingUp, AlertCircle, Save, RefreshCw } from 'lucide-react';
 import { clientApi, demandeCreditApi, creditPlanApi } from '../../../lib/api-client';
-import { Modal, FormField, SelectField, Button } from '../../ui';
+import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../ui';
 
 interface Client {
   id: string;
@@ -441,10 +441,12 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   const selectedClient = clients.find(c => c.id === formData.client_id);
   const scoreCredit = calculateCreditScore();
 
-  const clientOptions = clients.map(client => ({
+  const clientOptions = useMemo(() => clients.map(client => ({
     value: client.id,
-    label: `${client.nom} - Score: ${client.score}`
-  }));
+    label: client.nom,
+    subLabel: `Score: ${client.score} | Remb: ${client.taux_remboursement}%`,
+    image: client.photo_url
+  })), [clients]);
 
   const selectedPlan = creditPlans.find(p => p.id === formData.credit_plan_id);
 
@@ -529,15 +531,16 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
           </div>
 
           <div className="md:col-span-2">
-            <SelectField
+            <SearchableSelect
               label="Client"
               name="client_id"
               value={formData.client_id}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, client_id: e.target.value })}
+              onChange={(value) => setFormData({ ...formData, client_id: String(value) })}
               options={clientOptions}
               disabled={!!clientId}
               required
               error={errors.client_id}
+              placeholder="Rechercher un client..."
             />
           </div>
 
