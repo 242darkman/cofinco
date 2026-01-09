@@ -1,5 +1,6 @@
 import { lazy, ComponentType } from 'react';
 import { MODULE_ACCESS } from './rbac-config';
+import { authService } from './auth';
 
 // Lazy load components
 const Dashboard = lazy(() => import('@/components/dashboard/Dashboard'));
@@ -203,7 +204,9 @@ export const ROUTES: RouteConfig[] = [
 
 /**
  * Vérifie si un utilisateur peut accéder à une route
- * Utilise désormais MODULE_ACCESS de rbac-config.ts
+ * Utilise authService.canAccessModule() qui prend en compte :
+ * - Les permissions du rôle (MODULE_ACCESS)
+ * - Les permissions personnalisées de l'utilisateur (depuis la BDD)
  */
 export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
   // Admin a accès à tout
@@ -221,8 +224,13 @@ export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
     return route.requiredRoles.includes(userRole);
   }
 
-  // Vérifier via MODULE_ACCESS
+  // Vérifier via authService qui combine permissions rôle + custom
   if (route.requiredModule) {
+    // Utiliser authService s'il est initialisé (utilisateur connecté)
+    if (authService.isAuthenticated()) {
+      return authService.canAccessModule(route.requiredModule);
+    }
+    // Fallback sur MODULE_ACCESS statique si pas authentifié
     const allowedModules = MODULE_ACCESS[userRole] || [];
     return allowedModules.includes(route.requiredModule);
   }

@@ -325,6 +325,18 @@ class AuthService {
   }
 
   /**
+   * Normalise le nom du module pour la recherche dans permissionsMap
+   * Ex: "Crédits" -> "credits", "Épargnes" -> "epargnes"
+   */
+  private normalizeModuleName(module: string): string {
+    return module
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
+      .replace(/\s+/g, ''); // Supprime les espaces
+  }
+
+  /**
    * Vérifie si l'utilisateur peut accéder à un module
    * Utilise les permissions chargées dynamiquement ou MODULE_ACCESS de rbac-config.ts
    */
@@ -336,8 +348,16 @@ class AuthService {
 
     // Check if user has any permission on this module
     if (this.permissionsLoaded && Object.keys(this.permissionsMap).length > 0) {
-      const moduleKey = module.toLowerCase();
-      return (this.permissionsMap[moduleKey]?.length || 0) > 0;
+      const moduleKey = this.normalizeModuleName(module);
+
+      // Chercher dans permissionsMap avec la clé normalisée
+      // ou chercher une clé qui correspond après normalisation
+      for (const [key, actions] of Object.entries(this.permissionsMap)) {
+        if (this.normalizeModuleName(key) === moduleKey && actions.length > 0) {
+          return true;
+        }
+      }
+      return false;
     }
 
     // Fallback to static config
