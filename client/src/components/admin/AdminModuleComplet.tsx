@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin, MessageSquare, KeyRound, Clock, UserPlus, Award, Package } from 'lucide-react';
+import { Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin, MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard } from 'lucide-react';
 import { Button, Card, ConfirmDialog } from '../ui';
 
 // Hooks
@@ -28,6 +28,7 @@ import AdminSmsSettings from './AdminSmsSettings';
 import AdminVersionInfo from './AdminVersionInfo';
 import AdminCaisseAccessCodes from './AdminCaisseAccessCodes';
 import AdminGestionCaisses from './AdminGestionCaisses';
+import AdminCreditsGestion from './AdminCreditsGestion';
 import RolesPermissionsManager from './permissions/RolesPermissionsManager';
 import ModulePermissionsView from './permissions/ModulePermissionsView';
 import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
@@ -36,7 +37,7 @@ interface AdminModuleCompletProps {
   activeView?: string;
 }
 
-export default function AdminModuleCompletRefactored({ activeView }: AdminModuleCompletProps) {
+export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
   const [activeTab, setActiveTab] = useState<AdminTabId>('dashboard');
   const [selectedRole, setSelectedRole] = useState('Administrateur');
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -47,7 +48,7 @@ export default function AdminModuleCompletRefactored({ activeView }: AdminModule
   const { modules } = useModules();
   const { permissions, searchPermissions } = usePermissions();
   const {
-    rolePermissions,
+    rolePermissions, // eslint-disable-line @typescript-eslint/no-unused-vars
     fetchRolePermissions,
     toggleRolePermission: toggleRolePerm,
     roleHasPermission
@@ -156,7 +157,8 @@ export default function AdminModuleCompletRefactored({ activeView }: AdminModule
     'BarChart3': BarChart3, 'UserPlus': UserPlus, 'Users': Users, 'Building2': Building2,
     'MapPin': MapPin, 'KeyRound': KeyRound, 'Activity': Activity, 'Monitor': Monitor,
     'Power': Power, 'Shield': Shield, 'Key': Key, 'MessageSquare': MessageSquare,
-    'Settings': Settings, 'Clock': Clock, 'Award': Award, 'Package': Package
+    'Settings': Settings, 'Clock': Clock, 'Award': Award, 'Package': Package,
+    'CreditCard': CreditCard
   };
 
   const filteredPermissions = searchTerm ? searchPermissions(searchTerm) : (permissions || []);
@@ -240,6 +242,7 @@ export default function AdminModuleCompletRefactored({ activeView }: AdminModule
             {activeTab === 'zones' && <AdminGestionZones />}
             {activeTab === 'tontines' && <AdminTontinesGestion />}
             {activeTab === 'caisses' && <AdminGestionCaisses />}
+            {activeTab === 'credits' && <AdminCreditsGestion />}
             {activeTab === 'codes' && <AdminCaisseAccessCodes onClose={() => setActiveTab('dashboard')} />}
             {activeTab === 'maintenance' && <AdminMaintenanceMode />}
             {activeTab === 'settings' && <AdminSystemSettings />}

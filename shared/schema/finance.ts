@@ -40,6 +40,29 @@ export type InsertInterestRate = z.infer<typeof insertInterestRateSchema>;
 export type InterestRate = typeof interestRates.$inferSelect;
 
 // Credits table
+export const creditPlans = pgTable("credit_plans", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  typeCredit: text("type_credit").notNull(), // Personnel, Immobilier, Commercial
+  montantMin: numeric("montant_min"),
+  montantMax: numeric("montant_max"),
+  tauxInteret: numeric("taux_interet").notNull(), // Pourcentage
+  dureeValeur: integer("duree_valeur").notNull(),
+  dureeUnite: text("duree_unite").notNull(), // Jour, Semaine, Mois
+  frequenceRemboursement: text("frequence_remboursement").notNull(), // Journalier, Hebdomadaire, Mensuel...
+  fraisDossier: numeric("frais_dossier"), // Montant fixe ou pourcentage (à gérer logiquement)
+  conditions: text("conditions").array(), // Liste de conditions requises
+  documentsRequis: text("documents_requis").array(), // Documents nécessaires
+  actif: boolean("actif").default(true),
+  agenceId: text("agence_id"), // NULL = Global, sinon spécifique agence
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditPlanSchema = createInsertSchema(creditPlans);
+export type UserCreditPlan = typeof creditPlans.$inferSelect;
+export type InsertCreditPlan = typeof creditPlans.$inferInsert;
+
 export const credits = pgTable("credits", {
   id: uuid("id").primaryKey().defaultRandom(),
   numeroCredit: text("numero_credit").notNull().unique(),

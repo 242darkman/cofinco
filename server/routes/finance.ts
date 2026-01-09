@@ -7,7 +7,8 @@ import {
   insertSessionCaisseSchema,
   insertOperationCaisseSchema,
   insertCaisseSchema,
-  insertCaisseTransfertSchema
+  insertCaisseTransfertSchema,
+  insertCreditPlanSchema
 } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
@@ -24,6 +25,45 @@ import {
 import { getWsInstance } from "../ws-server";
 
 export function registerFinanceRoutes(app: Express) {
+  // Credit Plans Routes
+  app.get("/api/credit-plans", requireAuth, async (req, res) => {
+    const agenceFilter = req.agenceFilter as { agence?: string } | null;
+    const filter: any = {};
+    
+    // Si pas admin, filtrer par agence ou global (agenceId IS NULL)
+    // Mais pour l'instant, on laisse voir tous les plans actifs
+    
+    // Si query param ?actif=true
+    if (req.query.actif === 'true') filter.actif = true;
+    
+    const plans = await storage.getAllCreditPlans(filter);
+    res.json(addSnakeCaseAliasesDeep(plans));
+  });
+
+  app.post("/api/credit-plans", requireAuth, requireRole('admin', 'chef', 'Administrateur'), requireAgenceAccess(), async (req, res) => {
+    const data = normalizeKeysDeep(req.body) as any;
+    
+    // Validation basique
+    if (!data.nom) return res.status(400).json({ message: "Le nom est obligatoire" });
+    
+    const parsed = insertCreditPlanSchema.parse(data);
+    const plan = await storage.createCreditPlan(parsed);
+    res.status(201).json(addSnakeCaseAliasesDeep(plan));
+  });
+
+  app.patch("/api/credit-plans/:id", requireAuth, requireRole('admin', 'chef', 'Administrateur'), async (req, res) => {
+    const data = normalizeKeysDeep(req.body) as any;
+    const plan = await storage.updateCreditPlan(req.params.id, data);
+    if (!plan) return res.status(404).json({ message: "Plan non trouvé" });
+    res.json(addSnakeCaseAliasesDeep(plan));
+  });
+
+  app.delete("/api/credit-plans/:id", requireAuth, requireRole('admin', 'chef', 'Administrateur'), async (req, res) => {
+    const success = await storage.deleteCreditPlan(req.params.id);
+    if (!success) return res.status(404).json({ message: "Plan non trouvé" });
+    res.json({ success: true });
+  });
+
   // Credits
   app.get("/api/credits", requireAuth, requireAgenceAccess(), async (req, res) => {
     // req.agenceFilter est injecté par requireAgenceAccess

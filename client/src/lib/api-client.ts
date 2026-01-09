@@ -207,6 +207,29 @@ export const creditApi = {
   }),
 };
 
+// Credit Plans API
+export const creditPlanApi = {
+  getAll: (params?: { actif?: boolean, agenceId?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.actif !== undefined) queryParams.append('actif', String(params.actif));
+    // agenceId might be used for filtering admin view
+    const query = queryParams.toString();
+    return request<any[]>(`/credit-plans${query ? `?${query}` : ''}`);
+  },
+  getById: (id: string) => request<any>(`/credit-plans/${id}`),
+  create: (data: any) => request<any>('/credit-plans', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id: string, data: any) => request<any>(`/credit-plans/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  delete: (id: string) => request<void>(`/credit-plans/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
 // Demandes de crédit API
 export const demandeCreditApi = {
   getAll: () => request<any[]>('/demandes-credit'),

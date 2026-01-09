@@ -42,6 +42,7 @@ export const ADMIN_TABS = [
   { id: 'settings', label: 'Paramètres', icon: 'Settings' },
   { id: 'maintenance', label: 'Maintenance', icon: 'Power' },
   { id: 'caisses', label: 'Caisses', icon: 'Wallet' },
+  { id: 'credits', label: 'Crédits', icon: 'CreditCard' },
   { id: 'tontines', label: 'Tontines', icon: 'Users' },
   { id: 'agences', label: 'Agences', icon: 'Building2' },
   { id: 'zones', label: 'Zones', icon: 'MapPin' },

@@ -16,7 +16,8 @@ import {
     type ModeleFacture, type InsertModeleFacture, type Caisse, type InsertCaisse,
     caisseTransferts, type CaisseTransfert, type InsertCaisseTransfert,
     type Agence, type CaisseAssignation,
-    type DureeSuggeree, type InsertDureeSuggeree
+    type DureeSuggeree, type InsertDureeSuggeree,
+    creditPlans, type UserCreditPlan, type InsertCreditPlan, insertCreditPlanSchema
   } from "@shared/schema";
   import { db } from "../db";
 import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, aliasedTable } from "drizzle-orm";
@@ -136,6 +137,37 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
   export async function updateCredit(id: string, updateData: Partial<InsertCredit>): Promise<Credit | undefined> {
     const [credit] = await db.update(credits).set({ ...updateData, updatedAt: new Date() }).where(eq(credits.id, id)).returning();
     return credit || undefined;
+  }
+
+  // Credit Plans
+  export async function getAllCreditPlans(filter: { actif?: boolean, agenceId?: string } = {}): Promise<UserCreditPlan[]> {
+    const conditions = [];
+    if (filter.actif !== undefined) conditions.push(eq(creditPlans.actif, filter.actif));
+    if (filter.agenceId) conditions.push(eq(creditPlans.agenceId, filter.agenceId));
+    
+    return db.select().from(creditPlans)
+      .where(and(...conditions))
+      .orderBy(desc(creditPlans.createdAt));
+  }
+
+  export async function getCreditPlan(id: string): Promise<UserCreditPlan | undefined> {
+    const [plan] = await db.select().from(creditPlans).where(eq(creditPlans.id, id));
+    return plan;
+  }
+
+  export async function createCreditPlan(plan: InsertCreditPlan): Promise<UserCreditPlan> {
+    const [newPlan] = await db.insert(creditPlans).values(plan).returning();
+    return newPlan;
+  }
+
+  export async function updateCreditPlan(id: string, plan: Partial<InsertCreditPlan>): Promise<UserCreditPlan | undefined> {
+    const [updated] = await db.update(creditPlans).set(plan).where(eq(creditPlans.id, id)).returning();
+    return updated;
+  }
+
+  export async function deleteCreditPlan(id: string): Promise<boolean> {
+    const result = await db.delete(creditPlans).where(eq(creditPlans.id, id)).returning();
+    return result.length > 0;
   }
   
   // Demandes Credit

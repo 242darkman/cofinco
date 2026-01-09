@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DollarSign, Calendar, FileText, TrendingUp, AlertCircle, Save, RefreshCw } from 'lucide-react';
-import { clientApi, demandeCreditApi } from '../../../lib/api-client';
+import { clientApi, demandeCreditApi, creditPlanApi } from '../../../lib/api-client';
 import { Modal, FormField, SelectField, Button } from '../../ui';
 
 interface Client {
@@ -44,8 +44,12 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   const [loadingDurees, setLoadingDurees] = useState(false);
   const [showDureesSuggestions, setShowDureesSuggestions] = useState(false);
 
+  // Credit Plans state
+  const [creditPlans, setCreditPlans] = useState<any[]>([]);
+  
   const [formData, setFormData] = useState({
     client_id: clientId || '',
+    credit_plan_id: '',
     montant_demande: '',
     duree_valeur: '',
     duree_unite: 'Mois' as 'Jour' | 'Semaine' | 'Mois',
@@ -56,7 +60,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     revenus_mensuels: '',
     type_revenu: 'Mensuel',
     revenu_journalier: '',
-    charges_mensuelles: ''
+    charges_mensuelles: '',
+    frais_dossier: ''
   });
 
   const RATE_BASE = 20;
@@ -81,7 +86,34 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
   useEffect(() => {
     loadClients();
+    loadCreditPlans();
   }, []);
+
+  const loadCreditPlans = async () => {
+    try {
+      const plans = await creditPlanApi.getAll({ actif: true });
+      setCreditPlans(plans || []);
+    } catch (error) {
+      console.error('Erreur chargement plans credit:', error);
+    }
+  };
+
+  const handleApplyPlan = (planId: string) => {
+    const plan = creditPlans.find(p => p.id === planId);
+    if (!plan) return;
+
+    setFormData(prev => ({
+      ...prev,
+      credit_plan_id: planId,
+      type_credit: plan.typeCredit || plan.type_credit,
+      taux_interet: String(plan.tauxInteret || plan.taux_interet),
+      duree_valeur: String(plan.dureeValeur || plan.duree_valeur),
+      duree_unite: plan.dureeUnite || plan.duree_unite,
+      frequence_remboursement: plan.frequenceRemboursement || plan.frequence_remboursement,
+      frais_dossier: plan.fraisDossier ? String(plan.fraisDossier) : prev.frais_dossier,
+      objet_credit: plan.description ? `${plan.nom} - ${plan.description}` : prev.objet_credit
+    }));
+  };
 
   // Charger les durees suggerees quand la frequence change
   useEffect(() => {
@@ -308,6 +340,17 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     if (!formData.client_id) newErrors.client_id = 'Client requis';
     if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) {
       newErrors.montant_demande = 'Montant invalide';
+    } else if (selectedPlan) {
+      const montant = parseFloat(formData.montant_demande);
+      const min = selectedPlan.montantMin || selectedPlan.montant_min;
+      const max = selectedPlan.montantMax || selectedPlan.montant_max;
+      
+      if (min && montant < min) {
+        newErrors.montant_demande = `Le montant minimum pour ce plan est de ${min.toLocaleString()} FCFA`;
+      }
+      if (max && montant > max) {
+        newErrors.montant_demande = `Le montant maximum pour ce plan est de ${max.toLocaleString()} FCFA`;
+      }
     }
     if (!formData.frequence_remboursement) {
       newErrors.frequence_remboursement = 'Frequence requise';
@@ -393,6 +436,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     label: `${client.nom} - Score: ${client.score}`
   }));
 
+  const selectedPlan = creditPlans.find(p => p.id === formData.credit_plan_id);
+
   const typeCreditOptions = [
     { value: 'Personnel', label: 'Personnel' },
     { value: 'Immobilier', label: 'Immobilier' },
@@ -460,6 +505,20 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         <div className="grid md:grid-cols-2 gap-6">
           {/* Client Selection */}
           <div className="md:col-span-2">
+             <SelectField
+              label="Plan de Crédit (Optionnel)"
+              name="creditPlanId"
+              value={formData.credit_plan_id}
+              onChange={(e) => handleApplyPlan(e.target.value)}
+              options={[
+                { value: '', label: '-- Sélectionner un modèle --' },
+                ...creditPlans.map(p => ({ value: p.id, label: `${p.nom} (Taux: ${p.tauxInteret || p.taux_interet}%)` }))
+              ]}
+              className="bg-teal-500/10 border-teal-500/30 text-teal-100"
+            />
+          </div>
+
+          <div className="md:col-span-2">
             <SelectField
               label="Client"
               name="client_id"
@@ -503,17 +562,60 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
           />
 
           {/* Montant */}
-          <FormField
-            label="Montant Demande (FCFA)"
-            name="montant_demande"
-            type="number"
-            value={formData.montant_demande}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, montant_demande: e.target.value })}
-            placeholder="100000"
-            error={errors.montant_demande}
-            required
-            icon={DollarSign}
-          />
+          {/* Montant avec validation min/max stricte */}
+          <div className="space-y-1">
+            <FormField
+              label="Montant Demande (FCFA)"
+              name="montant_demande"
+              type="number"
+              value={formData.montant_demande}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                let val = e.target.value;
+                // Clamp Max immediately
+                if (selectedPlan && (selectedPlan.montantMax || selectedPlan.montant_max)) {
+                   const max = selectedPlan.montantMax || selectedPlan.montant_max;
+                   if (parseFloat(val) > max) val = String(max);
+                }
+                setFormData({ ...formData, montant_demande: val });
+              }}
+              onBlur={() => {
+                // Clamp Min on blur
+                if (selectedPlan && (selectedPlan.montantMin || selectedPlan.montant_min)) {
+                   const min = selectedPlan.montantMin || selectedPlan.montant_min;
+                   if (formData.montant_demande && parseFloat(formData.montant_demande) < min) {
+                      setFormData(prev => ({ ...prev, montant_demande: String(min) }));
+                   }
+                }
+              }}
+              placeholder="100000"
+              error={errors.montant_demande}
+              required
+              icon={DollarSign}
+            />
+            
+            {selectedPlan && (
+               <div className="flex flex-wrap gap-2">
+                  {(selectedPlan.montantMin || selectedPlan.montant_min) && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({...prev, montant_demande: String(selectedPlan.montantMin || selectedPlan.montant_min)}))}
+                      className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded-md border border-slate-600 transition-colors flex items-center gap-1"
+                    >
+                      Min: <span className="font-bold text-white">{(selectedPlan.montantMin || selectedPlan.montant_min).toLocaleString()} FCFA</span>
+                    </button>
+                  )}
+                  {(selectedPlan.montantMax || selectedPlan.montant_max) && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({...prev, montant_demande: String(selectedPlan.montantMax || selectedPlan.montant_max)}))}
+                      className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded-md border border-slate-600 transition-colors flex items-center gap-1"
+                    >
+                      Max: <span className="font-bold text-white">{(selectedPlan.montantMax || selectedPlan.montant_max).toLocaleString()} FCFA</span>
+                    </button>
+                  )}
+               </div>
+            )}
+          </div>
 
           {/* FREQUENCE DE REMBOURSEMENT - AVANT LA DUREE */}
           <div className="md:col-span-2">

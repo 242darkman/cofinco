@@ -15,6 +15,7 @@ import {
     Tontine, InsertTontine, MembreTontine, InsertMembreTontine, ContributionTontine, InsertContributionTontine,
     TontineRegle, InsertTontineRegle, TontinePenalite, InsertTontinePenalite,
     TontinePlan, InsertTontinePlan,
+    UserCreditPlan, InsertCreditPlan,
     SessionCaisse, InsertSessionCaisse, OperationCaisse, InsertOperationCaisse, AgentTerrain, InsertAgentTerrain,
     CaisseTransfert, InsertCaisseTransfert,
     Prospection, InsertProspection, VisiteTerrain, InsertVisiteTerrain, PaiementTerrain, InsertPaiementTerrain,
@@ -57,6 +58,13 @@ export interface IStorage {
     getUpcomingEcheances(filter?: { agence?: string }): Promise<{ client: string; amount: number; date: string; status: string }[]>;
     createCredit(credit: InsertCredit): Promise<Credit>;
     updateCredit(id: string, credit: Partial<InsertCredit>): Promise<Credit | undefined>;
+
+    // Credit Plans
+    getCreditPlan(id: string): Promise<UserCreditPlan | undefined>;
+    getAllCreditPlans(filter?: { actif?: boolean, agenceId?: string }): Promise<UserCreditPlan[]>;
+    createCreditPlan(plan: InsertCreditPlan): Promise<UserCreditPlan>;
+    updateCreditPlan(id: string, plan: Partial<InsertCreditPlan>): Promise<UserCreditPlan | undefined>;
+    deleteCreditPlan(id: string): Promise<boolean>;
 
     // Demandes
     getDemandeCredit(id: string): Promise<DemandeCredit | undefined>;
