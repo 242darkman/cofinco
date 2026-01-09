@@ -77,23 +77,7 @@ export default function PlatformSidebarContent({
             </span>
           )}
         </div>
-        {sidebarOpen && (
-          <div className="mt-4 flex items-center gap-3 px-1">
-            <div
-              className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm"
-            >
-              <img
-                src="/cofin-logo.png"
-                alt={`${agenceName} Logo`}
-                className="w-7 h-7 object-contain"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-sidebar-text truncate">{agenceName}</p>
-              <p className="text-[10px] text-content-muted">Microfinance</p>
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* Navigation */}

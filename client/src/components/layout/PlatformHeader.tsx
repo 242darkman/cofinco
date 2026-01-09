@@ -46,11 +46,17 @@ export default function PlatformHeader({
             aria-label="Menu"
           />
         </div>
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 bg-status-success rounded-full animate-pulse shadow-lg shadow-status-success/50"></div>
+        <div className="flex items-center gap-4 border-l border-edge pl-4">
           <div>
-            <h2 className="text-lg md:text-xl font-bold text-accent">{t('cofinPlatform')}</h2>
-            <p className="text-content-muted text-xs font-medium">{t('platformeMicrofinance')}</p>
+            <h2 className="text-2xl font-black tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+              {t('cofinPlatform')}
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-content-muted/80">
+                {t('platformeMicrofinance')}
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-cyan-500/20 to-transparent"></div>
+            </div>
           </div>
         </div>
 
