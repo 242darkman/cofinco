@@ -28,6 +28,7 @@ export interface RouteConfig {
   requireAdmin?: boolean;
   label: string;
   labelKey?: string;
+  group?: 'Principal' | 'Services Clients' | 'Opérations' | 'Gestion' | 'Système';
   children?: RouteConfig[];
   defaultChild?: string;
 }
@@ -37,14 +38,18 @@ export interface RouteConfig {
  * Les routes utilisent désormais requiredModule qui référence MODULE_ACCESS
  */
 export const ROUTES: RouteConfig[] = [
+  // --- Tableau de bord ---
   {
     key: 'dashboard',
     path: '/dashboard',
     component: Dashboard,
     requiredModule: 'Dashboard',
-    label: 'Dashboard',
+    label: 'Tableau de bord',
     labelKey: 'menuDashboard',
+    group: 'Principal',
   },
+
+  // --- Produits Financiers ---
   {
     key: 'clients',
     path: '/clients',
@@ -52,12 +57,7 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Clients',
     label: 'Clients',
     labelKey: 'menuClients',
-    children: [
-      { key: 'clients-list', path: '/clients', component: null, label: 'Liste', labelKey: 'liste' },
-      { key: 'clients-map', path: '/clients/map', component: null, label: 'Carte', labelKey: 'carte' },
-      { key: 'clients-stats', path: '/clients/stats', component: null, label: 'Statistiques', labelKey: 'statistiques' },
-    ],
-    defaultChild: 'clients-list',
+    group: 'Services Clients',
   },
   {
     key: 'credits',
@@ -66,12 +66,7 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Crédits',
     label: 'Crédits',
     labelKey: 'menuCredits',
-    children: [
-      { key: 'credits-list', path: '/credits', component: Credits, label: 'Liste', labelKey: 'liste' },
-      { key: 'credits-demandes', path: '/credits/demandes', component: null, label: 'Demandes', labelKey: 'demandes' },
-      { key: 'credits-remboursements', path: '/credits/remboursements', component: null, label: 'Remboursements', labelKey: 'remboursements' },
-    ],
-    defaultChild: 'credits-list',
+    group: 'Services Clients',
   },
   {
     key: 'epargnes',
@@ -80,11 +75,7 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Épargnes',
     label: 'Épargnes',
     labelKey: 'menuEpargnes',
-    children: [
-      { key: 'epargnes-list', path: '/epargnes', component: Epargnes, label: 'Comptes', labelKey: 'comptes' },
-      { key: 'epargnes-transactions', path: '/epargnes/transactions', component: null, label: 'Transactions', labelKey: 'transactions' },
-    ],
-    defaultChild: 'epargnes-list',
+    group: 'Services Clients',
   },
   {
     key: 'tontines',
@@ -93,43 +84,10 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Tontines',
     label: 'Tontines',
     labelKey: 'menuTontines',
+    group: 'Services Clients',
   },
-  {
-    key: 'comptabilite',
-    path: '/comptabilite',
-    component: Comptabilite,
-    requiredModule: 'Comptabilité',
-    label: 'Comptabilité',
-    labelKey: 'menuComptabilite',
-    children: [
-      { key: 'compta-journal', path: '/comptabilite', component: Comptabilite, label: 'Journal', labelKey: 'journal' },
-      { key: 'compta-bilan', path: '/comptabilite/bilan', component: null, label: 'Bilan', labelKey: 'bilan' },
-      { key: 'compta-tresorerie', path: '/comptabilite/tresorerie', component: null, label: 'Trésorerie', labelKey: 'tresorerie' },
-    ],
-    defaultChild: 'compta-journal',
-  },
-  {
-    key: 'rh',
-    path: '/rh',
-    component: RessourcesHumaines,
-    requiredModule: 'Admin',
-    label: 'Ressources Humaines',
-    labelKey: 'menuRH',
-  },
-  {
-    key: 'agentTerrain',
-    path: '/terrain',
-    component: AgentTerrain,
-    requiredModule: 'Terrain',
-    label: 'Terrain',
-    labelKey: 'menuTerrain',
-    children: [
-      { key: 'terrain-agents', path: '/terrain', component: AgentTerrain, label: 'Agents', labelKey: 'agents' },
-      { key: 'terrain-visites', path: '/terrain/visites', component: null, label: 'Visites', labelKey: 'visites' },
-      { key: 'terrain-zones', path: '/terrain/zones', component: null, label: 'Zones', labelKey: 'zones' },
-    ],
-    defaultChild: 'terrain-agents',
-  },
+
+  // --- Opérations ---
   {
     key: 'caisse',
     path: '/caisse',
@@ -137,12 +95,16 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Caisse',
     label: 'Caisse',
     labelKey: 'menuCaisse',
-    children: [
-      { key: 'caisse-session', path: '/caisse', component: CaisseDashboard, label: 'Session', labelKey: 'session' },
-      { key: 'caisse-operations', path: '/caisse/operations', component: null, label: 'Opérations', labelKey: 'operations' },
-      { key: 'caisse-cloture', path: '/caisse/cloture', component: null, label: 'Clôture', labelKey: 'cloture' },
-    ],
-    defaultChild: 'caisse-session',
+    group: 'Opérations',
+  },
+  {
+    key: 'agentTerrain',
+    path: '/terrain',
+    component: AgentTerrain,
+    requiredModule: 'Terrain',
+    label: 'Collecte terrain',
+    labelKey: 'menuTerrain',
+    group: 'Opérations',
   },
   {
     key: 'transfert',
@@ -151,14 +113,18 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Communications',
     label: 'Transferts',
     labelKey: 'menuTransfert',
+    group: 'Opérations',
   },
+
+  // --- Gestion ---
   {
-    key: 'bourse',
-    path: '/bourse',
-    component: BourseModule,
-    requireAdmin: true,
-    label: 'Bourse',
-    labelKey: 'menuBourse',
+    key: 'comptabilite',
+    path: '/comptabilite',
+    component: Comptabilite,
+    requiredModule: 'Comptabilité',
+    label: 'Comptabilité',
+    labelKey: 'menuComptabilite',
+    group: 'Gestion',
   },
   {
     key: 'rapports',
@@ -167,12 +133,37 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Rapports',
     label: 'Rapports',
     labelKey: 'menuRapports',
-    children: [
-      { key: 'rapports-generator', path: '/rapports', component: ReportGenerator, label: 'Générateur', labelKey: 'generateur' },
-      { key: 'rapports-analytics', path: '/rapports/analytics', component: null, label: 'Analytique', labelKey: 'analytique' },
-    ],
-    defaultChild: 'rapports-generator',
+    group: 'Gestion',
   },
+  {
+    key: 'excel',
+    path: '/excel',
+    component: ExcelModule,
+    requiredModule: 'Comptabilité',
+    label: 'Import/Export',
+    labelKey: 'menuExcel',
+    group: 'Gestion',
+  },
+  {
+    key: 'rh',
+    path: '/rh',
+    component: RessourcesHumaines,
+    requiredModule: 'Admin',
+    label: 'Personnel',
+    labelKey: 'menuRH',
+    group: 'Gestion',
+  },
+  {
+    key: 'bourse',
+    path: '/bourse',
+    component: BourseModule,
+    requireAdmin: true,
+    label: 'Bourse',
+    labelKey: 'menuBourse',
+    group: 'Gestion',
+  },
+
+  // --- Système ---
   {
     key: 'administrateur',
     path: '/admin',
@@ -180,12 +171,7 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Admin',
     label: 'Administration',
     labelKey: 'menuAdmin',
-    children: [
-      { key: 'admin-users', path: '/admin', component: AdminModuleComplet, label: 'Utilisateurs', labelKey: 'utilisateurs' },
-      { key: 'admin-agences', path: '/admin/agences', component: null, label: 'Agences', labelKey: 'agences' },
-      { key: 'admin-audit', path: '/admin/audit', component: null, label: 'Audit', labelKey: 'audit', requiredModule: 'Audit' },
-    ],
-    defaultChild: 'admin-users',
+    group: 'Système',
   },
   {
     key: 'parametres',
@@ -194,12 +180,7 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Paramètres',
     label: 'Paramètres',
     labelKey: 'menuParametres',
-    children: [
-      { key: 'params-general', path: '/parametres', component: ParametresModule, label: 'Général', labelKey: 'general' },
-      { key: 'params-securite', path: '/parametres/securite', component: null, label: 'Sécurité', labelKey: 'securite' },
-      { key: 'params-notifications', path: '/parametres/notifications', component: null, label: 'Notifications', labelKey: 'notifications' },
-    ],
-    defaultChild: 'params-general',
+    group: 'Système',
   },
   {
     key: 'messages',
@@ -208,21 +189,15 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Communications',
     label: 'Messages',
     labelKey: 'menuMessages',
+    group: 'Système',
   },
   {
     key: 'profil',
     path: '/profil',
     component: UserProfile,
-    label: 'Profil',
+    label: 'Mon profil',
     labelKey: 'menuProfil',
-  },
-  {
-    key: 'excel',
-    path: '/excel',
-    component: ExcelModule,
-    requiredModule: 'Comptabilité',
-    label: 'Excel',
-    labelKey: 'menuExcel',
+    group: 'Système',
   },
 ];
 

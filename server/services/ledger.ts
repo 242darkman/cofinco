@@ -6,7 +6,7 @@ import {
   credits,
   sessionsCaisse
 } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Infer MouvementFinancier type from table
@@ -262,64 +262,66 @@ export async function createMouvementEvents(
 /**
  * Update compte solde within a transaction
  */
+/**
+ * Update compte solde within a transaction (Atomic Update)
+ */
 export async function updateCompteSolde(
   tx: PgTransaction<any, any, any>,
   compteId: string,
   delta: number
 ): Promise<string> {
-  const [compte] = await tx.select().from(comptes).where(eq(comptes.id, compteId));
-  if (!compte) throw new Error(`Compte ${compteId} not found`);
+  // Atomic update to handle concurrency
+  const [updated] = await tx.update(comptes)
+    .set({ 
+      soldeCourant: sql`${comptes.soldeCourant} + ${delta}`,
+      updatedAt: new Date() 
+    })
+    .where(eq(comptes.id, compteId))
+    .returning({ solde: comptes.soldeCourant });
 
-  const currentSolde = parseFloat(compte.soldeCourant || "0");
-  const nouveauSolde = (currentSolde + delta).toFixed(2);
-
-  await tx.update(comptes)
-    .set({ soldeCourant: nouveauSolde, updatedAt: new Date() })
-    .where(eq(comptes.id, compteId));
-
-  return nouveauSolde;
+  if (!updated) throw new Error(`Compte ${compteId} not found`);
+  return updated.solde;
 }
 
 /**
- * Update credit solde restant within a transaction
+ * Update credit solde restant within a transaction (Atomic Update)
  */
 export async function updateCreditSolde(
   tx: PgTransaction<any, any, any>,
   creditId: string,
   delta: number
 ): Promise<string> {
-  const [credit] = await tx.select().from(credits).where(eq(credits.id, creditId));
-  if (!credit) throw new Error(`Credit ${creditId} not found`);
+  // Atomic update
+  // Note: GREATEST(0, ...) check might differ between DBs, but works in Postgres
+  const [updated] = await tx.update(credits)
+    .set({ 
+      soldeRestant: sql`GREATEST(0, ${credits.soldeRestant} + ${delta})`, 
+      updatedAt: new Date() 
+    })
+    .where(eq(credits.id, creditId))
+    .returning({ solde: credits.soldeRestant });
   
-  const currentSolde = parseFloat(credit.soldeRestant || credit.montant || "0");
-  const nouveauSolde = Math.max(0, currentSolde + delta).toFixed(2);
-  
-  await tx.update(credits)
-    .set({ soldeRestant: nouveauSolde, updatedAt: new Date() })
-    .where(eq(credits.id, creditId));
-  
-  return nouveauSolde;
+  if (!updated) throw new Error(`Credit ${creditId} not found`);
+  return updated.solde || "0";
 }
 
 /**
- * Update session caisse solde theorique within a transaction
+ * Update session caisse solde theorique within a transaction (Atomic Update)
  */
 export async function updateSessionSolde(
   tx: PgTransaction<any, any, any>,
   sessionId: string,
   delta: number
 ): Promise<string> {
-  const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionId));
-  if (!session) throw new Error(`Session ${sessionId} not found`);
+  const [updated] = await tx.update(sessionsCaisse)
+    .set({ 
+      soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${delta}` 
+    })
+    .where(eq(sessionsCaisse.id, sessionId))
+    .returning({ solde: sessionsCaisse.soldeTheorique });
   
-  const currentSolde = parseFloat(session.soldeTheorique || "0");
-  const nouveauSolde = (currentSolde + delta).toFixed(2);
-  
-  await tx.update(sessionsCaisse)
-    .set({ soldeTheorique: nouveauSolde })
-    .where(eq(sessionsCaisse.id, sessionId));
-  
-  return nouveauSolde;
+  if (!updated) throw new Error(`Session ${sessionId} not found`);
+  return updated.solde;
 }
 
 /**

@@ -4,7 +4,7 @@ export interface MenuItem {
   labelKey: string;
   icon: LucideIcon;
   key: string;
-  section: 'principal' | 'gestion' | 'admin';
+  section: 'principal' | 'services' | 'operations' | 'gestion' | 'admin';
 }
 
 export interface User {

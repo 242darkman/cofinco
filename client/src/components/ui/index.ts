@@ -38,6 +38,9 @@ export type { TextareaFieldProps } from './TextareaField';
 export { default as SearchInput } from './SearchInput';
 export type { SearchInputProps } from './SearchInput';
 
+export { default as SearchableSelect } from './SearchableSelect';
+export type { SearchableSelectOption } from './SearchableSelect';
+
 // Modal & Dialog Components
 export { default as Modal } from './Modal';
 export type { ModalProps, ModalSize, ModalVariant } from './Modal';

@@ -191,6 +191,14 @@ export function registerFinanceRoutes(app: Express) {
         );
       }
 
+      // Nettoyage des champs numériques optionnels (évite "invalid input syntax for type numeric: ''")
+      const optionalNumericFields = ['revenusMensuels', 'revenuJournalier', 'chargesMensuelles', 'montantApprouve', 'montantFraisEngagement'];
+      for (const field of optionalNumericFields) {
+        if (data[field] === "") {
+          data[field] = null;
+        }
+      }
+
       const parsed = insertDemandeCreditSchema.parse(data);
 
       // Vérifier agence du client

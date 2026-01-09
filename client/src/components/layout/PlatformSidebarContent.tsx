@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
-import { Menu, X, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
+import React from 'react';
+import { Menu, X, LogOut } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
-import Button from '../ui/Button';
 import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 
 interface PlatformSidebarContentProps {
@@ -21,7 +20,6 @@ export default function PlatformSidebarContent({
   sidebarOpen,
   onToggleSidebar,
   currentModule,
-  currentSubModule,
   onModuleChange,
   onLogout,
   userRole = 'agent'
@@ -30,54 +28,42 @@ export default function PlatformSidebarContent({
   const { settings: systemSettings } = useSystemSettings();
   const agenceName = systemSettings?.find(s => s.cle === 'agence_name')?.valeur || 'COFIN&CO-M';
 
-  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set([currentModule]));
-
-  // Filtrer les routes accessibles par le rôle
-  const accessibleRoutes = ROUTES.filter(route => canAccessRoute(route, userRole));
-
-  // Toggle expansion d'un menu avec sous-routes
-  const toggleExpand = (key: string) => {
-    setExpandedMenus(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
-
-  // Trouver l'icône correspondante dans PLATFORM_MENU_ITEMS
   const getMenuIcon = (key: string) => {
     const item = PLATFORM_MENU_ITEMS.find(m => m.key === key);
     return item?.icon;
   };
 
   const handleModuleClick = (route: RouteConfig) => {
-    if (route.children && route.children.length > 0 && sidebarOpen) {
-      toggleExpand(route.key);
-      // Naviguer vers l'enfant par défaut
-      if (route.defaultChild) {
-        onModuleChange(route.key, route.defaultChild);
-      } else {
-        onModuleChange(route.key);
-      }
-    } else {
-      onModuleChange(route.key);
-    }
+    onModuleChange(route.key);
   };
 
-  const handleSubModuleClick = (parentKey: string, childKey: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onModuleChange(parentKey, childKey);
+  // Group routes
+  const accessibleRoutes = ROUTES.filter(route => canAccessRoute(route, userRole));
+  const groupedRoutes: Record<string, RouteConfig[]> = {};
+
+  // Define group order and labels
+  const groupConfig = {
+    'Principal': { label: '', showLabel: false },
+    'Services Clients': { label: 'Produits', showLabel: true },
+    'Opérations': { label: 'Opérations', showLabel: true },
+    'Gestion': { label: 'Gestion', showLabel: true },
+    'Système': { label: 'Système', showLabel: true },
   };
+  const groupOrder = Object.keys(groupConfig);
+
+  accessibleRoutes.forEach(route => {
+    const group = route.group || 'Principal';
+    if (!groupedRoutes[group]) {
+      groupedRoutes[group] = [];
+    }
+    groupedRoutes[group].push(route);
+  });
 
   return (
     <div className="flex flex-col h-full bg-sidebar-bg">
       {/* Header */}
       <div className="p-3 border-b border-sidebar-border flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <IconButton
             onClick={onToggleSidebar}
             icon={sidebarOpen ? X : Menu}
@@ -85,124 +71,150 @@ export default function PlatformSidebarContent({
             className="text-sidebar-text hover:text-content-primary"
             aria-label={sidebarOpen ? "Fermer le menu" : "Ouvrir le menu"}
           />
+          {sidebarOpen && (
+            <span className="text-xs font-medium text-content-muted uppercase tracking-wider">
+              Menu
+            </span>
+          )}
         </div>
         {sidebarOpen && (
-          <div className="relative flex flex-col items-center py-1">
-            <div className="absolute w-16 h-16 bg-accent/20 rounded-2xl blur-lg" style={{ transform: 'translate(4px, 4px)' }} />
-            <div className="absolute w-16 h-16 bg-accent/15 rounded-2xl" style={{ transform: 'translate(2px, 2px)' }} />
+          <div className="mt-4 flex items-center gap-3 px-1">
             <div
-              className="relative w-16 h-16 bg-white rounded-2xl flex items-center justify-center"
-              style={{ boxShadow: '0 12px 28px -10px rgba(59, 130, 246, 0.35), 0 0 0 1px rgba(59, 130, 246, 0.1)' }}
+              className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm"
             >
               <img
                 src="/cofin-logo.png"
                 alt={`${agenceName} Logo`}
-                className="w-12 h-12 object-contain"
+                className="w-7 h-7 object-contain"
               />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-sidebar-text truncate">{agenceName}</p>
+              <p className="text-[10px] text-content-muted">Microfinance</p>
             </div>
           </div>
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 pt-2 overflow-y-auto overflow-x-hidden no-scrollbar" role="navigation" aria-label="Menu principal">
-        {sidebarOpen && (
-          <div className="px-4 py-1 text-[11px] font-bold text-content-muted uppercase tracking-wider">
-            {t('principal')}
-          </div>
-        )}
+      <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden no-scrollbar" role="navigation" aria-label="Menu principal">
+        {groupOrder.map(groupName => {
+          const routes = groupedRoutes[groupName] || [];
+          if (routes.length === 0) return null;
 
-        {accessibleRoutes.map((route) => {
-          const Icon = getMenuIcon(route.key);
-          const isActive = currentModule === route.key;
-          const isExpanded = expandedMenus.has(route.key);
-          const hasChildren = route.children && route.children.length > 0;
-          const accessibleChildren = route.children?.filter(c => canAccessRoute(c, userRole)) || [];
-          const isDisabled = route.key === 'transfert' || route.key === 'bourse';
+          const config = groupConfig[groupName as keyof typeof groupConfig];
 
           return (
-            <div key={route.key}>
-              {/* Menu principal */}
-              <Button
-                onClick={() => {
-                  if (isDisabled) return;
-                  handleModuleClick(route);
-                }}
-                variant="ghost"
-                fullWidth
-                aria-current={isActive ? 'page' : undefined}
-                aria-disabled={isDisabled}
-                className={`flex items-center gap-3 px-4 py-2.5 transition text-sm justify-start rounded-none ${
-                    isActive
-                    ? 'bg-sidebar-active border-l-2 border-sidebar-text-active text-sidebar-text-active font-medium'
-                    : 'text-sidebar-text hover:text-content-primary hover:bg-sidebar-hover border-l-2 border-transparent'
-                } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-              >
-                {Icon && <Icon size={18} className="shrink-0" aria-hidden="true" />}
-                {sidebarOpen && (
-                  <>
-                    <span className="flex-1 text-left truncate">{t(route.labelKey || route.key)}</span>
-                    {isDisabled && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-warning-bg text-status-warning border border-status-warning/30">
-                        Bientôt
-                      </span>
-                    )}
-                    {hasChildren && accessibleChildren.length > 0 && (
-                      <span className="text-content-muted shrink-0" aria-hidden="true">
-                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </span>
-                    )}
-                  </>
-                )}
-              </Button>
-
-              {/* Sous-menus */}
-              {sidebarOpen && hasChildren && isExpanded && accessibleChildren.length > 0 && (
-                <div className="bg-surface-muted/50 border-l-2 border-edge-subtle ml-4" role="menu">
-                  {accessibleChildren.map((child) => {
-                    const isChildActive = currentSubModule === child.key ||
-                      (isActive && !currentSubModule && child.key === route.defaultChild);
-
-                    return (
-                      <Button
-                        key={child.key}
-                        onClick={(e) => handleSubModuleClick(route.key, child.key, e)}
-                        variant="ghost"
-                        fullWidth
-                        size="sm"
-                        role="menuitem"
-                        aria-current={isChildActive ? 'page' : undefined}
-                        className={`flex items-center gap-2 px-4 py-2 text-xs transition justify-start rounded-none ${
-                          isChildActive
-                            ? 'text-sidebar-text-active bg-sidebar-active font-medium'
-                            : 'text-content-muted hover:text-content-primary hover:bg-sidebar-hover'
-                        }`}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" aria-hidden="true" />
-                        <span className="truncate">{t(child.labelKey || child.key)}</span>
-                      </Button>
-                    );
-                  })}
+            <div key={groupName} className="mb-2">
+              {/* Group label - only show when sidebar is open and showLabel is true */}
+              {sidebarOpen && config.showLabel && (
+                <div className="px-4 py-2">
+                  <span className="text-[10px] font-semibold text-content-muted uppercase tracking-widest">
+                    {config.label}
+                  </span>
                 </div>
               )}
+
+              {/* Divider for collapsed sidebar between groups */}
+              {!sidebarOpen && groupName !== 'Principal' && (
+                <div className="mx-3 my-2 border-t border-sidebar-border/50" />
+              )}
+
+              {/* Route items */}
+              <div className="space-y-0.5 px-2">
+                {routes.map(route => renderRouteItem(route))}
+              </div>
             </div>
           );
         })}
       </nav>
 
-      {/* Footer - Bouton déconnexion distinctif */}
+      {/* Footer */}
       <div className="border-t border-sidebar-border flex-shrink-0 p-3">
-        <Button
+        <button
           onClick={onLogout}
-          variant="danger"
-          fullWidth
-          icon={LogOut}
+          className={`
+            w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+            text-red-400 hover:text-red-300 hover:bg-red-500/10
+            transition-all duration-200
+            ${!sidebarOpen ? 'justify-center' : ''}
+          `}
           aria-label={t('deconnexion')}
-          className="justify-start"
         >
-          {sidebarOpen && <span className="text-sm font-medium">{t('deconnexion')}</span>}
-        </Button>
+          <LogOut size={18} className="shrink-0" />
+          {sidebarOpen && (
+            <span className="text-sm font-medium">{t('deconnexion')}</span>
+          )}
+        </button>
       </div>
     </div>
   );
+
+  function renderRouteItem(route: RouteConfig) {
+    const Icon = getMenuIcon(route.key);
+    const isActive = currentModule === route.key;
+    const isDisabled = route.key === 'transfert' || route.key === 'bourse';
+
+    return (
+      <button
+        key={route.key}
+        onClick={() => {
+          if (isDisabled) return;
+          handleModuleClick(route);
+        }}
+        disabled={isDisabled}
+        aria-current={isActive ? 'page' : undefined}
+        className={`
+          group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
+          transition-all duration-200 text-sm
+          ${!sidebarOpen ? 'justify-center' : ''}
+          ${isActive
+            ? 'bg-accent/15 text-accent font-medium'
+            : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover'
+          }
+          ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        `}
+      >
+        {/* Active indicator */}
+        {isActive && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-accent rounded-r-full" />
+        )}
+
+        {Icon && (
+          <Icon
+            size={20}
+            className={`shrink-0 transition-colors ${isActive ? 'text-accent' : ''}`}
+            aria-hidden="true"
+          />
+        )}
+
+        {sidebarOpen && (
+          <>
+            <span className="flex-1 text-left truncate">
+              {t(route.labelKey || route.key)}
+            </span>
+            {isDisabled && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                Bientôt
+              </span>
+            )}
+          </>
+        )}
+
+        {/* Tooltip for collapsed sidebar */}
+        {!sidebarOpen && (
+          <div className="
+            absolute left-full ml-2 px-2 py-1 rounded-md
+            bg-surface-elevated text-content-primary text-xs font-medium
+            opacity-0 invisible group-hover:opacity-100 group-hover:visible
+            transition-all duration-200 whitespace-nowrap z-50
+            shadow-lg border border-edge-subtle
+          ">
+            {t(route.labelKey || route.key)}
+            {isDisabled && ' (Bientôt)'}
+          </div>
+        )}
+      </button>
+    );
+  }
 }
