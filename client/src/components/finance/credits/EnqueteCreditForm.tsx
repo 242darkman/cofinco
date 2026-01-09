@@ -429,8 +429,9 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       newErrors.anciennete_activite = 'L\'ancienneté est requise';
     }
 
-    if (!formData.description_activite || formData.description_activite.length < 20) {
-      newErrors.description_activite = 'Description détaillée requise (min. 20 caractères)';
+    const MIN_DESC_LENGTH = 10;
+    if (!formData.description_activite || formData.description_activite.trim().length < MIN_DESC_LENGTH) {
+      newErrors.description_activite = `Ajoutez quelques détails (minimum ${MIN_DESC_LENGTH} caractères)`;
     }
 
     if (!formData.revenu_mensuel_declare || parseFloat(formData.revenu_mensuel_declare) <= 0) {
@@ -867,10 +868,19 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
-              <FileText size={16} className="inline mr-2" />
-              Description détaillée de l'activité *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold text-slate-300">
+                <FileText size={16} className="inline mr-2" />
+                Description de l'activité *
+              </label>
+              <span className={`text-xs ${
+                formData.description_activite.length >= 10 ? 'text-green-400' : 
+                formData.description_activite.length >= 5 ? 'text-amber-400' : 
+                'text-slate-500'
+              }`}>
+                {formData.description_activite.length} / 10 min.
+              </span>
+            </div>
             <textarea
               value={formData.description_activite}
               onChange={(e) => handleChange('description_activite', e.target.value)}
@@ -878,9 +888,14 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border ${
                 errors.description_activite ? 'border-blue-500' : 'border-slate-600'
               } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-              placeholder="Décrivez en détail l'activité du client, ses produits/services, sa clientèle, son local..."
+              placeholder="Ex: Vente de vêtements au marché Total, clientèle locale, 3 employés"
               data-testid="textarea-description"
             />
+            {!formData.description_activite && !errors.description_activite && (
+              <p className="text-slate-400 text-xs mt-1 italic">
+                💡 Mentionnez: produits vendus, emplacement, clientèle type, équipement
+              </p>
+            )}
             {errors.description_activite && <p className="text-blue-400 text-xs mt-1">{errors.description_activite}</p>}
           </div>
 
