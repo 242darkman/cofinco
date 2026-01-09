@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend
+  AreaChart, Area, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid
 } from 'recharts';
-import { TrendingUp, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useBalanceHistory } from '../../../hooks/dashboard/useBalanceHistory';
 
@@ -13,227 +13,260 @@ interface BalanceHistoryChartProps {
   height?: number;
 }
 
+type Period = '7d' | '30d' | '90d' | '1y';
+type Metric = 'solde' | 'credits' | 'epargnes';
+
+const METRIC_CONFIG = {
+  solde: {
+    labelKey: 'soldeTotal',
+    color: '#10b981', // Emerald
+    gradientColors: ['#10b981', '#34d399'],
+  },
+  credits: {
+    labelKey: 'credits',
+    color: '#3b82f6', // Blue
+    gradientColors: ['#3b82f6', '#60a5fa'],
+  },
+  epargnes: {
+    labelKey: 'epargnes',
+    color: '#8b5cf6', // Violet
+    gradientColors: ['#8b5cf6', '#a78bfa'],
+  }
+} as const;
+
 export default function BalanceHistoryChart({
   title,
-  showLegend = true,
-  height = 350
+  height = 320 // Slightly taller for better mobile view
 }: BalanceHistoryChartProps) {
   const { t } = useLanguage();
-  const [period, setPeriod] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
-  const [activeMetric, setActiveMetric] = useState<'all' | 'solde' | 'credits' | 'epargnes'>('all');
-  
+  const [period, setPeriod] = useState<Period>('30d');
+  const [activeMetric, setActiveMetric] = useState<Metric>('solde');
+  const [showPeriodMenu, setShowPeriodMenu] = useState(false);
+
   const { data: chartData, loading, error } = useBalanceHistory(period);
-  
-  const displayTitle = title || t('evolutionSoldes');
 
-  // Get latest values for stats display
-  const latestData = chartData.length > 0 ? chartData[chartData.length - 1] : null;
+  const displayTitle = title || t('evolutionFinanciere');
 
-  const formatYAxis = (value: number) => {
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-    return value.toString();
-  };
+  // Calculate trend & stats
+  const { latestValue, previousValue, trend, trendPercent, minValue, maxValue } = useMemo(() => {
+    if (chartData.length < 2) {
+      return { latestValue: 0, previousValue: 0, trend: 0, trendPercent: 0, minValue: 0, maxValue: 0 };
+    }
+    const values = chartData.map(d => d[activeMetric] || 0);
+    const latest = values[values.length - 1];
+    const previous = values[0];
+    const diff = latest - previous;
+    const percent = previous > 0 ? ((diff / previous) * 100) : 0;
+    
+    // Add some padding to min/max for the chart domain
+    let min = Math.min(...values);
+    let max = Math.max(...values);
+    
+    // Safety check for flat lines or single values
+    if (min === max) {
+      if (min === 0) {
+        max = 10000; // Default range if 0
+      } else {
+        // Add 10% amplitude padding
+        const padding = Math.abs(min * 0.1) || 1000;
+        min -= padding;
+        max += padding;
+      }
+    } else {
+      // Standard padding
+      const range = max - min;
+      min -= range * 0.05;
+      max += range * 0.05;
+    }
+    
+    return {
+      latestValue: latest,
+      previousValue: previous,
+      trend: diff,
+      trendPercent: percent,
+      minValue: min,
+      maxValue: max
+    };
+  }, [chartData, activeMetric]);
 
-  const formatTooltip = (value: number) => {
-    return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
+  const formatValue = (value: number, compact = false) => {
+    if (compact) {
+      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+      if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+      return value.toString();
+    }
+    return new Intl.NumberFormat('fr-FR').format(value);
   };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const config = METRIC_CONFIG[activeMetric];
       return (
-        <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl">
-          <p className="text-slate-300 text-sm font-medium mb-2">{label}</p>
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-4 text-sm">
-              <span style={{ color: entry.color }}>{entry.name}</span>
-              <span className="font-semibold text-white">{formatTooltip(entry.value)}</span>
-            </div>
-          ))}
+        <div className="bg-slate-900 border border-slate-700/50 rounded-xl p-3 shadow-xl backdrop-blur-md">
+          <p className="text-slate-400 text-xs mb-1">{label}</p>
+          <div className="flex items-baseline gap-1">
+            <span className="font-bold text-lg text-white">
+              {formatValue(payload[0]?.value || 0)}
+            </span>
+            <span className="text-xs text-slate-500">FCFA</span>
+          </div>
         </div>
       );
     }
     return null;
   };
 
-  const periods = [
-    { value: '7d', label: t('jours7') },
-    { value: '30d', label: t('jours30') },
-    { value: '90d', label: t('mois3') },
-    { value: '1y', label: t('an1') }
+  const periods: { value: Period; label: string }[] = [
+    { value: '7d', label: '7J' },
+    { value: '30d', label: '30J' },
+    { value: '90d', label: '3M' },
+    { value: '1y', label: '1A' }
   ];
 
-  const metrics = [
-    { value: 'all', label: t('tout') },
-    { value: 'solde', label: t('solde'), color: '#10b981' },
-    { value: 'credits', label: t('credits'), color: '#3b82f6' },
-    { value: 'epargnes', label: t('epargnes'), color: '#8b5cf6' }
-  ];
-  const chartStyle = height ? { height } : undefined;
-  const chartHeightClass = height ? '' : 'h-56 sm:h-72 lg:h-80';
+  const config = METRIC_CONFIG[activeMetric];
 
+  // Loading State
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-6 flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-emerald-400" size={32} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-6 text-center">
-        <p className="text-red-400">{error}</p>
+      <div className="h-[320px] bg-slate-900/50 border border-slate-800/50 rounded-2xl flex flex-col items-center justify-center animate-pulse">
+        <div className="w-12 h-12 rounded-full bg-slate-800 mb-3"></div>
+        <div className="h-4 w-32 bg-slate-800 rounded"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-4 sm:p-6 min-w-0 overflow-hidden" data-testid="balance-history-chart">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/20 rounded-lg">
-            <TrendingUp className="text-emerald-400" size={20} />
-          </div>
-          <h3 className="text-base sm:text-lg font-semibold text-white">{displayTitle}</h3>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full lg:w-auto">
-          <div className="flex flex-wrap bg-slate-700/50 rounded-lg p-1 w-full sm:w-auto">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+      {/* Header Area */}
+      <div className="p-4 sm:p-5 pb-0">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            {displayTitle}
+          </h3>
+          
+          {/* Period Selector - Minimal & Modern */}
+          <div className="flex bg-slate-800/80 rounded-lg p-0.5 border border-slate-700/50">
             {periods.map((p) => (
               <button
                 key={p.value}
-                onClick={() => setPeriod(p.value as any)}
-                className={`px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                  period === p.value
-                    ? 'bg-emerald-500 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                data-testid={`button-period-${p.value}`}
+                onClick={() => setPeriod(p.value)}
+                className={`
+                  px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200
+                  ${period === p.value 
+                    ? 'bg-slate-600/50 text-white shadow-sm' 
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}
+                `}
               >
                 {p.label}
               </button>
             ))}
           </div>
+        </div>
 
-          <div className="flex flex-wrap bg-slate-700/50 rounded-lg p-1 w-full sm:w-auto">
-            {metrics.map((m) => (
+        {/* Segmented Control for Metrics */}
+        <div className="flex p-1 bg-slate-800/50 rounded-xl border border-slate-700/30 mb-6">
+          {(Object.keys(METRIC_CONFIG) as Metric[]).map((metric) => {
+            const isActive = activeMetric === metric;
+            const mConfig = METRIC_CONFIG[metric];
+            return (
               <button
-                key={m.value}
-                onClick={() => setActiveMetric(m.value as any)}
-                className={`px-2.5 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-                  activeMetric === m.value
-                    ? 'bg-blue-500 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                data-testid={`button-metric-${m.value}`}
+                key={metric}
+                onClick={() => setActiveMetric(metric)}
+                className={`
+                  flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-300 relative overflow-hidden
+                  ${isActive ? 'text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}
+                `}
               >
-                {m.label}
+                {/* Background active indicator */}
+                {isActive && (
+                  <div className="absolute inset-0 bg-slate-700 rounded-lg animate-in fade-in zoom-in-95 duration-200"></div>
+                )}
+                
+                {/* Content */}
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                   {t(mConfig.labelKey)}
+                </span>
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
+
+        {/* Current Stats Hero - Mobile First Layout */}
+        <div className="flex items-baseline justify-between mb-2 px-1">
+           <div>
+              <p className="text-sm text-slate-400 mb-1">Solde Actuel</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {formatValue(latestValue)}
+                </span>
+                <span className="text-sm font-medium text-slate-500">FCFA</span>
+              </div>
+           </div>
+
+           {/* Trend Badge */}
+           <div className={`
+             flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-bold
+             ${trend >= 0 
+               ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+               : 'bg-red-500/10 border-red-500/20 text-red-400'}
+           `}>
+             {trend >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+             <span>{trend >= 0 ? '+' : ''}{trendPercent.toFixed(1)}%</span>
+           </div>
         </div>
       </div>
 
-      <div className={chartHeightClass} style={chartStyle}>
+      {/* Chart */}
+      <div className="w-full relative" style={{ height: height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="gradientSolde" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gradientCredits" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="gradientEpargnes" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-          <XAxis
-            dataKey="date" 
-            stroke="#64748b" 
-            fontSize={11}
-            tickLine={false}
-            axisLine={false}
-            minTickGap={14}
-          />
-          <YAxis 
-            stroke="#64748b" 
-            fontSize={11}
-            tickFormatter={formatYAxis}
-            tickLine={false}
-            axisLine={false}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          
-          {showLegend && (
-            <Legend
-              wrapperStyle={{ paddingTop: '16px' }}
-              formatter={(value) => <span className="text-slate-300 text-xs sm:text-sm">{value}</span>}
+          <AreaChart
+            data={chartData}
+            margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id={`gradient-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={config.gradientColors[0]} stopOpacity={0.4} />
+                <stop offset="100%" stopColor={config.gradientColors[1]} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              vertical={false} 
+              stroke="#1e293b" 
+              opacity={0.5}
             />
-          )}
-
-          {(activeMetric === 'all' || activeMetric === 'solde') && (
+            <XAxis
+              dataKey="date"
+              stroke="#475569"
+              fontSize={10}
+              tickLine={false}
+              axisLine={false}
+              minTickGap={50}
+              dy={10}
+            />
+            <YAxis
+              stroke="#475569"
+              fontSize={10}
+              tickFormatter={(val) => formatValue(val, true)}
+              tickLine={false}
+              axisLine={false}
+              domain={[minValue, maxValue]} // Makes graph dynamic
+              width={45}
+            />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ stroke: config.color, strokeDasharray: '4 4' }}
+            />
             <Area
-              type="monotone"
-              dataKey="solde"
-              name={t('soldeTotal')}
-              stroke="#10b981"
-              strokeWidth={2}
-              fill="url(#gradientSolde)"
-              dot={false}
-              activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: '#1e293b' }}
+              type="monotone" // Smooth curves
+              dataKey={activeMetric}
+              stroke={config.color}
+              strokeWidth={3}
+              fill={`url(#gradient-${activeMetric})`}
+              animationDuration={1500}
             />
-          )}
-          
-          {(activeMetric === 'all' || activeMetric === 'credits') && (
-            <Area
-              type="monotone"
-              dataKey="credits"
-              name={t('credits')}
-              stroke="#3b82f6"
-              strokeWidth={2}
-              fill="url(#gradientCredits)"
-              dot={false}
-              activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2, fill: '#1e293b' }}
-            />
-          )}
-          
-          {(activeMetric === 'all' || activeMetric === 'epargnes') && (
-            <Area
-              type="monotone"
-              dataKey="epargnes"
-              name={t('epargnes')}
-              stroke="#8b5cf6"
-              strokeWidth={2}
-              fill="url(#gradientEpargnes)"
-              dot={false}
-              activeDot={{ r: 6, stroke: '#8b5cf6', strokeWidth: 2, fill: '#1e293b' }}
-            />
-          )}
           </AreaChart>
         </ResponsiveContainer>
-      </div>
-
-      {/* Stats Footer - Inline on mobile, grid on larger screens */}
-      <div className="flex flex-row justify-around sm:grid sm:grid-cols-3 gap-2 sm:gap-3 mt-4 sm:mt-6 pt-4 border-t border-slate-700 text-center">
-        <div className="flex flex-col items-center">
-          <p className="text-slate-400 text-[10px] sm:text-xs">{t('soldeActuel')}</p>
-          <p className="text-emerald-400 font-bold text-xs sm:text-base">{formatYAxis(latestData?.solde || 0)}</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <p className="text-slate-400 text-[10px] sm:text-xs">{t('credits')}</p>
-          <p className="text-blue-400 font-bold text-xs sm:text-base">{formatYAxis(latestData?.credits || 0)}</p>
-        </div>
-        <div className="flex flex-col items-center">
-          <p className="text-slate-400 text-[10px] sm:text-xs">{t('epargnes')}</p>
-          <p className="text-purple-400 font-bold text-xs sm:text-base">{formatYAxis(latestData?.epargnes || 0)}</p>
-        </div>
       </div>
     </div>
   );

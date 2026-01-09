@@ -624,6 +624,15 @@ body {
 }
 
 @layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out;
   }
