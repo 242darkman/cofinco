@@ -269,6 +269,17 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
     const [demande] = await db.update(demandesCredit).set({ deletedAt: new Date() }).where(eq(demandesCredit.id, id)).returning();
     return !!demande;
   }
+
+  export async function cancelDemandeCredit(id: string, motif?: string): Promise<DemandeCredit | undefined> {
+    const [demande] = await db.update(demandesCredit)
+      .set({ 
+        statut: 'Annulée' as any,
+        motifRejet: motif // On utilise motifRejet pour stocker la raison de l'annulation
+      })
+      .where(eq(demandesCredit.id, id))
+      .returning();
+    return demande || undefined;
+  }
   
   // Enquêtes
   export async function getEnqueteCredit(id: string): Promise<EnqueteCredit | undefined> {

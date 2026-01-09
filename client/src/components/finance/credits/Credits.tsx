@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign } from 'lucide-react';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign, XCircle } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog } from '../../ui';
 import { useCredits } from '../../../hooks/credits/useCredits';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
@@ -53,6 +53,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const [creditsPage, setCreditsPage] = useState(1);
   const [demandesPage, setDemandesPage] = useState(1);
   const [demandeToDelete, setDemandeToDelete] = useState<string | null>(null);
+  const [demandeToCancel, setDemandeToCancel] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -324,7 +325,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => d.statut === 'Enquête terminée')
+              .filter(d => ['Enquête terminée', 'En enquête'].includes(d.statut))
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={demandeColumns}
             loading={isLoading}
@@ -336,7 +337,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === 'Enquête terminée').length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => ['Enquête terminée', 'En enquête'].includes(d.statut)).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             actions={(item) => (
@@ -462,6 +463,20 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                     title="Supprimer"
                     aria-label="Supprimer"
                   />
+                  {(item.statut === 'En attente' || item.statut === 'A enquêter') && (
+                     <IconButton 
+                        icon={XCircle} 
+                        size="sm" 
+                        variant="ghost" 
+                        className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                        onClick={(e) => { 
+                          e.stopPropagation();
+                          setDemandeToCancel(item.id);
+                        }}
+                        title="Annuler"
+                        aria-label="Annuler"
+                      />
+                  )}
               </div>
             )}
           />
@@ -607,6 +622,23 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         variant="danger"
         confirmText="Supprimer"
         cancelText="Annuler"
+      />
+
+      <ConfirmDialog
+        isOpen={!!demandeToCancel}
+        onClose={() => setDemandeToCancel(null)}
+        onConfirm={() => {
+          if (demandeToCancel) {
+            demandes.cancelDemande(demandeToCancel, "Annulé par l'utilisateur");
+            setDemandeToCancel(null);
+            toast.success("Demande annulée");
+          }
+        }}
+        title="Confirmer l'annulation"
+        message="Voulez-vous vraiment annuler cette demande ? Elle restera visible dans l'historique avec le statut 'Annulée'."
+        variant="warning"
+        confirmText="Confirmer Annulation"
+        cancelText="Retour"
       />
 
        {selectedDemande && showFeesModal && (

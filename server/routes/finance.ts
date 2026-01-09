@@ -431,6 +431,20 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ success: true });
   });
 
+  app.put("/api/demandes-credit/:id/cancel", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+      const { motif } = req.body;
+      const demande = await storage.cancelDemandeCredit(req.params.id, motif);
+      
+      if (!demande) return res.status(404).json({ message: "Demande non trouvée" });
+      
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_cancelled', id: req.params.id } });
+      }
+      
+      res.json(addSnakeCaseAliasesDeep(demande));
+  });
+
   app.post("/api/demandes-credit/:id/payer-frais", requireAuth, requireRole('admin', 'chef', 'caisse', 'credit'), async (req, res) => {
       try {
           const data = normalizeKeysDeep(req.body) as any;
@@ -612,7 +626,8 @@ export function registerFinanceRoutes(app: Express) {
       
       // Update Demande Status
       if (enquete.demandeId) {
-          await storage.updateDemandeCredit(enquete.demandeId, { statut: 'En enquête' as any });
+          // Si l'enquête est créée, on considère qu'elle est terminée et prête pour approbation
+          await storage.updateDemandeCredit(enquete.demandeId, { statut: 'Enquête terminée' as any });
       }
 
       // Notify Credit Update

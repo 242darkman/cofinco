@@ -73,6 +73,7 @@ export interface IStorage {
     createDemandeCredit(demande: InsertDemandeCredit): Promise<DemandeCredit>;
     updateDemandeCredit(id: string, demande: Partial<InsertDemandeCredit>): Promise<DemandeCredit | undefined>;
     deleteDemandeCredit(id: string): Promise<boolean>;
+    cancelDemandeCredit(id: string, motif?: string): Promise<DemandeCredit | undefined>;
     payerFraisEngagement(data: {
       demandeId: string;
       montant: string;

@@ -103,6 +103,25 @@ export function useDemandes() {
     }
   };
 
+  const cancelDemande = async (id: string, motif?: string) => {
+    try {
+      const response = await fetch(`/api/demandes-credit/${id}/cancel`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motif })
+      });
+
+      if (!response.ok) throw new Error('Erreur annulation');
+
+      await fetchDemandes();
+      return true;
+    } catch (err) {
+      console.error('Erreur annulation:', err);
+      setError(err instanceof Error ? err.message : 'Erreur annulation');
+      return false;
+    }
+  };
+
   const payerFrais = async (id: string, montant: number, methodePaiement: string = 'Espèces', sessionCaisseId?: string) => {
     try {
       const response = await fetch(`/api/demandes-credit/${id}/payer-frais`, {
@@ -160,6 +179,7 @@ export function useDemandes() {
     approuverDemande,
     rejeterDemande,
     deleteDemande,
+    cancelDemande,
     getDemandesEnAttente,
     getStatutColor,
     payerFrais
