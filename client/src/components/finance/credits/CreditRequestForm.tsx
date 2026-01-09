@@ -202,52 +202,10 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   }, [convertirDureeEnJours]);
 
   const suggestedRate = useMemo(() => {
-    const montant = parseFloat(formData.montant_demande) || 0;
-    const dureeValeur = parseInt(formData.duree_valeur) || 0;
-    const dureeJours = convertirDureeEnJours(dureeValeur, formData.duree_unite);
-    const dureeMois = dureeJours / 30;
-
-    const revenus = parseFloat(formData.revenus_mensuels) || 0;
-    const charges = parseFloat(formData.charges_mensuelles) || 0;
-    const client = clients.find(c => c.id === formData.client_id);
-    const score = client?.score ?? 0;
-    const tauxRemboursement = client?.taux_remboursement ?? 0;
-
-    const revenusNet = Math.max(0, revenus - charges);
-    const baseMonthly = dureeMois > 0 ? (montant * (1 + RATE_BASE / 100 * (dureeMois / 12))) / dureeMois : 0;
-    const debtRatio = revenusNet > 0 ? baseMonthly / revenusNet : 0;
-
-    let adjustment = 0;
-
-    if (dureeMois > 24) adjustment += 5;
-    else if (dureeMois > 12) adjustment += 3;
-    else if (dureeMois > 6) adjustment += 1;
-
-    if (debtRatio <= 0.3) adjustment += 0;
-    else if (debtRatio <= 0.4) adjustment += 2;
-    else if (debtRatio <= 0.5) adjustment += 4;
-    else if (debtRatio > 0) adjustment += 6;
-
-    if (score >= 75) adjustment -= 1;
-    else if (score >= 60) adjustment += 0;
-    else if (score >= 45) adjustment += 2;
-    else if (score > 0) adjustment += 4;
-
-    if (tauxRemboursement >= 95) adjustment -= 1;
-    else if (tauxRemboursement > 0 && tauxRemboursement < 80) adjustment += 2;
-
-    const rawRate = RATE_BASE + adjustment;
-    return Math.min(RATE_MAX, Math.max(RATE_MIN, rawRate));
-  }, [
-    formData.montant_demande,
-    formData.duree_valeur,
-    formData.duree_unite,
-    formData.revenus_mensuels,
-    formData.charges_mensuelles,
-    formData.client_id,
-    clients,
-    convertirDureeEnJours
-  ]);
+    // SIMPLIFICATION: Le taux est fixe à 20% par défaut, sans ajustement de risque automatique.
+    // L'utilisateur peut toujours l'ajuster manuellement si nécessaire via l'option d'override.
+    return RATE_BASE;
+  }, []);
 
   useEffect(() => {
     if (!rateOverrideEnabled) {
