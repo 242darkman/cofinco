@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from "../auth";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
 import { logAudit } from "../audit";
+import { getWsInstance } from "../ws-server";
 
 export function registerRbacRoutes(app: Express) {
   // ============================================
@@ -185,7 +186,7 @@ export function registerRbacRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_created', role } });
       }
@@ -223,7 +224,7 @@ export function registerRbacRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_updated', id } });
       }
@@ -259,7 +260,7 @@ export function registerRbacRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_deleted', id } });
       }
@@ -328,7 +329,7 @@ export function registerRbacRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'bulk_update', role } });
       }
@@ -653,7 +654,7 @@ export function registerRbacRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'user_permission_toggled', userId } });
       }
@@ -684,7 +685,7 @@ export function registerRbacRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'user_permissions_reset', userId } });
       }
