@@ -54,7 +54,7 @@ export default function AdminCreditPlansGestion({
     type_credit: 'Personnel',
     montant_min: '',
     montant_max: '',
-    taux_interet: '10',
+    taux_interet: '20',
     duree_valeur: '30',
     duree_unite: 'Jour',
     frequence_remboursement: 'Journalier',
@@ -329,10 +329,7 @@ export default function AdminCreditPlansGestion({
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, type_credit: e.target.value})}
               options={[
                 { value: 'Personnel', label: 'Personnel' },
-                { value: 'Commercial', label: 'Commercial' },
-                { value: 'Immobilier', label: 'Immobilier' },
-                { value: 'Scolaire', label: 'Scolaire' },
-                { value: 'Agricole', label: 'Agricole' }
+                { value: 'Commercial', label: 'Commercial' }
               ]}
             />
             <TextareaField

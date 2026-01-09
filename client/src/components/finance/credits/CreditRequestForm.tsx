@@ -102,6 +102,15 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     const plan = creditPlans.find(p => p.id === planId);
     if (!plan) return;
 
+    // Pré-remplir le montant si fixe (min == max)
+    const min = parseFloat(plan.montantMin || plan.montant_min);
+    const max = parseFloat(plan.montantMax || plan.montant_max);
+    let fixedMontant = undefined;
+
+    if (!isNaN(min) && !isNaN(max) && min === max) {
+        fixedMontant = String(min);
+    }
+
     setFormData(prev => ({
       ...prev,
       credit_plan_id: planId,
@@ -111,7 +120,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       duree_unite: plan.dureeUnite || plan.duree_unite,
       frequence_remboursement: plan.frequenceRemboursement || plan.frequence_remboursement,
       frais_dossier: plan.fraisDossier ? String(plan.fraisDossier) : prev.frais_dossier,
-      objet_credit: plan.description ? `${plan.nom} - ${plan.description}` : prev.objet_credit
+      objet_credit: plan.description ? `${plan.nom} - ${plan.description}` : prev.objet_credit,
+      montant_demande: fixedMontant !== undefined ? fixedMontant : prev.montant_demande
     }));
   };
 
@@ -415,7 +425,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         revenuJournalier: formData.revenu_journalier,
         chargesMensuelles: formData.charges_mensuelles,
         scoreCredit,
-        statut: scoreCredit >= 70 ? 'En cours' : 'En attente',
+        statut: scoreCredit >= 70 ? 'A enquêter' : 'En attente',
         ...overridePayload,
       });
 
