@@ -106,6 +106,48 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     return value;
   };
 
+  // Smart formatting for conversion display
+  const formatConversion = (value: number, unit: 'days' | 'months' | 'years'): string => {
+    const totalMonths = convertToMonths(value, unit);
+    
+    // If original is in years, show in months and years
+    if (unit === 'years') {
+      if (value === 1) return '1 an (12 mois)';
+      return `${value} années (${totalMonths} mois)`;
+    }
+    
+    // If original is in months
+    if (unit === 'months') {
+      if (value < 12) return `${value} mois`;
+      const years = Math.floor(value / 12);
+      const remainingMonths = value % 12;
+      if (remainingMonths === 0) {
+        return years === 1 ? '1 an' : `${years} ans`;
+      }
+      const yearText = years === 1 ? '1 an' : `${years} ans`;
+      return `${yearText} et ${remainingMonths} mois`;
+    }
+    
+    // If original is in days
+    if (unit === 'days') {
+      if (value < 30) {
+        return totalMonths === 0 ? 'moins d\'1 mois' : '≈ 1 mois';
+      }
+      if (totalMonths < 12) {
+        return `≈ ${totalMonths} mois`;
+      }
+      const years = Math.floor(totalMonths / 12);
+      const remainingMonths = totalMonths % 12;
+      if (remainingMonths === 0) {
+        return years === 1 ? '≈ 1 an' : `≈ ${years} ans`;
+      }
+      const yearText = years === 1 ? '1 an' : `${years} ans`;
+      return `≈ ${yearText} et ${remainingMonths} mois`;
+    }
+    
+    return `${totalMonths} mois`;
+  };
+
   // Update anciennete_activite when seniority value/unit changes
   useEffect(() => {
     if (seniorityValue) {
@@ -675,8 +717,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 <div className="mt-2 text-xs text-cyan-400 flex items-center gap-1">
                   <CheckCircle size={12} />
                   <span>
-                    {seniorityValue} {seniorityUnit === 'days' ? 'jour(s)' : seniorityUnit === 'months' ? 'mois' : 'année(s)'}
-                    {' '}= <span className="font-semibold">{convertToMonths(parseFloat(seniorityValue), seniorityUnit)} mois</span>
+                    <span className="font-semibold">{formatConversion(parseFloat(seniorityValue), seniorityUnit)}</span>
                   </span>
                 </div>
               )}
