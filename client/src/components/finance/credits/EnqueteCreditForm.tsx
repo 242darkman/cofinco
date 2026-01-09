@@ -60,6 +60,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   
+  // Seniority state (value + unit)
+  const [seniorityValue, setSeniorityValue] = useState<string>('');
+  const [seniorityUnit, setSeniorityUnit] = useState<'days' | 'months' | 'years'>('months');
+
   const [formData, setFormData] = useState({
     demandeId: initialData?.id || '',
     client_id: clientId || initialData?.client_id || '',
@@ -93,6 +97,33 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       setFormData(prev => ({ ...prev, revenu_mensuel_declare: revenuMensuel.toString() }));
     }
   }, [formData.revenu_journalier, formData.jours_travail_mois]);
+
+  // Convert seniority to months
+  const convertToMonths = (value: number, unit: 'days' | 'months' | 'years'): number => {
+    if (unit === 'days') return Math.round(value / 30);
+    if (unit === 'months') return value;
+    if (unit === 'years') return value * 12;
+    return value;
+  };
+
+  // Update anciennete_activite when seniority value/unit changes
+  useEffect(() => {
+    if (seniorityValue) {
+      const months = convertToMonths(parseFloat(seniorityValue), seniorityUnit);
+      setFormData(prev => ({ ...prev, anciennete_activite: months.toString() }));
+    } else {
+      setFormData(prev => ({ ...prev, anciennete_activite: '' }));
+    }
+  }, [seniorityValue, seniorityUnit]);
+
+  // Initialize seniority from formData if editing
+  useEffect(() => {
+    if (initialData?.anciennete_activite) {
+      const months = parseInt(initialData.anciennete_activite);
+      setSeniorityValue(months.toString());
+      setSeniorityUnit('months');
+    }
+  }, [initialData]);
 
   const loadClients = async () => {
     try {
@@ -616,19 +647,39 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-2">
-                <Clock size={16} className="inline mr-2" />
-                Ancienneté (mois) *
+                <Calendar size={16} className="inline mr-2" />
+                Ancienneté dans l'activité *
               </label>
-              <input
-                type="number"
-                min="0"
-                value={formData.anciennete_activite}
-                onChange={(e) => handleChange('anciennete_activite', e.target.value)}
-                className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border ${
-                  errors.anciennete_activite ? 'border-blue-500' : 'border-slate-600'
-                } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                placeholder="Ex: 30"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  value={seniorityValue}
+                  onChange={(e) => setSeniorityValue(e.target.value)}
+                  className={`flex-1 bg-slate-800 text-white px-4 py-3 rounded-lg border ${
+                    errors.anciennete_activite ? 'border-blue-500' : 'border-slate-600'
+                  } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  placeholder={seniorityUnit === 'days' ? 'Ex: 90' : seniorityUnit === 'months' ? 'Ex: 6' : 'Ex: 2'}
+                />
+                <select
+                  value={seniorityUnit}
+                  onChange={(e) => setSeniorityUnit(e.target.value as 'days' | 'months' | 'years')}
+                  className="bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 min-w-[120px]"
+                >
+                  <option value="days">Jours</option>
+                  <option value="months">Mois</option>
+                  <option value="years">Années</option>
+                </select>
+              </div>
+              {seniorityValue && (
+                <div className="mt-2 text-xs text-cyan-400 flex items-center gap-1">
+                  <CheckCircle size={12} />
+                  <span>
+                    {seniorityValue} {seniorityUnit === 'days' ? 'jour(s)' : seniorityUnit === 'months' ? 'mois' : 'année(s)'}
+                    {' '}= <span className="font-semibold">{convertToMonths(parseFloat(seniorityValue), seniorityUnit)} mois</span>
+                  </span>
+                </div>
+              )}
               {errors.anciennete_activite && <p className="text-blue-400 text-xs mt-1">{errors.anciennete_activite}</p>}
             </div>
           </div>
