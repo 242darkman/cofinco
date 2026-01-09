@@ -448,16 +448,29 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       const payload = {
         ...formData,
         demandeId: formData.demandeId || undefined,
-        montant_demande: parseFloat(formData.montant_demande),
-        revenu_journalier: parseFloat(formData.revenu_journalier) || 0,
-        jours_travail_mois: parseInt(formData.jours_travail_mois) || 26,
-        revenu_mensuel_declare: parseFloat(formData.revenu_mensuel_declare),
-        type_revenu: formData.type_revenu,
-        charges_mensuelles: parseFloat(formData.charges_mensuelles) || 0,
-        geo_latitude: geoLocation.latitude,
-        geo_longitude: geoLocation.longitude,
-        geo_accuracy: geoLocation.accuracy,
-        geo_timestamp: geoLocation.timestamp,
+        // Backend expects strings for monetary values
+        montantDemande: formData.montant_demande,
+        revenuJournalier: formData.revenu_journalier || '0',
+        joursTravailMois: parseInt(formData.jours_travail_mois) || 26,
+        revenuMensuelDeclare: formData.revenu_mensuel_declare,
+        typeRevenu: formData.type_revenu,
+        chargesMensuelles: formData.charges_mensuelles || '0',
+        // Backend expects number for ancienneteActivite
+        ancienneteActivite: parseInt(formData.anciennete_activite),
+        // Map description_activite to objetCredit
+        objetCredit: formData.description_activite,
+        // Keep all other fields
+        categorieActivite: formData.categorie_activite,
+        typeActivite: formData.type_activite,
+        autresCredits: formData.autres_credits,
+        garantiesProposees: formData.garanties_proposees,
+        photosActivite: formData.photos_activite,
+        documentsJustificatifs: formData.documents_justificatifs,
+        // Geo data
+        geoLatitude: geoLocation.latitude,
+        geoLongitude: geoLocation.longitude,
+        geoAccuracy: geoLocation.accuracy,
+        geoTimestamp: geoLocation.timestamp,
         statut: 'en_attente'
       };
 
@@ -765,7 +778,6 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                     <input
                       type="number"
                       min="0"
-                      step="500"
                       value={formData.revenu_journalier}
                       onChange={(e) => {
                         const journalier = e.target.value;
@@ -807,7 +819,6 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   <input
                     type="number"
                     min="0"
-                    step="1000"
                     value={formData.revenu_mensuel_declare}
                     onChange={(e) => handleChange('revenu_mensuel_declare', e.target.value)}
                     className={`w-full bg-slate-700 text-white px-4 py-3 rounded-lg border ${
@@ -907,7 +918,6 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             <input
               type="number"
               min="0"
-              step="1000"
               value={formData.charges_mensuelles}
               onChange={(e) => handleChange('charges_mensuelles', e.target.value)}
               className="w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
