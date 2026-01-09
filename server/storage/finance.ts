@@ -218,11 +218,43 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
   }
   
   export async function createDemandeCredit(insertDemande: InsertDemandeCredit): Promise<DemandeCredit> {
+    // Import dynamique pour éviter les dépendances circulaires
+    const { calculerScoreMicrofinance, mettreAJourScoreClient } = await import('../services/microfinance-scoring');
+
+    // Calculer automatiquement le score de crédit
+    let scoreCredit: number | null = null;
+    try {
+      // Convertir la durée en mois selon l'unité
+      let dureeMois = insertDemande.dureeValeur || 1;
+      if (insertDemande.dureeUnite === 'Jour') {
+        dureeMois = Math.ceil(dureeMois / 30);
+      } else if (insertDemande.dureeUnite === 'Semaine') {
+        dureeMois = Math.ceil(dureeMois / 4);
+      }
+
+      const scoringResult = await calculerScoreMicrofinance({
+        clientId: insertDemande.clientId,
+        montantDemande: parseFloat(insertDemande.montantDemande?.toString() || '0'),
+        dureeMois,
+        revenuMensuel: insertDemande.revenusMensuels ? parseFloat(insertDemande.revenusMensuels.toString()) : undefined,
+        chargesMensuelles: insertDemande.chargesMensuelles ? parseFloat(insertDemande.chargesMensuelles.toString()) : undefined
+      });
+
+      scoreCredit = scoringResult.score;
+
+      // Mettre à jour le score du client également
+      await mettreAJourScoreClient(insertDemande.clientId).catch(console.error);
+    } catch (error) {
+      console.error('Erreur calcul score crédit:', error);
+      // Continuer sans score en cas d'erreur
+    }
+
     // Forcer le statut "En attente" - les frais d'engagement sont obligatoires avant toute enquête
     const demandeAvecStatut = {
       ...insertDemande,
       statut: 'En attente' as const, // Toujours "En attente" à la création
-      fraisEngagementPayes: false
+      fraisEngagementPayes: false,
+      scoreCredit: scoreCredit ?? insertDemande.scoreCredit ?? null
     };
     const [demande] = await db.insert(demandesCredit).values(demandeAvecStatut).returning();
     return demande;

@@ -511,6 +511,90 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enquete));
   });
 
+  // Obtenir le détail du scoring pour une demande
+  app.get("/api/demandes-credit/:id/scoring", requireAuth, async (req, res) => {
+    try {
+      const demande = await storage.getDemandeCredit(req.params.id);
+      if (!demande) {
+        return res.status(404).json({ message: "Demande non trouvée" });
+      }
+
+      const { calculerScoreMicrofinance } = await import('../services/microfinance-scoring');
+
+      // Convertir la durée en mois
+      let dureeMois = demande.dureeValeur || 1;
+      if (demande.dureeUnite === 'Jour') {
+        dureeMois = Math.ceil(dureeMois / 30);
+      } else if (demande.dureeUnite === 'Semaine') {
+        dureeMois = Math.ceil(dureeMois / 4);
+      }
+
+      const scoringResult = await calculerScoreMicrofinance({
+        clientId: demande.clientId,
+        montantDemande: parseFloat(demande.montantDemande?.toString() || '0'),
+        dureeMois,
+        revenuMensuel: demande.revenusMensuels ? parseFloat(demande.revenusMensuels.toString()) : undefined,
+        chargesMensuelles: demande.chargesMensuelles ? parseFloat(demande.chargesMensuelles.toString()) : undefined
+      });
+
+      res.json({
+        demandeId: demande.id,
+        numeroDemande: demande.numeroDemande,
+        ...scoringResult
+      });
+    } catch (error: any) {
+      console.error("Erreur calcul scoring:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du calcul du scoring" });
+    }
+  });
+
+  // Recalculer le score d'une demande
+  app.post("/api/demandes-credit/:id/recalculer-score", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+    try {
+      const demande = await storage.getDemandeCredit(req.params.id);
+      if (!demande) {
+        return res.status(404).json({ message: "Demande non trouvée" });
+      }
+
+      const { calculerScoreMicrofinance, mettreAJourScoreClient } = await import('../services/microfinance-scoring');
+
+      // Convertir la durée en mois
+      let dureeMois = demande.dureeValeur || 1;
+      if (demande.dureeUnite === 'Jour') {
+        dureeMois = Math.ceil(dureeMois / 30);
+      } else if (demande.dureeUnite === 'Semaine') {
+        dureeMois = Math.ceil(dureeMois / 4);
+      }
+
+      const scoringResult = await calculerScoreMicrofinance({
+        clientId: demande.clientId,
+        montantDemande: parseFloat(demande.montantDemande?.toString() || '0'),
+        dureeMois,
+        revenuMensuel: demande.revenusMensuels ? parseFloat(demande.revenusMensuels.toString()) : undefined,
+        chargesMensuelles: demande.chargesMensuelles ? parseFloat(demande.chargesMensuelles.toString()) : undefined
+      });
+
+      // Mettre à jour le score de la demande
+      await storage.updateDemandeCredit(demande.id, {
+        scoreCredit: scoringResult.score
+      });
+
+      // Mettre à jour le score du client
+      await mettreAJourScoreClient(demande.clientId);
+
+      res.json({
+        message: "Score recalculé avec succès",
+        nouveauScore: scoringResult.score,
+        grade: scoringResult.grade,
+        recommendation: scoringResult.recommendation,
+        details: scoringResult.details
+      });
+    } catch (error: any) {
+      console.error("Erreur recalcul scoring:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du recalcul du scoring" });
+    }
+  });
+
   // Enquetes (roles: admin, chef, credit, superviseur)
   app.get("/api/enquetes-credit", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur', 'agent_terrain'), async (req, res) => {
       // Return both completed/in-progress enquetes AND demandes ready for investigation

@@ -221,6 +221,11 @@ export const creditApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  // Scoring
+  getScoring: (demandeId: string) => request<any>(`/demandes-credit/${demandeId}/scoring`),
+  recalculerScore: (demandeId: string) => request<any>(`/demandes-credit/${demandeId}/recalculer-score`, {
+    method: 'POST',
+  }),
 };
 
 // Credit Plans API
