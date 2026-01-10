@@ -10,3 +10,5 @@ vite.config.ts.*
 
 deploy_key
 deploy_key.pub
+
+/ssl_prod_key

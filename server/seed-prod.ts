@@ -19,6 +19,7 @@ import {
   planComptable,
   journaux,
   exercices,
+  creditPlans,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 
@@ -365,6 +366,7 @@ async function seedProd() {
     await db.delete(planComptable);
     await db.delete(journaux);
     await db.delete(exercices);
+    await db.delete(creditPlans);
     
     // NOTE: We do NOT delete users, agences, or zones if they have data linked
     // But for a fresh install we might want to ensure they exist.
@@ -456,7 +458,80 @@ async function seedProd() {
     // SMS Templates
     await db.insert(smsTemplates).values(SMS_TEMPLATES_DATA);
     
-    // 5. SEED SYSTEM SETTINGS
+    // Credit Plans
+    console.log('\n📝 Seeding Credit Plans...');
+    await db.insert(creditPlans).values([
+      {
+        nom: 'Crédit 50.000',
+        description: 'Micro-crédit de 50.000 FCFA',
+        typeCredit: 'Personnel',
+        montantMin: '50000',
+        montantMax: '50000',
+        tauxInteret: '20',
+        dureeValeur: 30,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Journalier',
+        fraisDossier: '2500',
+        conditions: ['Carte d\'identité'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 75.000',
+        description: 'Micro-crédit de 75.000 FCFA',
+        typeCredit: 'Personnel',
+        montantMin: '75000',
+        montantMax: '75000',
+        tauxInteret: '20',
+        dureeValeur: 30,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Journalier',
+        fraisDossier: '3750',
+        conditions: ['Carte d\'identité'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 100.000',
+        description: 'Micro-crédit de 100.000 FCFA',
+        typeCredit: 'Personnel',
+        montantMin: '100000',
+        montantMax: '100000',
+        tauxInteret: '20',
+        dureeValeur: 30,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Hebdomadaire',
+        fraisDossier: '5000',
+        conditions: ['Carte d\'identité', 'Garant'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 150.000',
+        description: 'Micro-crédit de 150.000 FCFA',
+        typeCredit: 'Commercial',
+        montantMin: '150000',
+        montantMax: '150000',
+        tauxInteret: '20',
+        dureeValeur: 60,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Hebdomadaire',
+        fraisDossier: '7500',
+        conditions: ['Carte d\'identité', 'Commerce'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 200.000',
+        description: 'Micro-crédit de 200.000 FCFA',
+        typeCredit: 'Commercial',
+        montantMin: '200000',
+        montantMax: '200000',
+        tauxInteret: '20',
+        dureeValeur: 90,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Hebdomadaire',
+        fraisDossier: '10000',
+        conditions: ['Carte d\'identité', 'Commerce', 'Garant'],
+        actif: true
+      }
+    ]);
     console.log('\n⚙️ Seeding Settings...');
 
     await db.insert(systemSettings).values({

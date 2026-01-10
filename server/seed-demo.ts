@@ -21,13 +21,13 @@ import {
   enquetesCredit,
   credits,
   remboursements,
-  comptesEpargne,
-  transactionsEpargne,
+  transactionsCompte,
   objectifsEpargne,
   plansEpargne,
   sessionsCaisse,
   operationsCaisse,
   caisseTransferts,
+  mouvementsFinanciers,
   agentsTerrain,
   objectifsMensuels,
   prospections,
@@ -52,6 +52,7 @@ import {
   tontinePenalites,
   tontineDistributions,
   tontineAlertes,
+  tontinePlans,
   kycLevels,
   transferts,
   transfertAuditLogs,
@@ -98,6 +99,8 @@ import {
   transactionsBourse,
   watchlistBourse,
   dureesSuggerees,
+  planComptable,
+  creditPlans,
 } from '@shared/schema';
 import { hashPassword, ROLES } from './auth';
 import { eq } from 'drizzle-orm';
@@ -161,7 +164,7 @@ const CREDIT_OBJECTS = [
 const EPARGNE_TYPES = ['Epargne Simple', 'Epargne Projet', 'Epargne Bloquée', 'Compte Courant'];
 const SEGMENTS = ['Standard', 'Premium', 'VIP'];
 const CREDIT_STATUSES = ['En attente', 'Approuvé', 'Actif', 'En retard', 'Soldé', 'Rejeté', 'Annulé'];
-const PAYMENT_METHODS = ['Espèces', 'Mobile Money', 'Virement', 'Chèque'];
+const PAYMENT_METHODS = ['Espèces', 'Mobile Money', 'Virement', 'Carte'];
 
 // Fonctions helper pour générer des données aléatoires
 const randomFromArray = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -447,6 +450,10 @@ async function seedDemo() {
     await db.delete(caisseAssignations);
     await db.delete(caisseSecurityCodes);
     await db.delete(codeGenerationPermissions);
+
+    // Pivot Ledger & Financial movements should be cleared before accounts/clients
+    await db.delete(mouvementsFinanciers);
+    
     await db.delete(posDevices);
     await db.delete(operationsCaisse);
     await db.delete(caisseTransferts);
@@ -466,6 +473,7 @@ async function seedDemo() {
     await db.delete(contributionsTontine);
     await db.delete(membresTontine);
     await db.delete(tontineRegles);
+    await db.delete(tontinePlans); // New table
     await db.delete(tontines);
 
     await db.delete(transfertAuditLogs);
@@ -480,11 +488,12 @@ async function seedDemo() {
     await db.delete(plansEpargne);
     await db.delete(remboursements);
     await db.delete(credits);
+    await db.delete(creditPlans);
     await db.delete(enquetesCredit);
     await db.delete(demandesCredit);
     await db.delete(objectifsEpargne);
-    await db.delete(transactionsEpargne);
-    await db.delete(comptesEpargne);
+    await db.delete(transactionsCompte);
+    await db.delete(comptes); // Moved up from line 542
     await db.delete(interestRates);
 
     await db.delete(transactionsBourse);
@@ -538,7 +547,8 @@ async function seedDemo() {
     await db.delete(lignesEcritures);
     await db.delete(ecritures);
     await db.delete(journaux);
-    await db.delete(comptes);
+    await db.delete(planComptable);
+    // await db.delete(comptes); // Removed (moved to line 487)
     await db.delete(exercices);
 
     await db.delete(systemSettings);
@@ -805,7 +815,7 @@ async function seedDemo() {
       description: `Exercice comptable ${previousYear}`,
     }).returning();
 
-    const planComptable = [
+    const planComptableData = [
       // Classe 1: Capitaux
       { num: '101', label: 'Capital social', classe: 1, type: 'Capitaux', sens: 'Crédit' },
       { num: '1011', label: 'Capital souscrit, non appelé', classe: 1, type: 'Capitaux', sens: 'Débit' },
@@ -858,8 +868,8 @@ async function seedDemo() {
     ];
 
     const insertedComptes: Record<string, string> = {};
-    for (const cpt of planComptable) {
-      const [inserted] = await db.insert(comptes).values({
+    for (const cpt of planComptableData) {
+      const [inserted] = await db.insert(planComptable).values({
         numeroCompte: cpt.num,
         intitule: cpt.label,
         classe: cpt.classe,
@@ -1428,8 +1438,86 @@ async function seedDemo() {
 
     console.log(`   ✅ Created ${insertedClients.length} clients with ${clientActivitiesData.length} activities and ${historiquePointsData.length} points entries`);
 
+
     // 10. SEED FINANCE (INTEREST, EPARGNE, CREDITS) - Version enrichie avec Faker
     console.log('\n💰 Seeding Finance (80 comptes épargne, 40+ crédits, 12 mois d\'historique)...');
+
+    // 10.1 CREDIT PLANS
+    console.log('   📝 Seeding Credit Plans...');
+    const creditPlansData = [
+      {
+        nom: 'Crédit 50.000',
+        description: 'Micro-crédit de 50.000 FCFA',
+        typeCredit: 'Personnel',
+        montantMin: '50000',
+        montantMax: '50000',
+        tauxInteret: '20',
+        dureeValeur: 30,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Journalier',
+        fraisDossier: '2500',
+        conditions: ['Carte d\'identité'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 75.000',
+        description: 'Micro-crédit de 75.000 FCFA',
+        typeCredit: 'Personnel',
+        montantMin: '75000',
+        montantMax: '75000',
+        tauxInteret: '20',
+        dureeValeur: 30,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Journalier',
+        fraisDossier: '3750',
+        conditions: ['Carte d\'identité'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 100.000',
+        description: 'Micro-crédit de 100.000 FCFA',
+        typeCredit: 'Personnel',
+        montantMin: '100000',
+        montantMax: '100000',
+        tauxInteret: '20',
+        dureeValeur: 30,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Hebdomadaire',
+        fraisDossier: '5000',
+        conditions: ['Carte d\'identité', 'Garant'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 150.000',
+        description: 'Micro-crédit de 150.000 FCFA',
+        typeCredit: 'Commercial',
+        montantMin: '150000',
+        montantMax: '150000',
+        tauxInteret: '20',
+        dureeValeur: 60,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Hebdomadaire',
+        fraisDossier: '7500',
+        conditions: ['Carte d\'identité', 'Commerce'],
+        actif: true
+      },
+      {
+        nom: 'Crédit 200.000',
+        description: 'Micro-crédit de 200.000 FCFA',
+        typeCredit: 'Commercial',
+        montantMin: '200000',
+        montantMax: '200000',
+        tauxInteret: '20',
+        dureeValeur: 90,
+        dureeUnite: 'Jour',
+        frequenceRemboursement: 'Hebdomadaire',
+        fraisDossier: '10000',
+        conditions: ['Carte d\'identité', 'Commerce', 'Garant'],
+        actif: true
+      }
+    ];
+
+    await db.insert(creditPlans).values(creditPlansData);
 
     // Taux d'intérêt
     await db.insert(interestRates).values([
@@ -1442,95 +1530,283 @@ async function seedDemo() {
     ]);
 
     // Générer des comptes épargne pour tous les clients
-    const comptesEpargneData = insertedClients.map((client, index) => {
-      const statut = client.status === 'Suspendu' ? 'Suspendu' : client.status === 'Inactif' ? 'Inactif' : 'Actif';
-      const monthsBack = randomBetween(1, 18);
-      const typeCompte = randomFromArray(EPARGNE_TYPES);
-      const soldeBase = client.segment === 'VIP' ? randomBetween(200000, 1500000)
-        : client.segment === 'Premium' ? randomBetween(50000, 500000)
-        : randomBetween(5000, 150000);
+    // ---------------------------------------------------------
+    // GENERATE COMPTES (Epargne / Courant / Bloqué)
+    // ---------------------------------------------------------
+    const comptesData: any[] = [];
 
-      return {
-        clientId: client.id,
-        numeroCompte: `EP-${String(index + 1).padStart(5, '0')}`,
-        typeCompte,
-        tauxInteret: typeCompte === 'Epargne Bloquée' ? '5.0' : typeCompte === 'Epargne Projet' ? '4.0' : '3.0',
-        solde: generateRealisticAmount(soldeBase, soldeBase * 1.5, 1000),
-        statut,
-        objectifEpargne: typeCompte === 'Epargne Projet' ? generateRealisticAmount(500000, 2000000, 100000) : null,
-        versementMensuel: typeCompte === 'Epargne Projet' ? generateRealisticAmount(25000, 100000, 5000) : null,
-        agenceId: client.agenceId,
-        dateOuverture: monthsAgo(monthsBack),
-      };
+    // [FIX] Créer exactement 1 compte par type par client (règle métier: unique type/client)
+    // On assigne chaque client à 1-3 types de compte distincts
+    const allAccountTypes: Array<{subType: string, typeCompte: 'Épargne' | 'Courant' | 'Bloqué'}> = [
+      { subType: 'Epargne Simple', typeCompte: 'Épargne' },
+      { subType: 'Compte Courant', typeCompte: 'Courant' },
+      { subType: 'Epargne Bloquée', typeCompte: 'Bloqué' },
+    ];
+
+    insertedClients.forEach((client, index) => {
+      // Choisir 1 à 3 types de compte distincts pour ce client
+      const numAccounts = randomBetween(1, 3);
+      const shuffledTypes = [...allAccountTypes].sort(() => Math.random() - 0.5);
+      const selectedTypes = shuffledTypes.slice(0, numAccounts);
+
+      selectedTypes.forEach((accountType, i) => {
+        // Generate a consistently formatted account number
+        const typePrefix = accountType.typeCompte === 'Épargne' ? 'CE' :
+                          accountType.typeCompte === 'Courant' ? 'CC' : 'CB';
+        const clientRef = (client as any).reference || String(index).padStart(5, '0');
+        const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
+        const numeroCompte = `${typePrefix}-${clientRef}-${timestamp}${i}`;
+
+        const solde = generateRealisticAmount(5000, 5000000, 1000);
+        const isEpargneProjet = accountType.subType === 'Epargne Projet' ||
+                               (accountType.typeCompte === 'Épargne' && Math.random() > 0.7);
+
+        comptesData.push({
+          clientId: client.id,
+          agenceId: insertedAgences['Siège'] || null,
+          numeroCompte,
+          typeCompte: accountType.typeCompte,
+          statut: 'Actif',
+          soldeCourant: String(solde),
+          blocageActif: accountType.typeCompte === 'Bloqué',
+          blocageMotif: accountType.typeCompte === 'Bloqué' ? 'Épargne forcée' : null,
+          createdAt: daysAgo(randomBetween(30, 365)),
+
+          // Store these for next steps (plans/objectifs) if needed
+          _originalSubType: accountType.subType,
+          _targetSave: isEpargneProjet ? generateRealisticAmount(500000, 2000000, 100000) : null,
+          _monthlyPay: isEpargneProjet ? generateRealisticAmount(25000, 100000, 5000) : null
+        });
+      });
     });
 
-    const insertedComptesEpargne = await db.insert(comptesEpargne).values(comptesEpargneData).returning();
+    console.log(`Prepared ${comptesData.length} accounts to insert.`);
+
+    // Insert accounts
+    const insertedClientAccounts: any[] = [];
+    // DB insert requires matching schema exactly, so we must exclude the temporary underscore props
+    const batchSize = 50;
+    for (let i = 0; i < comptesData.length; i += batchSize) {
+      const batch = comptesData.slice(i, i + batchSize).map(c => ({
+        clientId: c.clientId,
+        agenceId: c.agenceId,
+        numeroCompte: c.numeroCompte,
+        typeCompte: c.typeCompte,
+        statut: c.statut,
+        soldeCourant: c.soldeCourant,
+        blocageActif: c.blocageActif,
+        blocageMotif: c.blocageMotif,
+        createdAt: c.createdAt
+      }));
+      
+      const res = await db.insert(comptes).values(batch).returning();
+      
+      // Re-attach the temp props to the result so we can use them for transactions/plans
+      res.forEach((r, idx) => {
+        insertedClientAccounts.push({
+          ...r,
+          _originalSubType: comptesData[i+idx]._originalSubType,
+          _targetSave: comptesData[i+idx]._targetSave,
+          _monthlyPay: comptesData[i+idx]._monthlyPay
+        });
+      });
+    }
+
+    // Restore compteByClientId for later usage
     const compteByClientId: Record<string, any> = {};
-    for (const compte of insertedComptesEpargne) {
+    for (const compte of insertedClientAccounts) {
       compteByClientId[compte.clientId] = compte;
     }
 
-    // Générer un historique de transactions sur 12 mois pour chaque compte
-    const transactionsEpargneData: any[] = [];
-    let transactionCounter = 1;
+    // ---------------------------------------------------------
+    // [FIX] GENERATE TRANSACTIONS WITH LINKED LEDGER MOVEMENTS
+    // Pattern prod: chaque transaction DOIT avoir un mouvement_financier associé
+    // Le solde du compte est calculé depuis les mouvements, pas depuis les transactions
+    // IMPORTANT: On génère d'abord un dépôt initial, puis les transactions suivantes
+    //            respectent la contrainte de solde positif (pas de retrait si solde insuffisant)
+    // ---------------------------------------------------------
+    console.log('   💰 Generating account transactions with ledger movements...');
 
-    for (const compte of insertedComptesEpargne) {
-      let soldeActuel = 0;
-      const numTransactions = randomBetween(5, 25); // 5 à 25 transactions par compte
-      const accountAge = Math.min(12, Math.ceil((Date.now() - new Date(compte.dateOuverture ?? new Date()).getTime()) / (30 * 24 * 60 * 60 * 1000)));
+    // Structure pour tracker les mouvements par compte (pour calculer le solde final)
+    const mouvementsByCompte: Record<string, { total: number; movements: any[]; transactions: any[] }> = {};
 
-      for (let t = 0; t < numTransactions; t++) {
-        const isDeposit = t === 0 || Math.random() > 0.3; // Premier toujours dépôt, sinon 70% dépôts
-        const montant = isDeposit
-          ? parseInt(generateRealisticAmount(5000, 100000, 1000))
-          : Math.min(soldeActuel * 0.5, parseInt(generateRealisticAmount(5000, 50000, 1000)));
+    for (const compte of insertedClientAccounts) {
+      mouvementsByCompte[compte.id] = { total: 0, movements: [], transactions: [] };
 
-        if (!isDeposit && montant <= 0) continue; // Skip if insufficient balance
+      // Generate 5-15 transactions par compte (historique réaliste)
+      const nbTx = randomBetween(5, 15);
+      const compteCreatedAt = new Date(compte.createdAt);
+      const daysSinceCreation = Math.floor((Date.now() - compteCreatedAt.getTime()) / (1000 * 60 * 60 * 24));
 
-        soldeActuel = isDeposit ? soldeActuel + montant : soldeActuel - montant;
+      // STEP 1: Générer toutes les transactions avec leurs dates d'abord
+      const rawTransactions: Array<{
+        isDepot: boolean;
+        montant: number;
+        txDate: Date;
+        txDaysAgo: number;
+      }> = [];
 
-        const daysBack = randomBetween(0, accountAge * 30);
-        transactionsEpargneData.push({
-          compteId: compte.id,
-          typeTransaction: isDeposit ? 'Depot' : 'Retrait',
+      for (let k = 0; k < nbTx; k++) {
+        const txDaysAgo = randomBetween(0, Math.max(1, daysSinceCreation));
+        rawTransactions.push({
+          isDepot: k === 0 ? true : faker.datatype.boolean({ probability: 0.55 }), // Première tx = dépôt obligatoire
+          montant: parseInt(generateRealisticAmount(5000, 100000, 1000)),
+          txDate: daysAgo(txDaysAgo),
+          txDaysAgo,
+        });
+      }
+
+      // STEP 2: Trier par date (plus ancien d'abord) pour cohérence chronologique
+      rawTransactions.sort((a, b) => b.txDaysAgo - a.txDaysAgo);
+
+      // STEP 3: Générer les transactions en respectant la contrainte de solde positif
+      let runningBalance = 0;
+
+      for (const rawTx of rawTransactions) {
+        let isDepot = rawTx.isDepot;
+        let montant = rawTx.montant;
+
+        // Si c'est un retrait, vérifier qu'on a assez de fonds
+        if (!isDepot) {
+          if (runningBalance < 5000) {
+            // Pas assez de fonds pour un retrait minimum = forcer un dépôt
+            isDepot = true;
+          } else if (montant > runningBalance) {
+            // Réduire le retrait à une fraction du solde disponible (arrondi au millier inférieur)
+            montant = Math.floor(runningBalance * faker.number.float({ min: 0.3, max: 0.7 }) / 1000) * 1000;
+            // S'assurer qu'on a au moins 5000
+            if (montant < 5000) {
+              montant = 5000;
+            }
+          }
+        }
+
+        // Determine proper enum for 'typePaiement'
+        let typePaiement = 'Dépôt Épargne';
+        if (compte.typeCompte === 'Courant') {
+          typePaiement = isDepot ? 'Dépôt Courant' : 'Retrait Courant';
+        } else if (compte.typeCompte === 'Bloqué') {
+          typePaiement = isDepot ? 'Dépôt Bloqué' : 'Retrait Bloqué';
+        } else {
+          typePaiement = isDepot ? 'Dépôt Épargne' : 'Retrait Épargne';
+        }
+
+        const sens = isDepot ? 'Crédit' : 'Débit';
+        const delta = isDepot ? montant : -montant;
+        runningBalance += delta;
+        mouvementsByCompte[compte.id].total = runningBalance;
+
+        const reference = `EPG-${rawTx.txDate.toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+        const methodePaiement = randomFromArray(['Espèces', 'Mobile Money']);
+
+        // 1. Créer le mouvement financier (source de vérité)
+        mouvementsByCompte[compte.id].movements.push({
           montant: String(montant),
-          soldeApres: String(soldeActuel),
-          methodePaiement: randomFromArray(PAYMENT_METHODS),
-          reference: `${isDeposit ? 'DEP' : 'RET'}-EP-${String(transactionCounter++).padStart(5, '0')}`,
-          observations: isDeposit
-            ? randomFromArray(['Dépôt mensuel', 'Versement régulier', 'Épargne projet', 'Bonus commercial', 'Virement reçu'])
-            : randomFromArray(['Retrait urgent', 'Besoin personnel', 'Frais scolaires', 'Achat matériel', 'Retrait partiel']),
-          createdAt: daysAgo(daysBack),
+          sens,
+          statut: 'Posté',
+          methodePaiement,
+          reference,
+          description: isDepot ? 'Dépôt comptoir' : 'Retrait espèces',
+          compteId: compte.id,
+          clientId: compte.clientId,
+          agenceId: compte.agenceId,
+          sourceModule: 'EPARGNE',
+          typePaiement,
+          dateOperation: rawTx.txDate,
+          createdAt: rawTx.txDate,
+          createdBy: staffGroups.Caissiers[randomBetween(0, Math.max(0, staffGroups.Caissiers.length - 1))]?.id || staffGroups.Admins[0]?.id,
+        });
+
+        // 2. Créer la transaction compte (UI record, liée au mouvement)
+        mouvementsByCompte[compte.id].transactions.push({
+          compteId: compte.id,
+          typePaiement,
+          montant: String(montant),
+          soldeApres: String(runningBalance), // Solde après cette transaction
+          statut: 'Posté',
+          methodePaiement,
+          referenceExterne: reference, // Même référence que le mouvement
+          observations: isDepot ? 'Dépôt comptoir' : 'Retrait espèces',
+          createdAt: rawTx.txDate,
+          // mouvementId sera ajouté après insertion des mouvements
         });
       }
     }
 
-    // Insérer les transactions par lots pour éviter les problèmes de performance
-    const batchSize = 100;
-    for (let i = 0; i < transactionsEpargneData.length; i += batchSize) {
-      await db.insert(transactionsEpargne).values(transactionsEpargneData.slice(i, i + batchSize));
+    // Insérer les mouvements et récupérer les IDs
+    const allMovements: any[] = [];
+    const movementToCompteMap: Array<{ compteId: string; index: number }> = [];
+
+    for (const compteId of Object.keys(mouvementsByCompte)) {
+      for (let i = 0; i < mouvementsByCompte[compteId].movements.length; i++) {
+        allMovements.push(mouvementsByCompte[compteId].movements[i]);
+        movementToCompteMap.push({ compteId, index: i });
+      }
     }
 
-    // Générer des objectifs d'épargne pour les comptes Epargne Projet
+    // Insert mouvements in batches and collect IDs
+    const insertedMovements: any[] = [];
+    for (let i = 0; i < allMovements.length; i += batchSize) {
+      const batch = allMovements.slice(i, i + batchSize);
+      const inserted = await db.insert(mouvementsFinanciers).values(batch).returning();
+      insertedMovements.push(...inserted);
+    }
+
+    // Lier les transactions aux mouvements insérés
+    const allTransactions: any[] = [];
+    let mvtIndex = 0;
+    for (const compteId of Object.keys(mouvementsByCompte)) {
+      for (let i = 0; i < mouvementsByCompte[compteId].transactions.length; i++) {
+        const tx = mouvementsByCompte[compteId].transactions[i];
+        tx.mouvementId = insertedMovements[mvtIndex]?.id;
+        allTransactions.push(tx);
+        mvtIndex++;
+      }
+    }
+
+    // Insert transactions avec mouvementId
+    for (let i = 0; i < allTransactions.length; i += batchSize) {
+      await db.insert(transactionsCompte).values(allTransactions.slice(i, i + batchSize));
+    }
+
+    // Mettre à jour les soldes des comptes pour refléter le total des mouvements
+    console.log('   📊 Updating account balances from ledger...');
+    for (const compte of insertedClientAccounts) {
+      const data = mouvementsByCompte[compte.id];
+      if (data) {
+        const nouveauSolde = Math.max(0, data.total);
+        await db.update(comptes)
+          .set({ soldeCourant: String(nouveauSolde) })
+          .where(eq(comptes.id, compte.id));
+        // Mettre à jour l'objet local aussi
+        compte.soldeCourant = String(nouveauSolde);
+      }
+    }
+
+    // Générer des objectifs d'épargne pour les comptes avec _targetSave (comptes épargne projet)
     const objectifsEpargneData: any[] = [];
     const objectifNames = ['Achat stock', 'Projet école', 'Mariage', 'Voyage', 'Équipement', 'Logement', 'Retraite', 'Urgences'];
 
-    insertedComptesEpargne.filter(c => c.typeCompte === 'Epargne Projet').forEach((compte, idx) => {
+    // Filtrer les comptes qui ont un objectif (ceux avec _targetSave défini)
+    insertedClientAccounts.filter(c => c._targetSave !== null).forEach((compte) => {
       objectifsEpargneData.push({
         compteId: compte.id,
         nom: randomFromArray(objectifNames),
-        montantCible: compte.objectifEpargne || generateRealisticAmount(500000, 2000000, 100000),
-        montantActuel: generateRealisticAmount(50000, parseInt(compte.objectifEpargne || '500000') * 0.8, 10000),
+        montantCible: String(compte._targetSave || generateRealisticAmount(500000, 2000000, 100000)),
+        montantActuel: String(generateRealisticAmount(50000, parseInt(String(compte._targetSave || '500000')) * 0.8, 10000)),
         dateCible: monthsFromNow(randomBetween(3, 24)),
         description: faker.lorem.sentence(),
         statut: Math.random() > 0.8 ? 'Atteint' : 'En cours',
       });
     });
 
-    await db.insert(objectifsEpargne).values(objectifsEpargneData);
+    // Insérer seulement si on a des objectifs à créer
+    if (objectifsEpargneData.length > 0) {
+      await db.insert(objectifsEpargne).values(objectifsEpargneData);
+    }
 
     // Générer 40 demandes de crédit avec différents statuts
-    const DEMANDE_STATUSES = ['En attente', 'En cours', 'Approuvée', 'Rejetée', 'Décaissée', 'Annulée'];
+    const DEMANDE_STATUSES = ['En attente', 'Approuvée', 'Rejetée', 'Décaissée', 'Annulée'];
     const demandesData: any[] = [];
 
     for (let i = 0; i < 40; i++) {
@@ -1597,13 +1873,42 @@ async function seedDemo() {
     const RECOMMANDATIONS = ['Favorable', 'Sous conditions', 'Défavorable', 'À approfondir'];
     const HABITATIONS = ['Propriétaire', 'Locataire', 'Hébergé', 'Logement de fonction'];
     const EVALUATIONS = ['Très bonne', 'Bonne', 'Moyenne', 'Faible'];
+    const CATEGORIES_ACTIVITE = ['Commerce', 'Services', 'Artisanat', 'Agriculture', 'Élevage', 'Transport', 'Autre'];
+    const TYPES_ACTIVITE_PAR_CATEGORIE: Record<string, string[]> = {
+      'Commerce': ['Boutique', 'Grossiste', 'Détaillant', 'Import/Export', 'Marché'],
+      'Services': ['Coiffure', 'Restauration', 'Réparation', 'Couture', 'Informatique'],
+      'Artisanat': ['Menuiserie', 'Soudure', 'Maçonnerie', 'Électricité', 'Plomberie'],
+      'Agriculture': ['Cultures vivrières', 'Maraîchage', 'Arboriculture', 'Cultures de rente'],
+      'Élevage': ['Volaille', 'Bovins', 'Ovins', 'Porcins', 'Pisciculture'],
+      'Transport': ['Taxi', 'Moto-taxi', 'Transport marchandises', 'Location véhicules'],
+      'Autre': ['Autre activité']
+    };
+    const ORGANISMES_CREDIT = ['Banque ABC', 'IMF Espoir', 'Crédit Populaire', 'Banque Nationale', 'Microfinance Plus'];
+    const TYPES_GARANTIE = ['Caution solidaire', 'Gage matériel', 'Hypothèque', 'Nantissement stock', 'Caution personnelle'];
 
-    insertedDemandes.filter(d => ['Approuvée', 'Décaissée', 'En cours'].includes(d.statut || '')).forEach((demande, idx) => {
+    // Coordonnées GPS approximatives pour différentes zones (exemple: région de Kinshasa)
+    const GPS_ZONES = [
+      { lat: -4.3276, lng: 15.3136 }, // Centre-ville
+      { lat: -4.3415, lng: 15.2920 }, // Gombe
+      { lat: -4.3890, lng: 15.3012 }, // Ngaliema
+      { lat: -4.3125, lng: 15.3545 }, // Limete
+      { lat: -4.3756, lng: 15.3890 }, // Masina
+    ];
+
+    insertedDemandes.filter(d => ['Approuvée', 'Décaissée', 'En enquête'].includes(d.statut || '')).forEach((demande, idx) => {
+      const categorieActivite = randomFromArray(CATEGORIES_ACTIVITE);
+      const typeActivite = randomFromArray(TYPES_ACTIVITE_PAR_CATEGORIE[categorieActivite] || ['Autre']);
+      const gpsZone = randomFromArray(GPS_ZONES);
+      const hasAutresCredits = Math.random() > 0.6;
+      const hasGaranties = Math.random() > 0.3;
+
       enquetesData.push({
         clientId: demande.clientId,
         demandeId: demande.id,
         montantDemande: demande.montantDemande,
         objetCredit: demande.objetCredit,
+        categorieActivite,
+        typeActivite,
         revenuMensuel: demande.revenusMensuels,
         typeRevenu: demande.typeRevenu,
         revenuJournalier: demande.revenuJournalier,
@@ -1613,6 +1918,34 @@ async function seedDemo() {
         typeHabitation: randomFromArray(HABITATIONS),
         ancienneteActivite: randomBetween(1, 20),
         evaluationActivite: randomFromArray(EVALUATIONS),
+        autresCredits: hasAutresCredits ? [
+          {
+            organisme: randomFromArray(ORGANISMES_CREDIT),
+            montant: parseInt(generateRealisticAmount(50000, 500000, 25000)),
+            echeance: daysFromNow(randomBetween(30, 365)).toISOString().split('T')[0]
+          },
+          ...(Math.random() > 0.7 ? [{
+            organisme: randomFromArray(ORGANISMES_CREDIT),
+            montant: parseInt(generateRealisticAmount(25000, 200000, 10000)),
+            echeance: daysFromNow(randomBetween(60, 180)).toISOString().split('T')[0]
+          }] : [])
+        ] : null,
+        garantiesProposees: hasGaranties ? [
+          {
+            type: randomFromArray(TYPES_GARANTIE),
+            description: faker.lorem.sentence(),
+            valeur: parseInt(generateRealisticAmount(100000, 1000000, 50000))
+          },
+          ...(Math.random() > 0.5 ? [{
+            type: randomFromArray(TYPES_GARANTIE),
+            description: faker.lorem.sentence(),
+            valeur: parseInt(generateRealisticAmount(50000, 500000, 25000))
+          }] : [])
+        ] : null,
+        geoLatitude: String(gpsZone.lat + (Math.random() - 0.5) * 0.02),
+        geoLongitude: String(gpsZone.lng + (Math.random() - 0.5) * 0.02),
+        geoAccuracy: String(randomBetween(5, 50)),
+        geoTimestamp: daysAgo(randomBetween(5, 30)),
         capaciteRemboursement: generateRealisticAmount(
           parseInt(demande.revenusMensuels || '300000') * 0.3,
           parseInt(demande.revenusMensuels || '300000') * 0.6,
@@ -1631,7 +1964,7 @@ async function seedDemo() {
 
     // Générer 35 crédits actifs avec différents statuts
     const creditsData: any[] = [];
-    const CREDIT_STATUTS_WEIGHTED = ['Actif', 'Actif', 'Actif', 'En retard', 'Soldé', 'Soldé', 'Soldé', 'En attente', 'Rejeté'];
+    const CREDIT_STATUTS_WEIGHTED = ['Actif', 'Actif', 'Actif', 'En retard', 'Soldé', 'Soldé', 'Soldé', 'En attente', 'Annulé'];
     const GARANTIES = ['Caution', 'Matériel', 'Stock', 'Hypothèque', 'Véhicule', 'Nantissement', 'Aucune'];
 
     for (let i = 0; i < 35; i++) {
@@ -1644,7 +1977,7 @@ async function seedDemo() {
 
       const dateDebutDays = statut === 'Soldé' ? randomBetween(120, 365) : randomBetween(30, 180);
       const soldeRestant = statut === 'Soldé' ? 0
-        : statut === 'Rejeté' ? 0
+        : statut === 'Annulé' ? 0
         : Math.round(montant * (0.3 + Math.random() * 0.6));
 
       creditsData.push({
@@ -1661,7 +1994,7 @@ async function seedDemo() {
         dateFin: ['Actif', 'En retard'].includes(statut) ? daysFromNow(duree * 30 - dateDebutDays) : statut === 'Soldé' ? daysAgo(randomBetween(1, 60)) : null,
         dateSolde: statut === 'Soldé' ? daysAgo(randomBetween(1, 30)) : null,
         soldeRestant: String(soldeRestant),
-        echeance: randomFromArray(['Mensuel', 'Hebdomadaire', 'Bi-mensuel']),
+        echeance: randomFromArray(['Mensuel', 'Hebdomadaire', 'Bimensuel']),
         garanties: randomFromArray(GARANTIES),
         agenceId: client.agenceId,
         createdBy: staffGroups.Credits[i % staffGroups.Credits.length]?.id,
@@ -1677,20 +2010,29 @@ async function seedDemo() {
 
     insertedCredits.filter(c => ['Actif', 'En retard', 'Soldé'].includes(c.statut)).forEach(credit => {
       const montantCredit = parseInt(credit.montant || '0');
-      const soldeRestant = parseInt(credit.soldeRestant || '0');
-      const montantRembourse = montantCredit - soldeRestant;
+      const totalDu = montantCredit * (1 + parseFloat(credit.taux || '0') / 100);
+      const targetSoldeRestant = parseInt(credit.soldeRestant || '0');
+      // Fix: Ensure we actually pay back the difference
+      const montantRembourse = Math.max(0, Math.round(totalDu - targetSoldeRestant));
 
       if (montantRembourse <= 0) return;
 
       const numRemboursements = randomBetween(1, 8);
-      let totalRembourse = 0;
+      let totalGenere = 0;
 
-      for (let r = 0; r < numRemboursements && totalRembourse < montantRembourse; r++) {
-        const montant = Math.min(
-          parseInt(generateRealisticAmount(20000, 150000, 5000)),
-          montantRembourse - totalRembourse
-        );
-        totalRembourse += montant;
+      for (let r = 0; r < numRemboursements; r++) {
+        // Last payment must match exactly
+        let montant = 0;
+        if (r === numRemboursements - 1) {
+            montant = montantRembourse - totalGenere;
+        } else {
+            const max = (montantRembourse - totalGenere) / (numRemboursements - r);
+            montant = Math.round(randomBetween(1000, max) / 100) * 100; // Round to 100
+        }
+
+        if (montant <= 0) continue;
+        
+        totalGenere += montant;
 
         remboursementsData.push({
           creditId: credit.id,
@@ -1705,7 +2047,35 @@ async function seedDemo() {
       }
     });
 
-    await db.insert(remboursements).values(remboursementsData);
+    // [FIX] Insert repayments individually to create associated Ledger Movements
+    console.log('   💸 Generating repayments with ledger entries...');
+    
+    // We can't use batch insert easily because we need the movement ID for each repayment
+    // To speed up, we can process in parallel chunks or just sequential for safety
+    for (const rData of remboursementsData) {
+        // 1. Create Financial Movement
+        const [mvt] = await db.insert(mouvementsFinanciers).values({
+            sens: 'Crédit', // Inflow
+            statut: 'Posté',
+            montant: rData.montant,
+            dateOperation: rData.dateRemboursement,
+            reference: `REF-${rData.creditId.slice(0,5)}-${crypto.randomUUID().slice(0,6)}`,
+            creditId: rData.creditId,
+            sourceModule: 'CREDIT',
+            typePaiement: 'Remboursement Crédit',
+            createdAt: rData.createdAt,
+            createdBy: rData.createdBy,
+        }).returning();
+
+        // 2. Insert Remboursement linked to Movement
+        await db.insert(remboursements).values({
+            ...rData,
+            mouvementId: mvt.id
+        });
+    }
+
+    // Removed batch insert in favor of individual inserts above
+    // await db.insert(remboursements).values(remboursementsData);
 
     // Générer des plans d'épargne liés aux crédits
     const plansEpargneData: any[] = [];
@@ -1716,7 +2086,7 @@ async function seedDemo() {
       plansEpargneData.push({
         creditId: credit.id,
         clientId: credit.clientId,
-        compteEpargneId: compte.id,
+        compteId: compte.id,
         montantMensuel: generateRealisticAmount(15000, 75000, 5000),
         duree: credit.duree,
         montantTotal: generateRealisticAmount(200000, 800000, 50000),
@@ -1730,7 +2100,47 @@ async function seedDemo() {
 
     await db.insert(plansEpargne).values(plansEpargneData);
 
-    console.log(`   ✅ Finance data created: ${insertedComptesEpargne.length} comptes, ${transactionsEpargneData.length} transactions, ${insertedCredits.length} crédits, ${remboursementsData.length} remboursements`);
+    console.log(`   ✅ Finance data created: ${insertedClientAccounts.length} comptes, ${allTransactions.length} transactions, ${insertedCredits.length} crédits, ${remboursementsData.length} remboursements`);
+
+    // 10.5 SEED TONTINE PLANS
+    console.log('\n📝 Seeding Tontine Plans...');
+    const tontinePlansData = [
+      {
+        nom: 'Modèle Rotatif Standard',
+        description: 'Plan classique 12 membres, hebdomadaire',
+        montantCotisation: '5000',
+        nombreMembres: 12,
+        frequence: 'Hebdomadaire',
+        typeDistribution: 'Rotation',
+        tauxPlateforme: '1.5',
+        intervalleCotisation: 1,
+        actif: true,
+      },
+      {
+        nom: 'Modèle Cagnotte Mensuel',
+        description: 'Plan d\'épargne mensuel, distribution finale',
+        montantCotisation: '25000',
+        nombreMembres: 10,
+        frequence: 'Mensuel',
+        typeDistribution: 'Cagnotte',
+        tauxPlateforme: '2',
+        intervalleCotisation: 1,
+        actif: true,
+      },
+      {
+        nom: 'Modèle Petit Commerce',
+        description: 'Collecte quotidienne pour petits commerçants',
+        montantCotisation: '1000',
+        nombreMembres: 20,
+        frequence: 'Journalier',
+        typeDistribution: 'Rotation',
+        tauxPlateforme: '2.5',
+        intervalleCotisation: 1,
+        actif: true,
+      }
+    ];
+
+    const insertedPlans = await db.insert(tontinePlans).values(tontinePlansData).returning();
 
     // 11. SEED TONTINES - Données enrichies avec Faker
     console.log('\n🤝 Seeding Tontines...');
@@ -1747,10 +2157,15 @@ async function seedDemo() {
         intervalleCotisation: 1,
         delaiPenalite: 2,
         nombreMembres: 15,
-        statut: 'actif',
+        statut: 'Active',
         dateDebut: daysAgo(120),
         agenceId: insertedAgences['Siège'],
         gestionnaireId: insertedUsers['chef_siege']?.id,
+        regles: {
+          frais_sortie_pourcentage: 2,
+          montant_par_tour: 15000,
+          description_frais: 'Frais de gestion de 2% par tour'
+        }
       },
       {
         nom: 'Tontine Hebdomadaire Nord - Entrepreneurs',
@@ -1766,6 +2181,11 @@ async function seedDemo() {
         dateDebut: daysAgo(90),
         agenceId: insertedAgences['Agence Nord'],
         gestionnaireId: insertedUsers['chef_nord']?.id,
+        regles: {
+          frais_sortie_pourcentage: 1.5,
+          montant_par_tour: 60000,
+          description_frais: 'Frais de plateforme standards'
+        }
       },
       {
         nom: 'Tontine Femmes Commerçantes',
@@ -1781,6 +2201,11 @@ async function seedDemo() {
         dateDebut: daysAgo(180),
         agenceId: insertedAgences['Agence Sud'],
         gestionnaireId: insertedUsers['chef_sud']?.id,
+        regles: {
+          frais_sortie_pourcentage: 1.5,
+          montant_par_tour: 50000,
+          description_frais: 'Frais réduits pour groupements'
+        }
       },
       {
         nom: 'Tontine Mensuelle Premium',
@@ -1796,6 +2221,11 @@ async function seedDemo() {
         dateDebut: daysAgo(240),
         agenceId: insertedAgences['Siège'],
         gestionnaireId: insertedUsers['chef_siege']?.id,
+        regles: {
+          frais_sortie_pourcentage: 1,
+          montant_par_tour: 500000,
+          description_frais: 'Frais premium réduits'
+        }
       },
       {
         nom: 'Tontine Est Artisans',
@@ -1811,6 +2241,11 @@ async function seedDemo() {
         dateDebut: daysAgo(60),
         agenceId: insertedAgences['Agence Est'],
         gestionnaireId: insertedUsers['chef_est']?.id,
+        regles: {
+          frais_sortie_pourcentage: 2,
+          montant_par_tour: 24000,
+          description_frais: 'Frais de gestion mensuels'
+        }
       },
       {
         nom: 'Tontine Spéciale Sud - Terminée',
@@ -1827,6 +2262,11 @@ async function seedDemo() {
         dateFin: daysAgo(20),
         agenceId: insertedAgences['Agence Sud'],
         gestionnaireId: insertedUsers['chef_sud']?.id,
+        regles: {
+          frais_sortie_pourcentage: 2,
+          montant_par_tour: 12000,
+          description_frais: 'Frais archivés'
+        }
       },
       {
         nom: 'Tontine Rentrée Scolaire 2024',
@@ -1843,6 +2283,11 @@ async function seedDemo() {
         dateFin: daysAgo(90),
         agenceId: insertedAgences['Agence Nord'],
         gestionnaireId: insertedUsers['chef_nord']?.id,
+        regles: {
+          frais_sortie_pourcentage: 1.5,
+          montant_par_tour: 150000,
+          description_frais: 'Frais exceptionnels rentrée'
+        }
       },
       {
         nom: 'Tontine Projet Construction',
@@ -1858,6 +2303,11 @@ async function seedDemo() {
         dateDebut: daysAgo(150),
         agenceId: insertedAgences['Siège'],
         gestionnaireId: insertedUsers['chef_siege']?.id,
+        regles: {
+          frais_sortie_pourcentage: 1,
+          montant_par_tour: 300000,
+          description_frais: 'Frais suspendus'
+        }
       },
     ];
 
@@ -1952,12 +2402,12 @@ async function seedDemo() {
 
         contributionsData.push({
           tontineId: tontine.id,
-          membreId: membre.id,
+          clientId: membre.clientId,
+          typeOperation: 'Versement',
           montant: tontine.montantCotisation,
-          statut: isPaid ? 'Validé' : (isLate ? 'En retard' : 'En attente'),
-          methodePaiement: randomFromArray(PAYMENT_METHODS),
+          statutTransaction: isPaid ? 'Posté' : 'Pending',
+          methodePaiement: randomFromArray(['Espèces', 'Mobile Money', 'Virement']),
           reference: `TONT-${String(contributionCounter++).padStart(6, '0')}`,
-          dateEcheance: daysAgo(c * (tontine.frequence === 'Journalier' ? 1 : tontine.frequence === 'Hebdomadaire' ? 7 : 30)),
           createdAt: daysAgo(c * (tontine.frequence === 'Journalier' ? 1 : tontine.frequence === 'Hebdomadaire' ? 7 : 30) + (isLate ? randomBetween(1, 5) : 0)),
         });
       }
@@ -2058,6 +2508,7 @@ async function seedDemo() {
 
     const insertedAgents: any[] = [];
     for (const agentUser of staffGroups.Agents.slice(0, 3)) {
+      // Note: employeId will be set later in section 18 when employes are created
       const [agentProfile] = await db.insert(agentsTerrain).values({
         nom: agentUser.nom,
         prenom: agentUser.prenom,
@@ -2134,7 +2585,7 @@ async function seedDemo() {
         interetCredit: true,
         montantSouhaite: '350000',
         objetCredit: 'Matériel cuisine',
-        statut: 'en_cours',
+        statut: 'En attente',
         priorite: 'haute',
         commentairesAgent: 'Besoin urgent',
         dateProspection: daysAgo(1),
@@ -2166,27 +2617,53 @@ async function seedDemo() {
       },
     ]);
 
+    // 1. Create movement for validated payment
+    const [mvtTerrain] = await db.insert(mouvementsFinanciers).values({
+        montant: '5000',
+        sens: 'Crédit',
+        typePaiement: 'Dépôt Épargne',
+        methodePaiement: 'Espèces',
+        statut: 'Posté',
+        reference: `MVT-COL-001-${crypto.randomUUID().slice(0, 6)}`,
+        agentId: insertedAgents[0].id,
+        clientId: clientKouassi.id,
+        sourceModule: 'TERRAIN', // Ensure enum match or use string if loose
+        createdAt: daysAgo(1),
+    }).returning();
+
     await db.insert(paiementsTerrain).values([
       {
         agentId: insertedAgents[0].id,
         clientId: clientKouassi.id,
-        typePaiement: 'Collecte',
+        typePaiement: 'Dépôt Épargne',
         montant: '5000',
         methodePaiement: 'Espèces',
         reference: 'COL-001',
-        statut: 'Validé',
+        statut: 'Posté',
         dateValidation: daysAgo(1),
         observations: 'Collecte terrain',
+        mouvementId: mvtTerrain.id,
       },
       {
         agentId: insertedAgents[1].id,
         clientId: clientTaty.id,
-        typePaiement: 'Collecte',
+        typePaiement: 'Dépôt Épargne',
         montant: '10000',
         methodePaiement: 'Mobile Money',
         reference: 'COL-002',
-        statut: 'En attente',
+        statut: 'Pending',
         observations: 'En attente OTP',
+      },
+      {
+        agentId: insertedAgents[0].id,
+        clientId: clientKouassi.id,
+        typePaiement: 'Remboursement Crédit',
+        montant: '15000',
+        methodePaiement: 'Espèces',
+        reference: 'COL-003',
+        statut: 'Pending',
+        observations: 'A valider par le chef',
+        createdAt: daysAgo(0),
       },
     ]);
 
@@ -2278,33 +2755,47 @@ async function seedDemo() {
       { caisse: caisseByName['Caisse Est 1'], caissier: staffGroups.Caissiers[4] },
     ];
 
-    // Générer un historique de shifts sur 90 jours
+    // ---------------------------------------------------------
+    // [FIX] CAISSE OPERATIONS WITH PROPER LEDGER INTEGRATION
+    // Pattern prod: chaque opération caisse DOIT créer un mouvement_financier
+    // Le solde_theorique est calculé depuis solde_initial + somme des mouvements
+    // ---------------------------------------------------------
+    console.log('   🏦 Generating caisse sessions with linked ledger movements...');
+
     const shiftsData: any[] = [];
     const sessionsData: any[] = [];
 
-    for (let dayOffset = 90; dayOffset >= 0; dayOffset--) {
-      // Ne pas créer de shifts les dimanches (jour 0)
+    // Structure pour stocker les opérations par session (pour calculer solde_theorique)
+    const operationsBySession: Record<string, {
+      session: any;
+      shift: any;
+      operations: any[];
+      movements: any[];
+      totalDelta: number;
+    }> = {};
+
+    // Générer un historique de shifts sur 30 jours (réduit pour performance)
+    for (let dayOffset = 30; dayOffset >= 0; dayOffset--) {
       const date = daysAgo(dayOffset);
-      if (date.getDay() === 0) continue;
+      if (date.getDay() === 0) continue; // Pas de shifts le dimanche
 
       for (const assignment of caissierAssignments) {
-        // 80% de chance d'avoir un shift ce jour
-        if (faker.datatype.boolean({ probability: 0.8 })) {
-          const soldeOuvertureStr = generateRealisticAmount(200000, 800000, 50000);
-          const soldeOuverture = parseInt(soldeOuvertureStr);
-          const isClosed = dayOffset > 1 || faker.datatype.boolean({ probability: 0.3 });
-          const ecart = faker.datatype.boolean({ probability: 0.1 }) ? randomBetween(-5000, 5000) : 0;
-          const soldeTheorique = soldeOuverture + parseInt(generateRealisticAmount(-100000, 200000, 10000));
+        if (!assignment.caisse || !assignment.caissier) continue;
+        if (faker.datatype.boolean({ probability: 0.75 })) { // 75% de chance d'avoir un shift
+          const soldeOuverture = parseInt(generateRealisticAmount(200000, 800000, 50000));
+          const isClosed = dayOffset > 0 || faker.datatype.boolean({ probability: 0.3 });
 
           shiftsData.push({
             caisseId: assignment.caisse.id,
-            agentId: assignment.caissier?.id,
+            agentId: assignment.caissier.id,
+            agenceId: assignment.caisse.agenceId,
             dateOuverture: date,
-            dateFermeture: isClosed ? new Date(date.getTime() + 8 * 60 * 60 * 1000) : null, // +8h
+            dateFermeture: isClosed ? new Date(date.getTime() + 8 * 60 * 60 * 1000) : null,
             soldeOuverture: String(soldeOuverture),
-            soldeFermeture: isClosed ? String(soldeTheorique + ecart) : null,
-            soldeTheorique: isClosed ? String(soldeTheorique) : null,
-            ecart: isClosed ? String(ecart) : null,
+            // Ces champs seront mis à jour après calcul des opérations
+            soldeFermeture: null,
+            soldeTheorique: String(soldeOuverture), // Temporaire
+            ecart: null,
             statut: isClosed ? 'ferme' : 'ouvert',
           });
         }
@@ -2313,18 +2804,18 @@ async function seedDemo() {
 
     const insertedShifts = await db.insert(shiftsCaisse).values(shiftsData).returning();
 
-    // Créer des sessions caisse correspondantes (une session par shift)
+    // Créer les sessions (une par shift) - solde_theorique sera mis à jour après
     for (const shift of insertedShifts) {
-      const assignment = caissierAssignments.find(a => a.caisse.id === shift.caisseId);
-      const agenceId = assignment?.caisse.agenceId;
+      const assignment = caissierAssignments.find(a => a.caisse?.id === shift.caisseId);
+      const agenceId = assignment?.caisse?.agenceId;
 
       sessionsData.push({
         caissierId: shift.agentId,
         caisseId: shift.caisseId,
         soldeInitial: shift.soldeOuverture,
-        soldeTheorique: shift.soldeTheorique || shift.soldeOuverture,
-        soldeReel: shift.soldeFermeture,
-        ecart: shift.ecart,
+        soldeTheorique: shift.soldeOuverture, // Sera mis à jour
+        soldeReel: null,
+        ecart: null,
         statut: shift.statut === 'ferme' ? 'Fermée' : 'Ouverte',
         agenceId,
         dateOuverture: shift.dateOuverture,
@@ -2334,52 +2825,165 @@ async function seedDemo() {
 
     const insertedSessions = await db.insert(sessionsCaisse).values(sessionsData).returning();
 
-    // Générer des opérations caisse réparties dans le temps (500+ opérations)
-    const operationsData: any[] = [];
-    let operationCounter = 1;
-    const operationTypes = ['Versement', 'Retrait', 'Dépôt épargne', 'Retrait épargne', 'Remboursement crédit', 'Frais de dossier', 'Cotisation tontine'];
-    const operationDescriptions: Record<string, string[]> = {
-      'Versement': ['Dépôt client', 'Versement en espèces', 'Alimentation compte'],
-      'Retrait': ['Retrait client', 'Retrait partiel', 'Retrait espèces'],
-      'Dépôt épargne': ['Versement épargne mensuel', 'Dépôt sur compte épargne', 'Alimentation épargne'],
-      'Retrait épargne': ['Retrait partiel épargne', 'Clôture partielle', 'Retrait intérêts'],
-      'Remboursement crédit': ['Échéance mensuelle', 'Remboursement anticipé', 'Paiement partiel'],
-      'Frais de dossier': ['Frais ouverture compte', 'Frais demande crédit', 'Frais administratifs'],
-      'Cotisation tontine': ['Cotisation hebdomadaire', 'Cotisation mensuelle', 'Rattrapage cotisation'],
-    };
+    // Mapper sessions aux shifts pour mise à jour ultérieure
+    const sessionToShift: Record<string, any> = {};
+    insertedSessions.forEach((session, idx) => {
+      sessionToShift[session.id] = insertedShifts[idx];
+      operationsBySession[session.id] = {
+        session,
+        shift: insertedShifts[idx],
+        operations: [],
+        movements: [],
+        totalDelta: 0,
+      };
+    });
 
-    // Pour chaque session, générer des opérations
+    // Types d'opérations avec leur sens (Crédit = entrée d'argent dans la caisse)
+    // IMPORTANT: Les types doivent correspondre à type_paiement_terrain_enum
+    const operationTypes: Array<{
+      type: string;
+      typeOperation: string; // Pour operations_caisse (type_operation_caisse_enum)
+      sens: 'Crédit' | 'Débit';
+      sourceModule: string;
+      descriptions: string[];
+    }> = [
+      { type: 'Dépôt Épargne', typeOperation: 'Dépôt épargne', sens: 'Crédit', sourceModule: 'CAISSE', descriptions: ['Versement épargne', 'Dépôt comptoir'] },
+      { type: 'Retrait Épargne', typeOperation: 'Retrait épargne', sens: 'Débit', sourceModule: 'CAISSE', descriptions: ['Retrait client', 'Clôture partielle'] },
+      { type: 'Remboursement Crédit', typeOperation: 'Remboursement crédit', sens: 'Crédit', sourceModule: 'CAISSE', descriptions: ['Échéance mensuelle', 'Remboursement'] },
+      { type: 'Dépôt Courant', typeOperation: 'Dépôt épargne', sens: 'Crédit', sourceModule: 'CAISSE', descriptions: ['Dépôt compte courant'] },
+      { type: 'Frais Engagement', typeOperation: 'Frais Engagement', sens: 'Crédit', sourceModule: 'CAISSE', descriptions: ['Frais dossier crédit', 'Frais engagement'] },
+    ];
+
+    let operationCounter = 1;
+
+    // Générer les opérations et mouvements pour chaque session
     for (const session of insertedSessions) {
-      const numOperations = randomBetween(5, 25); // 5-25 opérations par session
+      const numOperations = randomBetween(3, 12); // 3-12 opérations par session
+      const sessionData = operationsBySession[session.id];
+      const assignment = caissierAssignments.find(a => a.caisse?.id === session.caisseId);
 
       for (let o = 0; o < numOperations; o++) {
-        const type = randomFromArray(operationTypes);
-        const isDebit = ['Retrait', 'Retrait épargne'].includes(type);
-        const montant = generateRealisticAmount(
-          isDebit ? 5000 : 10000,
-          isDebit ? 100000 : 250000,
+        const opType = randomFromArray(operationTypes);
+        const montant = parseInt(generateRealisticAmount(
+          opType.sens === 'Débit' ? 5000 : 10000,
+          opType.sens === 'Débit' ? 80000 : 150000,
           5000
-        );
+        ));
 
-        operationsData.push({
-          sessionId: session.id,
-          typeOperation: type,
+        const delta = opType.sens === 'Crédit' ? montant : -montant;
+        sessionData.totalDelta += delta;
+
+        const opDate = session.dateOuverture || new Date();
+        const reference = `CAI-${opDate.toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+        const methodePaiement = randomFromArray(PAYMENT_METHODS);
+        const client = insertedClients[randomBetween(0, insertedClients.length - 1)];
+
+        // 1. Créer le mouvement financier (source de vérité)
+        sessionData.movements.push({
           montant: String(montant),
-          modePaiement: randomFromArray(PAYMENT_METHODS),
-          reference: `OP-${String(operationCounter++).padStart(6, '0')}`,
-          description: randomFromArray(operationDescriptions[type]),
-          clientId: insertedClients[randomBetween(0, insertedClients.length - 1)].id,
-          createdAt: session.dateOuverture,
+          sens: opType.sens,
+          statut: 'Posté',
+          methodePaiement,
+          reference,
+          description: randomFromArray(opType.descriptions),
+          clientId: client.id,
+          agenceId: assignment?.caisse?.agenceId,
+          sessionCaisseId: session.id,
+          sourceModule: opType.sourceModule,
+          typePaiement: opType.type,
+          dateOperation: opDate,
+          createdAt: opDate,
+          createdBy: session.caissierId,
+        });
+
+        // 2. Créer l'opération caisse (liée au mouvement)
+        sessionData.operations.push({
+          sessionId: session.id,
+          typeOperation: opType.typeOperation, // Utilise l'enum type_operation_caisse_enum
+          montant: String(montant),
+          modePaiement: methodePaiement,
+          reference,
+          description: randomFromArray(opType.descriptions),
+          clientId: client.id,
+          statut: 'Posté',
+          createdAt: opDate,
+          // mouvementId sera ajouté après insertion
         });
       }
     }
 
-    // Insérer par lots
+    // Insérer tous les mouvements et récupérer les IDs
+    const allCaisseMovements: any[] = [];
+    const movementSessionMap: string[] = []; // Pour mapper mouvement -> session
+
+    for (const sessionId of Object.keys(operationsBySession)) {
+      for (const mvt of operationsBySession[sessionId].movements) {
+        allCaisseMovements.push(mvt);
+        movementSessionMap.push(sessionId);
+      }
+    }
+
+    const insertedCaisseMovements: any[] = [];
+    for (let i = 0; i < allCaisseMovements.length; i += batchSize) {
+      const batch = allCaisseMovements.slice(i, i + batchSize);
+      const inserted = await db.insert(mouvementsFinanciers).values(batch).returning();
+      insertedCaisseMovements.push(...inserted);
+    }
+
+    // Lier les opérations aux mouvements et les insérer
+    const allCaisseOperations: any[] = [];
+    let mvtIdx = 0;
+
+    for (const sessionId of Object.keys(operationsBySession)) {
+      const sessionData = operationsBySession[sessionId];
+      for (let i = 0; i < sessionData.operations.length; i++) {
+        const op = sessionData.operations[i];
+        op.mouvementId = insertedCaisseMovements[mvtIdx]?.id;
+        allCaisseOperations.push(op);
+        mvtIdx++;
+      }
+    }
+
     const insertedOperations: any[] = [];
-    for (let i = 0; i < operationsData.length; i += 100) {
-      const batch = operationsData.slice(i, i + 100);
+    for (let i = 0; i < allCaisseOperations.length; i += batchSize) {
+      const batch = allCaisseOperations.slice(i, i + batchSize);
       const ops = await db.insert(operationsCaisse).values(batch).returning();
       insertedOperations.push(...ops);
+    }
+
+    // Mettre à jour les sessions avec le solde_theorique calculé
+    console.log('   📊 Updating session balances from ledger...');
+    for (const sessionId of Object.keys(operationsBySession)) {
+      const sessionData = operationsBySession[sessionId];
+      const soldeInitial = parseFloat(sessionData.session.soldeInitial);
+      const soldeTheorique = soldeInitial + sessionData.totalDelta;
+      const isClosed = sessionData.session.statut === 'Fermée';
+
+      // Simuler un écart aléatoire pour les sessions fermées (10% de chance)
+      const ecart = isClosed && faker.datatype.boolean({ probability: 0.1 })
+        ? randomBetween(-5000, 5000)
+        : 0;
+      const soldeReel = isClosed ? soldeTheorique + ecart : null;
+
+      await db.update(sessionsCaisse)
+        .set({
+          soldeTheorique: String(soldeTheorique),
+          soldeReel: soldeReel !== null ? String(soldeReel) : null,
+          ecart: ecart !== 0 ? String(ecart) : null,
+        })
+        .where(eq(sessionsCaisse.id, sessionId));
+
+      // Mettre à jour aussi le shift correspondant
+      const shift = sessionData.shift;
+      if (shift && isClosed) {
+        await db.update(shiftsCaisse)
+          .set({
+            soldeTheorique: String(soldeTheorique),
+            soldeFermeture: soldeReel !== null ? String(soldeReel) : null,
+            ecart: ecart !== 0 ? String(ecart) : null,
+          })
+          .where(eq(shiftsCaisse.id, shift.id));
+      }
     }
 
     // Générer des comptages de billets pour les shifts fermés
@@ -2600,10 +3204,10 @@ async function seedDemo() {
           agenceDestId: insertedAgences[destAgence],
           montant: String(generateRealisticAmount(50000, 500000, 25000)),
           statut: faker.helpers.weightedArrayElement([
-            { value: 'valide', weight: 60 },
-            { value: 'en_attente', weight: 25 },
-            { value: 'rejete', weight: 10 },
-            { value: 'annule', weight: 5 },
+            { value: 'Validé', weight: 60 },
+            { value: 'En attente', weight: 25 },
+            { value: 'Rejeté', weight: 10 },
+            { value: 'Annulé', weight: 5 },
           ]),
           reference: `CTRF-${String(transfertCounter++).padStart(4, '0')}`,
           motif: randomFromArray([
@@ -2623,7 +3227,7 @@ async function seedDemo() {
 
     await db.insert(caisseTransferts).values(transfertsData);
 
-    console.log(`   ✅ Caisse: ${insertedCaisses.length} caisses, ${insertedShifts.length} shifts, ${insertedSessions.length} sessions, ${operationsData.length} opérations, ${insertedFactures.length} factures`);
+    console.log(`   ✅ Caisse: ${insertedCaisses.length} caisses, ${insertedShifts.length} shifts, ${insertedSessions.length} sessions, ${insertedOperations.length} opérations, ${insertedFactures.length} factures`);
 
     // 14. SEED TRANSFERS & KYC
     console.log('\n💸 Seeding Transfers...');
@@ -2665,110 +3269,44 @@ async function seedDemo() {
       {
         reference: 'TRF-2024-0001',
         idempotencyKey: 'idem-0001',
-        type: 'national',
-        statut: 'completed',
-        expediteurNom: clientKouassi.nom || 'Client',
-        expediteurTelephone: clientKouassi.telephone || '+242000000000',
-        expediteurEmail: clientKouassi.email,
-        expediteurPays: 'CG',
-        expediteurKycLevel: 2,
-        beneficiaireNom: clientNguesso.nom || 'Beneficiaire',
-        beneficiaireTelephone: clientNguesso.telephone || '+242000000000',
-        beneficiairePays: 'Congo',
-        beneficiaireVille: 'Brazzaville',
-        montantEnvoye: '10000',
-        deviseEnvoi: 'XAF',
-        montantRecu: '9800',
-        deviseReception: 'XAF',
-        tauxChange: '1',
-        fraisTransfert: '200',
-        montantTotal: '10200',
-        operateurId: 'SYSTEM',
-        operateurNom: 'Internal',
-        modeReception: 'wallet',
-        modePaiement: 'cash',
-        otpVerifie: true,
-        riskScore: 10,
-        riskFlags: ['low'],
-        fraudCheck: false,
-        amlCheck: true,
-        sanctionsCheck: true,
-        agentId: staffGroups.Caissiers[0]?.id,
-        approuveParId: adminUser.id,
-        dateApprobation: daysAgo(2),
-        dateCreation: daysAgo(2),
-        dateCompletion: daysAgo(1),
+        statut: 'Posté',
+        clientId: clientKouassi.id,
+        montant: '10000',
+        sens: 'Sortie',
+        methodePaiement: 'Espèces',
+        destinataire: clientNguesso.nom || 'Beneficiaire',
+        numeroTelephone: clientNguesso.telephone || '+242000000000',
+        motif: 'Transfert familial',
+        createdBy: staffGroups.Caissiers[0]?.id,
+        createdAt: daysAgo(2),
       },
       {
         reference: 'TRF-2024-0002',
         idempotencyKey: 'idem-0002',
-        type: 'international',
-        statut: 'pending',
-        expediteurNom: clientTaty.nom || 'Client',
-        expediteurTelephone: clientTaty.telephone || '+242000000000',
-        expediteurEmail: clientTaty.email,
-        expediteurPays: 'CG',
-        expediteurKycLevel: 1,
-        beneficiaireNom: 'Doe',
-        beneficiaireTelephone: '+33123456789',
-        beneficiairePays: 'France',
-        beneficiaireVille: 'Paris',
-        montantEnvoye: '50000',
-        deviseEnvoi: 'XAF',
-        montantRecu: '76',
-        deviseReception: 'EUR',
-        tauxChange: '650',
-        fraisTransfert: '1500',
-        montantTotal: '51500',
-        operateurId: 'INTL',
-        operateurNom: 'Swift',
-        modeReception: 'bank',
-        modePaiement: 'cash',
-        otpCode: '458732',
-        otpExpiration: daysFromNow(1),
-        otpVerifie: false,
-        riskScore: 45,
-        riskFlags: ['manual_review'],
-        fraudCheck: false,
-        amlCheck: false,
-        sanctionsCheck: false,
-        agentId: staffGroups.Caissiers[1]?.id,
-        dateCreation: daysAgo(1),
+        statut: 'Pending',
+        clientId: clientTaty.id,
+        montant: '50000',
+        sens: 'Sortie',
+        methodePaiement: 'Espèces',
+        destinataire: 'Jane Doe',
+        numeroTelephone: '+33123456789',
+        motif: 'Cadeau',
+        createdBy: staffGroups.Caissiers[1]?.id,
+        createdAt: daysAgo(1),
       },
       {
         reference: 'TRF-2024-0003',
         idempotencyKey: 'idem-0003',
-        type: 'national',
-        statut: 'rejected',
-        expediteurNom: clientMakosso.nom || 'Client',
-        expediteurTelephone: clientMakosso.telephone || '+242000000000',
-        expediteurEmail: clientMakosso.email,
-        expediteurPays: 'CG',
-        expediteurKycLevel: 1,
-        beneficiaireNom: clientMoukassa.nom || 'Beneficiaire',
-        beneficiaireTelephone: clientMoukassa.telephone || '+242000000000',
-        beneficiairePays: 'Congo',
-        beneficiaireVille: 'Brazzaville',
-        montantEnvoye: '200000',
-        deviseEnvoi: 'XAF',
-        montantRecu: '196000',
-        deviseReception: 'XAF',
-        tauxChange: '1',
-        fraisTransfert: '4000',
-        montantTotal: '204000',
-        operateurId: 'SYSTEM',
-        operateurNom: 'Internal',
-        modeReception: 'cash',
-        modePaiement: 'cash',
-        otpVerifie: false,
-        riskScore: 80,
-        riskFlags: ['blacklist'],
-        fraudCheck: true,
-        amlCheck: true,
-        sanctionsCheck: false,
-        agentId: staffGroups.Caissiers[3]?.id,
-        dateCreation: daysAgo(3),
-        dateExpiration: daysAgo(1),
+        statut: 'Annulé',
+        clientId: clientMakosso.id,
+        montant: '200000',
+        sens: 'Sortie',
+        methodePaiement: 'Espèces',
+        destinataire: clientMoukassa.nom || 'Beneficiaire',
+        numeroTelephone: clientMoukassa.telephone || '+242000000000',
+        motif: 'Paiement',
+        createdBy: staffGroups.Caissiers[3]?.id,
+        createdAt: daysAgo(3),
       },
     ]).returning();
 
@@ -2776,22 +3314,22 @@ async function seedDemo() {
       {
         transfertId: transfertRecords[0].id,
         action: 'CREATED',
-        nouveauStatut: 'completed',
+        nouveauStatut: 'Posté',
         details: { source: 'seed' },
         userId: adminUser.id,
       },
       {
         transfertId: transfertRecords[1].id,
         action: 'CREATED',
-        nouveauStatut: 'pending',
+        nouveauStatut: 'Pending',
         details: { source: 'seed' },
         userId: staffGroups.Caissiers[1]?.id,
       },
       {
         transfertId: transfertRecords[2].id,
         action: 'REJECTED',
-        ancienStatut: 'pending',
-        nouveauStatut: 'rejected',
+        ancienStatut: 'Pending',
+        nouveauStatut: 'Annulé',
         details: { reason: 'Score de risque' },
         userId: adminUser.id,
       },
@@ -3254,6 +3792,25 @@ async function seedDemo() {
     insertedEmployes.forEach(emp => {
       userToEmployeMap.set(emp.userId, emp.id);
     });
+
+    // ✅ Update agents terrain with employeId now that employes exist
+    console.log('   🔗 Linking agents terrain to employe records...');
+    const allAgentsTerrain = await db.select().from(agentsTerrain);
+    for (const agent of allAgentsTerrain) {
+      // Find corresponding user by matching nom/prenom (legacy fields)
+      const agentUser = Object.values(insertedUsers).find(
+        (u: any) => u.nom === agent.nom && (u.prenom === agent.prenom || u.prenom === 'Staff')
+      );
+      if (agentUser) {
+        const employeId = userToEmployeMap.get(agentUser.id);
+        if (employeId) {
+          await db.update(agentsTerrain)
+            .set({ employeId })
+            .where(eq(agentsTerrain.id, agent.id));
+        }
+      }
+    }
+    console.log(`   ✅ Linked ${allAgentsTerrain.length} agents to their employe records`);
 
     // Créer plus d'avantages variés
     await db.insert(avantages).values([
@@ -3773,27 +4330,27 @@ async function seedDemo() {
 
     await db.insert(dureesSuggerees).values([
       // Journalier
-      { frequence: 'Journalier', dureeValeur: 15, dureeUnite: 'Jour', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Journalier', dureeValeur: 30, dureeUnite: 'Jour', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Journalier', dureeValeur: 60, dureeUnite: 'Jour', estRecommandee: 0, ordre: 2, actif: 1 },
-      { frequence: 'Journalier', dureeValeur: 90, dureeUnite: 'Jour', estRecommandee: 0, ordre: 3, actif: 1 },
+      { frequence: 'Journalier', dureeValeur: 15, dureeUnite: 'Jour', estRecommandee: false, ordre: 0, actif: true, label: '15 jours' },
+      { frequence: 'Journalier', dureeValeur: 30, dureeUnite: 'Jour', estRecommandee: true, ordre: 1, actif: true, label: '30 jours' },
+      { frequence: 'Journalier', dureeValeur: 60, dureeUnite: 'Jour', estRecommandee: false, ordre: 2, actif: true, label: '60 jours' },
+      { frequence: 'Journalier', dureeValeur: 90, dureeUnite: 'Jour', estRecommandee: false, ordre: 3, actif: true, label: '90 jours' },
       // Hebdomadaire
-      { frequence: 'Hebdomadaire', dureeValeur: 1, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Hebdomadaire', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Hebdomadaire', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Hebdomadaire', dureeValeur: 1, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '1 mois' },
+      { frequence: 'Hebdomadaire', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '3 mois' },
+      { frequence: 'Hebdomadaire', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '6 mois' },
       // Mensuel
-      { frequence: 'Mensuel', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Mensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Mensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Mensuel', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '3 mois' },
+      { frequence: 'Mensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '6 mois' },
+      { frequence: 'Mensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '12 mois' },
       // Bimensuel
-      { frequence: 'Bimensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Bimensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Bimensuel', dureeValeur: 18, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
+      { frequence: 'Bimensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '6 mois' },
+      { frequence: 'Bimensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '12 mois' },
+      { frequence: 'Bimensuel', dureeValeur: 18, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '18 mois' },
       // Trimestriel
-      { frequence: 'Trimestriel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: 0, ordre: 0, actif: 1 },
-      { frequence: 'Trimestriel', dureeValeur: 24, dureeUnite: 'Mois', estRecommandee: 1, ordre: 1, actif: 1 },
-      { frequence: 'Trimestriel', dureeValeur: 36, dureeUnite: 'Mois', estRecommandee: 0, ordre: 2, actif: 1 },
-    ]);
+      { frequence: 'Trimestriel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '12 mois' },
+      { frequence: 'Trimestriel', dureeValeur: 24, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '24 mois' },
+      { frequence: 'Trimestriel', dureeValeur: 36, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '36 mois' },
+    ] as any);
 
     console.log('   ✅ Durees Suggerees created');
 
