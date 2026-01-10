@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle } from 'lucide-react';
-import { creditApi, demandeCreditApi } from '../../../lib/api-client';
+import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, Star, MessageSquare, UserCheck } from 'lucide-react';
+import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -79,17 +79,23 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isReevaluating, setIsReevaluating] = useState(false);
   const [enquetes, setEnquetes] = useState<any[]>([]);
+  const [expandedEnquete, setExpandedEnquete] = useState<string | null>(null);
 
   useEffect(() => {
     if (demande?.id) {
        fetch(`/api/demandes-credit/${demande.id}/enquete`)
          .then(res => res.json())
-         .then(data => setEnquetes(Array.isArray(data) ? data : [data]))
+         .then(data => {
+           const enquetesList = Array.isArray(data) ? data : (data ? [data] : []);
+           setEnquetes(enquetesList);
+           // Auto-expand the latest enquete for better UX
+           if (enquetesList.length > 0 && enquetesList[0]?.id) {
+             setExpandedEnquete(enquetesList[0].id);
+           }
+         })
          .catch(err => console.warn("No enquete found", err));
     }
   }, [demande?.id]);
-
-  const latestEnquete = enquetes.length > 0 ? enquetes[0] : null;
 
   const isFinished = (demande.statut.toLowerCase() === 'approuvée' || 
                       demande.statut.toLowerCase() === 'décaissée' || 
@@ -131,7 +137,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
   };
 
   // Memoized financial calculations - V2
-  const { montantBase, mensualite, montantTotal, nombreEcheancesCalc, tauxEndettement, revenus } = useMemo(() => {
+  const { montantBase, mensualite, nombreEcheancesCalc, tauxEndettement } = useMemo(() => {
     const base = demande.montant_demande;
     const rev = demande.revenus_mensuels ?? 0;
     
@@ -163,10 +169,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
     return {
       montantBase: base,
       mensualite: isFinite(mens) ? mens : 0,
-      montantTotal: total,
       nombreEcheancesCalc: nombreEcheances,
       tauxEndettement: isFinite(endettement) ? endettement : 0,
-      revenus: rev,
     };
   }, [demande]);
 
@@ -466,30 +470,251 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
             {enquetes.length > 0 && (
               <div className="space-y-4">
                  <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2">
-                    <Shield size={18} /> Historique des Enquêtes ({enquetes.length})
+                    <Shield size={18} /> Résultats des Enquêtes ({enquetes.length})
                  </h3>
-                 {enquetes.map((enquete, index) => (
-                   <div key={enquete.id || index} className={`bg-purple-500/10 border border-purple-500/50 rounded-lg p-4 ${index !== 0 ? 'opacity-75' : ''}`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="text-xs font-bold text-purple-300 uppercase">Enquête #{enquetes.length - index}</span>
-                        <span className="text-xs text-slate-400">{new Date(enquete.created_at || Date.now()).toLocaleDateString('fr-FR')}</span>
-                      </div>
-                      <dl className="grid md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                          <div className="flex justify-between">
-                              <dt className="text-slate-400">Statut:</dt>
-                              <dd className="text-white font-bold">{enquete.statut}</dd>
-                          </div>
-                          <div className="flex justify-between">
-                              <dt className="text-slate-400">Note Globale:</dt>
-                              <dd className="text-white font-bold">{enquete.score_global || '-'}/100</dd>
-                          </div>
-                          <div className="col-span-2 mt-2">
-                              <dt className="text-slate-400 block mb-1">Recommandation Agent:</dt>
-                              <dd className="text-white bg-slate-800/50 p-2 rounded italic">"{enquete.recommandation || enquete.evaluation_activite || 'Aucune recommandation'}"</dd>
-                          </div>
-                      </dl>
-                   </div>
-                 ))}
+                 {enquetes.map((enquete, index) => {
+                   const isExpanded = expandedEnquete === (enquete.id || `enquete-${index}`);
+                   const enqueteId = enquete.id || `enquete-${index}`;
+                   const isLatest = index === 0;
+
+                   // Determine status styling
+                   const getStatutStyle = (statut: string) => {
+                     const s = (statut || '').toLowerCase();
+                     if (s.includes('approuv') || s === 'approved') return { bg: 'bg-emerald-500/20', border: 'border-emerald-500/50', text: 'text-emerald-400', label: 'Approuvé' };
+                     if (s.includes('rejet') || s === 'rejected') return { bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400', label: 'Rejeté' };
+                     if (s.includes('cours') || s === 'in_progress') return { bg: 'bg-blue-500/20', border: 'border-blue-500/50', text: 'text-blue-400', label: 'En cours' };
+                     if (s.includes('reduit') || s === 'reduced') return { bg: 'bg-amber-500/20', border: 'border-amber-500/50', text: 'text-amber-400', label: 'Réduit' };
+                     return { bg: 'bg-purple-500/20', border: 'border-purple-500/50', text: 'text-purple-400', label: 'En attente' };
+                   };
+
+                   const statutStyle = getStatutStyle(enquete.statut);
+                   const scoreColor = (enquete.score_global ?? 0) >= 70 ? 'text-emerald-400' : (enquete.score_global ?? 0) >= 50 ? 'text-amber-400' : 'text-red-400';
+
+                   return (
+                     <div
+                       key={enqueteId}
+                       className={`${statutStyle.bg} border ${statutStyle.border} rounded-xl overflow-hidden transition-all duration-300 ${!isLatest && !isExpanded ? 'opacity-60' : ''}`}
+                     >
+                       {/* Header - Always visible */}
+                       <button
+                         onClick={() => setExpandedEnquete(isExpanded ? null : enqueteId)}
+                         className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+                         aria-expanded={isExpanded}
+                       >
+                         <div className="flex items-center gap-4">
+                           <div className={`w-12 h-12 rounded-full ${statutStyle.bg} border ${statutStyle.border} flex items-center justify-center`}>
+                             <Shield className={statutStyle.text} size={22} />
+                           </div>
+                           <div className="text-left">
+                             <div className="flex items-center gap-2">
+                               <span className="text-white font-bold">Enquête #{enquetes.length - index}</span>
+                               {isLatest && (
+                                 <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full border border-cyan-500/30">
+                                   Dernière
+                                 </span>
+                               )}
+                             </div>
+                             <div className="flex items-center gap-3 mt-1">
+                               <span className={`text-sm ${statutStyle.text} font-semibold`}>{statutStyle.label}</span>
+                               <span className="text-slate-500">•</span>
+                               <span className="text-slate-400 text-sm">
+                                 {new Date(enquete.created_at || Date.now()).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                               </span>
+                             </div>
+                           </div>
+                         </div>
+
+                         <div className="flex items-center gap-4">
+                           {/* Quick score preview */}
+                           <div className="text-right hidden sm:block">
+                             <div className="text-slate-400 text-xs uppercase">Score</div>
+                             <div className={`text-xl font-bold ${scoreColor}`}>
+                               {enquete.score_global ?? '-'}<span className="text-sm text-slate-500">/100</span>
+                             </div>
+                           </div>
+                           <div className={`p-2 rounded-lg transition-colors ${isExpanded ? 'bg-white/10' : 'bg-transparent'}`}>
+                             {isExpanded ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                           </div>
+                         </div>
+                       </button>
+
+                       {/* Expandable Content */}
+                       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                         <div className="px-4 pb-4 space-y-4 border-t border-slate-700/50">
+                           {/* Montant demandé */}
+                           {enquete.montant_demande && (
+                             <div className="pt-4 flex items-center gap-3 bg-slate-800/30 rounded-lg p-3">
+                               <DollarSign size={20} className="text-cyan-400" />
+                               <div>
+                                 <div className="text-xs text-slate-400">Montant évalué lors de l'enquête</div>
+                                 <div className="text-xl font-bold text-cyan-400">{formatMoney(enquete.montant_demande)}</div>
+                               </div>
+                             </div>
+                           )}
+
+                           {/* Score & Financial Overview */}
+                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                               <Star size={16} className={`mx-auto mb-1 ${scoreColor}`} />
+                               <div className={`text-lg font-bold ${scoreColor}`}>
+                                 {enquete.score_global != null ? `${enquete.score_global}/100` : 'En attente'}
+                               </div>
+                               <div className="text-xs text-slate-400">Score Global</div>
+                             </div>
+                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                               <DollarSign size={16} className="mx-auto mb-1 text-green-400" />
+                               <div className="text-lg font-bold text-white">
+                                 {(() => {
+                                   const typeRevenu = enquete.type_revenu || enquete.typeRevenu;
+                                   if (typeRevenu === 'Journalier' && (enquete.revenu_journalier || enquete.revenuJournalier)) {
+                                     return formatMoney(enquete.revenu_journalier || enquete.revenuJournalier || 0);
+                                   }
+                                   return formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0);
+                                 })()}
+                               </div>
+                               <div className="text-xs text-slate-400">
+                                 {(enquete.type_revenu || enquete.typeRevenu) === 'Journalier' ? 'Revenu/Jour' : 'Revenu Mensuel'}
+                               </div>
+                             </div>
+                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                               <TrendingUp size={16} className="mx-auto mb-1 text-cyan-400" />
+                               <div className="text-lg font-bold text-white">{formatMoney(enquete.charges_mensuelles || enquete.chargesMensuelles || 0)}</div>
+                               <div className="text-xs text-slate-400">Charges</div>
+                             </div>
+                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                               <Briefcase size={16} className="mx-auto mb-1 text-purple-400" />
+                               <div className="text-lg font-bold text-white">{formatMoney(enquete.capacite_remboursement || enquete.capaciteRemboursement || 0)}</div>
+                               <div className="text-xs text-slate-400">Capacité Remb.</div>
+                             </div>
+                           </div>
+
+                           {/* Activité & Situation */}
+                           <div className="grid md:grid-cols-2 gap-4">
+                             {/* Left Column - Activité */}
+                             <div className="bg-slate-800/30 rounded-lg p-4">
+                               <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                 <Briefcase size={14} className="text-amber-400" /> Activité Professionnelle
+                               </h4>
+                               <dl className="space-y-2 text-sm">
+                                 {(enquete.categorie_activite || enquete.categorieActivite) && (
+                                   <div className="flex justify-between items-center">
+                                     <dt className="text-slate-400">Catégorie:</dt>
+                                     <dd className="text-amber-400 font-semibold">{enquete.categorie_activite || enquete.categorieActivite}</dd>
+                                   </div>
+                                 )}
+                                 {(enquete.type_activite || enquete.typeActivite) && (
+                                   <div className="flex justify-between items-center">
+                                     <dt className="text-slate-400">Type:</dt>
+                                     <dd className="text-white font-medium">{enquete.type_activite || enquete.typeActivite}</dd>
+                                   </div>
+                                 )}
+                                 <div className="flex justify-between items-center">
+                                   <dt className="text-slate-400">Ancienneté:</dt>
+                                   <dd className="text-white font-medium">
+                                     {(() => {
+                                       const mois = enquete.anciennete_activite || enquete.ancienneteActivite;
+                                       if (!mois) return 'Non spécifié';
+                                       if (mois >= 12) {
+                                         const ans = Math.floor(mois / 12);
+                                         const reste = mois % 12;
+                                         return reste > 0 ? `${ans} an${ans > 1 ? 's' : ''} et ${reste} mois` : `${ans} an${ans > 1 ? 's' : ''}`;
+                                       }
+                                       return `${mois} mois`;
+                                     })()}
+                                   </dd>
+                                 </div>
+                                 {(enquete.objet_credit || enquete.objetCredit) && (
+                                   <div className="pt-2 border-t border-slate-700/50">
+                                     <dt className="text-slate-400 text-xs mb-1">Description:</dt>
+                                     <dd className="text-slate-300 text-xs italic">"{enquete.objet_credit || enquete.objetCredit}"</dd>
+                                   </div>
+                                 )}
+                               </dl>
+                             </div>
+
+                             {/* Right Column - Situation Financière */}
+                             <div className="bg-slate-800/30 rounded-lg p-4">
+                               <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                 <DollarSign size={14} className="text-green-400" /> Situation Financière
+                               </h4>
+                               <dl className="space-y-2 text-sm">
+                                 <div className="flex justify-between items-center">
+                                   <dt className="text-slate-400">Type de revenu:</dt>
+                                   <dd className="text-white font-medium">{enquete.type_revenu || enquete.typeRevenu || 'Non spécifié'}</dd>
+                                 </div>
+                                 {(enquete.type_revenu || enquete.typeRevenu) === 'Journalier' && (enquete.revenu_journalier || enquete.revenuJournalier) && (
+                                   <>
+                                     <div className="flex justify-between items-center">
+                                       <dt className="text-slate-400">Revenu journalier:</dt>
+                                       <dd className="text-green-400 font-semibold">{formatMoney(enquete.revenu_journalier || enquete.revenuJournalier)}/j</dd>
+                                     </div>
+                                     <div className="flex justify-between items-center bg-green-500/10 -mx-2 px-2 py-1 rounded">
+                                       <dt className="text-slate-400">Revenu mensuel (calculé):</dt>
+                                       <dd className="text-green-400 font-bold">{formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0)}</dd>
+                                     </div>
+                                   </>
+                                 )}
+                                 {(enquete.type_revenu || enquete.typeRevenu) !== 'Journalier' && (
+                                   <div className="flex justify-between items-center">
+                                     <dt className="text-slate-400">Revenu mensuel:</dt>
+                                     <dd className="text-green-400 font-semibold">{formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0)}</dd>
+                                   </div>
+                                 )}
+                                 <div className="flex justify-between items-center">
+                                   <dt className="text-slate-400">Autres prêts:</dt>
+                                   <dd className="text-white font-medium">{formatMoney(enquete.autre_prets || enquete.autrePrets || 0)}</dd>
+                                 </div>
+                                 <div className="flex justify-between items-center">
+                                   <dt className="text-slate-400">Personnes à charge:</dt>
+                                   <dd className="text-white font-medium">{enquete.personnes_charge ?? enquete.personnesCharge ?? 0}</dd>
+                                 </div>
+                                 {(enquete.type_habitation || enquete.typeHabitation) && (
+                                   <div className="flex justify-between items-center">
+                                     <dt className="text-slate-400">Habitation:</dt>
+                                     <dd className="text-white font-medium">{enquete.type_habitation || enquete.typeHabitation}</dd>
+                                   </div>
+                                 )}
+                               </dl>
+                             </div>
+                           </div>
+
+                           {/* Evaluation & Recommandation */}
+                           <div className="space-y-3">
+                             {enquete.evaluation_activite && (
+                               <div className="bg-slate-800/30 rounded-lg p-4">
+                                 <h4 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+                                   <Briefcase size={14} className="text-amber-400" /> Évaluation de l'Activité
+                                 </h4>
+                                 <p className="text-slate-300 text-sm leading-relaxed">{enquete.evaluation_activite}</p>
+                               </div>
+                             )}
+
+                             {(enquete.recommandation || enquete.observations) && (
+                               <div className={`rounded-lg p-4 ${statutStyle.bg} border ${statutStyle.border}`}>
+                                 <h4 className={`text-sm font-semibold ${statutStyle.text} mb-2 flex items-center gap-2`}>
+                                   <MessageSquare size={14} /> Recommandation de l'Agent
+                                 </h4>
+                                 <p className="text-white text-sm leading-relaxed italic">
+                                   "{enquete.recommandation || enquete.observations || 'Aucune recommandation spécifique'}"
+                                 </p>
+                               </div>
+                             )}
+                           </div>
+
+                           {/* Agent Info */}
+                           {enquete.created_by && (
+                             <div className="flex items-center gap-2 pt-2 border-t border-slate-700/50">
+                               <UserCheck size={14} className="text-slate-500" />
+                               <span className="text-xs text-slate-500">
+                                 Enquête réalisée par l'agent terrain
+                               </span>
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })}
               </div>
             )}
 

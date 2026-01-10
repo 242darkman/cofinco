@@ -446,22 +446,23 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     e.preventDefault();
     if (validateForm()) {
       const payload = {
-        ...formData,
+        clientId: formData.client_id,
         demandeId: formData.demandeId || undefined,
-        // Backend expects strings for monetary values
+        // Montant et objet
         montantDemande: formData.montant_demande,
-        revenuJournalier: formData.revenu_journalier || '0',
-        joursTravailMois: parseInt(formData.jours_travail_mois) || 26,
-        revenuMensuelDeclare: formData.revenu_mensuel_declare,
-        typeRevenu: formData.type_revenu,
-        chargesMensuelles: formData.charges_mensuelles || '0',
-        // Backend expects number for ancienneteActivite
-        ancienneteActivite: parseInt(formData.anciennete_activite),
-        // Map description_activite to objetCredit
         objetCredit: formData.description_activite,
-        // Keep all other fields
+        // Activité professionnelle
         categorieActivite: formData.categorie_activite,
         typeActivite: formData.type_activite,
+        ancienneteActivite: parseInt(formData.anciennete_activite) || 0,
+        // Revenus - mapper vers les noms attendus par le backend
+        typeRevenu: formData.type_revenu,
+        revenuMensuel: formData.revenu_mensuel_declare || '0',
+        revenuJournalier: formData.revenu_journalier || '0',
+        joursTravailMois: parseInt(formData.jours_travail_mois) || 26,
+        // Charges
+        chargesMensuelles: formData.charges_mensuelles || '0',
+        // Données supplémentaires (stockées en JSON si nécessaire)
         autresCredits: formData.autres_credits,
         garantiesProposees: formData.garanties_proposees,
         photosActivite: formData.photos_activite,

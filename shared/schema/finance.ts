@@ -150,21 +150,44 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   demandeId: uuid("demande_id").references(() => demandesCredit.id),
   montantDemande: numeric("montant_demande").notNull(),
   objetCredit: text("objet_credit").notNull(),
+
+  // Activité professionnelle
+  categorieActivite: text("categorie_activite"),
+  typeActivite: text("type_activite"),
+  ancienneteActivite: integer("anciennete_activite"),
+  evaluationActivite: text("evaluation_activite"),
+
+  // Revenus
   revenuMensuel: numeric("revenu_mensuel"),
   typeRevenu: typeRevenuEnum("type_revenu"),
   revenuJournalier: numeric("revenu_journalier"),
   joursTravailMois: integer("jours_travail_mois").default(26),
+
+  // Charges et situation
   chargesMensuelles: numeric("charges_mensuelles"),
   autrePrets: numeric("autre_prets").default("0"),
   personnesCharge: integer("personnes_charge").default(0),
   typeHabitation: text("type_habitation"),
-  ancienneteActivite: integer("anciennete_activite"),
-  evaluationActivite: text("evaluation_activite"),
+
+  // Données complémentaires (JSON)
+  autresCredits: json("autres_credits"), // [{organisme, montant, echeance}]
+  garantiesProposees: json("garanties_proposees"), // [{type, description, valeur}]
+  photosActivite: text("photos_activite").array(), // URLs ou base64
+  documentsJustificatifs: text("documents_justificatifs").array(),
+
+  // Géolocalisation terrain
+  geoLatitude: numeric("geo_latitude"),
+  geoLongitude: numeric("geo_longitude"),
+  geoAccuracy: numeric("geo_accuracy"),
+  geoTimestamp: timestamp("geo_timestamp"),
+
+  // Analyse
   capaciteRemboursement: numeric("capacite_remboursement"),
   scoreGlobal: integer("score_global"),
   recommandation: text("recommandation"),
   statut: text("statut").notNull().default("En cours"),
   observations: text("observations"),
+
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
 });
