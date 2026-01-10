@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, Star, MessageSquare, UserCheck } from 'lucide-react';
+import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, Star, MessageSquare, UserCheck, RefreshCw } from 'lucide-react';
 import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -7,6 +7,8 @@ import { formatMoney } from '../../../lib/format';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import ConfirmDialog from '../../ui/ConfirmDialog';
+import { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
+import { ReevaluationModal } from './ReevaluationModal';
 
 interface Demande {
   id: string;
@@ -78,6 +80,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
   const [showConfirmReject, setShowConfirmReject] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isReevaluating, setIsReevaluating] = useState(false);
+  const [showReevaluationModal, setShowReevaluationModal] = useState(false);
+  const [isEligibleForReevaluation, setIsEligibleForReevaluation] = useState(false);
   const [enquetes, setEnquetes] = useState<any[]>([]);
   const [expandedEnquete, setExpandedEnquete] = useState<string | null>(null);
 
@@ -416,12 +420,34 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
             </div>
 
             {/* Motif Rejet (si applicable) */}
-            {isRejected && demande.motif_rejet && !isReevaluating && (
+            {isRejected && demande.motif_rejet && (
               <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
                 <h3 className="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
-                   <XCircle size={18} /> Motif du Rejet Précédent
+                   <XCircle size={18} /> Motif du Rejet
                 </h3>
                 <p className="text-slate-300 italic">"{demande.motif_rejet}"</p>
+              </div>
+            )}
+
+            {/* Reevaluation Section for rejected demands */}
+            {isRejected && !isCancelled && (
+              <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4">
+                <h3 className="text-lg font-bold text-blue-400 mb-4 flex items-center gap-2">
+                  <RefreshCw size={18} /> Réévaluation de la demande
+                </h3>
+                <ReevaluationEligibilityCheck
+                  demandeId={demande.id}
+                  onEligibilityChange={setIsEligibleForReevaluation}
+                />
+                {isEligibleForReevaluation && (
+                  <button
+                    onClick={() => setShowReevaluationModal(true)}
+                    className="mt-4 w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={20} />
+                    Demander une réévaluation
+                  </button>
+                )}
               </div>
             )}
 
@@ -922,14 +948,6 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                 )
               ) : (
                 <div className="flex-1 flex flex-col sm:flex-row gap-3">
-                  {isRejected && canApproveCredits && (
-                    <button
-                      onClick={() => setIsReevaluating(true)}
-                      className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
-                    >
-                      <AlertTriangle size={20} /> Réévaluer cette demande
-                    </button>
-                  )}
                   <button
                     onClick={onClose}
                     className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
@@ -966,6 +984,29 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
         onClose={() => setShowConfirmReject(false)}
         variant="danger"
       />
+
+      {/* Reevaluation Modal */}
+      {showReevaluationModal && (
+        <ReevaluationModal
+          demande={{
+            id: demande.id,
+            numeroDemande: demande.numero_demande,
+            clientId: demande.client_id,
+            montantDemande: String(demande.montant_demande),
+            motifRejet: demande.motif_rejet,
+            scoreCredit: demande.score_credit || undefined,
+            dureeValeur: demande.duree_valeur,
+            dureeUnite: demande.duree_unite,
+          }}
+          isOpen={showReevaluationModal}
+          onClose={() => setShowReevaluationModal(false)}
+          onSuccess={() => {
+            setShowReevaluationModal(false);
+            toast.success('Demande de réévaluation soumise avec succès');
+            onSuccess();
+          }}
+        />
+      )}
     </>
   );
 }

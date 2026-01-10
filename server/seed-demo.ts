@@ -101,6 +101,9 @@ import {
   dureesSuggerees,
   planComptable,
   creditPlans,
+  configReevaluation,
+  reevaluationsCredit,
+  reevaluationAuditLogs,
 } from '@shared/schema';
 import { hashPassword, ROLES } from './auth';
 import { eq } from 'drizzle-orm';
@@ -256,6 +259,10 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
     { name: 'Rejeter un crédit', code: 'credits.reject', description: 'Rejeter une demande de crédit' },
     { name: 'Décaisser un crédit', code: 'credits.disburse', description: 'Décaisser un crédit approuvé' },
     { name: 'Collecter remboursements', code: 'credits.collect', description: 'Enregistrer les remboursements' },
+    { name: 'Voir les réévaluations', code: 'credits.reevaluations.view', description: 'Accès aux réévaluations' },
+    { name: 'Créer une réévaluation', code: 'credits.reevaluations.create', description: 'Demander une réévaluation' },
+    { name: 'Valider éligibilité', code: 'credits.reevaluations.validate', description: 'Valider l\'éligibilité d\'une réévaluation' },
+    { name: 'Décision comité', code: 'credits.reevaluations.decide', description: 'Prendre la décision finale sur une réévaluation' },
   ],
   'Remboursements': [
     { name: 'Voir les remboursements', code: 'remboursements.view', description: 'Accès au module Remboursements' },
@@ -346,6 +353,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'dashboard.view',
     'caisse.view', 'caisse.open', 'caisse.close', 'caisse.deposit', 'caisse.withdraw', 'caisse.transfer',
     'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
+    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
     'remboursements.view', 'remboursements.create',
     'clients.view', 'clients.create', 'clients.edit',
     'epargnes.view', 'epargnes.create', 'epargnes.deposit', 'epargnes.withdraw',
@@ -388,6 +396,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   'Gestionnaire Crédit': [
     'dashboard.view',
     'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
+    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
     'clients.view', 'clients.create', 'clients.edit',
     'remboursements.view', 'remboursements.create',
     'rapports.view',
@@ -490,6 +499,9 @@ async function seedDemo() {
     await db.delete(credits);
     await db.delete(creditPlans);
     await db.delete(enquetesCredit);
+    await db.delete(reevaluationAuditLogs);
+    await db.delete(reevaluationsCredit);
+    await db.delete(configReevaluation);
     await db.delete(demandesCredit);
     await db.delete(objectifsEpargne);
     await db.delete(transactionsCompte);
@@ -1867,6 +1879,134 @@ async function seedDemo() {
     }
 
     const insertedDemandes = await db.insert(demandesCredit).values(demandesData).returning();
+
+    // ==========================================================
+    // REEVALUATION SAMPLE DATA
+    // ==========================================================
+    console.log('   🔄 Seeding Reevaluation Config and Sample Data...');
+    
+    // 1. Insert global reevaluation config
+    await db.insert(configReevaluation).values({
+      delaiMinimumJours: 30,
+      maxReevaluationsParDemande: 2,
+      motifsNonReevaluables: [
+        'Fraude avérée',
+        'Client blacklisté',
+        'Faux documents',
+        'Identité non vérifiable',
+        'Contentieux juridique'
+      ],
+      elementsNouveauxObligatoires: true,
+      enqueteComplementaireObligatoire: false,
+      documentsMinimum: 0,
+      seuilScoreMinimum: 40,
+      deltaScoreMinimum: 5,
+      reductionMontantMaxPourcentage: 50,
+      actif: true,
+      agenceId: null,
+    });
+    
+    // 2. Update some rejected demandes to have old dateRejet for reevaluation eligibility
+    const rejectedDemandes = insertedDemandes.filter(d => d.statut === 'Rejetée');
+    const MOTIFS_REJET = [
+      'Capacité de remboursement insuffisante',
+      'Score crédit trop faible',
+      'Revenus non vérifiables',
+      'Historique de crédit négatif',
+      'Garanties insuffisantes',
+      'Endettement excessif'
+    ];
+    
+    // Update 5 rejected demandes to be eligible for reevaluation (45+ days old)
+    for (let i = 0; i < Math.min(5, rejectedDemandes.length); i++) {
+      const demande = rejectedDemandes[i];
+      const dateRejet = daysAgo(randomBetween(45, 90));
+      await db.update(demandesCredit)
+        .set({
+          dateRejet,
+          motifRejet: randomFromArray(MOTIFS_REJET),
+          scoreCredit: randomBetween(30, 50), // Low score that was rejected
+        })
+        .where(eq(demandesCredit.id, demande.id));
+    }
+    
+    // 3. Create sample reevaluations at different stages
+    if (rejectedDemandes.length >= 3) {
+      const reevaluationsData: any[] = [];
+      const reevaluationStatuses = [
+        { statut: 'Demandée', eligible: null },
+        { statut: 'Autorisée', eligible: true },
+        { statut: 'En comité', eligible: true },
+      ];
+      
+      for (let i = 0; i < Math.min(3, rejectedDemandes.length); i++) {
+        const demande = rejectedDemandes[i];
+        const statusInfo = reevaluationStatuses[i];
+        const elementsNouveaux = [
+          {
+            type: randomFromArray(['Garantie supplémentaire', 'Justificatif de revenus', 'Co-emprunteur']),
+            description: faker.lorem.sentence(),
+            valeurAjoutee: randomBetween(50000, 200000)
+          }
+        ];
+        
+        reevaluationsData.push({
+          demandeId: demande.id,
+          clientId: demande.clientId,
+          numeroReevaluation: `REEV-${new Date().getFullYear()}-${String(i + 1).padStart(4, '0')}`,
+          numeroVersion: 1,
+          motifRejetInitial: demande.motifRejet || 'Capacité de remboursement insuffisante',
+          dateRejetInitial: daysAgo(60),
+          scoreRejetInitial: demande.scoreCredit,
+          montantInitialDemande: demande.montantDemande,
+          elementsNouveaux,
+          justification: 'Situation financière améliorée avec nouveau contrat de travail et garanties supplémentaires. Le client présente maintenant un dossier plus solide avec des revenus stables et documentés.',
+          nouveauMontantDemande: String(Math.round(parseInt(String(demande.montantDemande)) * 0.8)),
+          documentsJoints: ['contrat_travail.pdf', 'attestation_revenus.pdf'],
+          statut: statusInfo.statut,
+          eligibiliteValidee: statusInfo.eligible,
+          dateValidationEligibilite: statusInfo.eligible !== null ? daysAgo(5) : null,
+          validePar: statusInfo.eligible !== null ? staffGroups.Credits[0]?.id : null,
+          nouveauScore: statusInfo.statut === 'En comité' ? randomBetween(55, 70) : null,
+          deltaScore: statusInfo.statut === 'En comité' ? randomBetween(10, 20) : null,
+          createdBy: staffGroups.Credits[i % staffGroups.Credits.length]?.id || staffGroups.Agents[0]?.id,
+          createdAt: daysAgo(randomBetween(5, 15)),
+        });
+      }
+      
+      const insertedReevaluations = await db.insert(reevaluationsCredit).values(reevaluationsData).returning();
+      
+      // Update demandes to reflect reevaluation in progress
+      for (const reeval of insertedReevaluations) {
+        await db.update(demandesCredit)
+          .set({
+            reevaluationEnCours: reeval.statut !== 'Approuvée' && reeval.statut !== 'Rejetée définitivement',
+            derniereReevaluationId: reeval.id,
+            dateDerniereReevaluation: reeval.createdAt,
+            statut: 'Réévaluation en cours'
+          })
+          .where(eq(demandesCredit.id, reeval.demandeId));
+      }
+      
+      // Create audit logs for reevaluations
+      for (const reeval of insertedReevaluations) {
+        await db.insert(reevaluationAuditLogs).values({
+          reevaluationId: reeval.id,
+          demandeId: reeval.demandeId,
+          action: 'REEVALUATION_CREEE',
+          statutAvant: null,
+          statutApres: 'Demandée',
+          details: {
+            description: 'Réévaluation créée',
+            elementsNouveaux: reeval.elementsNouveaux
+          },
+          userId: reeval.createdBy,
+          roleUtilisateur: 'Agent',
+        });
+      }
+      
+      console.log(`   ✅ Created ${insertedReevaluations.length} sample reevaluations`);
+    }
 
     // Générer des enquêtes pour les demandes approuvées ou déboursées
     const enquetesData: any[] = [];

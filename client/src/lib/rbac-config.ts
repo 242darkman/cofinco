@@ -115,11 +115,11 @@ export type PermissionConfig = {
 
 export const ROLE_PERMISSIONS: PermissionConfig = {
   'Administrateur': {
-    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export']
+    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide']
   },
   "Chef d'Agence": {
     'clients': ['view', 'create', 'edit', 'delete'],
-    'credits': ['view', 'create', 'edit', 'approve', 'delete'],
+    'credits': ['view', 'create', 'edit', 'approve', 'delete', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide'],
     'epargnes': ['view', 'create', 'edit'],
     'tontines': ['view', 'create', 'edit', 'manage'],
     'comptabilite': ['view'],
@@ -140,7 +140,7 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
   },
   'Gestionnaire Crédit': {
     'clients': ['view', 'create', 'edit'],
-    'credits': ['view', 'create', 'edit', 'approve'],
+    'credits': ['view', 'create', 'edit', 'approve', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide'],
     'remboursements': ['view', 'create'],
     'rapports': ['view', 'export'],
     'rh': ['view'] // Pointage uniquement

@@ -24,6 +24,36 @@ export const statutDemandeEnum = pgEnum("statut_demande_enum", [
   "Annulée",
   "Décaissée",
   "Clôturée",
+  // Reevaluation workflow states
+  "Réévaluation en cours",      // Reevaluation in progress
+  "Approuvée après réévaluation", // Approved after reevaluation
+  "Rejetée définitivement",     // Definitively rejected (no more reevaluation possible)
+]);
+
+// ========== REEVALUATION WORKFLOW ENUMS ==========
+
+export const statutReevaluationEnum = pgEnum("statut_reevaluation_enum", [
+  "Demandée",                    // Client/Agent a initié la demande
+  "Éligibilité en cours",        // Vérification automatique
+  "Autorisée",                   // Éligible, peut procéder
+  "Refusée",                     // Non éligible (délai, max atteint, motif blacklisté)
+  "Enquête complémentaire",      // Enquête terrain en cours
+  "Enquête terminée",            // Enquête complémentaire soumise
+  "En comité",                   // Soumis au comité de décision
+  "Approuvée",                   // Comité approuve la réévaluation
+  "Rejetée définitivement",      // Comité rejette définitivement
+  "Annulée",                     // Annulée par le demandeur
+]);
+
+export const typeElementNouveauEnum = pgEnum("type_element_nouveau_enum", [
+  "Garantie supplémentaire",
+  "Co-emprunteur",
+  "Justificatif de revenus",
+  "Réduction montant demandé",
+  "Ajustement durée",
+  "Amélioration situation",
+  "Document manquant",
+  "Autre",
 ]);
 
 export const typeRevenuEnum = pgEnum("type_revenu_enum", [

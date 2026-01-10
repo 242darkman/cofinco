@@ -73,7 +73,26 @@ export const PERMISSION_DESCRIPTIONS: Record<string, PermissionDescription> = {
     interface: 'Onglet "Remboursements" dans le module Crédits',
     details: ['Enregistrer un paiement d\'échéance', 'Appliquer des pénalités de retard', 'Imprimer le reçu de paiement']
   },
-  
+  'credits.reevaluations.view': {
+    action: 'Voir les réévaluations',
+    interface: 'Onglet "Réévaluations" dans le module Crédits',
+    details: ['Consulter les demandes de réévaluation', 'Voir l\'historique des réévaluations', 'Suivre l\'état d\'avancement']
+  },
+  'credits.reevaluations.create': {
+    action: 'Créer une réévaluation',
+    interface: 'Bouton "Demander réévaluation" sur un crédit rejeté',
+    details: ['Soumettre une demande de réévaluation', 'Ajouter des éléments nouveaux', 'Joindre des justificatifs']
+  },
+  'credits.reevaluations.validate': {
+    action: 'Valider l\'éligibilité',
+    interface: 'Bouton "Valider éligibilité" sur une réévaluation',
+    details: ['Vérifier les critères d\'éligibilité', 'Autoriser ou refuser la réévaluation', 'Déclencher une enquête complémentaire']
+  },
+  'credits.reevaluations.decide': {
+    action: 'Décision comité',
+    interface: 'Bouton "Enregistrer décision" sur une réévaluation en comité',
+    details: ['Approuver ou rejeter définitivement', 'Fixer le montant approuvé', 'Enregistrer les conditions spéciales']
+  },
   // Module Clients
   'clients.view': {
     action: 'Voir les clients',

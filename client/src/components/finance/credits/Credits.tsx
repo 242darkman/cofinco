@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign, XCircle } from 'lucide-react';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign, XCircle, RefreshCw } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog } from '../../ui';
 import { useCredits } from '../../../hooks/credits/useCredits';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
@@ -13,13 +13,14 @@ import CreditDisbursementModal from './CreditDisbursementModal';
 import CreditFeesPaymentModal from './CreditFeesPaymentModal';
 import EnqueteDetailModal from './EnqueteDetailModal';
 import ReferenceTable from './CreditRemboursement';
+import { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';
 import { TableColumn } from '../../ui/ResponsiveTable';
 import { ProtectedFeature } from '../../auth/ProtectedFeature';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 
-type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'remboursements';
+type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements';
 
 const TABS = [
   { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
@@ -28,6 +29,7 @@ const TABS = [
   { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck }, // Only "A enquêter" (ready for investigation)
   { key: 'approbation', label: 'Approbation', icon: CheckCircle }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
   { key: 'commission', label: 'Commission Crédit', icon: DollarSign }, // Approved demands waiting for disbursement
+  { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw }, // Credit reevaluation workflow
   { key: 'remboursements', label: 'Remboursements', icon: TrendingUp }
 ];
 
@@ -521,6 +523,11 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       {/* Remboursements Tab */}
       {activeTab === 'remboursements' && (
         <ReferenceTable />
+      )}
+
+      {/* Réévaluations Tab */}
+      {activeTab === 'reevaluations' && (
+        <ReevaluationWorkflowPage embedded />
       )}
 
       {/* Modals */}

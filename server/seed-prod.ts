@@ -20,6 +20,7 @@ import {
   journaux,
   exercices,
   creditPlans,
+  configReevaluation,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 
@@ -72,6 +73,10 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
     { name: 'Rejeter un crédit', code: 'credits.reject', description: 'Rejeter une demande de crédit' },
     { name: 'Décaisser un crédit', code: 'credits.disburse', description: 'Décaisser un crédit approuvé' },
     { name: 'Collecter remboursements', code: 'credits.collect', description: 'Enregistrer les remboursements' },
+    { name: 'Voir les réévaluations', code: 'credits.reevaluations.view', description: 'Accès aux réévaluations' },
+    { name: 'Créer une réévaluation', code: 'credits.reevaluations.create', description: 'Demander une réévaluation' },
+    { name: 'Valider éligibilité', code: 'credits.reevaluations.validate', description: 'Valider l\'éligibilité d\'une réévaluation' },
+    { name: 'Décision comité', code: 'credits.reevaluations.decide', description: 'Prendre la décision finale sur une réévaluation' },
   ],
   'Remboursements': [
     { name: 'Voir les remboursements', code: 'remboursements.view', description: 'Accès au module Remboursements' },
@@ -162,6 +167,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'dashboard.view',
     'caisse.view', 'caisse.open', 'caisse.close', 'caisse.deposit', 'caisse.withdraw', 'caisse.transfer',
     'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
+    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
     'remboursements.view', 'remboursements.create',
     'clients.view', 'clients.create', 'clients.edit',
     'epargnes.view', 'epargnes.create', 'epargnes.deposit', 'epargnes.withdraw',
@@ -204,6 +210,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   'Gestionnaire Crédit': [
     'dashboard.view',
     'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
+    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
     'clients.view', 'clients.create', 'clients.edit',
     'remboursements.view', 'remboursements.create',
     'rapports.view',
@@ -458,6 +465,28 @@ async function seedProd() {
     // SMS Templates
     await db.insert(smsTemplates).values(SMS_TEMPLATES_DATA);
     
+    // Reevaluation Configuration
+    console.log('\\n🔄 Seeding Reevaluation Config...');
+    await db.insert(configReevaluation).values({
+      delaiMinimumJours: 30,
+      maxReevaluationsParDemande: 2,
+      motifsNonReevaluables: [
+        'Fraude avérée',
+        'Client blacklisté',
+        'Faux documents',
+        'Identité non vérifiable',
+        'Contentieux juridique'
+      ],
+      elementsNouveauxObligatoires: true,
+      enqueteComplementaireObligatoire: false,
+      documentsMinimum: 0,
+      seuilScoreMinimum: 40,
+      deltaScoreMinimum: 5,
+      reductionMontantMaxPourcentage: 50,
+      actif: true,
+      agenceId: null, // Global config
+    });
+    console.log('   ✅ Reevaluation config created');
     // Credit Plans
     console.log('\n📝 Seeding Credit Plans...');
     await db.insert(creditPlans).values([

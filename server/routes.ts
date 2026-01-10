@@ -20,6 +20,7 @@ import loyaltyRouter from "./routes/loyalty";
 import { registerOtpRoutes } from "./routes/otp";
 import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/config";
 import { registerComptesRoutes } from "./routes/comptes";
+import { registerReevaluationRoutes } from "./routes/reevaluations";
 
 export function registerRoutes(app: Express): Server {
   // Register modular routes
@@ -56,6 +57,9 @@ export function registerRoutes(app: Express): Server {
 
   // Security Config Module (OTP bypass, presence verification)
   registerSecurityConfigRoutes(app);
+
+  // Reevaluation Module (Credit reevaluation workflow)
+  registerReevaluationRoutes(app);
 
   // External Services
   registerMobileMoneyRoutes(app);

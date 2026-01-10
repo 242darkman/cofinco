@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 import { caisses } from "./operations";
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum } from "@shared/enum/enums";
 
 // Interest Rates
 export const interestRates = pgTable(
@@ -131,6 +131,13 @@ export const demandesCredit = pgTable(
     createdBy: uuid("created_by"),
     createdAt: timestamp("created_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),
+    
+    // Reevaluation tracking
+    dateRejet: timestamp("date_rejet"),
+    nombreReevaluations: integer("nombre_reevaluations").notNull().default(0),
+    derniereReevaluationId: uuid("derniere_reevaluation_id"), // Will reference reevaluationsCredit
+    dateDerniereReevaluation: timestamp("date_derniere_reevaluation"),
+    reevaluationEnCours: boolean("reevaluation_en_cours").notNull().default(false),
   },
   (t) => ({
     idxDemandesClient: index("idx_demandes_credit_client_id").on(t.clientId),
@@ -716,5 +723,319 @@ export const caisseTransferts = pgTable(
 export const insertCaisseTransfertSchema = createInsertSchema(caisseTransferts).omit({ id: true, dateCreation: true });
 export type InsertCaisseTransfert = z.infer<typeof insertCaisseTransfertSchema>;
 export type CaisseTransfert = typeof caisseTransferts.$inferSelect;
+
+// ========== REEVALUATION WORKFLOW TABLES ==========
+
+// Configuration for reevaluation rules
+export const configReevaluation = pgTable("config_reevaluation", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  
+  // Eligibility rules
+  delaiMinimumJours: integer("delai_minimum_jours").notNull().default(30),
+  maxReevaluationsParDemande: integer("max_reevaluations_par_demande").notNull().default(2),
+  motifsNonReevaluables: text("motifs_non_reevaluables").array(), // ['Fraude avérée', 'Client blacklisté']
+  
+  // Documentary requirements
+  elementsNouveauxObligatoires: boolean("elements_nouveaux_obligatoires").notNull().default(true),
+  enqueteComplementaireObligatoire: boolean("enquete_complementaire_obligatoire").notNull().default(false),
+  documentsMinimum: integer("documents_minimum").notNull().default(1),
+  
+  // Scoring thresholds
+  seuilScoreMinimum: integer("seuil_score_minimum").default(40),
+  deltaScoreMinimum: integer("delta_score_minimum").default(5), // Minimum improvement required
+  
+  // Amount limits
+  reductionMontantMaxPourcentage: integer("reduction_montant_max_pourcentage").default(50),
+  
+  // Validity
+  actif: boolean("actif").notNull().default(true),
+  agenceId: uuid("agence_id").references(() => agences.id), // NULL = global
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConfigReevaluationSchema = createInsertSchema(configReevaluation).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertConfigReevaluation = z.infer<typeof insertConfigReevaluationSchema>;
+export type ConfigReevaluation = typeof configReevaluation.$inferSelect;
+
+// Main reevaluation records
+export const reevaluationsCredit = pgTable(
+  "reevaluations_credit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    
+    // Original demande reference (IMMUTABLE after creation)
+    demandeId: uuid("demande_id").notNull().references(() => demandesCredit.id),
+    clientId: uuid("client_id").notNull().references(() => clients.id),
+    
+    // Version number (1st reevaluation = 1, 2nd = 2, etc.)
+    numeroVersion: integer("numero_version").notNull().default(1),
+    numeroReevaluation: text("numero_reevaluation").notNull().unique(), // REEV-2026-0001
+    
+    // Snapshot of initial rejection (IMMUTABLE - copy for audit)
+    motifRejetInitial: text("motif_rejet_initial").notNull(),
+    dateRejetInitial: timestamp("date_rejet_initial").notNull(),
+    scoreRejetInitial: integer("score_rejet_initial"),
+    montantInitialDemande: numeric("montant_initial_demande").notNull(),
+    
+    // New elements proposed
+    elementsNouveaux: json("elements_nouveaux").notNull(), // Array<{type, description, valeurAjoutee, documents}>
+    justification: text("justification").notNull(),
+    
+    // Requested adjustments
+    nouveauMontantDemande: numeric("nouveau_montant_demande"),
+    nouvelleDureeValeur: integer("nouvelle_duree_valeur"),
+    nouvelleDureeUnite: dureeUniteEnum("nouvelle_duree_unite"),
+    nouvelleFrequence: frequenceRemboursementEnum("nouvelle_frequence"),
+    
+    // Additional guarantees
+    garantiesAdditionnelles: json("garanties_additionnelles"), // [{type, description, valeur, documents}]
+    
+    // Co-borrower (if applicable)
+    coEmprunteurId: uuid("co_emprunteur_id").references(() => clients.id),
+    coEmprunteurDetails: json("co_emprunteur_details"), // {nom, relation, revenus, consentement}
+    
+    // Attached documents
+    documentsJoints: text("documents_joints").array(),
+    
+    // State and workflow
+    statut: statutReevaluationEnum("statut").notNull().default("Demandée"),
+    
+    // Eligibility
+    eligibiliteValidee: boolean("eligibilite_validee"),
+    motifRefusEligibilite: text("motif_refus_eligibilite"),
+    dateValidationEligibilite: timestamp("date_validation_eligibilite"),
+    validePar: uuid("valide_par").references(() => users.id),
+    
+    // Complementary inquiry (external reference)
+    enqueteComplementaireId: uuid("enquete_complementaire_id"),
+    
+    // Post-reevaluation scoring
+    nouveauScore: integer("nouveau_score"),
+    deltaScore: integer("delta_score"), // new - old
+    detailsScoring: json("details_scoring"), // Breakdown of new score
+    
+    // Committee decision
+    decisionComite: text("decision_comite"), // 'Approuvée', 'Rejetée définitivement', 'Montant réduit'
+    montantApprouveComite: numeric("montant_approuve_comite"),
+    dureeApprouveeComite: integer("duree_approuvee_comite"),
+    conditionsSpeciales: text("conditions_speciales"),
+    commentaireComite: text("commentaire_comite"),
+    dateDecisionComite: timestamp("date_decision_comite"),
+    decidePar: uuid("decide_par").references(() => users.id),
+    membresComite: uuid("membres_comite").array(), // List of present members
+    
+    // Metadata
+    createdBy: uuid("created_by").notNull().references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    
+    // Locking (after final decision, no longer modifiable)
+    verrouille: boolean("verrouille").notNull().default(false),
+    dateVerrouillage: timestamp("date_verrouillage"),
+  },
+  (t) => ({
+    idxDemandeId: index("idx_reevaluations_demande_id").on(t.demandeId),
+    idxClientId: index("idx_reevaluations_client_id").on(t.clientId),
+    idxStatut: index("idx_reevaluations_statut").on(t.statut),
+    idxCreatedAt: index("idx_reevaluations_created_at").on(t.createdAt),
+    // Constraint: only one active reevaluation per demande version
+    uqDemandeVersion: uniqueIndex("uq_reevaluation_demande_version").on(t.demandeId, t.numeroVersion),
+  }),
+);
+
+export const insertReevaluationCreditSchema = createInsertSchema(reevaluationsCredit).omit({ 
+  id: true, createdAt: true, updatedAt: true, verrouille: true, dateVerrouillage: true 
+});
+export type InsertReevaluationCredit = z.infer<typeof insertReevaluationCreditSchema>;
+export type ReevaluationCredit = typeof reevaluationsCredit.$inferSelect;
+
+// Complementary inquiries for reevaluations
+export const enquetesComplementaires = pgTable(
+  "enquetes_complementaires",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    
+    // Links
+    reevaluationId: uuid("reevaluation_id").notNull().references(() => reevaluationsCredit.id),
+    demandeId: uuid("demande_id").notNull().references(() => demandesCredit.id),
+    clientId: uuid("client_id").notNull().references(() => clients.id),
+    enqueteInitialeId: uuid("enquete_initiale_id").references(() => enquetesCredit.id),
+    
+    // Unique number
+    numeroEnquete: text("numero_enquete").notNull().unique(), // ENQC-2026-0001
+    
+    // Inquiry objective
+    objectifEnquete: text("objectif_enquete").notNull(), // What to verify
+    pointsAVerifier: text("points_a_verifier").array(), // List of specific points
+    
+    // Verifications performed (similar to normal inquiry but targeted)
+    verificationsEffectuees: json("verifications_effectuees"), // [{point, resultat, preuve, commentaire}]
+    
+    // Current situation (delta since last inquiry)
+    situationActuelle: json("situation_actuelle"), /* {
+      revenuActuel, revenuPrecedent, deltaRevenu,
+      chargesActuelles, chargesPrecedentes, deltaCharges,
+      nouveauxCredits, creditsSoldes,
+      changementSituation
+    } */
+    
+    // Verified guarantees
+    garantiesVerifiees: json("garanties_verifiees"), // [{type, existe, valeurEstimee, preuve}]
+    
+    // Verified co-borrower
+    coEmprunteurVerifie: json("co_emprunteur_verifie"), // {identiteConfirmee, revenusVerifies, consentementObtenu}
+    
+    // Photos and documents
+    photosEnquete: text("photos_enquete").array(),
+    documentsCollectes: text("documents_collectes").array(),
+    
+    // Geolocation
+    geoLatitude: numeric("geo_latitude"),
+    geoLongitude: numeric("geo_longitude"),
+    geoAccuracy: numeric("geo_accuracy"),
+    geoTimestamp: timestamp("geo_timestamp"),
+    
+    // Analysis and scoring
+    scoreComplementaire: integer("score_complementaire"),
+    recommandationEnqueteur: text("recommandation_enqueteur"), // Favorable, Défavorable, Réservé
+    observationsEnqueteur: text("observations_enqueteur"),
+    risquesIdentifies: text("risques_identifies").array(),
+    
+    // Status
+    statut: text("statut").notNull().default("En cours"), // En cours, Terminée, Annulée
+    
+    // Field agent
+    enqueteurId: uuid("enqueteur_id").notNull().references(() => users.id),
+    dateDebut: timestamp("date_debut").defaultNow(),
+    dateFin: timestamp("date_fin"),
+    
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => ({
+    idxReevaluationId: index("idx_enquetes_comp_reevaluation_id").on(t.reevaluationId),
+    idxEnqueteurId: index("idx_enquetes_comp_enqueteur_id").on(t.enqueteurId),
+    idxStatut: index("idx_enquetes_comp_statut").on(t.statut),
+  }),
+);
+
+export const insertEnqueteComplementaireSchema = createInsertSchema(enquetesComplementaires).omit({ 
+  id: true, createdAt: true, updatedAt: true 
+});
+export type InsertEnqueteComplementaire = z.infer<typeof insertEnqueteComplementaireSchema>;
+export type EnqueteComplementaire = typeof enquetesComplementaires.$inferSelect;
+
+// Scoring history tracking
+export const scoringHistory = pgTable(
+  "scoring_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    
+    // References
+    demandeId: uuid("demande_id").notNull().references(() => demandesCredit.id),
+    clientId: uuid("client_id").notNull().references(() => clients.id),
+    reevaluationId: uuid("reevaluation_id").references(() => reevaluationsCredit.id), // NULL if initial score
+    enqueteId: uuid("enquete_id").references(() => enquetesCredit.id),
+    enqueteComplementaireId: uuid("enquete_complementaire_id").references(() => enquetesComplementaires.id),
+    
+    // Score type
+    typeScore: text("type_score").notNull(), // 'Préliminaire', 'Post-enquête', 'Post-réévaluation'
+    numeroVersion: integer("numero_version").notNull().default(1),
+    
+    // Detailed scores
+    scoreTotal: integer("score_total").notNull(),
+    
+    // Breakdown by category
+    scoreCapaciteRemboursement: integer("score_capacite_remboursement"),
+    scoreStabiliteRevenus: integer("score_stabilite_revenus"),
+    scoreAncienneteActivite: integer("score_anciennete_activite"),
+    scoreHistoriqueCredit: integer("score_historique_credit"),
+    scoreGaranties: integer("score_garanties"),
+    scoreChargesEndettement: integer("score_charges_endettement"),
+    
+    // Data used for calculation (snapshot)
+    donneesCalcul: json("donnees_calcul").notNull(), /* {
+      revenuMensuel, charges, autresPrets, capacite,
+      anciennete, garantiesValeur, ratioEndettement
+    } */
+    
+    // Delta compared to previous score
+    scorePrecedent: integer("score_precedent"),
+    deltaScore: integer("delta_score"),
+    facteursDelta: json("facteurs_delta"), // [{facteur, impact, explication}]
+    
+    // Thresholds and recommendation
+    seuilApprobation: integer("seuil_approbation").default(60),
+    recommandationAuto: text("recommandation_auto"), // Based on score
+    
+    // Metadata
+    calculeParSysteme: boolean("calcule_par_systeme").notNull().default(true),
+    calculePar: uuid("calcule_par").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    idxDemandeId: index("idx_scoring_history_demande_id").on(t.demandeId),
+    idxReevaluationId: index("idx_scoring_history_reevaluation_id").on(t.reevaluationId),
+    idxCreatedAt: index("idx_scoring_history_created_at").on(t.createdAt),
+    uqDemandeTypeVersion: uniqueIndex("uq_scoring_demande_type_version").on(t.demandeId, t.typeScore, t.numeroVersion),
+  }),
+);
+
+export const insertScoringHistorySchema = createInsertSchema(scoringHistory).omit({ id: true, createdAt: true });
+export type InsertScoringHistory = z.infer<typeof insertScoringHistorySchema>;
+export type ScoringHistory = typeof scoringHistory.$inferSelect;
+
+// Reevaluation audit logs (immutable)
+export const reevaluationAuditLogs = pgTable(
+  "reevaluation_audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    
+    // References
+    reevaluationId: uuid("reevaluation_id").notNull().references(() => reevaluationsCredit.id),
+    demandeId: uuid("demande_id").notNull().references(() => demandesCredit.id),
+    
+    // Action
+    action: text("action").notNull(), /* 
+      'REEVALUATION_CREEE', 'ELIGIBILITE_VERIFIEE', 'ELIGIBILITE_REFUSEE',
+      'ENQUETE_COMPLEMENTAIRE_DEMARREE', 'ENQUETE_COMPLEMENTAIRE_TERMINEE',
+      'SOUMIS_COMITE', 'DECISION_COMITE', 'APPROUVEE', 'REJETEE_DEFINITIVEMENT',
+      'DOCUMENT_AJOUTE', 'SCORING_CALCULE', 'ANNULEE'
+    */
+    
+    // State before/after
+    statutAvant: text("statut_avant"),
+    statutApres: text("statut_apres"),
+    
+    // Action details
+    details: json("details").notNull(), /* {
+      description, champModifies, valeurAvant, valeurApres, 
+      motif, commentaire, documentsAffectes
+    } */
+    
+    // Actor
+    userId: uuid("user_id").notNull().references(() => users.id),
+    roleUtilisateur: text("role_utilisateur"),
+    
+    // Context
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    
+    // Immutable timestamp
+    timestamp: timestamp("timestamp").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxReevaluationId: index("idx_reeval_audit_reevaluation_id").on(t.reevaluationId),
+    idxDemandeId: index("idx_reeval_audit_demande_id").on(t.demandeId),
+    idxAction: index("idx_reeval_audit_action").on(t.action),
+    idxTimestamp: index("idx_reeval_audit_timestamp").on(t.timestamp),
+  }),
+);
+
+export const insertReevaluationAuditLogSchema = createInsertSchema(reevaluationAuditLogs).omit({ id: true, timestamp: true });
+export type InsertReevaluationAuditLog = z.infer<typeof insertReevaluationAuditLogSchema>;
+export type ReevaluationAuditLog = typeof reevaluationAuditLogs.$inferSelect;
 
 // End of finance tables
