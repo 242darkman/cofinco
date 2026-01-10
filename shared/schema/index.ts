@@ -6,6 +6,7 @@ export * from "./clients";
 export * from "./settings";
 export * from "./finance";
 export * from "./tontines";
+export * from "./coffre";
 export * from "./messages";
 export * from "./operations";
 export * from "./bourse";

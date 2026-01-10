@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { Button, Card, StatCard, TabGroup } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi } from '../../../lib/api-client';
+import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi } from '../../../lib/api-client';
+import { CaisseQuickActions } from './CaisseQuickActions';
 import CaisseOuverture from './CaisseOuverture';
 import CaisseOperations from './CaisseOperations';
 import CaisseRapprochement from './CaisseRapprochement';
@@ -35,6 +36,8 @@ interface SessionCaisse {
   observations: string;
   caissier_nom?: string;
   caisse_nom?: string;
+  caisse_id?: string;
+  agence_id?: string;
 }
 
 interface Transaction {
@@ -219,9 +222,75 @@ export default function CaisseDashboard({
 
 
 
-  // Helper for rendering the dashboard view
-  const DashboardView = () => (
+
+
+  const formattedMoney = (amount: number) => {
+      return new Intl.NumberFormat('fr-FR').format(amount);
+  }
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'operations':
+        return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} onBack={() => setActiveTab('dashboard')} /></div> : null;
+      case 'especes':
+        return currentSession ? (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                 <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
+                    <h2 className="text-lg font-bold text-white">Espèces</h2>
+                 </div>
+                 <CaisseEspeces sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); }} />
+            </div>
+        ) : null;
+      case 'mobilemoney':
+        return currentSession ? (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                 <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
+                    <h2 className="text-lg font-bold text-white">Mobile Money</h2>
+                 </div>
+                 <CaisseMobileMoney sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); loadCaissesSeparees(); }} />
+            </div>
+        ) : null;
+      case 'infos-client':
+        return (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseClientInfos /></div>
+        );
+      case 'rapprochement':
+        return currentSession ? (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseRapprochement session={currentSession} onClose={() => { setActiveTab('dashboard'); loadSessionActive(); loadTransactionsJour(); }} /></div>
+        ) : null;
+      case 'transferts':
+        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => setActiveTab('dashboard')} /></div>;
+      case 'etats':
+        return <CaisseEtats onBack={() => setActiveTab('dashboard')} />;
+
+      case 'supervision':
+        return (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                 <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
+                    <h2 className="text-lg font-bold text-white">Supervision</h2>
+                 </div>
+                 <CaisseSupervision 
+                    onTakeControl={(session) => {
+                      setSupervisedSession(session);
+                      setActiveTab('dashboard');
+                      // We might need to refresh transactions for this specific user/session
+                      // but for now, let's keep it simple
+                    }} 
+                 />
+            </div>
+        );
+      default:
+        return (
     <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
+      {currentSession && (
+        <CaisseQuickActions 
+          caisseId={currentSession.caisse_id || ''} 
+          agenceId={currentSession.agence_id || ''} 
+        />
+      )}
       
       {/* Top Session Stats - Mobile First Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -358,68 +427,7 @@ export default function CaisseDashboard({
        </Card>
 
     </div>
-  );
-
-  const formattedMoney = (amount: number) => {
-      return new Intl.NumberFormat('fr-FR').format(amount);
-  }
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'operations':
-        return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} onBack={() => setActiveTab('dashboard')} /></div> : null;
-      case 'especes':
-        return currentSession ? (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
-                    <h2 className="text-lg font-bold text-white">Espèces</h2>
-                 </div>
-                 <CaisseEspeces sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); }} />
-            </div>
-        ) : null;
-      case 'mobilemoney':
-        return currentSession ? (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
-                    <h2 className="text-lg font-bold text-white">Mobile Money</h2>
-                 </div>
-                 <CaisseMobileMoney sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); loadCaissesSeparees(); }} />
-            </div>
-        ) : null;
-      case 'infos-client':
-        return (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseClientInfos /></div>
         );
-      case 'rapprochement':
-        return currentSession ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseRapprochement session={currentSession} onClose={() => { setActiveTab('dashboard'); loadSessionActive(); loadTransactionsJour(); }} /></div>
-        ) : null;
-      case 'transferts':
-        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => setActiveTab('dashboard')} /></div>;
-      case 'etats':
-        return <CaisseEtats onBack={() => setActiveTab('dashboard')} />;
-
-      case 'supervision':
-        return (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
-                    <h2 className="text-lg font-bold text-white">Supervision</h2>
-                 </div>
-                 <CaisseSupervision 
-                    onTakeControl={(session) => {
-                      setSupervisedSession(session);
-                      setActiveTab('dashboard');
-                      // We might need to refresh transactions for this specific user/session
-                      // but for now, let's keep it simple
-                    }} 
-                 />
-            </div>
-        );
-      default:
-        return <DashboardView />;
     }
   };
 

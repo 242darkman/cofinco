@@ -5,7 +5,7 @@ import { z } from "zod";
 import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
-import { caisses } from "./operations";
+// import { caisses } from "./operations"; // Removed circular dependency
 import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum } from "@shared/enum/enums";
 
 // Interest Rates
@@ -605,6 +605,24 @@ export const objectifsEpargne = pgTable(
 export const insertObjectifEpargneSchema = createInsertSchema(objectifsEpargne).omit({ id: true, createdAt: true });
 export type InsertObjectifEpargne = z.infer<typeof insertObjectifEpargneSchema>;
 export type ObjectifEpargne = typeof objectifsEpargne.$inferSelect;
+
+// Objectifs Mensuels (moved here? No, kept in operations)
+
+// Caisses (Physical/Logical) - Moved from operations.ts
+export const caisses = pgTable("caisses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  agenceId: uuid("agence_id").notNull().references(() => agences.id),
+  type: text("type").notNull().default("Physique"), // 'Physique', 'Coffre-Fort', 'Virtuelle'
+  solde: numeric("solde").notNull().default("0"),
+  statut: text("statut").notNull().default("Fermée"), // 'Ouverte', 'Fermée'
+  // Optional: link to a specific device or location?
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertCaisseSchema = createInsertSchema(caisses).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCaisse = z.infer<typeof insertCaisseSchema>;
+export type Caisse = typeof caisses.$inferSelect;
 
 // Sessions caisse
 export const sessionsCaisse = pgTable("sessions_caisse", {

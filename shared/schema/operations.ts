@@ -4,7 +4,7 @@ import { z } from "zod";
 import { users } from "./auth";
 import { clients } from "./clients";
 import { agences } from "./agences";
-import { sessionsCaisse, operationsCaisse, mouvementsFinanciers, credits, comptes } from "./finance";
+import { sessionsCaisse, operationsCaisse, mouvementsFinanciers, credits, comptes, caisses } from "./finance";
 import { employes } from "./employes";
 import { methodePaiementEnum, statutTransactionEnum, typePaiementTerrainEnum } from "@shared/enum/enums";
 import { sql } from "drizzle-orm";
@@ -263,22 +263,7 @@ export const insertAgentLocationLogSchema = createInsertSchema(agentLocationLogs
 export type InsertAgentLocationLog = z.infer<typeof insertAgentLocationLogSchema>;
 export type AgentLocationLog = typeof agentLocationLogs.$inferSelect;
 
-// Caisses Agents
-// Caisses (Physical/Logical)
-export const caisses = pgTable("caisses", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  nom: text("nom").notNull(),
-  agenceId: uuid("agence_id").notNull().references(() => agences.id),
-  type: text("type").notNull().default("Physique"), // 'Physique', 'Coffre-Fort', 'Virtuelle'
-  solde: numeric("solde").notNull().default("0"),
-  statut: text("statut").notNull().default("Fermée"), // 'Ouverte', 'Fermée'
-  // Optional: link to a specific device or location?
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-export const insertCaisseSchema = createInsertSchema(caisses).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCaisse = z.infer<typeof insertCaisseSchema>;
-export type Caisse = typeof caisses.$inferSelect;
+// Caisses definition moved to finance.ts to avoid circular dependency
 
 // Caisse Security Codes
 export const caisseSecurityCodes = pgTable("caisse_security_codes", {

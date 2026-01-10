@@ -10,6 +10,7 @@ import Epargnes from './components/finance/epargne/Epargnes';
 import RessourcesHumaines from './components/hr/RessourcesHumaines';
 import AgentTerrain from './components/agent/AgentTerrain';
 import CaisseDashboard from './components/finance/caisse/CaisseDashboard';
+import { CoffreFortDashboard } from './components/finance/caisse/CoffreFortDashboard';
 import ClientForm from './components/client/ClientForm';
 import ClientKYC from './components/client/ClientKYC';
 import ClientNotes from './components/client/ClientNotes';
@@ -751,6 +752,12 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
             initialShowPaiement={pendingCaissePayment}
             onPaiementModalClose={() => setPendingCaissePayment(false)}
             initialState={moduleData}
+          />
+        );
+      case 'coffre':
+        return (
+          <CoffreFortDashboard 
+            agenceId={currentUser?.agenceId || selectedAgence || 'centrale'} 
           />
         );
       case 'transfert':

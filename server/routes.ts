@@ -22,7 +22,11 @@ import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/con
 import { registerComptesRoutes } from "./routes/comptes";
 import { registerReevaluationRoutes } from "./routes/reevaluations";
 
+import { coffreRouter } from "./routes/coffre";
+
 export function registerRoutes(app: Express): Server {
+  // ... existing routes
+  app.use("/api/coffre", coffreRouter);
   // Register modular routes
   registerAuthRoutes(app);
   registerClientRoutes(app);

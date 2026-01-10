@@ -11,6 +11,7 @@ const Comptabilite = lazy(() => import('@/components/finance/accounting/Comptabi
 const RessourcesHumaines = lazy(() => import('@/components/hr/RessourcesHumaines'));
 const AgentTerrain = lazy(() => import('@/components/agent/AgentTerrain'));
 const CaisseDashboard = lazy(() => import('@/components/finance/caisse/CaisseDashboard'));
+const CoffreFortDashboard = lazy(() => import('@/components/finance/caisse/CoffreFortDashboard').then(module => ({ default: module.CoffreFortDashboard })));
 const TransfertArgent = lazy(() => import('@/components/finance/transfert/TransfertArgent'));
 const BourseModule = lazy(() => import('@/components/finance/bourse/BourseModule'));
 const ReportGenerator = lazy(() => import('@/components/shared/ReportGenerator'));
@@ -114,6 +115,15 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Communications',
     label: 'Transferts',
     labelKey: 'menuTransfert',
+    group: 'Opérations',
+  },
+  {
+    key: 'coffre',
+    path: '/coffre',
+    component: CoffreFortDashboard,
+    requiredModule: 'Coffre-Fort',
+    label: 'Coffre-Fort',
+    labelKey: 'menuCoffre',
     group: 'Opérations',
   },
 

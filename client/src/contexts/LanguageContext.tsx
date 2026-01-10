@@ -338,6 +338,7 @@ const translations: Translations = {
   menuAgentTerrain: { fr: 'Agent de Terrain', en: 'Field Agent' },
   menuTerrain: { fr: 'Agent de Terrain', en: 'Field' },
   menuCaisse: { fr: 'Caisse', en: 'Cash Register' },
+  menuCoffre: { fr: 'Coffre-Fort', en: 'Safe' },
   menuTransfert: { fr: 'Transfert', en: 'Money Transfer' },
   menuBourse: { fr: 'Bourse', en: 'Stock Market' },
   menuExcel: { fr: 'Excel', en: 'Excel' },

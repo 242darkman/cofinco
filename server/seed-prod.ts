@@ -21,6 +21,11 @@ import {
   exercices,
   creditPlans,
   configReevaluation,
+  configCoffreFort,
+  transfertsCoffreCaisse,
+  transfertsCoffreAuditLogs,
+  scoringHistory,
+  enquetesComplementaires,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 
@@ -48,6 +53,7 @@ const MODULES_DATA = [
   { name: 'Administration', description: 'Administration système', icon: 'Shield', category: 'admin', orderIndex: 17 },
   { name: 'Audit', description: 'Traçabilité et conformité', icon: 'FileSearch', category: 'admin', orderIndex: 18 },
   { name: 'Messages', description: 'Messagerie interne', icon: 'Mail', category: 'general', orderIndex: 19 },
+  { name: 'Coffre-Fort', description: 'Gestion du coffre-fort', icon: 'Lock', category: 'finance', orderIndex: 20 },
 ];
 
 const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; description: string }>> = {
@@ -159,6 +165,14 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
     { name: 'Voir les messages', code: 'messages.view', description: 'Accès à la messagerie' },
     { name: 'Envoyer des messages', code: 'messages.send', description: 'Envoyer un message' },
   ],
+  'Coffre-Fort': [
+    { name: 'Voir le coffre', code: 'coffre.view', description: 'Accès au module Coffre-Fort' },
+    { name: 'Initier transfert', code: 'coffre.transfert.init', description: 'Demander un transfert de fonds' },
+    { name: 'Valider transfert', code: 'coffre.transfert.validate', description: 'Valider une demande de transfert' },
+    { name: 'Exécuter transfert', code: 'coffre.transfert.execute', description: 'Exécuter un transfert validé' },
+    { name: 'Voir configuration', code: 'coffre.config.view', description: 'Voir la configuration du coffre' },
+    { name: 'Modifier configuration', code: 'coffre.config.edit', description: 'Modifier la configuration du coffre' },
+  ],
 };
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -179,6 +193,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'rh.view', 'rh.create', 'rh.edit',
     'communications.view',
     'messages.view', 'messages.send',
+    'coffre.view', 'coffre.transfert.init', 'coffre.transfert.validate', 'coffre.transfert.execute', 'coffre.config.view',
   ],
   'Agent Caisse': [
     'dashboard.view',
@@ -187,7 +202,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'epargnes.view', 'epargnes.deposit', 'epargnes.withdraw',
     'credits.view', 'credits.collect',
     'remboursements.view', 'remboursements.create',
+    'remboursements.view', 'remboursements.create',
     'messages.view', 'messages.send',
+    'coffre.view',
   ],
   'Agent Terrain': [
     'dashboard.view',
@@ -375,6 +392,16 @@ async function seedProd() {
     await db.delete(exercices);
     await db.delete(creditPlans);
     
+    await db.delete(creditPlans);
+    await db.delete(creditPlans);
+    
+    // Deletion for reevaluation dependencies
+    await db.delete(scoringHistory);
+    await db.delete(enquetesComplementaires);
+    await db.delete(transfertsCoffreAuditLogs);
+    await db.delete(transfertsCoffreCaisse);
+    await db.delete(configCoffreFort);
+    
     // NOTE: We do NOT delete users, agences, or zones if they have data linked
     // But for a fresh install we might want to ensure they exist.
     // For SAFETY in prod, we will upsert or check existence rather than wiping critical tables
@@ -419,6 +446,28 @@ async function seedProd() {
     }
     console.log('   ✅ Zones and Agencies created');
 
+    // 2b. SEED COFFRE CONFIG FOR AGENCIES
+    console.log('   🛡️ Seeding Coffre Configuration...');
+    for (const [nom, id] of Object.entries(insertedAgences)) {
+      // Check if config exists first to avoid duplicate if we didn't wipe
+      const existing = await db.query.configCoffreFort.findFirst({
+        where: (table, { eq }) => eq(table.agenceId, id)
+      });
+
+      if (!existing) {
+        await db.insert(configCoffreFort).values({
+          agenceId: id,
+          seuilDoubleValidation: '10000000', // 10 millions for prod
+          separationInitiateurValideur: true,
+          actif: true,
+          rolesInitiateurs: ['Chef d\'Agence', 'Agent Caisse'],
+          rolesValideurs: ['Chef d\'Agence', 'Superviseur'],
+          rolesExecuteurs: ['Chef d\'Agence'],
+        });
+      }
+    }
+    console.log('   ✅ Coffre config checked/created');
+    
     // 3. SEED RBAC MODULES & PERMISSIONS
     console.log('\n🔐 Seeding Modules & Permissions...');
     const insertedModules: Record<string, string> = {};

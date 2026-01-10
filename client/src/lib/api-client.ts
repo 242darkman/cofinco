@@ -650,6 +650,42 @@ export const caisseTransfertApi = {
   }),
 };
 
+// Coffre-Fort API
+export const coffreApi = {
+  createTransfert: (data: any) => request<any>('/coffre/transferts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  validateTransfert: (id: string, approved: boolean, reasonRejection?: string) => request<any>(`/coffre/transferts/${id}/validate`, {
+    method: 'POST',
+    body: JSON.stringify({ approved, reasonRejection }),
+  }),
+  executeTransfert: (id: string, sessionId?: string, billetage?: Record<string, number>) => request<any>(`/coffre/transferts/${id}/execute`, {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, billetage }),
+  }),
+  cancelTransfert: (id: string, reason: string) => request<any>(`/coffre/transferts/${id}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  }),
+  listTransferts: (params: any) => {
+    const queryParams = new URLSearchParams();
+    if (params.agenceId) queryParams.append('agenceId', params.agenceId);
+    if (params.statut) queryParams.append('statut', params.statut);
+    if (params.typeTransfert) queryParams.append('typeTransfert', params.typeTransfert);
+    if (params.limit) queryParams.append('limit', String(params.limit));
+    if (params.page) queryParams.append('page', String(params.page));
+    const query = queryParams.toString();
+    return request<any>(`/coffre/transferts${query ? `?${query}` : ''}`);
+  },
+  getTransfertDetails: (id: string) => request<any>(`/coffre/transferts/${id}`),
+  getConfig: (agenceId: string) => request<any>(`/coffre/config?agenceId=${agenceId}`),
+  updateConfig: (data: any) => request<any>('/coffre/config', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+};
+
 // Incidents Caisse API
 export const caisseIncidentApi = {
   getAll: () => request<any[]>('/caisse-incidents'),

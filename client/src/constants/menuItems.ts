@@ -33,6 +33,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   { labelKey: 'menuCaisse', icon: Wallet, key: 'caisse', section: 'operations' },
   { labelKey: 'menuAgentTerrain', icon: MapPinned, key: 'agentTerrain', section: 'operations' },
   { labelKey: 'menuTransfert', icon: ArrowLeftRight, key: 'transfert', section: 'operations' },
+  { labelKey: 'menuCoffre', icon: Shield, key: 'coffre', section: 'operations' },
 
   // Gestion
   { labelKey: 'menuComptabilite', icon: BookOpen, key: 'comptabilite', section: 'gestion' },

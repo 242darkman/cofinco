@@ -1,5 +1,18 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
+export const statutTransfertCoffreEnum = pgEnum("statut_transfert_coffre_enum", [
+  "Demandé",
+  "Validé",
+  "Exécuté",
+  "Rejeté",
+  "Annulé",
+]);
+
+export const typeTransfertCoffreEnum = pgEnum("type_transfert_coffre_enum", [
+  "COFFRE_VERS_CAISSE",
+  "CAISSE_VERS_COFFRE",
+]);
+
 export const frequenceRemboursementEnum = pgEnum("frequence_remboursement_enum", [
   "Journalier",
   "Hebdomadaire",
@@ -115,6 +128,8 @@ export const typeOperationCaisseEnum = pgEnum("type_operation_caisse_enum", [
   "Frais",
   "Ajustement",
   "Transfert caisse",
+  "Approvisionnement coffre",
+  "Versement coffre"
 ]);
 
 export const statutTransfertCaisseEnum = pgEnum("statut_transfert_caisse_enum", [

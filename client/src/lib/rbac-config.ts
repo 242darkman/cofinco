@@ -32,7 +32,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'RH',
     'Paramètres',
     'Admin',
-    'Audit'
+    'Coffre-Fort'
   ],
   "Chef d'Agence": [
     'Dashboard',
@@ -46,6 +46,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Terrain',
     'Communications',
     'Caisse',
+    'Coffre-Fort',
     'RH',
     'Admin'
   ],
