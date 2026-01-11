@@ -4,7 +4,8 @@ import {
   evenementsOutbox,
   comptes,
   credits,
-  sessionsCaisse
+  sessionsCaisse,
+  tontines
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -13,7 +14,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
 
 // Types for the ledger service
-export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME";
+export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT";
 export type SensMouvement = "Débit" | "Crédit";
 export type TypeEvenement =
   | "MOUVEMENT_CREE"
@@ -70,7 +71,8 @@ export function generateReference(sourceModule: SourceModule): string {
     TONTINE: "TON",
     TERRAIN: "TER",
     TRANSFERT: "TRF",
-    SYSTEME: "SYS"
+    SYSTEME: "SYS",
+    CAISSE_AGENT: "CAG",
   };
   
   return `${prefixes[sourceModule]}-${year}${month}${day}-${time}${random}`;
@@ -325,6 +327,26 @@ export async function updateSessionSolde(
 }
 
 /**
+ * Update tontine solde within a transaction (Atomic Update)
+ */
+export async function updateTontineSolde(
+  tx: PgTransaction<any, any, any>,
+  tontineId: string,
+  delta: number
+): Promise<string> {
+  const [updated] = await tx.update(tontines)
+    .set({ 
+      solde: sql`${tontines.solde} + ${delta}`,
+      updatedAt: new Date()
+    })
+    .where(eq(tontines.id, tontineId))
+    .returning({ solde: tontines.solde });
+  
+  if (!updated) throw new Error(`Tontine ${tontineId} not found`);
+  return updated.solde || "0";
+}
+
+/**
  * Check idempotency key uniqueness
  */
 export async function checkIdempotencyKey(idempotencyKey: string): Promise<boolean> {
@@ -381,6 +403,7 @@ export default {
   updateCompteSolde,
   updateCreditSolde,
   updateSessionSolde,
+  updateTontineSolde,
   checkIdempotencyKey,
   executeWithLedger,
 };

@@ -358,7 +358,14 @@ export async function deposerSurCompte(
     throw new CompteError(depositCheck.reason!, "DEPOSIT_NOT_ALLOWED");
   }
 
-  // 3. Validate session if provided
+  // 3. Validate session if provided or required
+  if (data.methodePaiement === "Espèces" && !data.sessionCaisseId) {
+    throw new CompteError(
+      "Une session de caisse active est requise pour les dépôts en espèces",
+      "SESSION_REQUIRED"
+    );
+  }
+
   if (data.sessionCaisseId) {
     await validateSessionCaisse(data.sessionCaisseId);
   }
@@ -451,7 +458,14 @@ export async function retirerDuCompte(
     );
   }
 
-  // 4. Validate session if provided
+  // 4. Validate session if provided or required
+  if (data.methodePaiement === "Espèces" && !data.sessionCaisseId) {
+    throw new CompteError(
+      "Une session de caisse active est requise pour les retraits en espèces",
+      "SESSION_REQUIRED"
+    );
+  }
+
   if (data.sessionCaisseId) {
     await validateSessionCaisse(data.sessionCaisseId);
   }

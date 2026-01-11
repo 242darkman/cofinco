@@ -1117,3 +1117,191 @@ export const securityConfigApi = {
       body: JSON.stringify(data),
     }),
 };
+
+// ============================================
+// CAISSE AGENT API - Workflow d'approbation
+// ============================================
+
+import type {
+  CaisseAgentSummary,
+  OperationTerrainWithRelations,
+  CreateCollectCashInput,
+  CreateSettlementCashInput,
+} from "@shared/schema";
+
+/**
+ * Types pour les réponses API caisse agent
+ */
+export interface OperationTerrainListResponse {
+  data: OperationTerrainWithRelations[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface OperationTerrainFilters {
+  agentId?: string;
+  clientId?: string;
+  type?: 'COLLECT_CASH' | 'SETTLEMENT_CASH';
+  statut?: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  dateDebut?: string;
+  dateFin?: string;
+  limit?: number;
+  page?: number;
+}
+
+/**
+ * API pour la gestion des caisses agent et workflow d'approbation
+ */
+export const caisseAgentApi = {
+  // ============ Opérations Terrain ============
+
+  /**
+   * Créer une opération terrain (collecte ou remise)
+   */
+  createOperation: (data: CreateCollectCashInput | CreateSettlementCashInput & { type: 'COLLECT_CASH' | 'SETTLEMENT_CASH' }) =>
+    request<OperationTerrainWithRelations>('/caisse-agent/operations-terrain', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /**
+   * Créer une collecte cash (agent collecte argent d'un client)
+   */
+  createCollectCash: (data: CreateCollectCashInput) =>
+    request<OperationTerrainWithRelations>('/caisse-agent/operations-terrain', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, type: 'COLLECT_CASH' }),
+    }),
+
+  /**
+   * Créer une remise cash (agent remet argent à l'agence)
+   */
+  createSettlementCash: (data: CreateSettlementCashInput) =>
+    request<OperationTerrainWithRelations>('/caisse-agent/operations-terrain', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, type: 'SETTLEMENT_CASH' }),
+    }),
+
+  /**
+   * Lister les opérations terrain avec filtres
+   */
+  listOperations: (filters?: OperationTerrainFilters) => {
+    const queryParams = new URLSearchParams();
+    if (filters?.agentId) queryParams.append('agentId', filters.agentId);
+    if (filters?.clientId) queryParams.append('clientId', filters.clientId);
+    if (filters?.type) queryParams.append('type', filters.type);
+    if (filters?.statut) queryParams.append('statut', filters.statut);
+    if (filters?.dateDebut) queryParams.append('dateDebut', filters.dateDebut);
+    if (filters?.dateFin) queryParams.append('dateFin', filters.dateFin);
+    if (filters?.limit) queryParams.append('limit', String(filters.limit));
+    if (filters?.page) queryParams.append('page', String(filters.page));
+    const query = queryParams.toString();
+    return request<OperationTerrainListResponse>(`/caisse-agent/operations-terrain${query ? `?${query}` : ''}`);
+  },
+
+  /**
+   * Obtenir les détails d'une opération terrain
+   */
+  getOperation: (operationId: string) =>
+    request<OperationTerrainWithRelations>(`/caisse-agent/operations-terrain/${operationId}`),
+
+  /**
+   * Approuver une opération terrain (superviseur/chef d'agence)
+   */
+  approveOperation: (operationId: string) =>
+    request<OperationTerrainWithRelations>(`/caisse-agent/operations-terrain/${operationId}/approve`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Rejeter une opération terrain
+   */
+  rejectOperation: (operationId: string, rejectionReason: string) =>
+    request<OperationTerrainWithRelations>(`/caisse-agent/operations-terrain/${operationId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
+    }),
+
+  /**
+   * Annuler une opération terrain (par l'agent ou admin)
+   */
+  cancelOperation: (operationId: string, cancellationReason: string) =>
+    request<OperationTerrainWithRelations>(`/caisse-agent/operations-terrain/${operationId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ cancellationReason }),
+    }),
+
+  // ============ Gestion des Caisses Agent ============
+
+  /**
+   * Obtenir le résumé de la caisse d'un agent
+   */
+  getCaisseSummary: (agentId: string) =>
+    request<CaisseAgentSummary>(`/caisse-agent/agents/${agentId}/caisse`),
+
+  /**
+   * Créer une caisse pour un agent (si elle n'existe pas)
+   */
+  createCaisse: (agentId: string) =>
+    request<CaisseAgentSummary>(`/caisse-agent/agents/${agentId}/caisse`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Suspendre la caisse d'un agent
+   */
+  suspendCaisse: (agentId: string, reason: string) =>
+    request<{ message: string }>(`/caisse-agent/agents/${agentId}/caisse/suspend`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  /**
+   * Réactiver la caisse d'un agent
+   */
+  reactivateCaisse: (agentId: string) =>
+    request<{ message: string }>(`/caisse-agent/agents/${agentId}/caisse/reactivate`, {
+      method: 'POST',
+    }),
+
+  // ============ Opérations en attente (pour superviseur) ============
+
+  /**
+   * Lister les opérations en attente d'approbation
+   */
+  getPendingOperations: (filters?: Omit<OperationTerrainFilters, 'statut'>) =>
+    caisseAgentApi.listOperations({ ...filters, statut: 'SUBMITTED' }),
+
+  /**
+   * Compter les opérations en attente (pour badge notification)
+   */
+  countPendingOperations: () =>
+    request<{ count: number }>('/caisse-agent/operations-terrain/pending/count'),
+
+  // ============ Historique par agent ============
+
+  /**
+   * Lister les opérations d'un agent spécifique
+   */
+  getAgentOperations: (agentId: string, filters?: Omit<OperationTerrainFilters, 'agentId'>) =>
+    caisseAgentApi.listOperations({ ...filters, agentId }),
+
+  /**
+   * Obtenir les statistiques d'un agent
+   */
+  getAgentStats: (agentId: string, periode?: { debut: string; fin: string }) => {
+    const queryParams = new URLSearchParams();
+    if (periode?.debut) queryParams.append('dateDebut', periode.debut);
+    if (periode?.fin) queryParams.append('dateFin', periode.fin);
+    const query = queryParams.toString();
+    return request<{
+      totalCollecte: string;
+      totalRemise: string;
+      nbOperations: number;
+      nbApprouvees: number;
+      nbRejetees: number;
+      tauxApprobation: number;
+    }>(`/caisse-agent/agents/${agentId}/stats${query ? `?${query}` : ''}`);
+  },
+};

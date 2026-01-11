@@ -146,17 +146,38 @@ export function registerTontineRoutes(app: Express) {
 
   // Create contribution tontine (roles: admin, chef, caisse, superviseur)
   app.post("/api/contributions-tontine", requireAuth, requireRole('admin', 'chef', 'caisse', 'superviseur'), async (req, res) => {
-      const data = normalizeKeysDeep(req.body);
-      const parsed = insertContributionTontineSchema.parse(data);
-      const contrib = await storage.createContributionTontine(parsed);
-      
-      // Notify
-      const wsInstance = getWsInstance();
-      if (wsInstance) {
-          wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'contribution_new', tontineId: parsed.tontineId } });
+      try {
+        const data = normalizeKeysDeep(req.body);
+        const parsed = insertContributionTontineSchema.parse(data);
+        
+        let sessionCaisseId = undefined;
+
+        // If Cash, we need an active session
+        if (parsed.methodePaiement === 'Espèces') {
+            const activeSession = await storage.getActiveSessionForUser(req.session.user!.id);
+            if (!activeSession) {
+                return res.status(400).json({ message: "Vous devez avoir une caisse ouverte pour encaisser des espèces." });
+            }
+            sessionCaisseId = activeSession.id;
+        }
+
+        const contrib = await storage.createContributionTontineWithLedger(parsed, sessionCaisseId, req.session.user!.id);
+        
+        // Notify
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'contribution_new', tontineId: parsed.tontineId } });
+            // Refresh Dashboard as cash balance changed
+            if (sessionCaisseId) {
+                 wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+            }
+        }
+        
+        res.json(addSnakeCaseAliasesDeep(contrib));
+      } catch (e: any) {
+        console.error("Erreur contribution tontine:", e);
+        res.status(400).json({ message: e.message || "Erreur lors de l'enregistrement de la contribution" });
       }
-      
-      res.json(addSnakeCaseAliasesDeep(contrib));
   });
 
   // Get tontines for a specific client (their memberships)

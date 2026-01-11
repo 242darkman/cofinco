@@ -12,7 +12,7 @@ import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
-import { createClientAccount, getComptesByClient } from "../storage/finance";
+import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 
 export function registerClientRoutes(app: Express) {
   // CLIENTS ÉLIGIBLES AU CRÉDIT: Clients actifs avec un compte courant dans l'agence
@@ -45,12 +45,21 @@ export function registerClientRoutes(app: Express) {
         });
 
         if (compteCourant) {
-          eligibleClients.push({
-            ...client,
-            compteCourantId: compteCourant.id,
-            compteCourantNumero: compteCourant.numeroCompte,
-            compteCourantSolde: compteCourant.soldeCourant
-          });
+          // 🛑 RÈGLE MICROFINANCE : Pas de crédit actif ni demande en cours
+          const credits = await getCreditsByClient(client.id);
+          const hasActiveCredit = credits.some(c => ['Actif', 'En retard', 'En cours', 'Contentieux'].includes(c.statut));
+
+          const demandes = await getDemandesByClient(client.id);
+          const hasPendingDemand = demandes.some(d => d.statut && ['En attente', 'A enquêter', 'En comité', 'Approuvée'].includes(d.statut));
+
+          if (!hasActiveCredit && !hasPendingDemand) {
+              eligibleClients.push({
+                ...client,
+                compteCourantId: compteCourant.id,
+                compteCourantNumero: compteCourant.numeroCompte,
+                compteCourantSolde: compteCourant.soldeCourant
+              });
+          }
         }
       }
 

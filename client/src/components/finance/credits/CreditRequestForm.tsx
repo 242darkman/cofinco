@@ -394,9 +394,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       });
 
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur creation demande:', error);
-      setErrors({ general: 'Erreur lors de la creation de la demande' });
+      setErrors({ general: error.message || 'Erreur lors de la creation de la demande' });
     } finally {
       setLoading(false);
     }

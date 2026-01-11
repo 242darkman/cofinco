@@ -54,6 +54,10 @@ const MODULES_DATA = [
   { name: 'Audit', description: 'Traçabilité et conformité', icon: 'FileSearch', category: 'admin', orderIndex: 18 },
   { name: 'Messages', description: 'Messagerie interne', icon: 'Mail', category: 'general', orderIndex: 19 },
   { name: 'Coffre-Fort', description: 'Gestion du coffre-fort', icon: 'Lock', category: 'finance', orderIndex: 20 },
+  { name: 'Incidents', description: 'Gestion des incidents terrain', icon: 'AlertTriangle', category: 'operations', orderIndex: 21 },
+  { name: 'Visites', description: 'Visites clients terrain', icon: 'Map', category: 'operations', orderIndex: 22 },
+  { name: 'Prospection', description: 'Prospection nouveaux clients', icon: 'UserPlus', category: 'operations', orderIndex: 23 },
+  { name: 'Paiements Agent', description: 'Paiements initiés par agents', icon: 'Banknote', category: 'finance', orderIndex: 24 },
 ];
 
 const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; description: string }>> = {
@@ -114,6 +118,28 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
     { name: 'Voir le module Agent', code: 'agent.view', description: 'Accès au module Agent Terrain' },
     { name: 'Effectuer des collectes', code: 'agent.collect', description: 'Enregistrer des collectes terrain' },
     { name: 'Enregistrer des visites', code: 'agent.visit', description: 'Créer des rapports de visite' },
+    // Aliases for frontend compatibility
+    { name: 'Gérer agents terrain', code: 'agents_terrain.edit', description: 'Gérer les agents terrain' },
+    { name: 'Voir agents terrain', code: 'agents_terrain.view', description: 'Voir les agents terrain' },
+    { name: 'Créer agents terrain', code: 'agents_terrain.create', description: 'Créer agents terrain' },
+    { name: 'Créer agent terrain', code: 'agent_terrain.create', description: 'Créer agent terrain' },
+  ],
+  'Incidents': [
+    { name: 'Voir les incidents', code: 'incidents.view', description: 'Voir les incidents' },
+    { name: 'Créer un incident', code: 'incidents.create', description: 'Signaler un incident' },
+    { name: 'Traiter un incident', code: 'incidents.edit', description: 'Résoudre un incident' },
+  ],
+  'Visites': [
+    { name: 'Voir les visites', code: 'visites.view', description: 'Voir les visites' },
+    { name: 'Créer une visite', code: 'visites.create', description: 'Enregistrer une visite' },
+  ],
+  'Prospection': [
+    { name: 'Voir les prospections', code: 'prospection.view', description: 'Voir les prospections' },
+    { name: 'Créer une prospection', code: 'prospection.create', description: 'Enregistrer un prospect' },
+  ],
+  'Paiements Agent': [
+    { name: 'Voir les paiements', code: 'paiements.view', description: 'Voir les paiements agent' },
+    { name: 'Créer un paiement', code: 'paiements.create', description: 'Encaisser un paiement' },
   ],
   'Transferts': [
     { name: 'Voir les transferts', code: 'transferts.view', description: 'Accès au module Transferts' },

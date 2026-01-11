@@ -1,10 +1,13 @@
 import { tontines, membresTontine, contributionsTontine, clients, users, tontineRegles, tontinePenalites, tontineDistributions, tontinePlans } from "@shared/schema";
 import { type Tontine, type InsertTontine, type MembreTontine, type InsertMembreTontine, type ContributionTontine, type InsertContributionTontine,
     type TontineRegle, type InsertTontineRegle, type TontinePenalite, type InsertTontinePenalite,
-    type TontinePlan, type InsertTontinePlan
+    type TontinePlan, type InsertTontinePlan,
+    operationsCaisse
  } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, sql, getTableColumns } from "drizzle-orm";
+
+import { executeWithLedger, updateTontineSolde, updateSessionSolde } from "../services/ledger";
 
 
 // Tontine Plans
@@ -234,9 +237,86 @@ export async function getContributionsByMembre(membreId: string): Promise<Contri
   return db.select().from(contributionsTontine).where(eq(contributionsTontine.clientId, membreId)).orderBy(desc(contributionsTontine.createdAt));
 }
 
-export async function createContributionTontine(insertContribution: InsertContributionTontine): Promise<ContributionTontine> {
-  const [contribution] = await db.insert(contributionsTontine).values(insertContribution).returning();
-  return contribution;
+
+
+// Basic create optimized for seed/migration without ledger overhead
+export async function createContributionTontine(contribution: InsertContributionTontine): Promise<ContributionTontine> {
+  const [newContribution] = await db.insert(contributionsTontine).values(contribution).returning();
+  return newContribution;
+}
+
+/**
+ * Validated Tontine Contribution with Ledger Integration
+ * Warning: Requires active session for Cash payments
+ */
+export async function createContributionTontineWithLedger(
+  data: InsertContributionTontine,
+  sessionCaisseId?: string,
+  userId?: string
+): Promise<ContributionTontine> {
+  const isCash = data.methodePaiement === 'Espèces';
+
+  // If Cash, session is mandatory
+  if (isCash && !sessionCaisseId) {
+    throw new Error("Une session de caisse active est requise pour les paiements en espèces");
+  }
+
+  return await executeWithLedger(
+    "TONTINE",
+    {
+      montant: data.montant.toString(),
+      sens: "Crédit", // Money IN for Tontine logic (but actually Debt for liability?) 
+      // Wait, Tontine 'solde' is the money collected. So it's a Credit to the Tontine Object.
+      // And a Debit to the Cashier (Account Receival).
+      // Let's stick to standard: Credit = Resource increase. Tontine collected money increases.
+      sourceModule: "TONTINE",
+      tontineId: data.tontineId,
+      clientId: data.clientId || undefined,
+      sessionCaisseId: isCash ? sessionCaisseId : undefined,
+      typePaiement: "Contribution Tontine",
+      methodePaiement: data.methodePaiement,
+      referenceExterne: data.reference,
+      idempotencyKey: data.idempotencyKey || undefined,
+      description: `Contribution Tontine (Tour ${data.tourNumero})`
+    } as any, // casting because InsertContributionTontine doesn't exactly match MouvementData
+    async (tx, mouvement) => {   
+      // 1. Update Tontine Balance
+      await updateTontineSolde(tx, data.tontineId, parseFloat(data.montant.toString()));
+
+      // 2. Update Session Balance (if Cash)
+      let nouveauSoldeSession;
+      if (isCash && sessionCaisseId) {
+        nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, parseFloat(data.montant.toString()));
+        
+        // Create Operation Caisse for traceability
+        await tx.insert(operationsCaisse).values({
+            sessionId: sessionCaisseId,
+            mouvementId: mouvement.id,
+            typeOperation: "Dépôt" as any, // Generic In
+            montant: data.montant.toString(),
+            methodePaiement: "Espèces" as any,
+            reference: `TON-IN-${data.reference}`, // Distinct from global ref
+            description: `Contribution Tontine ref: ${data.reference}`,
+            createdBy: userId
+        });
+      }
+
+      // 3. Create Contribution Record (Linked to Mouvement)
+      const [contribution] = await tx.insert(contributionsTontine).values({
+        ...data,
+        mouvementId: mouvement.id,
+        createdAt: new Date()
+      }).returning();
+
+      return { 
+        result: contribution, 
+        additionalEventData: { 
+            nouveauSoldeSession 
+        } 
+      };
+    },
+    userId
+  ).then(({ result }) => result);
 }
 
 // Règles

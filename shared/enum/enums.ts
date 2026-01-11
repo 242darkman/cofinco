@@ -156,6 +156,7 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "TERRAIN",
   "TRANSFERT",
   "SYSTEME",
+  "CAISSE_AGENT", // Nouveau module pour les opérations de caisse agent
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -170,6 +171,11 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "COMPTE_BLOQUE",
   "COMPTE_DEBLOQUE",
   "COMPTE_TRANSFERE_AGENCE",
+  // Caisse Agent events
+  "CAISSE_AGENT_SOLDE_CHANGE",
+  "OPERATION_TERRAIN_SUBMITTED",
+  "OPERATION_TERRAIN_APPROVED",
+  "OPERATION_TERRAIN_REJECTED",
 ]);
 
 export const typeTauxInteretEnum = pgEnum("type_taux_interet_enum", [
@@ -217,4 +223,24 @@ export const motifBlocageEnum = pgEnum("motif_blocage_enum", [
   "Décision interne",
   "Litige",
   "Autre",
+]);
+
+// ========== CAISSE AGENT ENUMS ==========
+
+export const statutCaisseAgentEnum = pgEnum("statut_caisse_agent_enum", [
+  "Active",
+  "Suspendue",
+  "Clôturée",
+]);
+
+export const typeOperationTerrainEnum = pgEnum("type_operation_terrain_enum", [
+  "COLLECT_CASH",      // Agent collecte cash d'un client
+  "SETTLEMENT_CASH",   // Agent remet cash à l'agence/coffre
+]);
+
+export const statutOperationTerrainEnum = pgEnum("statut_operation_terrain_enum", [
+  "SUBMITTED",   // Soumise, en attente de validation
+  "APPROVED",    // Approuvée, écritures postées
+  "REJECTED",    // Rejetée, aucune écriture
+  "CANCELLED",   // Annulée par l'agent/admin
 ]);

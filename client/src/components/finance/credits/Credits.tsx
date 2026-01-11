@@ -514,7 +514,22 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                   setSelectedDemande(item);
                   setShowEnqueteForm(true);
               }}
-              actions={() => null} 
+              actions={(item) => (
+                <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
+                   <Button 
+                      size="sm" 
+                      variant="primary"
+                      onClick={(e) => { 
+                        e.stopPropagation();
+                        setSelectedDemande(item);
+                        setShowEnqueteForm(true);
+                      }}
+                      icon={ClipboardCheck}
+                   >
+                     Enquêter
+                   </Button>
+                </ProtectedFeature>
+              )} 
             />
           </Card>
         </div>

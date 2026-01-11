@@ -173,6 +173,11 @@ export interface IStorage {
     getContributionsByTontine(tontineId: string): Promise<ContributionTontine[]>;
     getContributionsByMembre(membreId: string): Promise<ContributionTontine[]>;
     createContributionTontine(contribution: InsertContributionTontine): Promise<ContributionTontine>;
+    createContributionTontineWithLedger(
+      data: InsertContributionTontine,
+      sessionCaisseId?: string,
+      userId?: string
+    ): Promise<ContributionTontine>;
 
     getTontineRegles(tontineId: string): Promise<TontineRegle[]>;
     createTontineRegle(regle: InsertTontineRegle): Promise<TontineRegle>;

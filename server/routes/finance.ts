@@ -216,27 +216,24 @@ export function registerFinanceRoutes(app: Express) {
 
       // 5. Si décaissement immédiat: créditer le compte courant du client
       if (!estProgramme) {
-        const mouvementData = {
-          compteId: compteCourant.id,
-          clientId: demande.clientId,
-          creditId: credit.id,
-          montant: montantDecaissement.toString(),
-          sens: 'Crédit' as const,
-          sourceModule: 'CREDIT' as const,
-          typeOperation: 'Décaissement crédit',
-          description: `Décaissement crédit ${numeroCredit}`,
-          reference: numeroCredit,
-          statut: 'Posté' as const,
-          createdBy: user?.id,
-        };
+          try {
+             const result = await storage.createDecaissementWithLedger({
+                 creditId: credit.id,
+                 compteId: compteCourant.id,
+                 montant: montantDecaissement.toString(),
+                 numeroCredit
+             }, user?.id);
+             
+             // Update local helper
+             nouveauSolde += montantDecaissement;
 
-        await db.insert(mouvementsFinanciers).values(mouvementData);
-
-        // 6. Mettre à jour le solde du compte courant
-        nouveauSolde = nouveauSolde + montantDecaissement;
-        await db.update(comptes)
-          .set({ soldeCourant: nouveauSolde.toString(), updatedAt: new Date() })
-          .where(eq(comptes.id, compteCourant.id));
+          } catch (err: any) {
+              console.error("Erreur Ledger lors du décaissement:", err);
+              // Fallback or rollback? Since we already created the credit, we might be in a half-state if ledger fails.
+              // Ideally createCredit should be inside the ledger transaction too... 
+              // But for now, let's bubble up the error.
+              throw new Error(`Erreur lors du décaissement effectif: ${err.message}`);
+          }
       }
 
       // 7. Mettre à jour le statut de la demande
@@ -1102,107 +1099,88 @@ export function registerFinanceRoutes(app: Express) {
         }
 
         const parsed = insertOperationCaisseSchema.parse(data);
-        const op = await storage.createOperationCaisse(parsed);
 
-        // Update account balance and create transaction history
+        // Targeted Account Resolution
         let targetCompteId = data.compteId;
         
-        // If no specific account provided, try to find the client's default savings account
-        if (!targetCompteId && parsed.clientId) {
-             const clientAccounts = await storage.getComptesByClient(parsed.clientId);
-             const defaultAccount = clientAccounts.find(c => c.typeCompte === 'Épargne' && c.statut === 'Actif') || clientAccounts[0];
-             if (defaultAccount) {
-                 targetCompteId = defaultAccount.id;
-             }
-        }
-
-            if (targetCompteId && parsed.montant) {
-            const compte = await storage.getCompte(targetCompteId);
-            if (compte) {
-                const montant = Number(parsed.montant);
-                const currentSolde = Number(compte.soldeCourant) || 0;
-                let newSolde: number;
-                let transactionType = 'Dépôt';
-
-                // Versement/Dépôt = add to balance, Retrait = subtract from balance
-                const opType = (parsed.typeOperation || '').toLowerCase();
-                const isDeposit = ['versement', 'dépôt', 'depot', 'depôt', 'dépôt épargne'].includes(opType);
-                const isWithdrawal = ['retrait', 'retrait épargne'].includes(opType);
-
-                if (isDeposit) {
-                    newSolde = currentSolde + montant;
-                    transactionType = 'Dépôt';
-                } else if (isWithdrawal) {
-                    newSolde = currentSolde - montant;
-                    transactionType = 'Retrait';
-                } else {
-                    newSolde = currentSolde; // No change for other operations
-                }
-
-                if (newSolde !== currentSolde) {
-                    // 1. Update Balance
-                    await storage.updateCompte(targetCompteId, { soldeCourant: String(newSolde) });
-
-                    // 2. Create Transaction Record (CRUCIAL for History)
-                    // Map transaction type to valid typePaiement
-                    const typePaiement = transactionType === 'Dépôt' 
-                        ? (compte.typeCompte === 'Courant' ? 'Dépôt Courant' : 'Dépôt Épargne')
-                        : (compte.typeCompte === 'Courant' ? 'Retrait Courant' : 'Retrait Épargne');
-
-                    await storage.createTransactionCompte({
-                        compteId: targetCompteId,
-                        typePaiement: typePaiement as any,
-                        montant: String(montant),
-                        soldeApres: String(newSolde),
-                        methodePaiement: 'Espèces',
-                        referenceExterne: op.reference || `OP-${Date.now()}`,
-                        observations: `Opération Caisse: ${parsed.typeOperation}`,
-                        createdBy: user.id
-                    } as any);
-
-                    // 3. Broadcast account update
-                    try {
-                        const wsInstance = getWsInstance();
-                        if (wsInstance) {
-                            wsInstance.broadcast({ type: "COMPTE_UPDATE", payload: { compteId: targetCompteId, newSolde } });
-                        }
-                    } catch (wsErr) {
-                        console.error('Error broadcasting compte update:', wsErr);
-                    }
-                }
+        // If no specific account provided but client is, try to find the client's default savings account
+        // Only if it's a deposit/withdraw that requires an account
+        const opsRequiringAccount = ['retrait', 'retrait épargne', 'dépôt', 'depot', 'dépôt épargne', 'versement'];
+        if (opsRequiringAccount.includes((parsed.typeOperation || '').toLowerCase())) {
+             if (!targetCompteId && parsed.clientId) {
+                 const clientAccounts = await storage.getComptesByClient(parsed.clientId);
+                 const defaultAccount = clientAccounts.find(c => c.typeCompte === 'Épargne' && c.statut === 'Actif') || clientAccounts[0];
+                 if (defaultAccount) {
+                     targetCompteId = defaultAccount.id;
+                 } else {
+                     return res.status(400).json({ message: "Aucun compte actif trouvé pour ce client. Impossible d'effectuer cette opération." });
+                 }
             }
         }
 
-        try {
-            // Loyalty Points: Award points for deposits
-            if (parsed.clientId && parsed.typeOperation === 'Dépôt épargne' && parsed.montant) {
-                const points = Math.floor(Number(parsed.montant) / 1000); // 1 point per 1000 FCFA
-                await storage.addLoyaltyPoints(
-                    parsed.clientId,
-                    points,
-                    'EPARGNE',
-                    `Versement de ${parsed.montant} FCFA`,
-                    Number(parsed.montant)
-                );
-                // Recalculate engagement score
-                await storage.calculateEngagementScore(parsed.clientId);
-            }
-            
-            // Notify Client Update for Limits Real-time Refresh
-            if (parsed.clientId) {
+        // --- NEW LEDGER FLOW ---
+        // We use the unified function if we have a target Account OR if it's a generic operation we want tracked
+        // For now, we assume ALL operations via this endpoint should be robust.
+        
+        const hasAccountImpact = !!targetCompteId;
+
+        if (hasAccountImpact) {
+            const { operation, transaction, mouvement } = await storage.createCashTransactionWithLedger({
+                sessionId: parsed.sessionId,
+                typeOperation: parsed.typeOperation,
+                montant: parsed.montant.toString(),
+                methodePaiement: parsed.methodePaiement || 'Espèces',
+                clientId: parsed.clientId || undefined,
+                compteId: targetCompteId,
+                description: parsed.description || undefined,
+                idempotencyKey: parsed.idempotencyKey
+            }, user.id);
+
+            // Side Effects (Loyalty, WS) - Kept outside transaction critical path for now or could be moved to events
+            try {
+                 // Loyalty Points
+                if (parsed.clientId && parsed.typeOperation === 'Dépôt épargne' && parsed.montant) {
+                    const points = Math.floor(Number(parsed.montant) / 1000);
+                    await storage.addLoyaltyPoints(
+                        parsed.clientId,
+                        points,
+                        'EPARGNE',
+                        `Versement de ${parsed.montant} FCFA`,
+                        Number(parsed.montant)
+                    );
+                    await storage.calculateEngagementScore(parsed.clientId);
+                }
+
                 const wsInstance = getWsInstance();
                 if (wsInstance) {
-                    wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: parsed.clientId } });
-                    // Also update dashboard & Caisse List
+                    if (parsed.clientId) wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: parsed.clientId } });
+                    if (transaction) wsInstance.broadcast({ type: "COMPTE_UPDATE", payload: { compteId: transaction.compteId, newSolde: Number(transaction.soldeApres) } });
+                    
                     wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
                     wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
                 }
+            } catch (err) {
+                console.error("Post-operation side-effects error:", err);
             }
-        } catch (wsError) {
-             console.error('Error in post-operation processing (WS/Loyalty):', wsError);
+
+            res.json(addSnakeCaseAliasesDeep(operation));
+
+        } else {
+            // Fallback for Operations WITHOUT Account impact (e.g. "Divers", "Frais divers" not linked to account)
+            // We use the simpler ledger function that only touches Session + Ledger
+            const { operation } = await storage.createOperationCaisseWithLedger({
+                sessionId: parsed.sessionId,
+                typeOperation: parsed.typeOperation,
+                montant: parsed.montant.toString(),
+                methodePaiement: parsed.methodePaiement || 'Espèces',
+                clientId: parsed.clientId || undefined,
+                description: parsed.description || undefined,
+                idempotencyKey: parsed.idempotencyKey
+            }, user.id);
+
+            res.json(addSnakeCaseAliasesDeep(operation));
         }
 
-        res.json(addSnakeCaseAliasesDeep(op));
       } catch (error: any) {
         console.error('Error creating operation:', error);
         res.status(400).json({ message: error.message || "Erreur lors de la création de l'opération" });

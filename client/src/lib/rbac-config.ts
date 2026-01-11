@@ -29,10 +29,15 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Terrain',
     'Communications',
     'Caisse',
+    'CaisseAgent',
     'RH',
     'Paramètres',
     'Admin',
-    'Coffre-Fort'
+    'Coffre-Fort',
+    'Incidents',
+    'Visites',
+    'Prospection',
+    'Paiements Agent'
   ],
   "Chef d'Agence": [
     'Dashboard',
@@ -46,7 +51,12 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Terrain',
     'Communications',
     'Caisse',
+    'CaisseAgent',
     'Coffre-Fort',
+    'Incidents',
+    'Visites',
+    'Prospection',
+    'Paiements Agent',
     'RH',
     'Admin'
   ],
@@ -69,6 +79,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Dashboard',
     'Clients',
     'Terrain',
+    'CaisseAgent',
     'Rapports',
     'Communications',
     'RH'
@@ -85,6 +96,11 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Dashboard',
     'Clients',
     'Terrain',
+    'CaisseAgent',
+    'Incidents',
+    'Visites',
+    'Prospection',
+    'Paiements Agent',
     'Communications',
     'RH'
   ]
@@ -116,7 +132,7 @@ export type PermissionConfig = {
 
 export const ROLE_PERMISSIONS: PermissionConfig = {
   'Administrateur': {
-    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide']
+    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide', 'caisseagent.approve', 'caisseagent.reject']
   },
   "Chef d'Agence": {
     'clients': ['view', 'create', 'edit', 'delete'],
@@ -127,10 +143,15 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'rapports': ['view', 'export'],
     'terrain': ['view', 'manage'],
     'caisse': ['view', 'manage'],
+    'caisseagent': ['view', 'manage', 'caisseagent.approve', 'caisseagent.reject', 'caisseagent.suspend'],
     'rh': ['view', 'create', 'edit', 'manage'],
     'paie': ['view', 'create', 'approve'],
     'users': ['view', 'create', 'edit'],
-    'coffre': ['view', 'transfert.init', 'transfert.validate', 'transfert.execute', 'config.view']
+    'coffre': ['view', 'transfert.init', 'transfert.validate', 'transfert.execute', 'config.view'],
+    'incidents': ['view', 'manage', 'edit'],
+    'visites': ['view'],
+    'prospection': ['view'],
+    'paiements': ['view']
   },
   'Comptable': {
     'clients': ['view'],
@@ -151,6 +172,7 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'clients': ['view'],
     'terrain': ['view', 'manage'],
     'tontines': ['view', 'manage'],
+    'caisseagent': ['view', 'caisseagent.approve', 'caisseagent.reject'],
     'rapports': ['view'],
     'rh': ['view'] // Pointage uniquement
   },
@@ -164,7 +186,11 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
   'Agent Terrain': {
     'clients': ['view', 'create', 'edit'],
     'terrain': ['view', 'create'],
-    'prospections': ['view', 'create'],
+    'prospection': ['view', 'create'],
+    'caisseagent': ['view', 'create'], // Peut créer des opérations, pas les approuver
+    'incidents': ['view', 'create'],
+    'visites': ['view', 'create'],
+    'paiements': ['view', 'create'],
     'rh': ['view'] // Pointage uniquement
   }
 };

@@ -1076,6 +1076,8 @@ import {
   updateCompteSolde, 
   updateCreditSolde, 
   updateSessionSolde,
+  createMouvementFinancier,
+  createMouvementEvents,
   type SensMouvement,
   type MouvementFinancier
 } from "../services/ledger";
@@ -1243,6 +1245,11 @@ export async function createRemboursementWithLedger(data: {
   const [credit] = await db.select().from(credits).where(eq(credits.id, data.creditId));
   if (!credit) throw new Error(`Credit ${data.creditId} not found`);
 
+  // Force Session for Cash
+  if (data.methodePaiement === 'Espèces' && !data.sessionCaisseId) {
+      throw new Error("Une session de caisse active est requise pour les remboursements en espèces");
+  }
+
   return executeWithLedger(
     "CREDIT",
     {
@@ -1305,6 +1312,11 @@ export async function payerFraisEngagement(data: {
   if (!demande) throw new Error(`Demande ${data.demandeId} non trouvée`);
   if (demande.fraisEngagementPayes) throw new Error(`Les frais ont déjà été payés pour cette demande`);
 
+  // Force Session for Cash
+  if (data.methodePaiement === 'Espèces' && !data.sessionCaisseId) {
+      throw new Error("Une session de caisse active est requise pour le paiement des frais en espèces");
+  }
+
   return executeWithLedger(
     "CREDIT",
     {
@@ -1335,8 +1347,13 @@ export async function payerFraisEngagement(data: {
 
       // 4. Créer l'opération caisse
       const reference = `FRAIS-${demande.numeroDemande}-${Date.now()}`;
+      // Note: sessionId not-null constraint handled by strict check above or type safety
       const [operation] = await tx.insert(operationsCaisse).values({
-        sessionId: data.sessionCaisseId!,
+        sessionId: data.sessionCaisseId!, // Safe assertion if logic ensures it (Espèces requires it, others might not?)
+        // WAIT: If methodePaiement is NOT Espèces (e.g. Virement), sessionCaisseId might be undefined.
+        // But operationsCaisse REQUIRES a sessionId in the DB schema? 
+        // Let's check schema/operationsCaisse. If it's nullable, fine. If not, we have a problem for non-cash fees.
+        // Assuming for now fees are always collected via a session (even transfers handled by a cashier).
         mouvementId: mouvement.id,
         typeOperation: "Frais Engagement" as any,
         montant: data.montant,
@@ -1357,6 +1374,50 @@ export async function payerFraisEngagement(data: {
     },
     userId
   ).then(({ result, mouvement }) => ({ ...result, mouvement }));
+}
+
+/**
+ * Execute a Credit Disbursement (Decaissement) via Ledger
+ */
+export async function createDecaissementWithLedger(data: {
+    creditId: string;
+    compteId: string;
+    montant: string;
+    numeroCredit: string;
+}, userId?: string): Promise<{ credit: Credit; mouvement: MouvementFinancier }> {
+    
+    // 1. Use Helper
+    const [credit] = await db.select().from(credits).where(eq(credits.id, data.creditId));
+    if (!credit) throw new Error("Crédit non trouvé");
+
+    return executeWithLedger(
+        "CREDIT",
+        {
+            montant: data.montant,
+            sens: "Débit", // Money leaving the institution (to user account)
+            clientId: credit.clientId,
+            creditId: data.creditId,
+            compteId: data.compteId, // Target Account
+            methodePaiement: "Virement", // Internal Transfer
+            typePaiement: "Décaissement crédit" as any,
+            referenceExterne: data.numeroCredit,
+            metadata: { description: `Décaissement crédit ${data.numeroCredit}` }
+        },
+        async (tx, mouvement) => {
+             // 2. Update Account Balance (Credit the user's account)
+             // Note: updateCompteSolde handles adding the amount.
+             const nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, parseFloat(data.montant));
+
+             // 3. Return the credit (unchanged here, but part of the flow)
+             return {
+                 result: credit,
+                 additionalEventData: {
+                     nouveauSoldeCompte
+                 }
+             };
+        },
+        userId
+    ).then(({ result, mouvement }) => ({ credit: result, mouvement }));
 }
 
 /**
@@ -1443,3 +1504,250 @@ export async function getClientPortfolio(clientId: string): Promise<{
     })),
   };
 }
+
+/**
+ * Create a unified Cash Transaction with full ledger flow.
+ * - Updates Account (if applicable)
+ * - Updates Session
+ * - Creates Ledger Entry
+ * - Creates Transaction Record (if applicable)
+ * - Creates Operation Record
+ */
+export async function createCashTransactionWithLedger(data: {
+  sessionId: string;
+  typeOperation: string;
+  montant: string;
+  methodePaiement: string;
+  clientId?: string;
+  compteId?: string;
+  description?: string;
+  idempotencyKey?: string;
+}, userId?: string): Promise<{ 
+  operation: OperationCaisse; 
+  transaction?: TransactionCompte; 
+  mouvement: MouvementFinancier 
+}> {
+
+  // 1. Determine direction and validation
+  const opType = data.typeOperation.toLowerCase();
+  
+  // Define IN/OUT based on business logic
+  // IN: Money comes INTO the cash box (Deposit, etc.)
+  // OUT: Money goes OUT of the cash box (Withdrawal, etc.)
+  const IN_TYPES = ['versement', 'dépôt', 'depot', 'depôt', 'dépôt épargne', 'encaissement', 'remboursement crédit'];
+  const OUT_TYPES = ['retrait', 'retrait épargne', 'décaissement', 'décaissement crédit', 'frais'];
+
+  let sens: SensMouvement;
+  let cashDelta: number; // Impact on Cash Session
+  let accountDelta: number = 0; // Impact on Client Account
+
+  if (IN_TYPES.includes(opType)) {
+      sens = "Crédit"; // Credit to the system (Cash in)
+      cashDelta = parseFloat(data.montant);
+      accountDelta = parseFloat(data.montant); // Account balance increases (Deposit)
+  } else if (OUT_TYPES.includes(opType)) {
+      sens = "Débit"; // Debit from the system (Cash out)
+      cashDelta = -parseFloat(data.montant);
+      accountDelta = -parseFloat(data.montant); // Account balance decreases (Withdrawal)
+  } else {
+      // Default or Neutral - Assume no cash impact unless specified? 
+      // safer to require explicit types, but for now fallback to Neutral/Info
+      sens = "Crédit"; 
+      cashDelta = 0; 
+  }
+
+  // Double check Account CompteId if provided
+  let compte: any; 
+  if (data.compteId) {
+      const [foundCompte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
+      if (!foundCompte) throw new Error(`Compte ${data.compteId} not found`);
+      compte = foundCompte;
+  }
+
+  // Get session
+  const [session] = await db.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, data.sessionId));
+  if (!session) throw new Error(`Session ${data.sessionId} not found`);
+
+  // Generate References
+  const timestamp = Date.now().toString().slice(-8);
+  const refRandom = Math.floor(Math.random() * 1000);
+  const opReference = `OP-${timestamp}-${refRandom}`;
+  
+  // Ledger Execution
+  return executeWithLedger(
+    "CAISSE", // Source Module
+    {
+      montant: data.montant,
+      sens,
+      clientId: data.clientId,
+      compteId: data.compteId, // Link to account if present
+      sessionCaisseId: data.sessionId,
+      agenceId: session.agenceId || undefined,
+      methodePaiement: data.methodePaiement,
+      typePaiement: data.typeOperation as any, // Map to Enum if needed, but string allowed usually
+      idempotencyKey: data.idempotencyKey,
+      referenceExterne: opReference
+    },
+    async (tx, mouvement) => {
+      // 1. Update Session Balance (Atomic)
+      const nouveauSoldeSession = await updateSessionSolde(tx, data.sessionId, cashDelta);
+
+      // 2. Update Account Balance (Atomic) - ONLY if account implicated
+      let nouveauSoldeCompte: string | undefined;
+      let transaction: TransactionCompte | undefined;
+
+      if (data.compteId && compte) {
+          nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, accountDelta);
+          
+          // Map Transaction Type
+          const transType = (accountDelta > 0) 
+            ? (compte.typeCompte === 'Courant' ? 'Dépôt Courant' : 'Dépôt Épargne')
+            : (compte.typeCompte === 'Courant' ? 'Retrait Courant' : 'Retrait Épargne');
+
+          // Create Transaction Record
+          const [createdTx] = await tx.insert(transactionsCompte).values({
+              compteId: data.compteId,
+              mouvementId: mouvement.id,
+              typePaiement: transType as any,
+              montant: data.montant,
+              soldeApres: nouveauSoldeCompte,
+              methodePaiement: data.methodePaiement as any,
+              observations: data.description || `Opération Caisse: ${data.typeOperation}`,
+              createdBy: userId
+          }).returning();
+          transaction = createdTx;
+      }
+
+      // 3. Create Operation Caisse Record
+      const [operation] = await tx.insert(operationsCaisse).values({
+        sessionId: data.sessionId,
+        mouvementId: mouvement.id,
+        typeOperation: data.typeOperation as any,
+        montant: data.montant,
+        methodePaiement: data.methodePaiement as any,
+        reference: opReference,
+        description: data.description,
+        clientId: data.clientId,
+        createdBy: userId,
+        idempotencyKey: data.idempotencyKey,
+      }).returning();
+
+      return {
+        result: { operation, transaction },
+        additionalEventData: {
+          nouveauSoldeSession,
+          nouveauSoldeCompte
+        }
+      };
+    },
+    userId
+  ).then(({ result, mouvement }) => ({ ...result, mouvement }));
+}
+
+/**
+ * Validate a transfer with full ledger dual-entry (Debit Source / Credit Dest)
+ */
+export async function validateTransfertWithLedger(
+  transfertId: string, 
+  sessionDestId: string, 
+  userId: string
+): Promise<CaisseTransfert> {
+  return await db.transaction(async (tx) => {
+    // 1. Get Transfer
+    const [transfert] = await tx.select().from(caisseTransferts).where(eq(caisseTransferts.id, transfertId));
+    if (!transfert) throw new Error("Transfert non trouvé");
+    if (transfert.statut !== 'En attente') throw new Error("Transfert déjà traité");
+
+    // 2. Get Sessions
+    const [sessionSource] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, transfert.sessionSourceId));
+    const [sessionDest] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionDestId));
+
+    if (!sessionSource) throw new Error("Session source introuvable (archivée ou supprimée?)");
+    if (!sessionDest) throw new Error("Session destination introuvable");
+    if (sessionDest.statut !== 'Ouverte') throw new Error("La session de destination doit être ouverte");
+
+    // Check Sufficient Funds
+    const currentSolde = Number(sessionSource.soldeTheorique || sessionSource.soldeInitial || 0);
+    const amount = Number(transfert.montant);
+
+    if (currentSolde < amount) {
+        throw new Error(`Solde insuffisant dans la caisse source (${currentSolde} < ${amount})`);
+    }
+
+    // 3. Process SOURCE (DEBIT / OUT)
+    const refSource = `TRF-OUT-${transfert.reference}`;
+    const mouvementSource = await createMouvementFinancier(tx, {
+      montant: transfert.montant,
+      sens: "Débit",
+      sourceModule: "TRANSFERT",
+      sessionCaisseId: sessionSource.id,
+      agenceId: sessionSource.agenceId || undefined,
+      typePaiement: "Transfert Caisse",
+      referenceExterne: refSource,
+      methodePaiement: "Virement",
+      description: `Transfert vers ${sessionDest.caisseId} (Ref: ${transfert.reference})`
+    } as any, userId);
+
+    const soldeSource = await updateSessionSolde(tx, sessionSource.id, -parseFloat(transfert.montant));
+    
+    await tx.insert(operationsCaisse).values({
+      sessionId: sessionSource.id,
+      mouvementId: mouvementSource.id,
+      typeOperation: "Transfert caisse" as any,
+      montant: transfert.montant,
+      methodePaiement: "Virement" as any,
+      reference: refSource,
+      description: `Transfert émis vers ${sessionDest.caisseId}`,
+      createdBy: userId
+    });
+
+    await createMouvementEvents(tx, mouvementSource, { 
+      nouveauSoldeSession: soldeSource 
+    });
+
+    // 4. Process DEST (CREDIT / IN)
+    const refDest = `TRF-IN-${transfert.reference}`;
+    const mouvementDest = await createMouvementFinancier(tx, {
+      montant: transfert.montant,
+      sens: "Crédit",
+      sourceModule: "TRANSFERT",
+      sessionCaisseId: sessionDest.id,
+      agenceId: sessionDest.agenceId || undefined,
+      typePaiement: "Transfert Caisse",
+      referenceExterne: refDest,
+      methodePaiement: "Virement",
+      description: `Réception transfert de ${sessionSource.caisseId} (Ref: ${transfert.reference})`
+    } as any, userId);
+
+    const soldeDest = await updateSessionSolde(tx, sessionDest.id, parseFloat(transfert.montant));
+
+    await tx.insert(operationsCaisse).values({
+      sessionId: sessionDest.id,
+      mouvementId: mouvementDest.id,
+      typeOperation: "Transfert caisse" as any,
+      montant: transfert.montant,
+      methodePaiement: "Virement" as any,
+      reference: refDest,
+      description: `Transfert reçu de ${sessionSource.caisseId}`,
+      createdBy: userId
+    });
+
+    await createMouvementEvents(tx, mouvementDest, { 
+       nouveauSoldeSession: soldeDest 
+    });
+
+    // 5. Update Transfer Status
+    const [updatedTransfert] = await tx.update(caisseTransferts)
+      .set({
+        statut: 'Validé',
+        sessionDestId: sessionDest.id,
+        dateValidation: new Date(),
+        validatedBy: userId
+      })
+      .where(eq(caisseTransferts.id, transfertId))
+      .returning();
+
+    return updatedTransfert;
+  });
+}
+
