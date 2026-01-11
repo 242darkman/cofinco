@@ -14,6 +14,7 @@ import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { getAuthUser, requireRole } from "server/middleware";
 import { storage } from "server/storage";
 import { users } from "@shared/schema";
+import { getWsInstance } from "../ws-server";
 
 export const hrRouter = Router();
 
@@ -91,7 +92,7 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
     }).returning();
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_new', id: newConge.id } });
     }
@@ -143,7 +144,7 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     }
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_approved', id: updated.id } });
     }
@@ -195,7 +196,7 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
     }
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_rejected', id: updated.id } });
     }
@@ -265,7 +266,7 @@ hrRouter.post("/formations", getAuthUser, async (req, res) => {
     }).returning();
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_new', id: newFormation.id } });
     }
@@ -310,7 +311,7 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
     });
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_participant_added', formationId: id } });
     }
@@ -334,7 +335,7 @@ hrRouter.delete("/formations/:id/participants/:employeId", getAuthUser, async (r
       ));
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_participant_removed', formationId: id } });
     }
@@ -366,7 +367,7 @@ hrRouter.patch("/formations/:id", getAuthUser, async (req, res) => {
     }
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_status_update', id: updated.id } });
     }
@@ -428,7 +429,7 @@ hrRouter.post("/sanctions", getAuthUser, async (req, res) => {
     }).returning();
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'sanction_new', id: newSanction.id } });
     }
@@ -483,7 +484,7 @@ hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
     }).returning();
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'candidature_new', id: newCandidature.id } });
     }
@@ -521,7 +522,7 @@ hrRouter.patch("/candidatures/:id", getAuthUser, async (req, res) => {
     }
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'candidature_updated', id: updated.id } });
     }
@@ -574,7 +575,7 @@ hrRouter.post("/paie/generate", getAuthUser, requireRole(['rh', 'admin']), async
 
         const results = await storage.generateMonthlyPaie(mois, userId);
         // Broadcast HR Update
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'paie_generated', mois } });
         }
@@ -664,7 +665,7 @@ hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
     }).returning();
     
     // Broadcast HR Update
-    const wsInstance = require("../ws-server").getWsInstance();
+    const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'bulletin_archived', id: newBulletin.id } });
     }
@@ -739,7 +740,7 @@ hrRouter.post("/avantages/assign", getAuthUser, async (req, res) => {
             dateAttribution: new Date().toISOString().split('T')[0]
         });
         // Broadcast HR Update
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'avantage_assigned', employeId } });
         }
@@ -792,7 +793,7 @@ hrRouter.post("/presence/checkout", getAuthUser, async (req, res) => {
         if (!result) return res.status(404).json({ error: "Aucun pointage d'arrivée trouvé pour aujourd'hui" });
         
         // WebSocket: Notify presence update
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId } });
         }
