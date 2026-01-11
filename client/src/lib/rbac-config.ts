@@ -129,7 +129,8 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'caisse': ['view', 'manage'],
     'rh': ['view', 'create', 'edit', 'manage'],
     'paie': ['view', 'create', 'approve'],
-    'users': ['view', 'create', 'edit']
+    'users': ['view', 'create', 'edit'],
+    'coffre': ['view', 'transfert.init', 'transfert.validate', 'transfert.execute', 'config.view']
   },
   'Comptable': {
     'clients': ['view'],

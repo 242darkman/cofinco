@@ -4,12 +4,18 @@ import { idempotencyMiddleware } from "../middleware/idempotency";
 import { z } from "zod";
 import { db } from "../db";
 import { configCoffreFort } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import * as schema from "@shared/schema";
+
+import { requireAuth } from "../auth";
 
 export const coffreRouter = Router();
 const service = new TransfertCoffreService();
 
-// Middleware auth requis ici (supposé déjà monté au niveau global ou route parent)
+// Apply authentication middleware to all routes in this router
+coffreRouter.use(requireAuth);
+
+// 1. Créer une demande de transfert
 
 // 1. Créer une demande de transfert
 coffreRouter.post(
@@ -185,6 +191,32 @@ coffreRouter.get("/transferts/:id", async (req, res) => {
   }
 });
 // 7. Récupérer la configuration
+coffreRouter.get("/stats", async (req, res) => {
+  try {
+    const agenceId = req.query.agenceId as string;
+    if (!agenceId) return res.status(400).json({ error: "Missing agenceId" });
+
+    // Récupérer la caisse de type 'Coffre-Fort' pour cette agence
+    const [coffre] = await db.select()
+      .from(schema.caisses)
+      .where(
+        and(
+          eq(schema.caisses.agenceId, agenceId),
+          eq(schema.caisses.type, "Coffre-Fort")
+        )
+      );
+
+    if (!coffre) {
+      return res.json({ solde: 0 });
+    }
+
+    res.json({ solde: Number(coffre.solde) });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 8. Récupérer la configuration
 coffreRouter.get("/config", async (req, res) => {
   try {
     const agenceId = req.query.agenceId as string;

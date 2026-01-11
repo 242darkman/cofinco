@@ -73,9 +73,12 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         clientApi.getAll()
       ]);
 
-      const clientsMap = new Map(clientsData.map((c: any) => [c.id, c]));
+      const safeClientsData = Array.isArray(clientsData) ? clientsData : [];
+      const safeComptesData = Array.isArray(comptesData) ? comptesData : [];
+
+      const clientsMap = new Map(safeClientsData.map((c: any) => [c.id, c]));
       
-      const comptesWithClients = comptesData.map((compte: any) => ({
+      const comptesWithClients = safeComptesData.map((compte: any) => ({
         ...compte,
         clients: clientsMap.get(compte.client_id) || { id: compte.client_id, nom: 'Client inconnu', phone: '' }
       }));

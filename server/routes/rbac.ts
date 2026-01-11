@@ -391,7 +391,9 @@ export function registerRbacRoutes(app: Express) {
         const permissionsMap: Record<string, string[]> = {};
         allPerms.forEach(p => {
           // Parse code like "caisse.view" -> module: "caisse", action: "view"
-          const [module, action] = p.code.split('.');
+          const parts = p.code.split('.');
+          const module = parts[0];
+          const action = parts.slice(1).join('.');
           if (!permissionsMap[module]) {
             permissionsMap[module] = [];
           }
@@ -432,7 +434,9 @@ export function registerRbacRoutes(app: Express) {
 
       rolePerms.forEach(p => {
         if (p.code) {
-          const [module, action] = p.code.split('.');
+          const parts = p.code.split('.');
+          const module = parts[0];
+          const action = parts.slice(1).join('.');
           if (!permissionsMap[module]) {
             permissionsMap[module] = [];
           }

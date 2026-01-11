@@ -679,6 +679,7 @@ export const coffreApi = {
     return request<any>(`/coffre/transferts${query ? `?${query}` : ''}`);
   },
   getTransfertDetails: (id: string) => request<any>(`/coffre/transferts/${id}`),
+  getStats: (agenceId: string) => request<any>(`/coffre/stats?agenceId=${agenceId}`),
   getConfig: (agenceId: string) => request<any>(`/coffre/config?agenceId=${agenceId}`),
   updateConfig: (data: any) => request<any>('/coffre/config', {
     method: 'PUT',

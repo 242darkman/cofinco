@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 import LoginPage from './components/auth/LoginPage';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingScreen from './components/ui/LoadingScreen';
@@ -206,6 +206,7 @@ function App() {
       <AgenceProvider>
         <WebSocketProvider>
           <ErrorBoundary>
+            <Toaster position="top-right" richColors closeButton />
             <UpdatePrompt />
             <LocationTracker />
             <Suspense fallback={null}>

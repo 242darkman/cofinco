@@ -103,16 +103,16 @@ export async function executeTransfertCoffre(
       sourceModule: "TRANSFERT",
       agenceId: transfert.agenceId,
       reference: refDebit,
-      description: `Transfert sortant vers ${caisseDest.nom}`,
-      categorie: "Transfert Caisse", 
       idempotencyKey: `${transfert.idempotencyKey || transfert.id}-debit`,
       statut: "Posté",
-      dateMouvement: new Date(),
+      dateOperation: new Date(),
       metadata: {
         transfertId: transfert.id,
         caisseId: caisseSource.id,
         type: "SORTIE_COFFRE_CAISSE",
         groupRef,
+        description: `Transfert sortant vers ${caisseDest.nom}`,
+        categorie: "Transfert Caisse", 
       },
     }).returning();
 
@@ -123,16 +123,16 @@ export async function executeTransfertCoffre(
       sourceModule: "TRANSFERT",
       agenceId: transfert.agenceId,
       reference: refCredit,
-      description: `Transfert entrant de ${caisseSource.nom}`,
-      categorie: "Transfert Caisse",
       idempotencyKey: `${transfert.idempotencyKey || transfert.id}-credit`,
       statut: "Posté",
-      dateMouvement: new Date(),
+      dateOperation: new Date(),
       metadata: {
         transfertId: transfert.id,
         caisseId: caisseDest.id,
         type: "ENTREE_COFFRE_CAISSE",
         groupRef,
+        description: `Transfert entrant de ${caisseSource.nom}`,
+        categorie: "Transfert Caisse",
       },
     }).returning();
 
@@ -166,33 +166,49 @@ export async function executeTransfertCoffre(
         typeOpDestVal = "Approvisionnement coffre"; // Dest is Caisse
     }
 
-    const [operationSource] = await tx.insert(operationsCaisse).values({
-      sessionId: sessionExecuteId || transfert.sessionRequestId, // Might be null for Coffre
-      mouvementId: mouvementDebit.id,
-      typeOperation: typeOpSourceVal as any,
-      montant: transfert.montant,
-      methodePaiement: "Espèces",
-      reference: refDebit,
-      description: `Transfert ${transfert.reference} - Sortie vers ${caisseDest.nom}`,
-      caisseId: caisseSource.id,
-      dateOperation: new Date(),
-      statut: "Validée",
-    }).returning();
+    // 8. Créer les opérations caisse (seulement si une session est liée)
+    let operationSource: any = null;
+    let operationDest: any = null;
 
-    const [operationDest] = await tx.insert(operationsCaisse).values({
-      sessionId: sessionExecuteId || null, // Destination session? If Coffre -> Caisse, we need Dest Session.
-      // If we don't have dest session ID (e.g. executed by someone else), we might default to null or require it.
-      // For now, using sessionExecuteId if provided, else null.
-      mouvementId: mouvementCredit.id,
-      typeOperation: typeOpDestVal as any,
-      montant: transfert.montant,
-      methodePaiement: "Espèces",
-      reference: refCredit,
-      description: `Transfert ${transfert.reference} - Entrée de ${caisseSource.nom}`,
-      caisseId: caisseDest.id,
-      dateOperation: new Date(),
-      statut: "Validée",
-    }).returning();
+    // Déterminer la session pour la source (si c'est une caisse utilisateur)
+    // Si CAISSE -> COFFRE, la source est la caisse. On utilise le sessionRequestId ou sessionExecuteId.
+    // Si COFFRE -> CAISSE, la source est le coffre. Pas de session (sauf si on gère une session coffre, ici on assume non).
+    const isSourceCaisse = transfert.typeTransfert === "CAISSE_VERS_COFFRE";
+    const sessionIdSource = isSourceCaisse ? (sessionExecuteId || transfert.sessionRequestId) : null;
+
+    if (sessionIdSource) {
+      const [op] = await tx.insert(operationsCaisse).values({
+        sessionId: sessionIdSource,
+        mouvementId: mouvementDebit.id,
+        typeOperation: typeOpSourceVal as any,
+        montant: transfert.montant,
+        methodePaiement: "Espèces",
+        reference: refDebit,
+        description: `Transfert ${transfert.reference} - Sortie vers ${caisseDest.nom}`,
+        // caisseId n'existe pas dans operationsCaisse, c'est lié via sessionId
+        statut: "Posté",
+      }).returning();
+      operationSource = op;
+    }
+
+    // Déterminer la session pour la destination (si c'est une caisse utilisateur)
+    // Si COFFRE -> CAISSE, la destination est la caisse.
+    const isDestCaisse = transfert.typeTransfert === "COFFRE_VERS_CAISSE";
+    const sessionIdDest = isDestCaisse ? (sessionExecuteId || transfert.sessionRequestId) : null;
+
+    if (sessionIdDest) {
+      const [op] = await tx.insert(operationsCaisse).values({
+        sessionId: sessionIdDest,
+        mouvementId: mouvementCredit.id,
+        typeOperation: typeOpDestVal as any,
+        montant: transfert.montant,
+        methodePaiement: "Espèces",
+        reference: refCredit,
+        description: `Transfert ${transfert.reference} - Entrée de ${caisseSource.nom}`,
+        statut: "Posté",
+      }).returning();
+      operationDest = op;
+    }
 
     // 9. Mettre à jour les soldes des caisses (atomique)
     // Note: 'operationsCaisse' or 'mouvementsFinanciers' might trigger balance updates via DB triggers if they exist.
@@ -220,8 +236,8 @@ export async function executeTransfertCoffre(
         sessionExecuteId,
         mouvementDebitId: mouvementDebit.id,
         mouvementCreditId: mouvementCredit.id,
-        operationSourceId: operationSource.id,
-        operationDestId: operationDest.id,
+        operationSourceId: operationSource?.id || null,
+        operationDestId: operationDest?.id || null,
         billetage: billetage || transfert.billetage,
         verrouille: true,
         updatedAt: new Date(),
@@ -238,8 +254,8 @@ export async function executeTransfertCoffre(
       details: {
         mouvementDebitId: mouvementDebit.id,
         mouvementCreditId: mouvementCredit.id,
-        operationSourceId: operationSource.id,
-        operationDestId: operationDest.id,
+        operationSourceId: operationSource?.id,
+        operationDestId: operationDest?.id,
         soldeSourceAvant: soldeSource,
         soldeSourceApres: soldeSource - montant,
         billetage,
