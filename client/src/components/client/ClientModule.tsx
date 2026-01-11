@@ -12,6 +12,7 @@ import ClientsMap from './ClientsMap';
 import { clientService } from '../../services/clientService';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
+import { toast, handleApiError } from '../../lib/toast';
 
 export default function ClientModule() {
   // RBAC permissions
@@ -52,17 +53,18 @@ export default function ClientModule() {
     try {
       if (selectedClient) {
         await clientService.update(selectedClient.id, clientData);
-        alert('Client mis à jour avec succès !');
+        toast.success('Client mis à jour avec succès !');
       } else {
         await clientService.create(clientData);
-        alert('Client créé avec succès !');
+        toast.success('Client créé avec succès ! Un compte courant a été automatiquement ouvert.');
+        toast.info('Le client peut maintenant effectuer des opérations bancaires.');
       }
       setShowForm(false);
       setSelectedClient(null);
       loadClients();
     } catch (error: any) {
       console.error('Error saving client:', error);
-      alert('Erreur lors de la création: ' + (error.error || 'Erreur inconnue'));
+      toast.error(handleApiError(error, 'Erreur lors de la création du client'));
     }
   };
 

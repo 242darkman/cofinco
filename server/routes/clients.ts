@@ -404,6 +404,22 @@ export function registerClientRoutes(app: Express) {
 
         const client = await storage.createClient(parsed);
 
+        // 🏦 Auto-création d'un compte courant pour chaque nouveau client
+        // Règle microfinance : tout client doit avoir un compte courant dans son agence
+        let compteCourant = null;
+        try {
+          compteCourant = await createClientAccount(client.id, {
+            typeCompte: 'Courant',
+            soldeInitial: 0,
+            tauxInteret: 0,
+            statut: 'Actif'
+          }, req.session.user?.id);
+          console.log(`✅ Compte courant ${compteCourant.numeroCompte} créé automatiquement pour le client ${client.nom}`);
+        } catch (accountError) {
+          console.error(`⚠️ Échec création compte courant auto pour client ${client.id}:`, accountError);
+          // Ne pas bloquer la création du client si le compte échoue
+        }
+
         await logAudit(
             req,
             "CREATE_CLIENT",
@@ -426,10 +442,11 @@ export function registerClientRoutes(app: Express) {
             wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { agenceId: client.agenceId, agence: client.agence } });
 
             // Activité en temps réel
+            const accountInfo = compteCourant ? ` + Compte ${compteCourant.numeroCompte}` : '';
             wsInstance.broadcast({
               type: "LIVE_ACTIVITY",
               payload: {
-                action: `Nouveau client: ${client.nom}${client.prenom ? ' ' + client.prenom : ''}`,
+                action: `Nouveau client: ${client.nom}${client.prenom ? ' ' + client.prenom : ''}${accountInfo}`,
                 user: req.session.user?.nom || 'Système',
                 type: 'client',
                 timestamp: new Date().toISOString(),

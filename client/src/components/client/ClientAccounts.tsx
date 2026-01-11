@@ -3,6 +3,7 @@ import { Plus, CreditCard, Wallet, Lock, X, Edit2, Trash2, Check, AlertCircle, T
 import { Card, Badge, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useCompteSubscription } from '../../hooks/useRealTimeSubscription';
+import { toast, handleApiError } from '../../lib/toast';
 
 interface CompteBancaire {
   id: string;
@@ -152,9 +153,10 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       const newAccount = await res.json();
       setComptes(prev => [normalizeCompte(newAccount), ...prev]);
       resetForm();
+      toast.success(`Compte ${newAccount.typeCompte || 'bancaire'} créé avec succès ! N° ${newAccount.numeroCompte || newAccount.numero_compte}`);
     } catch (error) {
       console.error('Erreur souscription compte:', error);
-      alert(error instanceof Error ? error.message : 'Erreur inconnue');
+      toast.error(handleApiError(error, 'Erreur lors de la création du compte'));
     }
   };
 
@@ -167,12 +169,13 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       try {
           // Note: PATCH endpoint for comptes not yet implemented
           // For now, show a message that editing requires admin action
-          alert("La modification des comptes nécessite une action administrative. Contactez votre superviseur.");
+          toast.warning("La modification des comptes nécessite une action administrative.");
+          toast.info("Veuillez contacter votre superviseur pour effectuer cette opération.");
           resetForm();
           setShowConfirm(false);
       } catch (error) {
           console.error("Update error:", error);
-          alert("Erreur lors de la modification");
+          toast.error(handleApiError(error, 'Erreur lors de la modification'));
           setShowForm(true);
           setShowConfirm(false);
       } finally {
@@ -182,7 +185,8 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
   };
 
   const handleDelete = async (compteId: string) => {
-     if (!confirm('Action non supportée pour le moment sur la nouvelle API (sécurité).')) return;
+     toast.warning('La suppression de compte n\'est pas disponible pour des raisons de sécurité.');
+     toast.info('Contactez l\'administrateur pour clôturer un compte.');
      // Implement DELETE /api/accounts/:id if needed
   };
 
