@@ -1631,39 +1631,60 @@ async function seedDemo() {
     ];
 
     insertedClients.forEach((client, index) => {
-      // Choisir 1 à 3 types de compte distincts pour ce client
-      const numAccounts = randomBetween(1, 3);
-      const shuffledTypes = [...allAccountTypes].sort(() => Math.random() - 0.5);
-      const selectedTypes = shuffledTypes.slice(0, numAccounts);
+      // 🏦 RÈGLE MICROFINANCE: Chaque client DOIT avoir un compte courant
+      // Puis on ajoute optionnellement d'autres types de comptes
+      
+      const clientRef = (client as any).reference || String(index).padStart(5, '0');
+      const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
+      
+      // 1. TOUJOURS créer un compte courant en premier
+      const soldeCourant = generateRealisticAmount(5000, 2000000, 1000);
+      comptesData.push({
+        clientId: client.id,
+        agenceId: client.agenceId || insertedAgences['Siège'] || null,
+        numeroCompte: `CC-${clientRef}-${timestamp}0`,
+        typeCompte: 'Courant',
+        statut: 'Actif',
+        soldeCourant: String(soldeCourant),
+        blocageActif: false,
+        blocageMotif: null,
+        createdAt: daysAgo(randomBetween(30, 365)),
+        _originalSubType: 'Compte Courant',
+        _targetSave: null,
+        _monthlyPay: null
+      });
+      
+      // 2. Optionnellement ajouter d'autres types (Épargne et/ou Bloqué)
+      const optionalTypes: Array<{subType: string, typeCompte: 'Épargne' | 'Bloqué', prefix: string}> = [
+        { subType: 'Epargne Simple', typeCompte: 'Épargne', prefix: 'CE' },
+        { subType: 'Epargne Bloquée', typeCompte: 'Bloqué', prefix: 'CB' },
+      ];
+      
+      // 60% chance d'avoir un compte épargne, 30% chance d'avoir un compte bloqué
+      optionalTypes.forEach((accountType, i) => {
+        const shouldCreate = accountType.typeCompte === 'Épargne' 
+          ? Math.random() < 0.6 
+          : Math.random() < 0.3;
+          
+        if (shouldCreate) {
+          const solde = generateRealisticAmount(5000, 5000000, 1000);
+          const isEpargneProjet = accountType.typeCompte === 'Épargne' && Math.random() > 0.7;
 
-      selectedTypes.forEach((accountType, i) => {
-        // Generate a consistently formatted account number
-        const typePrefix = accountType.typeCompte === 'Épargne' ? 'CE' :
-                          accountType.typeCompte === 'Courant' ? 'CC' : 'CB';
-        const clientRef = (client as any).reference || String(index).padStart(5, '0');
-        const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
-        const numeroCompte = `${typePrefix}-${clientRef}-${timestamp}${i}`;
-
-        const solde = generateRealisticAmount(5000, 5000000, 1000);
-        const isEpargneProjet = accountType.subType === 'Epargne Projet' ||
-                               (accountType.typeCompte === 'Épargne' && Math.random() > 0.7);
-
-        comptesData.push({
-          clientId: client.id,
-          agenceId: insertedAgences['Siège'] || null,
-          numeroCompte,
-          typeCompte: accountType.typeCompte,
-          statut: 'Actif',
-          soldeCourant: String(solde),
-          blocageActif: accountType.typeCompte === 'Bloqué',
-          blocageMotif: accountType.typeCompte === 'Bloqué' ? 'Épargne forcée' : null,
-          createdAt: daysAgo(randomBetween(30, 365)),
-
-          // Store these for next steps (plans/objectifs) if needed
-          _originalSubType: accountType.subType,
-          _targetSave: isEpargneProjet ? generateRealisticAmount(500000, 2000000, 100000) : null,
-          _monthlyPay: isEpargneProjet ? generateRealisticAmount(25000, 100000, 5000) : null
-        });
+          comptesData.push({
+            clientId: client.id,
+            agenceId: client.agenceId || insertedAgences['Siège'] || null,
+            numeroCompte: `${accountType.prefix}-${clientRef}-${timestamp}${i + 1}`,
+            typeCompte: accountType.typeCompte,
+            statut: 'Actif',
+            soldeCourant: String(solde),
+            blocageActif: accountType.typeCompte === 'Bloqué',
+            blocageMotif: accountType.typeCompte === 'Bloqué' ? 'Épargne forcée' : null,
+            createdAt: daysAgo(randomBetween(30, 365)),
+            _originalSubType: accountType.subType,
+            _targetSave: isEpargneProjet ? generateRealisticAmount(500000, 2000000, 100000) : null,
+            _monthlyPay: isEpargneProjet ? generateRealisticAmount(25000, 100000, 5000) : null
+          });
+        }
       });
     });
 
