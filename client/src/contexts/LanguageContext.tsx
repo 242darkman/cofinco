@@ -335,6 +335,7 @@ const translations: Translations = {
   menuTontines: { fr: 'Tontines', en: 'Tontines' },
   menuCredits: { fr: 'Crédits', en: 'Credits' },
   menuEpargnes: { fr: 'Épargnes', en: 'Savings' },
+  menuCompte: { fr: 'Comptes', en: 'Accounts' },
   menuAgentTerrain: { fr: 'Agent de Terrain', en: 'Field Agent' },
   menuTerrain: { fr: 'Agent de Terrain', en: 'Field' },
   menuCaisse: { fr: 'Caisse', en: 'Cash Register' },

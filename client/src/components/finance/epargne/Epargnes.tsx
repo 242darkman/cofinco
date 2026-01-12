@@ -284,7 +284,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
 
 
       <PageHeader
-        title="Gestion des Épargnes"
+        title="Gestion des Comptes"
         description="Comptes d'épargne et placements"
         actions={
           <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>

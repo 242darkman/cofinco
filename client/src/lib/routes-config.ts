@@ -74,9 +74,9 @@ export const ROUTES: RouteConfig[] = [
     key: 'epargnes',
     path: '/epargnes',
     component: Epargnes,
-    requiredModule: 'Épargnes',
-    label: 'Épargnes',
-    labelKey: 'menuEpargnes',
+    requiredModule: 'Comptes',
+    label: 'Comptes',
+    labelKey: 'menuCompte',
     group: 'Services Clients',
   },
   {

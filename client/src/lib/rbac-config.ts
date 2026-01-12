@@ -13,7 +13,7 @@ export type ModuleAccessConfig = {
  * Comptable : Comptabilité, Rapports, Dashboard
  * Gestionnaire Crédit : Crédits, Clients, Remboursements, Dashboard
  * Superviseur : Supervision équipe, Dashboard
- * Agent Caisse : Clients, Épargnes, Transactions, Caisse, Dashboard
+ * Agent Caisse : Clients, Comptes, Transactions, Caisse, Dashboard
  * Agent Terrain : Clients, Terrain, Communications, Dashboard
  */
 export const MODULE_ACCESS: ModuleAccessConfig = {
@@ -21,7 +21,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Dashboard',
     'Clients',
     'Crédits',
-    'Épargnes',
+    'Comptes',
     'Tontines',
     'Comptabilité',
     'Remboursements',
@@ -43,7 +43,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Dashboard',
     'Clients',
     'Crédits',
-    'Épargnes',
+    'Comptes',
     'Tontines',
     'Comptabilité',
     'Remboursements',
@@ -65,6 +65,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Comptabilité',
     'Rapports',
     'Clients',
+    'Communications',
     'RH'
   ],
   'Gestionnaire Crédit': [
@@ -73,6 +74,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Crédits',
     'Remboursements',
     'Rapports',
+    'Communications',
     'RH'
   ],
   'Superviseur': [
@@ -87,7 +89,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
   'Agent Caisse': [
     'Dashboard',
     'Clients',
-    'Épargnes',
+    'Comptes',
     'Caisse',
     'Communications',
     'RH'

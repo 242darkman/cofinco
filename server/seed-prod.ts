@@ -39,7 +39,7 @@ const MODULES_DATA = [
   { name: 'Crédits', description: 'Gestion des crédits et prêts', icon: 'CreditCard', category: 'finance', orderIndex: 3 },
   { name: 'Remboursements', description: 'Suivi des remboursements', icon: 'Banknote', category: 'finance', orderIndex: 4 },
   { name: 'Clients', description: 'Gestion des clients', icon: 'Users', category: 'operations', orderIndex: 5 },
-  { name: 'Épargnes', description: 'Gestion des comptes épargne', icon: 'PiggyBank', category: 'finance', orderIndex: 6 },
+  { name: 'Comptes', description: 'Gestion des comptes épargne', icon: 'PiggyBank', category: 'finance', orderIndex: 6 },
   { name: 'Tontines', description: 'Gestion des tontines', icon: 'UsersRound', category: 'finance', orderIndex: 7 },
   { name: 'Comptabilité', description: 'Module de comptabilité', icon: 'Calculator', category: 'finance', orderIndex: 8 },
   { name: 'Agent Terrain', description: 'Module agent terrain', icon: 'MapPin', category: 'operations', orderIndex: 9 },
@@ -98,8 +98,8 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
     { name: 'Modifier un client', code: 'clients.edit', description: 'Modifier les informations client' },
     { name: 'Supprimer un client', code: 'clients.delete', description: 'Supprimer un client' },
   ],
-  'Épargnes': [
-    { name: 'Voir les épargnes', code: 'epargnes.view', description: 'Accès au module Épargnes' },
+  'Comptes': [
+    { name: 'Voir les épargnes', code: 'epargnes.view', description: 'Accès au module Comptes' },
     { name: 'Créer un compte', code: 'epargnes.create', description: 'Ouvrir un compte épargne' },
     { name: 'Effectuer un dépôt', code: 'epargnes.deposit', description: 'Créditer un compte épargne' },
     { name: 'Effectuer un retrait', code: 'epargnes.withdraw', description: 'Débiter un compte épargne' },
@@ -239,6 +239,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'epargnes.view',
     'comptabilite.view', 'comptabilite.create', 'comptabilite.edit', 'comptabilite.export',
     'rapports.view', 'rapports.export',
+    'communications.view',
     'rh.view', // Pointage uniquement
   ],
   
@@ -249,6 +250,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
     'remboursements.view', 'remboursements.create',
     'rapports.view', 'rapports.export',
+    'communications.view',
     'rh.view', // Pointage uniquement
   ],
   

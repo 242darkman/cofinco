@@ -115,15 +115,15 @@ export const PERMISSION_DESCRIPTIONS: Record<string, PermissionDescription> = {
     details: ['Supprimer définitivement le compte', 'Archiver les données client', 'Révoquer l\'accès']
   },
   
-  // Module Épargnes
+  // Module Comptes
   'epargnes.view': {
     action: 'Voir les épargnes',
-    interface: 'Accès au module Épargnes dans le menu principal',
+    interface: 'Accès au module Comptes dans le menu principal',
     details: ['Consulter les comptes d\'épargne', 'Voir les soldes', 'Historique des mouvements']
   },
   'epargnes.create': {
     action: 'Créer un compte épargne',
-    interface: 'Bouton "Nouveau compte" dans le module Épargnes',
+    interface: 'Bouton "Nouveau compte" dans le module Comptes',
     details: ['Ouvrir un nouveau compte épargne', 'Choisir le type de compte', 'Définir le versement initial']
   },
   'epargnes.deposit': {
