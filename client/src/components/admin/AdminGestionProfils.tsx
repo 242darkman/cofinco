@@ -5,9 +5,15 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { userApi, employeApi } from '../../lib/api-client';
 import { useAgence } from '../../contexts/AgenceContext';
-import { ObjectUploader } from '../storage/ObjectUploader';
+// ObjectUploader removed as it is no longer used
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+
+// Import hooks and component for permissions
+import { usePermissions as useAdminPermissions } from '../../hooks/admin/usePermissions';
+import { useUserPermissions } from '../../hooks/admin/useUserPermissions';
+import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
+import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
 
 // Local types removed to use shared entities or any for flexibility
 
@@ -60,10 +66,51 @@ export default function AdminGestionProfils() {
   const [moduleFilter, setModuleFilter] = useState<string>('all');
   const [permissionFilter, setPermissionFilter] = useState<string>('all');
   
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  /* Permissions Management Hooks */
+  const { permissions: adminPermissions } = useAdminPermissions();
+  const { getUserDisplayName } = useAdminUsers();
+  const {
+    userPermissions,
+    fetchUserPermissions,
+    toggleUserPermission,
+    activateAllPermissions,
+    blockAllPermissions,
+    resetPermissions,
+    getUserPermissionStatus,
+    countActivePermissions,
+    getAvailablePermissionsToAdd,
+    getAvailablePermissionsToRemove
+  } = useUserPermissions(selectedUser?.id || '');
+
+  // Fetch permissions when user is selected
+  useEffect(() => {
+    if (showPermissionsModal && selectedUser) {
+      fetchUserPermissions(selectedUser.id);
+    }
+  }, [showPermissionsModal, selectedUser]);
+
+  // Wrapper to match UserCustomPermissionsManager signature
+  const handleToggleUserPermission = useCallback(async (permId: string) => {
+    if (!selectedUser) return;
+    const perm = adminPermissions.find(p => p.id === permId);
+    if (!perm) return;
+    const currentStatus = getUserPermissionStatus(perm.code);
+    await toggleUserPermission(selectedUser.id, permId, currentStatus.granted);
+  }, [selectedUser, adminPermissions, getUserPermissionStatus, toggleUserPermission]);
+
+  // Wrapper to cast source type
+  const handleGetUserPermissionStatus = useCallback((permCode: string) => {
+    const status = getUserPermissionStatus(permCode);
+    // Map 'custom' to 'user' which is used in the component
+    const source = (status.source === 'custom' ? 'user' : status.source) as 'role' | 'user' | 'none';
+    return { ...status, source };
+  }, [getUserPermissionStatus]);
 
   const permissionTypes = [
     { key: 'peut_voir', label: 'Voir', icon: '👁️' },
@@ -134,7 +181,7 @@ export default function AdminGestionProfils() {
       const data = await employeApi.getAll();
       setUsers(data || []);
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement des profils'));
+      toast.error(handleApiError(error, 'Erreur lors du chargement du personnel'));
     } finally {
       setLoading(false);
     }
@@ -190,33 +237,44 @@ export default function AdminGestionProfils() {
     }
   }, [formData, loadUsers]);
 
-  const handleGetUploadParams = async (file: any) => {
-    const response = await fetch('/api/uploads/request-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: file.name,
-        contentType: file.type,
-      }),
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Erreur lors de la demande d\'URL d\'upload');
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate size (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.warning('La taille de l\'image ne doit pas dépasser 2 Mo');
+      return;
     }
-    
-    const { uploadURL, objectPath } = await response.json();
-    
-    // On garde l'objectPath pour l'enregistrer dans l'utilisateur après l'upload
-    setFormData(prev => ({ ...prev, photoProfile: objectPath }));
-    
-    return {
-      method: 'PUT' as const,
-      url: uploadURL,
-      headers: {
-        'Content-Type': file.type,
-      },
-    };
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload directly to our local server
+      const response = await fetch('/api/uploads/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'upload de l\'image');
+      }
+
+      const { objectPath } = await response.json();
+
+      // Update State
+      setFormData(prev => ({ ...prev, photoProfile: objectPath }));
+      toast.success('Photo modifiée avec succès');
+    } catch (error) {
+      console.error(error);
+      toast.error('Impossible de modifier la photo');
+    } finally {
+      setUploadingPhoto(false);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const getDefaultAccessForRole = (role: string): Record<string, UserAccess> => {
@@ -298,43 +356,11 @@ export default function AdminGestionProfils() {
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
-  const openPermissionsModal = useCallback(async (emp: any) => {
+  const openPermissionsModal = useCallback((emp: any) => {
     const user = emp.user || emp;
     setSelectedUser(user);
-    setPermissionsLoading(true);
     setShowPermissionsModal(true);
-
-    try {
-      const savedPermissions = await userApi.getPermissions(user.id);
-
-      if (Object.keys(savedPermissions).length > 0) {
-        setUserAccess(savedPermissions);
-      } else {
-        const defaultAccess = getDefaultAccessForRole(user.role);
-        setUserAccess(defaultAccess);
-      }
-    } catch (error) {
-      const defaultAccess = getDefaultAccessForRole(user.role);
-      setUserAccess(defaultAccess);
-    } finally {
-      setPermissionsLoading(false);
-    }
   }, []);
-
-  const savePermissions = useCallback(async () => {
-    if (!selectedUser) return;
-
-    setSavingPermissions(true);
-    try {
-      const result = await userApi.updatePermissions(selectedUser.id, userAccess);
-      toast.success(`Permissions sauvegardées avec succès (${result.count} modules)`);
-      setShowPermissionsModal(false);
-    } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la sauvegarde des permissions'));
-    } finally {
-      setSavingPermissions(false);
-    }
-  }, [selectedUser, userAccess]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(emp => {
@@ -385,7 +411,7 @@ export default function AdminGestionProfils() {
                 <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-content-primary">Profils</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-content-primary">Personnel</h2>
                 <p className="text-xs sm:text-sm text-content-muted">Gestion des accès ({filteredUsers.length})</p>
               </div>
             </div>
@@ -438,12 +464,12 @@ export default function AdminGestionProfils() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="text-content-muted text-sm mt-3">Chargement des profils...</p>
+            <p className="text-content-muted text-sm mt-3">Chargement du personnel...</p>
           </div>
         ) : filteredUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-content-muted">
             <Users size={48} className="opacity-20 mb-4" />
-            <p className="text-sm">Aucun profil trouvé</p>
+            <p className="text-sm">Aucun membre trouvé</p>
           </div>
         ) : (
           <>
@@ -715,34 +741,59 @@ export default function AdminGestionProfils() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-content-secondary">Photo de profil</label>
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 bg-surface-muted border border-edge rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+              {/* Photo Section - Centered & Professional */}
+              <div className="flex flex-col items-center justify-center -mt-2 mb-6">
+                <div className="relative group">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-surface-muted overflow-hidden shadow-lg bg-surface-muted flex items-center justify-center relative">
+                    {uploadingPhoto ? (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                      </div>
+                    ) : null}
+                    
                     {formData.photoProfile ? (
                       <img 
                         src={`/api/uploads/files/${formData.photoProfile}`} 
-                        alt="Preview" 
+                        alt="Profil" 
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <ImageIcon className="w-6 h-6 text-content-muted" />
+                      <ImageIcon size={40} className="text-content-muted opacity-50" />
                     )}
                   </div>
-                  <div className="flex-1">
-                    <ObjectUploader
-                      onGetUploadParameters={handleGetUploadParams}
-                      onComplete={() => toast.success('Photo uploadée avec succès')}
-                      buttonClassName="w-full"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Upload size={14} />
-                        <span>{formData.photoProfile ? 'Changer la photo' : 'Ajouter une photo'}</span>
-                      </div>
-                    </ObjectUploader>
-                    <p className="text-[10px] text-content-muted mt-1">Format recommandé: carré, max 2Mo</p>
+                  
+                  {/* Overlay Actions */}
+                  <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm p-1.5 flex justify-center gap-3 translate-y-full group-hover:translate-y-0 transition-transform duration-200 rounded-b-full z-20">
+                    <button 
+                         type="button"
+                         onClick={() => fileInputRef.current?.click()}
+                         className="text-white hover:text-primary transition-colors p-1 flex items-center justify-center"
+                         title="Changer la photo"
+                         disabled={uploadingPhoto}
+                       >
+                         <Upload size={16} />
+                    </button>
+
+                    {formData.photoProfile && (
+                       <button 
+                         type="button"
+                         onClick={() => setFormData({ ...formData, photoProfile: '' })}
+                         className="text-white hover:text-red-400 transition-colors p-1 flex items-center justify-center"
+                         title="Supprimer la photo"
+                       >
+                         <Trash2 size={16} />
+                       </button>
+                    )}
                   </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleFileUpload}
+                  />
                 </div>
+                <p className="text-[10px] text-content-muted mt-2">Format recommandé: carré, max 2Mo</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -861,86 +912,7 @@ export default function AdminGestionProfils() {
         </div>
       )}
 
-      {/* Permissions Modal - Improved UI */}
-      {showPermissionsModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-surface-base rounded-xl border border-edge w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
-            <div className="p-4 border-b border-edge flex justify-between items-center bg-surface-muted/30">
-              <div>
-                <h3 className="text-lg font-bold text-content-primary">Permissions</h3>
-                <p className="text-xs text-content-muted">{selectedUser.nom} ({selectedUser.role})</p>
-              </div>
-              <button onClick={() => setShowPermissionsModal(false)} className="text-content-muted hover:text-content-primary">
-                <XCircle size={20} />
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-auto custom-scrollbar p-0">
-              {permissionsLoading ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  <p className="text-content-muted text-sm mt-3">Chargement des permissions...</p>
-                </div>
-              ) : (
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-surface-base border-b border-edge shadow-sm z-10">
-                  <tr>
-                    <th className="text-left py-3 px-4 text-xs font-bold text-content-secondary uppercase tracking-wider">Module</th>
-                    {permissionTypes.map(perm => (
-                      <th key={perm.key} className="text-center py-3 px-1 text-[10px] font-bold text-content-secondary uppercase w-12" title={perm.label}>
-                        <span className="text-lg block mb-1">{perm.icon}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-edge">
-                  {modules.map(mod => {
-                    const access = userAccess[mod] || {
-                      module_name: mod, peut_voir: false, peut_creer: false, peut_modifier: false, 
-                      peut_supprimer: false, peut_valider: false, peut_exporter: false
-                    };
-                    return (
-                      <tr key={mod} className="hover:bg-surface-muted/30 transition-colors">
-                        <td className="py-3 px-4 font-medium text-content-primary">{mod}</td>
-                        {permissionTypes.map(perm => (
-                          <td key={perm.key} className="text-center py-3 px-1">
-                            <input
-                              type="checkbox"
-                              checked={(access as any)[perm.key] || false}
-                              onChange={(e) => {
-                                setUserAccess(prev => ({
-                                  ...prev,
-                                  [mod]: { ...access, [perm.key]: e.target.checked }
-                                }));
-                              }}
-                              className="w-4 h-4 rounded border-edge bg-surface-muted text-primary cursor-pointer focus:ring-primary/50"
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              )}
-            </div>
 
-            <div className="p-4 border-t border-edge flex justify-end gap-3 bg-surface-muted/30">
-              <Button size="sm" variant="secondary" onClick={() => setShowPermissionsModal(false)}>
-                Fermer
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={savePermissions}
-                disabled={savingPermissions}
-              >
-                {savingPermissions ? 'Sauvegarde...' : 'Sauvegarder'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ConfirmDialog
         isOpen={confirmState.isOpen}
@@ -951,6 +923,43 @@ export default function AdminGestionProfils() {
         variant={confirmState.variant}
         confirmText={confirmState.confirmText}
       />
+      {/* Permissions Modal - Embedded Manager */}
+      {showPermissionsModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-surface-base rounded-xl border border-edge w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-edge flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-content-primary">Permissions Spécifiques</h3>
+                <p className="text-xs text-content-muted">Gérer les exceptions pour {selectedUser.prenom} {selectedUser.nom}</p>
+              </div>
+              <button 
+                onClick={() => setShowPermissionsModal(false)}
+                className="text-content-muted hover:text-content-primary p-1 rounded-lg hover:bg-surface-muted transition-colors"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+               <UserCustomPermissionsManager
+                users={[selectedUser]} // Pass only selected user content context
+                permissions={adminPermissions}
+                selectedUserId={selectedUser.id}
+                onUserChange={(id) => { /* No-op, locked to selected user */ }}
+                preselectedUserId={selectedUser.id}
+                userPermissions={userPermissions}
+                getUserDisplayName={() => `${selectedUser.nom} ${selectedUser.prenom}`}
+                getUserPermissionStatus={handleGetUserPermissionStatus}
+                toggleUserPermission={handleToggleUserPermission}
+                onActivateAll={async () => { await activateAllPermissions(selectedUser.id, adminPermissions); }}
+                onBlockAll={async () => { await blockAllPermissions(selectedUser.id, adminPermissions); }}
+                onResetPermissions={async () => { await resetPermissions(selectedUser.id); }}
+                activePermissionsCount={countActivePermissions()}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

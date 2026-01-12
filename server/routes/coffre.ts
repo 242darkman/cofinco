@@ -4,8 +4,9 @@ import { idempotencyMiddleware } from "../middleware/idempotency";
 import { z } from "zod";
 import { db } from "../db";
 import { configCoffreFort } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import * as schema from "@shared/schema";
+import { storage } from "../storage";
 
 import { requireAuth } from "../auth";
 
@@ -23,7 +24,7 @@ coffreRouter.post(
   idempotencyMiddleware("create-transfert"),
   async (req, res) => {
     try {
-      const schema = z.object({
+      const validationSchema = z.object({
         caisseId: z.string().uuid(),
         typeTransfert: z.enum(["COFFRE_VERS_CAISSE", "CAISSE_VERS_COFFRE"]),
         montant: z.number().positive(),
@@ -31,16 +32,26 @@ coffreRouter.post(
         commentaire: z.string().optional(),
         idempotencyKey: z.string().optional(),
         billetage: z.record(z.string(), z.number()).optional(),
-        agenceId: z.string().uuid(), // Idéalement déduit du user/session
+        agenceId: z.preprocess((v) => (v === "" ? undefined : v), z.string().uuid().optional()), // Rend optionnel pour inférence
       });
 
-      const body = schema.parse(req.body);
+      const body = validationSchema.parse(req.body);
+      
+      // Inférence de l'agenceId si manquant
+      if (!body.agenceId) {
+        const [caisse] = await db.select().from(schema.caisses).where(eq(schema.caisses.id, body.caisseId));
+        if (!caisse) {
+          return res.status(400).json({ error: "Caisse introuvable" });
+        }
+        body.agenceId = caisse.agenceId;
+      }
       const userId = (req as any).user?.id || req.body.userId; // Fallback dev
 
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const result = await service.createTransfert({
         ...body,
+        agenceId: body.agenceId!,
         requestedBy: userId,
         ipAddress: req.ip,
         userAgent: req.get("User-Agent"),
@@ -51,6 +62,46 @@ coffreRouter.post(
       }
 
       res.status(201).json(result);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message || "Invalid Request" });
+    }
+  }
+);
+
+// 1.b Approvisionnement Externe du Coffre (ADMIN)
+coffreRouter.post(
+  "/approvisionnement",
+  idempotencyMiddleware("coffre-approvisionnement"),
+  async (req, res) => {
+    try {
+      const validationSchema = z.object({
+        agenceId: z.string().uuid(),
+        montant: z.number().positive(),
+        motif: z.string().min(3),
+        description: z.string().optional(),
+        idempotencyKey: z.string().optional(),
+      });
+
+      const body = validationSchema.parse(req.body);
+      
+      // Verify Admin Role (or at least Manager)
+      const userRole = (req as any).user?.role;
+      // Adaptez selon vos rôles : Admin, Chef Agence, etc.
+      if (!["Administrateur", "admin", "Chef Agence"].includes(userRole)) {
+         return res.status(403).json({ error: "Action réservée aux administrateurs" });
+      }
+
+      const userId = (req as any).user?.id || req.body.userId;
+
+      const result = await storage.provisionCoffreWithLedger({
+        agenceId: body.agenceId,
+        montant: body.montant.toString(),
+        motif: body.motif,
+        description: body.description,
+        idempotencyKey: body.idempotencyKey
+      }, userId);
+
+      res.json(result);
     } catch (e: any) {
       res.status(400).json({ error: e.message || "Invalid Request" });
     }
@@ -190,7 +241,85 @@ coffreRouter.get("/transferts/:id", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-// 7. Récupérer la configuration
+// 9. Lister les mouvements du coffre
+coffreRouter.get("/mouvements", async (req, res) => {
+  try {
+    const agenceId = req.query.agenceId as string;
+    if (!agenceId) return res.status(400).json({ error: "Missing agenceId" });
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+
+    // 1. Récupérer le coffre-fort de l'agence
+    const [coffre] = await db.select()
+      .from(schema.caisses)
+      .where(
+        and(
+          eq(schema.caisses.agenceId, agenceId),
+          eq(schema.caisses.type, "Coffre-Fort")
+        )
+      );
+
+    if (!coffre) {
+      return res.json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
+    }
+
+    // 2. Query Mouvements
+    // Criteria:
+    // - Agence ID matches
+    // - AND (
+    //    metadata->caisseId == coffre.id (Transfers)
+    //    OR typePaiement == 'Approvisionnement coffre' (External Provisioning)
+    //    OR typePaiement == 'Versement coffre' (Manual Deposits specific to safe?)
+    // )
+    
+    const conditions = and(
+        eq(schema.mouvementsFinanciers.agenceId, agenceId),
+        sql`(${schema.mouvementsFinanciers.metadata}->>'caisseId' = ${coffre.id} 
+            OR ${schema.mouvementsFinanciers.typePaiement} = 'Approvisionnement coffre'
+            OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'APPROVISIONNEMENT_EXTERNE')`
+    );
+
+    const [countResult] = await db.select({ count: sql<number>`count(*)` })
+        .from(schema.mouvementsFinanciers)
+        .where(conditions);
+    
+    const movements = await db.select()
+        .from(schema.mouvementsFinanciers)
+        .where(conditions)
+        .orderBy(desc(schema.mouvementsFinanciers.dateOperation))
+        .limit(limit)
+        .offset(offset);
+
+    // Enrichir avec infos utilisateur
+    const enriched = await Promise.all(movements.map(async (m) => {
+        let user = null;
+        if (m.createdBy) {
+            [user] = await db.select({ nom: schema.users.nom, prenom: schema.users.prenom })
+                .from(schema.users)
+                .where(eq(schema.users.id, m.createdBy));
+        }
+        return { ...m, initiator: user };
+    }));
+
+    res.json({
+        data: enriched,
+        pagination: {
+            page,
+            limit,
+            total: Number(countResult?.count || 0),
+            totalPages: Math.ceil(Number(countResult?.count || 0) / limit),
+        }
+    });
+
+  } catch (e: any) {
+    console.error("Error fetching coffre movements:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 7. Récupérer le solde (Updated comment number)
 coffreRouter.get("/stats", async (req, res) => {
   try {
     const agenceId = req.query.agenceId as string;

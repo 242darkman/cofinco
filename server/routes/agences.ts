@@ -158,7 +158,7 @@ export function registerAgencesRoutes(app: Express) {
         })
         .returning();
 
-      await logAudit(userId, "CREATE", "agences", newAgence.id, {
+      await logAudit(req, "CREATE", "agences", newAgence.id, {
         nom: newAgence.nom,
         codeAgence: newAgence.codeAgence
       });
@@ -211,7 +211,7 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Agence non trouvée" });
       }
 
-      await logAudit(userId, "UPDATE", "agences", id, { changes: data });
+      await logAudit(req, "UPDATE", "agences", id, { changes: data });
 
       // Notify
       const wsInstance = require("../ws-server").getWsInstance();
@@ -253,7 +253,7 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Agence non trouvée" });
       }
 
-      await logAudit(userId, "DELETE", "agences", id, { nom: deleted.nom });
+      await logAudit(req, "DELETE", "agences", id, { nom: deleted.nom });
 
       // Notify
       const wsInstance = require("../ws-server").getWsInstance();
@@ -402,7 +402,7 @@ export function registerAgencesRoutes(app: Express) {
         })
         .returning();
 
-      await logAudit(adminUserId, "CREATE", "user_agences", newAffectation.id, {
+      await logAudit(req, "CREATE", "user_agences", newAffectation.id, {
         userId,
         agenceId,
         agenceNom: agence.nom
@@ -457,7 +457,7 @@ export function registerAgencesRoutes(app: Express) {
         .where(eq(userAgences.id, id))
         .returning();
 
-      await logAudit(adminUserId, "UPDATE", "user_agences", id, { changes: req.body });
+      await logAudit(req, "UPDATE", "user_agences", id, { changes: req.body });
 
       // Notify
       const wsInstance = require("../ws-server").getWsInstance();
@@ -489,7 +489,7 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Affectation non trouvée" });
       }
 
-      await logAudit(adminUserId, "DELETE", "user_agences", id, {});
+      await logAudit(req, "DELETE", "user_agences", id, {});
 
       // Notify
       const wsInstance = require("../ws-server").getWsInstance();

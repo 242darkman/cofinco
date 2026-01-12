@@ -16,7 +16,7 @@ describe('Reevaluation Validation Rules', () => {
   // Mock data
   const mockConfig: ConfigReevaluation = {
     id: 'config-1',
-    delaiMinimumJours: 30,
+    delaiMinimumJours: 1, // Updated to match new minimum delay
     maxReevaluationsParDemande: 2,
     motifsNonReevaluables: ['Fraude avérée', 'Client blacklisté', 'Faux documents'],
     elementsNouveauxObligatoires: true,

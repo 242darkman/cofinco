@@ -13,7 +13,7 @@ import {
 // I'll assume 'evenementsOutbox' might not be there yet, so I will comment it out or look for it later.
 // Actually, looking at finance.ts view, I didn't see 'evenementsOutbox'. I will skip it for now to avoid errors.
 
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc, and } from "drizzle-orm";
 // import { generateReference, createMouvementFinancier } from "../ledger"; // Need to make sure this exists or I implement it.
 // I will implement helper functions here if they don't exist, to be safe.
 
@@ -171,10 +171,24 @@ export async function executeTransfertCoffre(
     let operationDest: any = null;
 
     // Déterminer la session pour la source (si c'est une caisse utilisateur)
-    // Si CAISSE -> COFFRE, la source est la caisse. On utilise le sessionRequestId ou sessionExecuteId.
-    // Si COFFRE -> CAISSE, la source est le coffre. Pas de session (sauf si on gère une session coffre, ici on assume non).
     const isSourceCaisse = transfert.typeTransfert === "CAISSE_VERS_COFFRE";
-    const sessionIdSource = isSourceCaisse ? (sessionExecuteId || transfert.sessionRequestId) : null;
+    let sessionIdSource = isSourceCaisse ? (sessionExecuteId || transfert.sessionRequestId) : null;
+
+    // RESOLUTION AUTOMATIQUE SESSION SOURCE
+    if (isSourceCaisse && !sessionIdSource) {
+      const [activeSession] = await tx.select()
+        .from(sessionsCaisse)
+        .where(and(
+          eq(sessionsCaisse.caisseId, caisseSource.id),
+          eq(sessionsCaisse.statut, "Ouverte")
+        ))
+        .orderBy(desc(sessionsCaisse.dateOuverture))
+        .limit(1);
+      
+      if (activeSession) {
+        sessionIdSource = activeSession.id;
+      }
+    }
 
     if (sessionIdSource) {
       const [op] = await tx.insert(operationsCaisse).values({
@@ -192,9 +206,56 @@ export async function executeTransfertCoffre(
     }
 
     // Déterminer la session pour la destination (si c'est une caisse utilisateur)
-    // Si COFFRE -> CAISSE, la destination est la caisse.
     const isDestCaisse = transfert.typeTransfert === "COFFRE_VERS_CAISSE";
-    const sessionIdDest = isDestCaisse ? (sessionExecuteId || transfert.sessionRequestId) : null;
+    let sessionIdDest: string | null = null;
+
+    if (isDestCaisse) {
+      // Vérifier si le sessionExecuteId passé correspond à la caisse destination
+      if (sessionExecuteId) {
+        const [sessionCheck] = await tx.select()
+          .from(sessionsCaisse)
+          .where(and(
+            eq(sessionsCaisse.id, sessionExecuteId),
+            eq(sessionsCaisse.caisseId, caisseDest.id),
+            eq(sessionsCaisse.statut, "Ouverte")
+          ));
+
+        if (sessionCheck) {
+          sessionIdDest = sessionExecuteId;
+        }
+      }
+
+      // Fallback: utiliser sessionRequestId si c'est sur la bonne caisse
+      if (!sessionIdDest && transfert.sessionRequestId) {
+        const [sessionCheck] = await tx.select()
+          .from(sessionsCaisse)
+          .where(and(
+            eq(sessionsCaisse.id, transfert.sessionRequestId),
+            eq(sessionsCaisse.caisseId, caisseDest.id),
+            eq(sessionsCaisse.statut, "Ouverte")
+          ));
+
+        if (sessionCheck) {
+          sessionIdDest = transfert.sessionRequestId;
+        }
+      }
+
+      // RESOLUTION AUTOMATIQUE: chercher une session ouverte sur la caisse destination
+      if (!sessionIdDest) {
+        const [activeSession] = await tx.select()
+          .from(sessionsCaisse)
+          .where(and(
+            eq(sessionsCaisse.caisseId, caisseDest.id),
+            eq(sessionsCaisse.statut, "Ouverte")
+          ))
+          .orderBy(desc(sessionsCaisse.dateOuverture))
+          .limit(1);
+
+        if (activeSession) {
+          sessionIdDest = activeSession.id;
+        }
+      }
+    }
 
     if (sessionIdDest) {
       const [op] = await tx.insert(operationsCaisse).values({

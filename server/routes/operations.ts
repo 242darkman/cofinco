@@ -3,6 +3,7 @@ import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainS
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { getWsInstance } from "../ws-server";
 
 export function registerOperationsRoutes(app: Express) {
   // Agents
@@ -19,7 +20,7 @@ export function registerOperationsRoutes(app: Express) {
       const agent = await storage.createAgentTerrain(parsed);
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'agent_new', id: agent.id } });
       }
@@ -53,7 +54,7 @@ export function registerOperationsRoutes(app: Express) {
       const prospection = await storage.createProspection(parsed);
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'prospection_new', id: prospection.id } });
       }
@@ -99,7 +100,7 @@ export function registerOperationsRoutes(app: Express) {
         }, user?.id);
         
         // Notify admins/managers of new pending payment
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_pending', id: paiement.id } });
         }
@@ -120,7 +121,7 @@ export function registerOperationsRoutes(app: Express) {
       const { paiement, mouvement } = await storage.validatePaiementTerrain(id, user?.id || 'system');
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_validated', id: paiement.id } });
           
@@ -145,7 +146,7 @@ export function registerOperationsRoutes(app: Express) {
       const paiement = await storage.rejectPaiementTerrain(id, reason || 'Rejeté par administrateur');
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_rejected', id: paiement.id } });
       }

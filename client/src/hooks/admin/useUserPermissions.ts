@@ -28,7 +28,16 @@ export function useUserPermissions(selectedUserId?: string) {
         throw new Error('Erreur lors de la récupération des permissions');
       }
       const data = await response.json();
-      setUserPermissions(data || []);
+      // Deduplicate permissions based on permission_code
+      const uniqueData = (data || []).reduce((acc: UserPermission[], current: UserPermission) => {
+        const x = acc.find(item => item.permission_code === current.permission_code);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+      setUserPermissions(uniqueData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur serveur');
       console.error('Erreur fetch user permissions:', err);

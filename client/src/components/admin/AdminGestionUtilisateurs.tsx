@@ -147,20 +147,7 @@ export default function AdminGestionUtilisateurs() {
                 <p className="text-xs sm:text-sm text-content-muted">Gestion des comptes ({filteredUsers.length})</p>
               </div>
             </div>
-            {canCreateUsers && (
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Plus}
-                onClick={() => {
-                  setEditingUser(null);
-                  setShowModal(true);
-                }}
-                className="w-full sm:w-auto justify-center shadow-lg shadow-primary/20"
-              >
-                Nouveau
-              </Button>
-            )}
+            {/* Button removed to prevent incomplete account creation. Use Profils/Personnel page instead. */}
           </div>
 
           {/* Search Bar */}

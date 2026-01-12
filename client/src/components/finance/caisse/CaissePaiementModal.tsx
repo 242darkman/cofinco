@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, Printer, Eye } from 'lucide-react';
+import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, Printer, Eye, CreditCard, TrendingUp, PiggyBank } from 'lucide-react';
 import OTPValidationModal from '../../auth/OTPValidationModal';
+import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { clientApi, clientSearchApi, operationCaisseApi, tontineApi } from '../../../lib/api-client';
@@ -10,11 +11,15 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
-  <img src="/airtel-logo.png" alt="Airtel Money" className={className} />
+  <div className={`flex items-center justify-center font-bold text-red-500 bg-red-100 rounded-lg p-2 ${className}`}>
+    <span>Airtel</span>
+  </div>
 );
 
 const MTNLogo = ({ className = '' }: { className?: string }) => (
-  <img src="/mtn-logo.png" alt="MTN MoMo" className={className} />
+  <div className={`flex items-center justify-center font-bold text-yellow-500 bg-yellow-100 rounded-lg p-2 ${className}`}>
+    <span>MTN</span>
+  </div>
 );
 
 interface ClientTontine {
@@ -36,6 +41,7 @@ interface CaissePaiementModalProps {
   sessionId: string;
   onClose: () => void;
   onSuccess: () => void;
+  initialType?: string;
 }
 
 const TYPES_OPERATIONS = [
@@ -54,7 +60,7 @@ const TYPES_OPERATIONS = [
   { value: 'Frais Bancaires', label: 'Frais Bancaires', isEntree: true },
 ] as const;
 
-export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: CaissePaiementModalProps) {
+export default function CaissePaiementModal({ sessionId, onClose, onSuccess, initialType }: CaissePaiementModalProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreatePayments = hasPermission('caisse', 'create') || hasPermission('paiements', 'create');
@@ -71,11 +77,16 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
 
+  // Client Summary State
+  const [clientCredits, setClientCredits] = useState<any[]>([]);
+  const [activeTontinesCount, setActiveTontinesCount] = useState(0);
+  const [activeCreditsAmount, setActiveCreditsAmount] = useState(0);
+
   const [formData, setFormData] = useState({
     client_id: '',
     montant: '',
     mode_paiement: 'Espèces',
-    type_operation: 'Cotisation Tontine',
+    type_operation: initialType || 'Cotisation Tontine',
     numero_telephone: '',
     numero_transaction: '',
     reference: '',
@@ -108,6 +119,23 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
     loadClients();
   }, [loadClients]);
 
+  // Sélectionner une tontine
+  const selectTontine = useCallback((tontine: ClientTontine) => {
+    setSelectedTontine(tontine);
+    const montantCotisation = tontine.tontine.montantCotisation;
+    setFormData(prev => ({
+      ...prev,
+      montant: montantCotisation,
+      description: sanitizeInput(`Cotisation ${tontine.tontine.nom} - ${tontine.tontine.frequence}`)
+    }));
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.montant;
+      delete newErrors.tontine;
+      return newErrors;
+    });
+  }, []);
+
   // Charger les tontines du client via api-client
   const loadClientTontines = useCallback(async (clientId: string) => {
     setLoadingTontines(true);
@@ -126,30 +154,40 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
   }, []);
 
   useEffect(() => {
-    if (formData.client_id && isTontineOperation) {
-      loadClientTontines(formData.client_id);
+    if (formData.client_id) {
+        // Load detailed client info
+        const displayClientSummary = async () => {
+             try {
+                 // 1. Load Credits
+                 const credits = await clientSearchApi.getCredits(formData.client_id, { statut: 'Accordé' }); // or Actif
+                 setClientCredits(credits || []);
+                 const totalCreditAmount = (credits || []).reduce((sum, c) => sum + Number(c.restant_du || 0), 0);
+                 setActiveCreditsAmount(totalCreditAmount);
+
+                 // 2. Load Tontines (also needed for summary even if not tontine op)
+                 const tontines = await clientSearchApi.getTontines(formData.client_id);
+                 setClientTontines(tontines || []);
+                 setActiveTontinesCount((tontines || []).filter(t => t.statut === 'Actif').length);
+                 
+                 // Auto-select if tontine op
+                 if (isTontineOperation && tontines && tontines.length === 1) {
+                      selectTontine(tontines[0]);
+                 }
+             } catch (err) {
+                 console.error("Error loading client details", err);
+             }
+        }
+        displayClientSummary();
     } else {
       setClientTontines([]);
+      setClientCredits([]);
       setSelectedTontine(null);
+      setActiveTontinesCount(0);
+      setActiveCreditsAmount(0);
     }
-  }, [formData.client_id, isTontineOperation, loadClientTontines]);
+  }, [formData.client_id, isTontineOperation, selectTontine]);
 
-  // Sélectionner une tontine
-  const selectTontine = useCallback((tontine: ClientTontine) => {
-    setSelectedTontine(tontine);
-    const montantCotisation = tontine.tontine.montantCotisation;
-    setFormData(prev => ({
-      ...prev,
-      montant: montantCotisation,
-      description: sanitizeInput(`Cotisation ${tontine.tontine.nom} - ${tontine.tontine.frequence}`)
-    }));
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors.montant;
-      delete newErrors.tontine;
-      return newErrors;
-    });
-  }, []);
+
 
   // Générer une référence
   const genererReference = useCallback(() => {
@@ -448,38 +486,57 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label
-                htmlFor="client-select"
-                className="block text-sm font-semibold text-slate-300 mb-2"
-              >
-                <User size={16} className="inline mr-1" aria-hidden="true" />
-                Client *
-              </label>
-              <select
-                id="client-select"
+              <SearchableSelect
+                label="Client *"
+                name="client_id"
                 value={formData.client_id}
-                onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-                className={`w-full px-4 py-3 bg-slate-700 border ${
-                  errors.client_id ? 'border-red-500' : 'border-slate-600'
-                } rounded-lg text-white focus:ring-2 focus:ring-blue-500`}
-                data-testid="select-client"
-                aria-required="true"
-                aria-invalid={!!errors.client_id}
-                aria-describedby={errors.client_id ? 'client-error' : undefined}
-              >
-                <option value="">Sélectionner un client</option>
-                {clients.map(client => (
-                  <option key={client.id} value={client.id}>
-                    {escapeHtml(client.nom)} - {escapeHtml(client.telephone || '')}
-                  </option>
-                ))}
-              </select>
-              {errors.client_id && (
-                <p id="client-error" className="text-red-500 text-sm mt-1" role="alert">
-                  {errors.client_id}
-                </p>
-              )}
+                onChange={(value: string | number) => setFormData({ ...formData, client_id: String(value) })}
+                options={clients.map(c => ({
+                  value: c.id,
+                  label: c.nom || 'Sans Nom',
+                  subLabel: [c.telephone, c.email].filter(Boolean).join(' • '),
+                  image: c.photo 
+                }))}
+                placeholder="Rechercher un client..."
+                error={errors.client_id}
+                required
+              />
             </div>
+            
+            {/* Client Summary */}
+            {formData.client_id && (
+                <div className="col-span-1 md:col-span-2 bg-slate-700/30 rounded-lg p-3 flex flex-wrap gap-4 items-center mb-2">
+                    <div className="flex items-center gap-2">
+                        <User className="text-blue-400" size={18} />
+                        <span className="text-slate-300 text-sm">Client: <strong className="text-white">{clients.find(c => c.id === formData.client_id)?.nom}</strong></span>
+                    </div>
+                    
+                    <div className="h-4 w-px bg-slate-600 hidden sm:block"></div>
+                    
+                    <div className="flex items-center gap-2" title="Crédits en cours">
+                        <CreditCard className={clientCredits.length > 0 ? "text-amber-400" : "text-slate-500"} size={18} />
+                        <span className="text-sm">
+                            <span className="text-slate-400">Crédits:</span> 
+                            <strong className={`ml-1 ${clientCredits.length > 0 ? "text-amber-400" : "text-slate-500"}`}>
+                                {clientCredits.length} 
+                                {clientCredits.length > 0 && ` (${formatMoney(activeCreditsAmount)})`}
+                            </strong>
+                        </span>
+                    </div>
+
+                    <div className="h-4 w-px bg-slate-600 hidden sm:block"></div>
+
+                    <div className="flex items-center gap-2" title="Tontines actives">
+                        <Users className={activeTontinesCount > 0 ? "text-emerald-400" : "text-slate-500"} size={18} />
+                        <span className="text-sm">
+                            <span className="text-slate-400">Tontines:</span>
+                            <strong className={`ml-1 ${activeTontinesCount > 0 ? "text-emerald-400" : "text-slate-500"}`}>
+                                {activeTontinesCount}
+                            </strong>
+                        </span>
+                    </div>
+                </div>
+            )}
 
             <div>
               <label
@@ -630,15 +687,17 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
             </legend>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3" role="radiogroup">
               {[
-                { mode: 'Espèces', icon: Wallet, color: 'green' },
-                { mode: 'Airtel Money', icon: null, color: 'red', logo: AirtelLogo },
-                { mode: 'MTN Mobile Money', icon: null, color: 'yellow', logo: MTNLogo },
-                { mode: 'Virement', icon: Building2, color: 'emerald' }
-              ].map(({ mode, icon: Icon, color, logo: Logo }) => (
+                { mode: 'Espèces', icon: Wallet, color: 'green', disabled: false },
+                { mode: 'Airtel Money', icon: null, color: 'red', logo: AirtelLogo, disabled: true },
+                { mode: 'MTN Mobile Money', icon: null, color: 'yellow', logo: MTNLogo, disabled: true },
+                { mode: 'Virement', icon: Building2, color: 'emerald', disabled: true }
+              ].map(({ mode, icon: Icon, color, logo: Logo, disabled }) => (
                 <button
                   key={mode}
                   type="button"
+                  disabled={disabled}
                   onClick={() => {
+                    if (disabled) return;
                     const needsPhone = mode === 'Airtel Money' || mode === 'MTN Mobile Money';
                     setFormData({
                       ...formData,
@@ -647,13 +706,16 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
                       numero_transaction: needsPhone ? formData.numero_transaction : ''
                     });
                   }}
-                  className={`p-4 rounded-lg border-2 transition ${
-                    formData.mode_paiement === mode
-                      ? `border-${color}-500 bg-${color}-500/20`
-                      : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                  className={`p-4 rounded-lg border-2 transition relative ${
+                    disabled 
+                      ? 'border-slate-800 bg-slate-800/50 opacity-50 cursor-not-allowed grayscale' 
+                      : formData.mode_paiement === mode
+                        ? `border-${color}-500 bg-${color}-500/20`
+                        : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
                   }`}
                   role="radio"
                   aria-checked={formData.mode_paiement === mode}
+                  aria-disabled={disabled}
                   data-testid={`payment-${mode.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   {Logo ? (
@@ -662,6 +724,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
                     <Icon
                       size={32}
                       className={`mx-auto mb-2 ${
+                        disabled ? 'text-slate-600' :
                         formData.mode_paiement === mode ? `text-${color}-400` : 'text-slate-400'
                       }`}
                       aria-hidden="true"
@@ -669,11 +732,18 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess }: C
                   ) : null}
                   <div
                     className={`text-sm font-semibold ${
+                      disabled ? 'text-slate-500' :
                       formData.mode_paiement === mode ? `text-${color}-400` : 'text-slate-300'
                     }`}
                   >
                     {mode.replace(' Money', '').replace(' Mobile', '')}
                   </div>
+                  {disabled && (
+                     <span className="absolute top-2 right-2 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-500"></span>
+                     </span>
+                  )}
                 </button>
               ))}
             </div>

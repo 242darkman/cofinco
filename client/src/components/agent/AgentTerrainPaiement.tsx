@@ -69,15 +69,15 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     client_id: clientId || '',
     visite_id: visiteId || '',
     montant: '',
-    methode_paiement: 'Espèce',
+    methode_paiement: 'Espèces',
     numero_telephone: '',
     numero_transaction: '',
-    type_paiement: 'Tontine',
+    type_paiement: 'Versement Tontine',
     reference: '',
     notes: ''
   });
 
-  const isTontinePayment = formData.type_paiement === 'Tontine';
+  const isTontinePayment = formData.type_paiement === 'Versement Tontine';
 
   useEffect(() => {
     loadAgents();
@@ -147,7 +147,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       if (response.ok) {
         const data = await response.json();
         setSelectedClient(data);
-        if (formData.methode_paiement !== 'Espèce' && !formData.numero_telephone) {
+        if (formData.methode_paiement !== 'Espèces' && !formData.numero_telephone) {
           setFormData(prev => ({ ...prev, numero_telephone: data.phone }));
         }
       }
@@ -227,8 +227,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         visite_id: formData.visite_id || null,
         montant,
         methode_paiement: formData.methode_paiement,
-        numero_telephone: formData.methode_paiement !== 'Espèce' ? formData.numero_telephone : null,
-        numero_transaction: formData.methode_paiement !== 'Espèce' ? formData.numero_transaction : null,
+        numero_telephone: formData.methode_paiement !== 'Espèces' ? formData.numero_telephone : null,
+        numero_transaction: formData.methode_paiement !== 'Espèces' ? formData.numero_transaction : null,
         type_paiement: formData.type_paiement,
         reference,
         notes: formData.notes.trim(),
@@ -551,7 +551,13 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 setFormData({ ...formData, type_paiement: e.target.value });
                 setSelectedTontine(null);
               }}
-              options={['Tontine', 'Crédit', 'Épargne', 'Compte Courant', 'Compte Bloqué', 'Autre']}
+              options={[
+                { value: 'Versement Tontine', label: 'Tontine' },
+                { value: 'Remboursement Crédit', label: 'Crédit' },
+                { value: 'Dépôt Épargne', label: 'Épargne' },
+                { value: 'Dépôt Courant', label: 'Compte Courant' },
+                { value: 'Dépôt Bloqué', label: 'Compte Bloqué' }
+              ]}
             />
 
             <FormField
@@ -621,7 +627,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
             </label>
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {[
-                { id: 'Espèce', label: 'Espèce', icon: 'FCFA', color: 'green', disabled: false },
+                { id: 'Espèces', label: 'Espèces', icon: 'FCFA', color: 'green', disabled: false },
                 { id: 'Airtel Money', label: 'Airtel', icon: <AirtelLogo className="h-8 w-8" />, color: 'red', disabled: true },
                 { id: 'MTN Mobile Money', label: 'MTN', icon: <MTNLogo className="h-8 w-8" />, color: 'yellow', disabled: true }
               ].map((m) => (
@@ -658,7 +664,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
             </div>
           </div>
 
-          {formData.methode_paiement !== 'Espèce' && (
+          {formData.methode_paiement !== 'Espèces' && (
             <div className="grid md:grid-cols-2 gap-4 p-3 bg-slate-700/20 border border-slate-600/50 rounded-lg">
               <FormField
                 label="Numéro de Téléphone *"

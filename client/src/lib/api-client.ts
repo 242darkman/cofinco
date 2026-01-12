@@ -288,23 +288,42 @@ export const remboursementApi = {
   }),
 };
 
-// Compte Epargne API
+// Compte Epargne API (uses unified /api/comptes endpoint)
 export const compteEpargneApi = {
-  getAll: () => request<any[]>('/comptes-epargne'),
-  getByClient: (clientId: string) => request<any[]>(`/clients/${clientId}/comptes-epargne`),
-  create: (data: any) => request<any>('/comptes-epargne', {
+  getAll: (params?: { search?: string; page?: number; limit?: number; typeCompte?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
+    if (params?.typeCompte) queryParams.append('typeCompte', params.typeCompte);
+    const query = queryParams.toString();
+    return request<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>(
+      `/comptes${query ? `?${query}` : ''}`
+    );
+  },
+  getByClient: (clientId: string) => request<any[]>(`/clients/${clientId}/comptes`),
+  getById: (id: string) => request<any>(`/comptes/${id}`),
+  create: (data: any) => request<any>('/comptes', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  update: (id: string, data: any) => request<any>(`/comptes-epargne/${id}`, {
+  update: (id: string, data: any) => request<any>(`/comptes/${id}`, {
     method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  depot: (id: string, data: any) => request<any>(`/comptes/${id}/depot`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  retrait: (id: string, data: any) => request<any>(`/comptes/${id}/retrait`, {
+    method: 'POST',
     body: JSON.stringify(data),
   }),
 };
 
 // Transaction Epargne API
 export const transactionEpargneApi = {
-  getByCompte: (compteId: string) => request<any[]>(`/comptes-epargne/${compteId}/transactions`),
+  getByCompte: (compteId: string) => request<any[]>(`/comptes/${compteId}/transactions`),
   create: (data: any) => request<any>('/transactions-epargne', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -344,6 +363,12 @@ export const tontineApi = {
   addContribution: (tontineId: string, data: any) => request<any>(`/tontines/${tontineId}/contributions`, {
     method: 'POST',
     body: JSON.stringify(data),
+  }),
+  // Gestion des bénéficiaires
+  getProchainBeneficiaire: (tontineId: string) => request<any>(`/tontines/${tontineId}/prochain-beneficiaire`),
+  getEligiblesBenefice: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/eligibles-benefice`),
+  tirageBeneficiaire: (tontineId: string) => request<any>(`/tontines/${tontineId}/tirage-beneficiaire`, {
+    method: 'POST',
   }),
 };
 
@@ -389,6 +414,21 @@ export const sessionCaisseApi = {
   close: (id: string, data: any) => request<any>(`/sessions-caisse/${id}/close`, {
     method: 'POST',
     body: JSON.stringify(data),
+  }),
+  // Heartbeat - mise à jour de l'activité de la session (pour éviter le timeout)
+  heartbeat: (id: string) => request<{ success: boolean; timestamp: string }>(`/sessions-caisse/${id}/heartbeat`, {
+    method: 'POST',
+  }),
+  // Routes de monitoring (admin)
+  getRisky: () => request<any[]>('/sessions-caisse/risky'),
+  getEcarts: (threshold?: number) => request<any[]>(`/sessions-caisse/ecarts${threshold ? `?threshold=${threshold}` : ''}`),
+  closeExpired: (timeoutHours?: number) => request<any>('/sessions-caisse/close-expired', {
+    method: 'POST',
+    body: JSON.stringify({ timeoutHours }),
+  }),
+  forceClose: (id: string, reason?: string) => request<any>(`/sessions-caisse/${id}/force-close`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
   }),
 };
 
@@ -522,9 +562,14 @@ export const contributionTontineApi = {
 // Distributions Tontine API
 export const distributionTontineApi = {
   getByTontine: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/distributions`),
-  create: (data: any) => request<any>('/distributions-tontine', {
+  getStats: (tontineId: string) => request<any>(`/tontines/${tontineId}/distributions/stats`),
+  getById: (id: string) => request<any>(`/tontine-distributions/${id}`),
+  create: (data: any) => request<any>('/tontine-distributions', {
     method: 'POST',
     body: JSON.stringify(data),
+  }),
+  cancel: (id: string) => request<any>(`/tontine-distributions/${id}`, {
+    method: 'DELETE',
   }),
 };
 
@@ -589,10 +634,10 @@ export const tontinePenaliteApi = {
 
 export const tontineDistributionApi = {
   getByTontine: (tontineId: string) => distributionTontineApi.getByTontine(tontineId),
-  create: (data: any) => request<any>('/tontine-distributions', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+  getStats: (tontineId: string) => distributionTontineApi.getStats(tontineId),
+  getById: (id: string) => distributionTontineApi.getById(id),
+  create: (data: any) => distributionTontineApi.create(data),
+  cancel: (id: string) => distributionTontineApi.cancel(id),
 };
 
 // Échéances Crédit API
@@ -685,6 +730,17 @@ export const coffreApi = {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
+  provision: (data: any) => request<any>('/coffre/approvisionnement', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getMouvements: (params: { agenceId: string; page?: number; limit?: number }) => {
+    const queryParams = new URLSearchParams();
+    queryParams.append('agenceId', params.agenceId);
+    if (params.page) queryParams.append('page', String(params.page));
+    if (params.limit) queryParams.append('limit', String(params.limit));
+    return request<any>(`/coffre/mouvements?${queryParams.toString()}`);
+  },
 };
 
 // Incidents Caisse API

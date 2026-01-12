@@ -277,4 +277,170 @@ export function registerTontineRoutes(app: Express) {
     const success = await storage.deleteTontinePlan(req.params.id);
     res.json({ success });
   });
+
+  // Prochain bénéficiaire
+  app.get("/api/tontines/:id/prochain-beneficiaire", requireAuth, async (req, res) => {
+    const beneficiaire = await storage.getProchainBeneficiaire(req.params.id);
+    res.json(addSnakeCaseAliasesDeep(beneficiaire));
+  });
+
+  // Membres éligibles au bénéfice
+  app.get("/api/tontines/:id/eligibles-benefice", requireAuth, async (req, res) => {
+    const eligibles = await storage.getMembresEligiblesBenefice(req.params.id);
+    res.json(addSnakeCaseAliasesDeep(eligibles));
+  });
+
+  // Tirage aléatoire du prochain bénéficiaire
+  app.post("/api/tontines/:id/tirage-beneficiaire", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+    try {
+      const beneficiaire = await storage.tirerProchainBeneficiaire(req.params.id);
+
+      if (!beneficiaire) {
+        return res.status(400).json({ message: "Aucun membre éligible pour le tirage" });
+      }
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: {
+            type: 'tirage_effectue',
+            tontineId: req.params.id,
+            beneficiaire: {
+              id: beneficiaire.id,
+              nom: beneficiaire.client?.nom,
+              tour: beneficiaire.tour
+            }
+          }
+        });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(beneficiaire));
+    } catch (error: any) {
+      console.error("Erreur tirage bénéficiaire:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du tirage" });
+    }
+  });
+
+  // ============ DISTRIBUTIONS ============
+
+  // Liste des distributions d'une tontine
+  app.get("/api/tontines/:id/distributions", requireAuth, async (req, res) => {
+    try {
+      const distributions = await storage.getDistributionsByTontine(req.params.id);
+      res.json(addSnakeCaseAliasesDeep(distributions));
+    } catch (error: any) {
+      console.error("Erreur chargement distributions:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du chargement des distributions" });
+    }
+  });
+
+  // Statistiques des distributions
+  app.get("/api/tontines/:id/distributions/stats", requireAuth, async (req, res) => {
+    try {
+      const stats = await storage.getDistributionStats(req.params.id);
+      res.json(addSnakeCaseAliasesDeep(stats));
+    } catch (error: any) {
+      console.error("Erreur chargement stats distributions:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du chargement des statistiques" });
+    }
+  });
+
+  // Créer une distribution
+  app.post("/api/tontine-distributions", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+    try {
+      const data = normalizeKeysDeep(req.body);
+
+      // Validation des champs requis
+      if (!data.tontineId) {
+        return res.status(400).json({ message: "tontineId est requis" });
+      }
+      if (!data.membreId) {
+        return res.status(400).json({ message: "membreId est requis" });
+      }
+      if (!data.montantTotal) {
+        return res.status(400).json({ message: "montantTotal est requis" });
+      }
+
+      const distribution = await storage.createTontineDistribution({
+        tontineId: data.tontineId,
+        membreId: data.membreId,
+        tourNumero: data.tourNumero || 1,
+        montantTotal: String(data.montantTotal),
+        dateDistribution: data.dateDistribution ? new Date(data.dateDistribution) : undefined,
+        modePaiement: data.modePaiement,
+        referencePaiement: data.referencePaiement,
+        notes: data.notes
+      }, req.session.user?.id);
+
+      // Notify via WebSocket
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: {
+            type: 'distribution_created',
+            tontineId: data.tontineId,
+            distribution: {
+              id: distribution.id,
+              tourNumero: distribution.tourNumero,
+              montantTotal: distribution.montantTotal,
+              beneficiaire: distribution.membre?.client?.nom
+            }
+          }
+        });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(distribution));
+    } catch (error: any) {
+      console.error("Erreur création distribution:", error);
+      res.status(400).json({ message: error.message || "Erreur lors de la création de la distribution" });
+    }
+  });
+
+  // Annuler une distribution
+  app.delete("/api/tontine-distributions/:id", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+    try {
+      // Récupérer la distribution avant suppression pour le broadcast
+      const distribution = await storage.getDistribution(req.params.id);
+      if (!distribution) {
+        return res.status(404).json({ message: "Distribution introuvable" });
+      }
+
+      const success = await storage.cancelTontineDistribution(req.params.id);
+
+      // Notify via WebSocket
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: {
+            type: 'distribution_cancelled',
+            tontineId: distribution.tontineId,
+            distributionId: req.params.id
+          }
+        });
+      }
+
+      res.json({ success, message: "Distribution annulée avec succès" });
+    } catch (error: any) {
+      console.error("Erreur annulation distribution:", error);
+      res.status(400).json({ message: error.message || "Erreur lors de l'annulation de la distribution" });
+    }
+  });
+
+  // Récupérer une distribution par ID
+  app.get("/api/tontine-distributions/:id", requireAuth, async (req, res) => {
+    try {
+      const distribution = await storage.getDistribution(req.params.id);
+      if (!distribution) {
+        return res.status(404).json({ message: "Distribution introuvable" });
+      }
+      res.json(addSnakeCaseAliasesDeep(distribution));
+    } catch (error: any) {
+      console.error("Erreur chargement distribution:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du chargement de la distribution" });
+    }
+  });
 }

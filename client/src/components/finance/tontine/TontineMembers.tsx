@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Pagination } from '../../ui/Pagination';
@@ -26,12 +26,26 @@ interface TontineMembre {
   tontine_id: string;
   client_id: string;
   position_ordre: number;
+  position?: number;
   status: 'Actif' | 'Inactif' | 'Exclu';
+  statut?: 'Actif' | 'Inactif' | 'Exclu';
   montant_total_contribue: number;
+  totalCotisations?: string;
   a_recu_benefice: boolean;
+  aRecuBenefice?: boolean;
   date_benefice: string | null;
+  dateBenefice?: string | null;
   date_adhesion: string;
+  dateAdhesion?: string;
   client: Client;
+  // Nouvelles stats calculées par le backend
+  toursPayes?: number;
+  toursRestants?: number;
+  montantRestant?: number;
+  estAJour?: boolean;
+  nombreContributions?: number;
+  tourActuel?: number;
+  montantCotisation?: number;
 }
 
 interface TontineMembersProps {
@@ -114,13 +128,17 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
       // Update tontine member count
       await tontineApi.update(tontineId, { nombre_membres: nextOrdre });
 
+      // Récupérer le nom du client pour le feedback
+      const addedClient = clients.find(c => c.id === selectedClientId);
+      const clientNom = addedClient?.nom || 'Nouveau membre';
+
       setShowAddForm(false);
       setSelectedClientId('');
       setSearchQuery('');
       fetchMembres();
       onUpdate();
 
-      toast.success('Membre ajouté avec succès');
+      toast.success(`${clientNom} a été ajouté à la tontine (Position #${nextOrdre})`);
     } catch (error) {
       toast.error(handleApiError(error, "Erreur lors de l'ajout du membre"));
     } finally {
@@ -286,13 +304,27 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                         </h4>
                         <div className="flex items-center gap-2 text-[10px] mt-0.5">
                           <span
-                            className={`px-1.5 py-0.5 rounded font-medium ${getStatutColor(membre.status)} bg-opacity-10`}
+                            className={`px-1.5 py-0.5 rounded font-medium ${getStatutColor(membre.status || membre.statut || 'Actif')} bg-opacity-10`}
                           >
-                            {membre.status}
+                            {membre.status || membre.statut}
                           </span>
                           <span className="text-slate-500">
-                            {new Date(membre.date_adhesion).toLocaleDateString('fr-FR')}
+                            {new Date(membre.date_adhesion || membre.dateAdhesion || '').toLocaleDateString('fr-FR')}
                           </span>
+                          {/* Indicateur à jour / en retard */}
+                          {membre.estAJour !== undefined && (
+                            membre.estAJour ? (
+                              <span className="flex items-center gap-0.5 text-green-400">
+                                <CheckCircle size={10} />
+                                À jour
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-0.5 text-amber-400">
+                                <AlertCircle size={10} />
+                                En retard
+                              </span>
+                            )
+                          )}
                         </div>
                       </div>
 
@@ -306,12 +338,37 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                       </button>
                     </div>
 
-                    <div className="mt-2 text-xs flex items-center justify-between border-t border-slate-700/50 pt-2">
-                      <span className="text-slate-500">Total cotisé</span>
-                      <span className="font-bold text-green-400">
-                        {(membre.montant_total_contribue || 0).toLocaleString('fr-FR')} FCFA
-                      </span>
+                    {/* Stats de cotisations */}
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs border-t border-slate-700/50 pt-2">
+                      <div className="flex flex-col">
+                        <span className="text-slate-500">Total cotisé</span>
+                        <span className="font-bold text-green-400">
+                          {Number(membre.totalCotisations || membre.montant_total_contribue || 0).toLocaleString('fr-FR')} FCFA
+                        </span>
+                      </div>
+                      <div className="flex flex-col text-right">
+                        <span className="text-slate-500">Restant</span>
+                        <span className={`font-bold ${(membre.montantRestant || 0) > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                          {(membre.montantRestant || 0).toLocaleString('fr-FR')} FCFA
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Progression des tours */}
+                    {membre.toursPayes !== undefined && (
+                      <div className="mt-2 flex items-center gap-2 text-[10px]">
+                        <Clock size={12} className="text-slate-500" />
+                        <span className="text-slate-400">
+                          Tours payés: <span className="text-cyan-400 font-bold">{membre.toursPayes}</span>
+                          {' / '}
+                          <span className="text-slate-500">{maxMembres}</span>
+                        </span>
+                        <span className="text-slate-600">|</span>
+                        <span className="text-slate-400">
+                          Restants: <span className={`font-bold ${(membre.toursRestants || 0) > 0 ? 'text-amber-400' : 'text-green-400'}`}>{membre.toursRestants || 0}</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>

@@ -12,6 +12,7 @@ import { log, logError, logWarn } from "./logger";
 import { scheduleAuditPurge } from "./audit";
 import { sessionActivityMiddleware, scheduleSessionCleanup } from "./session-tracker";
 import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
+import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
 
 const app = express();
 // const httpServer = createServer(app); // Removed to avoid duplicate server creation
@@ -198,6 +199,10 @@ async function seedAdminUser() {
   startOutboxWorker();
   log('[Outbox] Real-time event worker started');
 
+  // Start the caisse session cleanup cron job (closes expired sessions, monitors risky ones)
+  startSessionCleanupCron();
+  log('[Cron] Caisse session cleanup job started');
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -232,3 +237,4 @@ async function seedAdminUser() {
     },
   );
 })();
+// Force reload Mon Jan 12 11:32:54 CET 2026

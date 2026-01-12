@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Home, ChevronRight, Search, MessageCircle, Settings, User } from 'lucide-react';
+import { Menu, Home, ChevronRight, Search, MessageCircle, User } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import NotificationBadge from '../shared/NotificationBadge';
 import OfflineIndicator from '../shared/OfflineIndicator';
@@ -104,11 +104,7 @@ export default function PlatformHeader({
           </div>
         </div>
 
-        <IconButton
-          onClick={onSettingsClick}
-          icon={Settings}
-          aria-label="Paramètres"
-        />
+
 
         <div className="relative xl:ml-auto">
           <UserProfileDropdown 

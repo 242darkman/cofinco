@@ -1,438 +1,403 @@
-import React, { useState } from 'react';
-import { Users, UserPlus, Plus, Minus, Lock, Unlock, AlertCircle, CheckCircle, Search, X, Shield, LockKeyhole } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Users, Shield, Search, CheckCircle, X, 
+  ChevronDown, ChevronRight, Lock, Unlock, 
+  Filter, AlertCircle, ArrowLeft 
+} from 'lucide-react';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { UserPermission } from '../../../hooks/admin/useUserPermissions';
-import { AdminUser } from '../../../hooks/admin/useAdminUsers';
-import { ROLE_COLORS } from '../../../constants/admin-constants';
-import { Modal, Button, Pagination, Card, SearchInput, SelectableCard } from '../../ui';
+import { Card, SearchInput, SelectableCard, Button, Badge, Switch } from '../../ui';
 import { usePagination } from '../../../hooks/usePagination';
 
 interface UserCustomPermissionsManagerProps {
-  users: AdminUser[];
+  users: any[];
   permissions: Permission[];
   selectedUserId: string;
   onUserChange: (userId: string) => void;
   userPermissions: UserPermission[];
-  getUserDisplayName: (user: any) => string;
-  getUserPermissionStatus: (permCode: string) => { granted: boolean; source: string };
-  toggleUserPermission: (permId: string) => void;
-  onActivateAll: () => void;
-  onBlockAll: () => void;
-  onResetPermissions: () => void;
+  getUserDisplayName: (userId: string) => string;
+  getUserPermissionStatus: (permCode: string) => { granted: boolean; source: 'role' | 'user' | 'none' };
+  toggleUserPermission: (permId: string) => Promise<void>;
+  onActivateAll: () => Promise<void>;
+  onBlockAll: () => Promise<void>;
+  onResetPermissions: () => Promise<void>;
   activePermissionsCount: number;
-  getAvailablePermissionsToAdd: () => Permission[];
-  getAvailablePermissionsToRemove: () => Permission[];
   confirmMessage?: string;
+  preselectedUserId?: string;
 }
 
+// Group permissions by module
+const groupPermissionsByModule = (perms: Permission[]) => {
+  const groups: Record<string, Permission[]> = {};
+  perms.forEach(p => {
+    const module = p.moduleName || 'Autre';
+    if (!groups[module]) groups[module] = [];
+    groups[module].push(p);
+  });
+  return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+};
+
 export default function UserCustomPermissionsManager({
-  users = [],
-  permissions = [],
+  users,
+  permissions,
   selectedUserId,
   onUserChange,
-  userPermissions = [],
-  getUserDisplayName,
+  userPermissions, // kept for prop compatibility but unused if we use getter
   getUserPermissionStatus,
   toggleUserPermission,
   onActivateAll,
   onBlockAll,
   onResetPermissions,
   activePermissionsCount,
-  getAvailablePermissionsToAdd,
-  getAvailablePermissionsToRemove,
-  confirmMessage
+  confirmMessage,
+  preselectedUserId
 }: UserCustomPermissionsManagerProps) {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [selectedPermsToAdd, setSelectedPermsToAdd] = useState<string[]>([]);
-  const [selectedPermsToRemove, setSelectedPermsToRemove] = useState<string[]>([]);
-  const [modalSearchTerm, setModalSearchTerm] = useState('');
   const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [permSearchTerm, setPermSearchTerm] = useState('');
+  const [showOnlyCustom, setShowOnlyCustom] = useState(false);
+  const [expandedModules, setExpandedModules] = useState<string[]>([]);
+  const [isSelectionView, setIsSelectionView] = useState(!preselectedUserId);
+  
+  // Force update when permission count changes
+  useEffect(() => {
+     // This is just to trigger re-renders if needed
+  }, [activePermissionsCount]);
 
-  // Filter users based on search term
-  const filteredUsers = users.filter(user => {
-      const searchLower = userSearchTerm.toLowerCase();
-      return (
-          (user.name?.toLowerCase() || '').includes(searchLower) ||
-          (user.username?.toLowerCase() || '').includes(searchLower) ||
-          (user.role?.toLowerCase() || '').includes(searchLower)
-      );
-  });
+  useEffect(() => {
+    if (preselectedUserId) {
+      onUserChange(preselectedUserId);
+      setIsSelectionView(false);
+    }
+  }, [preselectedUserId]);
 
   const selectedUser = users.find(u => u.id === selectedUserId);
 
-  const handleOpenAddModal = () => {
-    setSelectedPermsToAdd([]);
-    setModalSearchTerm('');
-    setShowAddModal(true);
-  };
-
-  const handleOpenRemoveModal = () => {
-    setSelectedPermsToRemove([]);
-    setModalSearchTerm('');
-    setShowRemoveModal(true);
-  };
-
-  const togglePermToAdd = (permCode: string) => {
-    setSelectedPermsToAdd(prev =>
-      prev.includes(permCode) ? prev.filter(p => p !== permCode) : [...prev, permCode]
+  // Filter users
+  const filteredUsers = useMemo(() => {
+    const searchLower = userSearchTerm.toLowerCase();
+    return users.filter(user => 
+      (user.name?.toLowerCase() || '').includes(searchLower) ||
+      (user.username?.toLowerCase() || '').includes(searchLower) ||
+      (user.role?.toLowerCase() || '').includes(searchLower)
     );
-  };
+  }, [users, userSearchTerm]);
 
-  const togglePermToRemove = (permCode: string) => {
-    setSelectedPermsToRemove(prev =>
-      prev.includes(permCode) ? prev.filter(p => p !== permCode) : [...prev, permCode]
-    );
-  };
-
-  const handleValidateAdd = async () => {
-    for (const permCode of selectedPermsToAdd) {
-      const perm = permissions.find(p => p.code === permCode);
-      if (perm) {
-        await toggleUserPermission(perm.id);
-      }
+  // Filter permissions
+  const filteredPermissionGroups = useMemo(() => {
+    let perms = permissions;
+    
+    if (showOnlyCustom) {
+      perms = perms.filter(p => getUserPermissionStatus(p.code).source === 'user');
     }
-    setShowAddModal(false);
-    setSelectedPermsToAdd([]);
-  };
 
-  const handleValidateRemove = async () => {
-    for (const permCode of selectedPermsToRemove) {
-      const perm = permissions.find(p => p.code === permCode);
-      if (perm) {
-        await toggleUserPermission(perm.id);
-      }
+    if (permSearchTerm) {
+      const lower = permSearchTerm.toLowerCase();
+      perms = perms.filter(p => 
+        p.name.toLowerCase().includes(lower) || 
+        p.code.toLowerCase().includes(lower) ||
+        (p.moduleName || '').toLowerCase().includes(lower)
+      );
     }
-    setShowRemoveModal(false);
-    setSelectedPermsToRemove([]);
-  };
 
-  const availableToAdd = getAvailablePermissionsToAdd().filter(p =>
-    !modalSearchTerm || 
-    p.name.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
-    p.code.toLowerCase().includes(modalSearchTerm.toLowerCase())
-  );
+    return groupPermissionsByModule(perms);
+  }, [permissions, permSearchTerm, showOnlyCustom, getUserPermissionStatus]);
 
-  const availableToRemove = getAvailablePermissionsToRemove().filter(p =>
-    !modalSearchTerm ||
-    p.name.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
-    p.code.toLowerCase().includes(modalSearchTerm.toLowerCase())
-  );
-
-  // Pagination pour la grille utilisateurs (8 par page sur mobile, 12 sur desktop)
+  // Pagination for users
   const {
     currentPage,
     totalPages,
-    canGoNext,
-    canGoPrevious,
     goToPage,
     paginateArray
   } = usePagination({
     totalItems: filteredUsers.length,
-    itemsPerPage: 8, // Compact for mobile
+    itemsPerPage: 12, // More density
     initialPage: 1
   });
 
   const paginatedUsers = paginateArray(filteredUsers);
 
-  return (
-    <div className="space-y-4">
-      {/* Search Users */}
-      <SearchInput
-        value={userSearchTerm}
-        onChange={(e) => setUserSearchTerm(e.target.value)}
-        placeholder="Rechercher un utilisateur..."
-        onClear={() => setUserSearchTerm('')}
-        className="bg-slate-800 border-slate-700 focus:border-cyan-500"
-      />
+  const toggleModule = (moduleName: string) => {
+    setExpandedModules(prev => 
+      prev.includes(moduleName) 
+        ? prev.filter(m => m !== moduleName)
+        : [...prev, moduleName]
+    );
+  };
 
-      {/* Users Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {paginatedUsers.map((user) => {
-          const isSelected = selectedUserId === user.id;
-          
-          return (
-            <div key={user.id} className="h-full">
-                <SelectableCard
-                    selected={isSelected}
-                    onClick={() => onUserChange(user.id)}
-                    className="h-full"
-                >
-                    <div className="flex flex-col items-center text-center gap-2">
-                         <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold border-2 ${
-                              isSelected 
-                                ? 'bg-cyan-500 text-white border-white/20' 
-                                : 'bg-slate-700 text-slate-300 border-slate-600'
-                         }`}>
-                           {(user.name || '??').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                         </div>
-                         <div className="min-w-0 w-full">
-                             <div className={`font-bold text-sm truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
-                                 {(user.name || user.username).split(' ')[0]}
-                             </div>
-                             <div className="text-[10px] text-slate-400 truncate">@{user.username}</div>
-                         </div>
-                         <div className={`text-[10px] px-2 py-0.5 rounded-full border border-slate-600/50 bg-slate-700/50 text-slate-400 capitalize`}>
-                            {user.role}
-                         </div>
-                    </div>
-                </SelectableCard>
-            </div>
-          );
-        })}
-      </div>
+  const handleUserSelect = (userId: string) => {
+    onUserChange(userId);
+    setIsSelectionView(false);
+    // Expand all modules by default for better visibility
+    // setExpandedModules(Array.from(new Set(permissions.map(p => p.moduleName || 'Autre'))));
+    setExpandedModules([]); // Start collapsed for cleaner view
+  };
 
-       {/* Pagination */}
-       {filteredUsers.length > 8 && (
-          <div className="mt-2 text-center">
-            <span className="text-xs text-slate-500">
-                Page {currentPage} sur {totalPages} ({filteredUsers.length} utilisateurs)
-            </span>
-            <div className="flex justify-center mt-2">
-                 <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={goToPage}
-                    canGoNext={canGoNext}
-                    canGoPrevious={canGoPrevious}
-                    itemsPerPage={8}
-                    totalItems={filteredUsers.length}
-                  />
-            </div>
-          </div>
+  const handleBackToSelection = () => {
+    setIsSelectionView(true);
+    setUserSearchTerm('');
+  };
+
+  // --- RENDER SELECTION VIEW ---
+  if (isSelectionView) {
+    return (
+      <div className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
+        <div className="flex flex-col gap-2">
+           <h3 className="text-lg font-semibold text-white">Sélectionner un utilisateur</h3>
+           <SearchInput
+            value={userSearchTerm}
+            onChange={(e) => setUserSearchTerm(e.target.value)}
+            placeholder="Rechercher par nom, rôle..."
+            className="bg-slate-800 border-slate-700"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {paginatedUsers.map((user) => (
+             <SelectableCard
+                key={user.id}
+                selected={false}
+                onClick={() => handleUserSelect(user.id)}
+                className="hover:bg-slate-800/80 transition-colors h-auto"
+            >
+                <div className="flex flex-col items-center text-center gap-2 p-1">
+                     <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300">
+                       {(user.name || '??').slice(0, 2).toUpperCase()}
+                     </div>
+                     <div className="w-full">
+                         <div className="font-bold text-sm text-slate-200 truncate">{user.name}</div>
+                         <div className="text-xs text-slate-400 truncate">@{user.username}</div>
+                         <Badge variant="outline" className="mt-1 text-[10px] py-0 h-auto opacity-70" value={user.role} />
+                     </div>
+                </div>
+            </SelectableCard>
+          ))}
+        </div>
+        
+        {filteredUsers.length === 0 && (
+             <div className="text-center py-10 text-slate-500">Aucun utilisateur trouvé</div>
         )}
 
-      {/* Selected User Details */}
-      {selectedUser && (
-        <div className="animate-in slide-in-from-bottom-4 fade-in duration-300 mt-4">
-            <Card variant="glass" className="border-cyan-500/30 ring-1 ring-cyan-500/20">
-                <div className="flex flex-col gap-4">
-                     {/* User Header */}
-                    <div className="flex items-center gap-4 pb-4 border-b border-white/10">
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xl font-bold text-white shadow-lg shadow-cyan-500/20">
-                           {(selectedUser.name || '??').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                           <h3 className="text-lg font-bold text-white truncate">{selectedUser.name}</h3>
-                           <div className="flex items-center gap-2">
-                               <p className="text-cyan-400 text-xs truncate">@{selectedUser.username}</p>
-                               <span className="text-[10px] px-1.5 py-px bg-white/10 rounded text-slate-300 border border-white/10 uppercase tracking-wide">
-                                   {selectedUser.role}
-                               </span>
-                           </div>
-                        </div>
-                        <div className="hidden sm:block text-right">
-                           <div className="text-2xl font-bold text-cyan-400">{activePermissionsCount}</div>
-                           <div className="text-[10px] text-slate-400 uppercase tracking-wider">Perms Actives</div>
-                        </div>
-                    </div>
+        {totalPages > 1 && (
+            <div className="flex justify-center mt-4">
+                 <div className="flex gap-2">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        disabled={currentPage === 1}
+                        onClick={() => goToPage(currentPage - 1)}
+                    >
+                        Précédent
+                    </Button>
+                    <span className="flex items-center text-xs text-slate-500">
+                        Page {currentPage} / {totalPages}
+                    </span>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        disabled={currentPage === totalPages}
+                        onClick={() => goToPage(currentPage + 1)}
+                    >
+                        Suivant
+                    </Button>
+                 </div>
+            </div>
+        )}
+      </div>
+    );
+  }
 
-                    {/* Confirmation Message */}
-                    {confirmMessage && (
-                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2">
-                             <CheckCircle size={16} className="text-emerald-400 shrink-0" />
-                             <span className="text-xs font-medium text-emerald-400">{confirmMessage}</span>
-                        </div>
-                    )}
+  // --- RENDER PERMISSIONS VIEW ---
+  if (!selectedUser) return null;
 
-                    {/* Actions Bar */}
-                    <div className="flex flex-wrap gap-2">
-                        <Button 
-                            variant="primary" 
-                            size="sm" 
-                            onClick={handleOpenAddModal}
-                            className="bg-cyan-600 hover:bg-cyan-500 text-xs"
-                        >
-                            <Plus size={14} className="mr-1.5" /> Ajouter
-                        </Button>
-                        <Button 
-                            variant="danger" 
-                            size="sm" 
-                            onClick={handleOpenRemoveModal}
-                             className="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20 text-xs"
-                        >
-                            <Minus size={14} className="mr-1.5" /> Retirer
-                        </Button>
-                        <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block"></div>
-                        <Button variant="ghost" size="sm" onClick={onActivateAll} className="text-xs text-emerald-400 hover:bg-emerald-500/10">
-                            <Unlock size={14} className="mr-1.5" /> Tout Activer
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={onBlockAll} className="text-xs text-amber-400 hover:bg-amber-500/10">
-                            <Lock size={14} className="mr-1.5" /> Tout Bloquer
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={onResetPermissions} className="text-xs text-slate-400 hover:text-white ml-auto">
-                            Réinitialiser
-                        </Button>
-                    </div>
-
-                    {/* Permissions List */}
-                    <div className="space-y-2 mt-2">
-                       {userPermissions.length > 0 ? (
-                           <div className="grid gap-2 sm:grid-cols-2">
-                               {userPermissions.map((perm) => {
-                                   const status = getUserPermissionStatus(perm.permission_code);
-                                   const isCustom = status.source === 'custom';
-                                   
-                                   return (
-                                       <div 
-                                           key={perm.permission_code} 
-                                           className={`
-                                               group flex items-center justify-between p-3 rounded-xl border transition-all
-                                               ${status.granted 
-                                                   ? isCustom 
-                                                        ? 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10' 
-                                                        : 'bg-slate-700/30 border-slate-600/50' 
-                                                   : 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10'
-                                               }
-                                           `}
-                                       >
-                                           <div className="flex items-center gap-3 overflow-hidden">
-                                               <div className={`
-                                                    w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                                                    ${status.granted 
-                                                        ? isCustom ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
-                                                        : 'bg-red-500/20 text-red-400'
-                                                    }
-                                               `}>
-                                                   {status.granted ? <Shield size={14} /> : <LockKeyhole size={14} />}
-                                               </div>
-                                               <div className="min-w-0">
-                                                   <div className="font-medium text-sm text-slate-200 truncate">{perm.permission_name}</div>
-                                                   <div className="text-[10px] text-slate-500 font-mono truncate">{perm.permission_code}</div>
-                                               </div>
-                                           </div>
-                                            
-                                           <div className={`
-                                                text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border
-                                                ${status.granted 
-                                                    ? isCustom 
-                                                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' 
-                                                        : 'bg-slate-700 text-slate-400 border-slate-600'
-                                                    : 'bg-red-500/20 text-red-400 border-red-500/20'
-                                                }
-                                           `}>
-                                                {status.granted ? (isCustom ? 'Custom' : 'Hérité') : 'Bloqué'}
-                                           </div>
-                                       </div>
-                                   );
-                               })}
-                           </div>
-                       ) : (
-                           <div className="text-center py-10 border-2 border-dashed border-slate-700 rounded-xl">
-                               <Shield size={32} className="mx-auto text-slate-600 mb-2" />
-                               <p className="text-slate-500 text-sm">Aucune permission spécifique configurée.</p>
-                               <p className="text-slate-600 text-xs mt-1">L'utilisateur utilise les permissions de son rôle.</p>
-                           </div>
-                       )}
-                    </div>
-                </div>
-            </Card>
-        </div>
-      )}
-
-      {/* Add Permissions Modal - Dark Theme */}
-      <Modal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        title="Ajouter des Permissions"
-        size="lg"
-      >
-        <div className="space-y-4">
-          <SearchInput
-            value={modalSearchTerm}
-            onChange={(e) => setModalSearchTerm(e.target.value)}
-            placeholder="Rechercher une permission..."
-            className="bg-slate-900 border-slate-700"
-          />
-
-          <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-            {availableToAdd.length > 0 ? availableToAdd.map((perm) => (
-              <div
-                key={perm.code}
-                onClick={() => togglePermToAdd(perm.code)}
-                className={`
-                    p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between
-                    ${selectedPermsToAdd.includes(perm.code)
-                        ? 'bg-blue-500/20 border-blue-500/50'
-                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'
-                    }
-                `}
-              >
-                <div>
-                   <div className="font-semibold text-white text-sm">{perm.name}</div>
-                   <code className="text-xs text-slate-500">{perm.code}</code>
-                </div>
-                {selectedPermsToAdd.includes(perm.code) && (
-                   <CheckCircle size={20} className="text-blue-400 animate-in fade-in zoom-in" />
-                )}
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+      
+      {/* Detail Header */}
+      <Card variant="glass" className="border-cyan-500/30">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                  <Button variant="ghost" onClick={handleBackToSelection} className="w-10 h-10 p-0 rounded-full shrink-0 -ml-2 text-slate-400 hover:text-white flex items-center justify-center">
+                      <ArrowLeft size={20} />
+                  </Button>
+                  
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-cyan-500/20">
+                      {(selectedUser.name || '??').slice(0, 2).toUpperCase()}
+                  </div>
+                  
+                  <div>
+                      <h3 className="font-bold text-white leading-tight">{selectedUser.name}</h3>
+                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                          <span>@{selectedUser.username}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-600"></span>
+                          <span className="text-cyan-400">{selectedUser.role}</span>
+                      </div>
+                  </div>
               </div>
-            )) : (
-                <p className="text-center text-slate-500 py-4">Aucune permission disponible à ajouter.</p>
-            )}
-          </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
-            <Button variant="ghost" onClick={() => setShowAddModal(false)}>
-              Annuler
-            </Button>
-            <Button variant="primary" onClick={handleValidateAdd} disabled={selectedPermsToAdd.length === 0}>
-              Ajouter ({selectedPermsToAdd.length})
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Remove Permissions Modal - Dark Theme */}
-      <Modal
-        isOpen={showRemoveModal}
-        onClose={() => setShowRemoveModal(false)}
-        title="Retirer des Permissions"
-        size="lg"
-      >
-        <div className="space-y-4">
-           <SearchInput
-            value={modalSearchTerm}
-            onChange={(e) => setModalSearchTerm(e.target.value)}
-            placeholder="Rechercher une permission..."
-            className="bg-slate-900 border-slate-700"
-          />
-
-          <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-            {availableToRemove.length > 0 ? availableToRemove.map((perm) => (
-              <div
-                key={perm.code}
-                onClick={() => togglePermToRemove(perm.code)}
-                className={`
-                    p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between
-                    ${selectedPermsToRemove.includes(perm.code)
-                        ? 'bg-red-500/20 border-red-500/50'
-                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'
-                    }
-                `}
-              >
-                <div>
-                   <div className="font-semibold text-white text-sm">{perm.name}</div>
-                   <code className="text-xs text-slate-500">{perm.code}</code>
-                </div>
-                {selectedPermsToRemove.includes(perm.code) && (
-                   <X size={20} className="text-red-400 animate-in fade-in zoom-in" />
-                )}
+              <div className="flex items-center gap-4 bg-slate-950/30 px-4 py-2 rounded-lg border border-white/5 w-full sm:w-auto">
+                    <div className="text-center">
+                        <div className="text-xs text-slate-500 uppercase tracking-wider">Actives</div>
+                        <div className="text-xl font-bold text-cyan-400">{activePermissionsCount}</div>
+                    </div>
+                     <div className="w-px h-8 bg-white/10"></div>
+                     <div className="flex-1">
+                        <div className="text-xs text-slate-500 mb-1">Actions rapides</div>
+                        <div className="flex gap-2">
+                             <Button 
+                                variant="ghost" 
+                                size="xs" 
+                                onClick={onActivateAll} 
+                                className="h-6 px-2 text-emerald-400 hover:bg-emerald-500/10"
+                             >
+                                Toutes
+                             </Button>
+                             <Button 
+                                variant="ghost" 
+                                size="xs" 
+                                onClick={onBlockAll} 
+                                className="h-6 px-2 text-amber-400 hover:bg-amber-500/10"
+                             >
+                                Aucune
+                             </Button>
+                             <Button 
+                                variant="ghost" 
+                                size="xs" 
+                                onClick={onResetPermissions} 
+                                className="h-6 px-2 text-slate-400 hover:bg-slate-800"
+                              >
+                                Reset
+                             </Button>
+                        </div>
+                     </div>
               </div>
-            )) : (
-                <p className="text-center text-slate-500 py-4">Aucune permission disponible à retirer.</p>
-            )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
-            <Button variant="ghost" onClick={() => setShowRemoveModal(false)}>
-              Annuler
-            </Button>
-            <Button variant="danger" onClick={handleValidateRemove} disabled={selectedPermsToRemove.length === 0}>
-              Retirer ({selectedPermsToRemove.length})
-            </Button>
+          {/* Messages */}
+          {confirmMessage && (
+               <div className="mt-3 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded flex items-center gap-2 text-sm text-emerald-400 animate-in fade-in slide-in-from-top-2">
+                   <CheckCircle size={16} /> {confirmMessage}
+               </div>
+          )}
+      </Card>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+              <input 
+                  type="text" 
+                  value={permSearchTerm}
+                  onChange={(e) => setPermSearchTerm(e.target.value)}
+                  placeholder="Filtrer les permissions..."
+                  className="w-full bg-slate-800 border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm focus:ring-1 focus:ring-cyan-500 outline-none text-white placeholder:text-slate-500"
+              />
           </div>
-        </div>
-      </Modal>
+          <div className="flex items-center gap-2">
+               <button 
+                  onClick={() => setShowOnlyCustom(!showOnlyCustom)}
+                  className={`
+                      px-3 py-2 rounded-lg text-sm border flex items-center gap-2 transition-colors whitespace-nowrap
+                      ${showOnlyCustom 
+                          ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' 
+                          : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                      }
+                  `}
+               >
+                   <Filter size={16} />
+                   <span>Modifiées uniquement</span>
+               </button>
+          </div>
+      </div>
+
+      {/* Permission List */}
+      <div className="space-y-3">
+          {filteredPermissionGroups.map(([moduleName, modulePerms]) => {
+              const isExpanded = expandedModules.includes(moduleName) || permSearchTerm.length > 0;
+              const activeCount = modulePerms.filter(p => getUserPermissionStatus(p.code).granted).length;
+              const hasCustom = modulePerms.some(p => getUserPermissionStatus(p.code).source === 'user');
+
+              return (
+                  <div key={moduleName} className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                      {/* Module Header */}
+                      <div 
+                          onClick={() => toggleModule(moduleName)}
+                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-800 transition-colors"
+                      >
+                          <div className="flex items-center gap-3">
+                              <div className={`p-1.5 rounded-lg ${hasCustom ? 'bg-cyan-500/10 text-cyan-400' : 'bg-slate-700/50 text-slate-400'}`}>
+                                  {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                              </div>
+                              <div>
+                                  <h4 className="font-semibold text-slate-200">{moduleName}</h4>
+                                  <div className="text-xs text-slate-500">
+                                      {activeCount}/{modulePerms.length} actives • {modulePerms.length} permissions
+                                  </div>
+                              </div>
+                          </div>
+                          {hasCustom && (
+                              <Badge variant="info" className="text-[10px] bg-cyan-900/30 text-cyan-400 border-cyan-800" value="Modifié" />
+                          )}
+                      </div>
+
+                      {/* Permissions Grid */}
+                      {isExpanded && (
+                          <div className="border-t border-slate-700/50 bg-slate-900/20 divide-y divide-slate-700/30">
+                              {modulePerms.map(perm => {
+                                  // Find current status
+                                  const status = getUserPermissionStatus(perm.code);
+                                  const isCustom = status.source === 'user';
+                                  
+                                  return (
+                                      <div key={perm.id} className="flex items-center justify-between p-3 sm:px-4 hover:bg-white/5 transition-colors group">
+                                          <div className="flex-1 min-w-0 pr-4">
+                                              <div className="flex items-center gap-2 mb-0.5">
+                                                  <span className={`text-sm font-medium ${status.granted ? 'text-white' : 'text-slate-400'}`}>
+                                                      {perm.name}
+                                                  </span>
+                                                  {isCustom && (
+                                                      <span className={`text-[10px] px-1.5 rounded border ${
+                                                          status.granted 
+                                                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                                              : 'bg-red-500/10 border-red-500/20 text-red-400'
+                                                      }`}>
+                                                          {status.granted ? 'Accordée' : 'Bloquée'}
+                                                      </span>
+                                                  )}
+                                              </div>
+                                              <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
+                                                  {perm.code}
+                                                  {perm.description && (
+                                                      <span className="hidden sm:inline text-slate-600">• {perm.description}</span>
+                                                  )}
+                                              </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-3">
+                                              <div className="hidden sm:block text-right text-xs text-slate-500 mr-2">
+                                                  {status.source === 'role' ? 'Hérité' : 'Spécifique'}
+                                              </div>
+                                              <Switch 
+                                                  checked={status.granted}
+                                                  onChange={() => toggleUserPermission(perm.id)}
+                                                  className={status.granted ? "bg-emerald-500" : "bg-slate-600"}
+                                              />
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      )}
+                  </div>
+              );
+          })}
+          
+          {filteredPermissionGroups.length === 0 && (
+              <div className="text-center py-12 border border-dashed border-slate-700 rounded-xl">
+                  <Shield size={32} className="mx-auto text-slate-600 mb-2" />
+                  <p className="text-slate-500">Aucune permission ne correspond à votre recherche</p>
+              </div>
+          )}
+      </div>
     </div>
   );
 }

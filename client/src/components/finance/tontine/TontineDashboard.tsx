@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight } from 'lucide-react';
-import { Card, ProgressBar } from '../../ui';
+import React, { useState, useEffect, useCallback } from 'react';
+import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Shuffle, Gift, RefreshCw } from 'lucide-react';
+import { Card, ProgressBar, Button } from '../../ui';
+import { toast } from '../../../lib/toast';
 
 interface TontineDashboardProps {
   tontineId: string;
@@ -45,11 +46,72 @@ export default function TontineDashboard({
   });
   const [loading, setLoading] = useState(false);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [tirageEnCours, setTirageEnCours] = useState(false);
+  const [eligiblesBenefice, setEligiblesBenefice] = useState<any[]>([]);
 
   useEffect(() => {
     fetchStats();
     fetchRecentActivity();
+    fetchEligiblesBenefice();
   }, [tontineId, tourActuel]);
+
+  const fetchEligiblesBenefice = async () => {
+    if (!tontineId) return;
+    try {
+      const res = await fetch(`/api/tontines/${tontineId}/eligibles-benefice`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setEligiblesBenefice(data || []);
+      }
+    } catch (error) {
+      console.error('Erreur chargement éligibles:', error);
+    }
+  };
+
+  const fetchProchainBeneficiaire = async () => {
+    if (!tontineId) return null;
+    try {
+      const res = await fetch(`/api/tontines/${tontineId}/prochain-beneficiaire`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        return data?.client?.nom || null;
+      }
+    } catch (error) {
+      console.error('Erreur chargement prochain bénéficiaire:', error);
+    }
+    return null;
+  };
+
+  const handleTirage = useCallback(async () => {
+    if (!tontineId) return;
+    setTirageEnCours(true);
+    try {
+      const res = await fetch(`/api/tontines/${tontineId}/tirage-beneficiaire`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Erreur lors du tirage');
+      }
+
+      const data = await res.json();
+      const beneficiaireNom = data?.client?.nom || 'Membre sélectionné';
+
+      toast.success(`Tirage effectué ! ${beneficiaireNom} est le prochain bénéficiaire`);
+
+      // Refresh stats et éligibles
+      setStats(prev => ({ ...prev, prochainBeneficiaire: beneficiaireNom }));
+      fetchEligiblesBenefice();
+      fetchStats();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors du tirage');
+    } finally {
+      setTirageEnCours(false);
+    }
+  }, [tontineId]);
 
   const fetchStats = async () => {
     if (!tontineId) return;
@@ -69,7 +131,8 @@ export default function TontineDashboard({
 
       const totalContributions = contribData?.reduce((sum: number, c: any) => sum + (Number(c.montant) || 0), 0) || 0;
       const totalDistributions = 0;
-      const membresActifs = membresData?.filter((m: any) => m.status === 'Actif').length || 0;
+      // Support both 'status' (frontend alias) and 'statut' (backend raw)
+      const membresActifs = membresData?.filter((m: any) => (m.status === 'Actif' || m.statut === 'Actif')).length || 0;
 
       const contributionsTourActuel = contribData?.filter((c: any) => c.tour_numero === currentTour).length || 0;
       const contributionsAttendues = membresActifs;
@@ -78,13 +141,26 @@ export default function TontineDashboard({
         ? (contributionsTourActuel / contributionsAttendues) * 100
         : 0;
 
+      // Calculer les retards: membres qui n'ont pas cotisé pour le tour actuel
+      const membresAyantCotiseTourActuel = new Set(
+        contribData?.filter((c: any) => c.tour_numero === currentTour && c.statut === 'Validée')
+          .map((c: any) => c.clientId || c.client_id)
+      );
       const membresEnRetard = membresData?.filter(
-        (m: any) =>
-          m.status === 'Actif' &&
-          (m.montant_total_contribue || 0) < (currentTour * contributionAmount),
+        (m: any) => {
+          const isActif = m.status === 'Actif' || m.statut === 'Actif';
+          const clientId = m.client_id || m.clientId;
+          return isActif && !membresAyantCotiseTourActuel.has(clientId);
+        }
       ).length || 0;
 
-      const prochainBeneficiaire = membresData?.find((m: any) => !m.a_recu_benefice)?.clients?.nom || null;
+      // Prochain bénéficiaire: membre actif qui n'a pas encore reçu le bénéfice
+      const prochainBeneficiaireCandidate = membresData?.find((m: any) => {
+        const isActif = m.status === 'Actif' || m.statut === 'Actif';
+        const aRecuBenefice = m.a_recu_benefice || m.aRecuBenefice;
+        return isActif && !aRecuBenefice;
+      });
+      const prochainBeneficiaire = prochainBeneficiaireCandidate?.client?.nom || null;
 
       setStats({
         totalContributions,
@@ -236,14 +312,49 @@ export default function TontineDashboard({
             </div>
 
             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-              <div className="text-slate-400 mb-1 uppercase tracking-wider font-semibold text-[10px]">Prochain Bénéficiaire</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-slate-400 uppercase tracking-wider font-semibold text-[10px]">Prochain Bénéficiaire</div>
+                {eligiblesBenefice.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleTirage}
+                    disabled={tirageEnCours}
+                    className="text-cyan-400 hover:text-cyan-300 text-[10px] px-2 py-1"
+                    icon={tirageEnCours ? RefreshCw : Shuffle}
+                  >
+                    {tirageEnCours ? 'Tirage...' : 'Tirer'}
+                  </Button>
+                )}
+              </div>
               {stats.prochainBeneficiaire ? (
                 <div className="text-white font-bold text-base flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <Gift size={16} className="text-emerald-400" />
                   {stats.prochainBeneficiaire}
                 </div>
+              ) : eligiblesBenefice.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="text-slate-400 text-xs">
+                    {eligiblesBenefice.length} membre(s) éligible(s)
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {eligiblesBenefice.slice(0, 5).map((m, i) => (
+                      <span key={i} className="text-[10px] bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-300">
+                        {m.client?.nom}
+                      </span>
+                    ))}
+                    {eligiblesBenefice.length > 5 && (
+                      <span className="text-[10px] bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-400">
+                        +{eligiblesBenefice.length - 5}
+                      </span>
+                    )}
+                  </div>
+                </div>
               ) : (
-                <div className="text-slate-500 italic text-xs">Aucun en attente</div>
+                <div className="text-green-400 italic text-xs flex items-center gap-1">
+                  <CheckCircle size={12} />
+                  Tous ont reçu le bénéfice
+                </div>
               )}
             </div>
 

@@ -19,33 +19,60 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('EpargneDetailModal compteId changed:', compteId);
     loadCompteDetails();
   }, [compteId]);
 
   const loadCompteDetails = async () => {
     try {
-      const [comptesData, transactionsData, clientsData] = await Promise.all([
+      const [comptesResponse, transactionsData, clientsResponse] = await Promise.all([
         compteEpargneApi.getAll(),
         transactionEpargneApi.getByCompte(compteId),
         clientApi.getAll()
       ]);
 
+      // Handle paginated response format: { data, total, page, limit, totalPages }
+      const comptesData = Array.isArray(comptesResponse) ? comptesResponse : comptesResponse.data || [];
+      const clientsAny = clientsResponse as any;
+      const clientsData = Array.isArray(clientsAny) ? clientsAny : clientsAny.data || [];
+
       const compteData = comptesData.find((c: any) => c.id === compteId);
       if (compteData) {
-        const clientData = clientsData.find((c: any) => c.id === compteData.client_id);
+        // Robust client finding
+        const clientId = compteData.client_id || compteData.clientId;
+        let clientData = null;
+        
+        if (clientId) {
+          clientData = clientsData.find((c: any) => c.id === clientId);
+        }
+        
+        // If client not found in list, try to use embedded client data if available
+        if (!clientData && compteData.clients) {
+          clientData = compteData.clients;
+        }
+
         setCompte({
           ...compteData,
-          clients: clientData || { nom: 'Inconnu', email: '', phone: '' }
+          clients: clientData || { nom: 'Inconnu', email: 'N/A', phone: 'N/A' }
         });
       }
 
       if (transactionsData) {
-        setTransactions(transactionsData);
+        // Normalize transaction fields from backend (typePaiement -> type_transaction, createdAt -> date_transaction)
+        const normalizedTransactions = transactionsData.map((t: any) => ({
+          ...t,
+          type_transaction: (t.typePaiement || t.type_paiement || '').replace(' Épargne', '') || 'Autre',
+          date_transaction: t.createdAt || t.created_at || new Date().toISOString(),
+          description: t.observations || t.typePaiement || t.type_paiement,
+          reference: t.billingReference || t.billing_reference || t.id?.substring(0, 8)
+        }));
+        setTransactions(normalizedTransactions);
 
-        const statsCalc = transactionsData.reduce((acc: any, t: any) => {
-          if (t.type_transaction === 'Dépôt') acc.totalDepots += t.montant;
-          else if (t.type_transaction === 'Retrait') acc.totalRetraits += Math.abs(t.montant);
-          else if (t.type_transaction === 'Intérêts') acc.totalInterets += t.montant;
+        const statsCalc = normalizedTransactions.reduce((acc: any, t: any) => {
+          const montant = Number(t.montant) || 0;
+          if (t.type_transaction === 'Dépôt') acc.totalDepots += montant;
+          else if (t.type_transaction === 'Retrait') acc.totalRetraits += Math.abs(montant);
+          else if (t.type_transaction === 'Intérêts') acc.totalInterets += montant;
           acc.nombreTransactions++;
           return acc;
         }, { totalDepots: 0, totalRetraits: 0, totalInterets: 0, nombreTransactions: 0 });
@@ -62,13 +89,26 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
   const calculateInterets = () => {
     if (!compte) return 0;
 
-    const dateOuverture = new Date(compte.date_ouverture);
+    // Use default interest rate if missing
+    const tauxInteret = compte.taux_interet || compte.tauxInteret || 0;
+    
+    // Validate date
+    const dateOuvertureStr = compte.date_ouverture || compte.createdAt || compte.created_at;
+    if (!dateOuvertureStr) return 0;
+    
+    const dateOuverture = new Date(dateOuvertureStr);
+    if (isNaN(dateOuverture.getTime())) return 0;
+
     const aujourdhui = new Date();
     const joursDiff = Math.floor((aujourdhui.getTime() - dateOuverture.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Avoid negative diff if date is in future (timezone issues)
+    if (joursDiff <= 0) return 0;
+    
     const anneeDiff = joursDiff / 365;
 
-    const interetsEstimes = compte.solde * (compte.taux_interet / 100) * anneeDiff;
-    return interetsEstimes;
+    const interetsEstimes = compte.solde * (tauxInteret / 100) * anneeDiff;
+    return interetsEstimes || 0; // Return 0 if NaN
   };
 
   if (loading) {
@@ -84,14 +124,22 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
   const interetsEstimes = calculateInterets();
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex justify-between items-center">
+    <div 
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+      onClick={(e) => {
+        // Close modal when clicking on backdrop
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex justify-between items-center z-10">
           <div>
             <h2 className="text-2xl font-bold text-white">{compte.numero_compte}</h2>
             <p className="text-slate-400 text-sm mt-1">{compte.type_compte}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition">
             <X size={24} />
           </button>
         </div>
@@ -128,15 +176,15 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Nom:</span>
-                  <span className="text-white font-semibold">{compte.clients.nom}</span>
+                  <span className="text-white font-semibold">{compte.clients?.nom || 'Inconnu'} {compte.clients?.prenom || ''}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Email:</span>
-                  <span className="text-white">{compte.clients.email}</span>
+                  <span className="text-white">{compte.clients?.email || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Téléphone:</span>
-                  <span className="text-white">{compte.clients.phone}</span>
+                  <span className="text-white">{compte.clients?.phone || compte.clients?.telephone || 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -149,11 +197,15 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Date d'ouverture:</span>
-                  <span className="text-white">{new Date(compte.date_ouverture).toLocaleDateString()}</span>
+                  <span className="text-white">
+                    {compte.date_ouverture ? new Date(compte.date_ouverture).toLocaleDateString() : 'N/A'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Taux d'intérêt:</span>
-                  <span className="text-white font-bold">{compte.taux_interet}% / an</span>
+                  <span className="text-white font-bold">
+                    {compte.taux_interet || compte.tauxInteret || 0}% / an
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Statut:</span>

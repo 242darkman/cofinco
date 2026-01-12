@@ -86,6 +86,7 @@ export const methodePaiementEnum = pgEnum("methode_paiement_enum", [
   "Virement",
   "Carte",
   "Chèque",
+  "Autre",
 ]);
 
 
@@ -198,10 +199,14 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   // Crédit
   "Remboursement Crédit",
   "Frais Engagement",
+  "Décaissement Crédit",
 
   // Tontine
   "Versement Tontine",
   "Retrait Tontine",
+
+  // Coffre
+  "Approvisionnement coffre",
 ]);
 
 export const typeCompteEnum = pgEnum("type_compte_enum", [

@@ -62,8 +62,8 @@ export const insertTontineSchema = createInsertSchema(tontines, {
       schema,
     ),
   montantCotisation: z.coerce.string(),
-  tauxPlateforme: z.coerce.string(),
-  solde: z.coerce.string(),
+  tauxPlateforme: z.coerce.string().optional().default("0"),
+  solde: z.coerce.string().optional().default("0"),
 }).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertTontine = z.infer<typeof insertTontineSchema>;
 export type Tontine = typeof tontines.$inferSelect;

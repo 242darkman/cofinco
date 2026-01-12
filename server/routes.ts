@@ -24,11 +24,13 @@ import { registerReevaluationRoutes } from "./routes/reevaluations";
 
 import { coffreRouter } from "./routes/coffre";
 import { caisseAgentRouter } from "./routes/caisse-agent";
+import { uploadRouter } from "./routes/upload";
 
 export function registerRoutes(app: Express): Server {
   // ... existing routes
   app.use("/api/coffre", coffreRouter);
   app.use("/api/caisse-agent", caisseAgentRouter);
+  app.use("/api/uploads", uploadRouter);
   // Register modular routes
   registerAuthRoutes(app);
   registerClientRoutes(app);

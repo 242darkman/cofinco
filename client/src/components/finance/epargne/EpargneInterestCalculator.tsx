@@ -10,12 +10,12 @@ interface Compte {
   id: string;
   numero_compte: string;
   solde: number;
-  taux_interet: number;
-  date_ouverture: string;
+  taux_interet?: number;
+  date_ouverture?: string;
   clients: {
     id: string;
     nom: string;
-  };
+  } | null;
 }
 
 interface EpargneInterestCalculatorProps {
@@ -37,13 +37,17 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
   const [periode, setPeriode] = useState<Periode>('month');
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // Default values for optional properties
+  const tauxInteret = compte.taux_interet ?? 0;
+  const dateOuverture = compte.date_ouverture ?? new Date().toISOString();
+
   // Memoized calculations
   const { interets, nouveauSolde, rendement, joursOuvert } = useMemo(() => {
     const periodeEnJours = PERIODE_CONFIG[periode].days;
-    const calculatedInterets = compte.solde * (compte.taux_interet / 100) * (periodeEnJours / 365);
+    const calculatedInterets = compte.solde * (tauxInteret / 100) * (periodeEnJours / 365);
     const calculatedNouveauSolde = compte.solde + calculatedInterets;
     const calculatedRendement = compte.solde > 0 ? (calculatedInterets / compte.solde) * 100 : 0;
-    const days = Math.floor((new Date().getTime() - new Date(compte.date_ouverture).getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.floor((new Date().getTime() - new Date(dateOuverture).getTime()) / (1000 * 60 * 60 * 24));
 
     return {
       interets: calculatedInterets,
@@ -51,7 +55,7 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
       rendement: calculatedRendement,
       joursOuvert: days,
     };
-  }, [compte.solde, compte.taux_interet, compte.date_ouverture, periode]);
+  }, [compte.solde, tauxInteret, dateOuverture, periode]);
 
   const handlePayInterests = useCallback(async () => {
     if (interets <= 0) {
@@ -69,23 +73,25 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
         montant: interets,
         soldeAvant: compte.solde,
         soldeApres: nouveauSolde,
-        description: `Intérêts créditeurs - ${PERIODE_CONFIG[periode].label} (${compte.taux_interet}%)`,
+        description: `Intérêts créditeurs - ${PERIODE_CONFIG[periode].label} (${tauxInteret}%)`,
       });
 
       // Update account balance
       await compteEpargneApi.update(compte.id, { solde: nouveauSolde });
 
-      // Update client total savings
-      try {
-        const clientData = await clientApi.getById(compte.clients.id);
-        if (clientData) {
-          await clientApi.update(compte.clients.id, {
-            epargneTotal: (parseFloat(clientData.epargneTotal) || 0) + interets,
-          });
+      // Update client total savings (if client data available)
+      if (compte.clients) {
+        try {
+          const clientData = await clientApi.getById(compte.clients.id);
+          if (clientData) {
+            await clientApi.update(compte.clients.id, {
+              epargneTotal: (parseFloat(clientData.epargneTotal) || 0) + interets,
+            });
+          }
+        } catch (clientError) {
+          // Non-blocking error for client update
+          console.warn('Mise à jour client non effectuée:', clientError);
         }
-      } catch (clientError) {
-        // Non-blocking error for client update
-        console.warn('Mise à jour client non effectuée:', clientError);
       }
 
       toast.success(`Intérêts de ${formatMoney(interets)} crédités avec succès`);
@@ -112,7 +118,7 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
   }, [interets]);
 
   // Escape client name for XSS protection
-  const safeClientName = escapeHtml(compte.clients.nom);
+  const safeClientName = compte.clients ? escapeHtml(compte.clients.nom) : 'Client inconnu';
   const safeNumeroCompte = escapeHtml(compte.numero_compte);
 
   return (

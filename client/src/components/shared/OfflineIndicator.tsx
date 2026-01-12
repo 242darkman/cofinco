@@ -10,6 +10,11 @@ export function OfflineIndicator() {
   const { t } = useLanguage();
   const [showDetails, setShowDetails] = useState(false);
 
+  // Always show indicator
+  // if (isOnline && !isSyncing && pendingCount === 0 && syncStats.failed === 0 && syncStats.conflicts === 0) {
+  //   return null;
+  // }
+
   const getStatusColor = () => {
     if (!isOnline) return 'bg-red-500';
     if (isSyncing) return 'bg-yellow-500';

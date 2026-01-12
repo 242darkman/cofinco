@@ -176,6 +176,7 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
   ],
   'Administration': [
     { name: 'Gérer les utilisateurs', code: 'admin.users', description: 'Accès gestion utilisateurs' },
+    { name: 'Voir les utilisateurs', code: 'users.view', description: 'Voir la liste des utilisateurs' },
     { name: 'Créer utilisateurs', code: 'users.create', description: 'Créer des utilisateurs' },
     { name: 'Modifier utilisateurs', code: 'users.edit', description: 'Modifier des utilisateurs' },
     { name: 'Supprimer utilisateurs', code: 'users.delete', description: 'Supprimer des utilisateurs' },
@@ -201,72 +202,88 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
   ],
 };
 
+// Based on client/src/lib/rbac-config.ts
+// Keys are in snake_case for backend consistency, permissions aligned with client config
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  'Administrateur': ['*'],
-  'Chef d\'Agence': [
+  'admin': ['*'], // Administrateur - Full access
+  
+  'chef_agence': [ // Chef d'Agence
     'dashboard.view',
-    'caisse.view', 'caisse.open', 'caisse.close', 'caisse.deposit', 'caisse.withdraw', 'caisse.transfer',
-    'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
+    'clients.view', 'clients.create', 'clients.edit', 'clients.delete',
+    'credits.view', 'credits.create', 'credits.edit', 'credits.approve', 'credits.delete',
     'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
+    'epargnes.view', 'epargnes.create', 'epargnes.edit',
+    'tontines.view', 'tontines.create', 'tontines.edit', 'tontines.manage',
+    'comptabilite.view',
     'remboursements.view', 'remboursements.create',
-    'clients.view', 'clients.create', 'clients.edit',
-    'epargnes.view', 'epargnes.create', 'epargnes.deposit', 'epargnes.withdraw',
-    'tontines.view', 'tontines.create', 'tontines.manage',
-    'comptabilite.view', 'comptabilite.reports',
-    'agent.view',
-    'transferts.view',
     'rapports.view', 'rapports.export',
-    'rh.view', 'rh.create', 'rh.edit',
-    'communications.view',
-    'messages.view', 'messages.send',
+    'agent.view', 'agent.manage',
+    'caisse.view', 'caisse.manage',
+    'caisseagent.view', 'caisseagent.manage', 'caisseagent.approve', 'caisseagent.reject', 'caisseagent.suspend',
+    'rh.view', 'rh.create', 'rh.edit', 'rh.manage',
+    'paie.view', 'paie.create', 'paie.approve',
+    'users.view', 'users.create', 'users.edit',
     'coffre.view', 'coffre.transfert.init', 'coffre.transfert.validate', 'coffre.transfert.execute', 'coffre.config.view',
-  ],
-  'Agent Caisse': [
-    'dashboard.view',
-    'caisse.view', 'caisse.open', 'caisse.close', 'caisse.deposit', 'caisse.withdraw',
-    'clients.view', 'clients.create',
-    'epargnes.view', 'epargnes.deposit', 'epargnes.withdraw',
-    'credits.view', 'credits.collect',
-    'remboursements.view', 'remboursements.create',
-    'remboursements.view', 'remboursements.create',
-    'messages.view', 'messages.send',
-    'coffre.view',
-  ],
-  'Agent Terrain': [
-    'dashboard.view',
-    'clients.view', 'clients.create',
-    'agent.view', 'agent.collect', 'agent.visit',
-    'credits.view', 'credits.collect',
-    'epargnes.view', 'epargnes.deposit',
+    'incidents.view', 'incidents.manage', 'incidents.edit',
+    'visites.view',
+    'prospection.view',
+    'paiements.view',
     'communications.view',
     'messages.view', 'messages.send',
   ],
-  'Comptable': [
+  
+  'comptable': [ // Comptable
     'dashboard.view',
-    'comptabilite.view', 'comptabilite.write', 'comptabilite.reports',
-    'credits.view',
-    'epargnes.view',
-    'rapports.view', 'rapports.export', 'rapports.schedule',
-    'caisse.view',
-    'audit.view',
-  ],
-  'Gestionnaire Crédit': [
-    'dashboard.view',
-    'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
-    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
-    'clients.view', 'clients.create', 'clients.edit',
-    'remboursements.view', 'remboursements.create',
-    'rapports.view',
-  ],
-  'Superviseur': [
-    'dashboard.view',
-    'caisse.view',
-    'credits.view',
     'clients.view',
+    'credits.view',
     'epargnes.view',
-    'tontines.view',
-    'agent.view',
+    'comptabilite.view', 'comptabilite.create', 'comptabilite.edit', 'comptabilite.export',
     'rapports.view', 'rapports.export',
+    'rh.view', // Pointage uniquement
+  ],
+  
+  'gestionnaire_credit': [ // Gestionnaire Crédit
+    'dashboard.view',
+    'clients.view', 'clients.create', 'clients.edit',
+    'credits.view', 'credits.create', 'credits.edit', 'credits.approve',
+    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
+    'remboursements.view', 'remboursements.create',
+    'rapports.view', 'rapports.export',
+    'rh.view', // Pointage uniquement
+  ],
+  
+  'superviseur': [ // Superviseur
+    'dashboard.view',
+    'clients.view',
+    'agent.view', 'agent.manage',
+    'tontines.view', 'tontines.manage',
+    'caisseagent.view', 'caisseagent.approve', 'caisseagent.reject',
+    'rapports.view',
+    'communications.view',
+    'rh.view', // Pointage uniquement
+  ],
+  
+  'caissier': [ // Agent Caisse
+    'dashboard.view',
+    'clients.view', 'clients.create',
+    'epargnes.view', 'epargnes.create', 'epargnes.edit',
+    'caisse.view', 'caisse.create', 'caisse.edit',
+    'remboursements.view', 'remboursements.create',
+    'communications.view',
+    'rh.view', // Pointage uniquement
+  ],
+  
+  'terrain': [ // Agent Terrain
+    'dashboard.view',
+    'clients.view', 'clients.create', 'clients.edit',
+    'agent.view', 'agent.create',
+    'prospection.view', 'prospection.create',
+    'caisseagent.view', 'caisseagent.create', // Peut créer des opérations, pas les approuver
+    'incidents.view', 'incidents.create',
+    'visites.view', 'visites.create',
+    'paiements.view', 'paiements.create',
+    'communications.view',
+    'rh.view', // Pointage uniquement
   ],
 };
 
@@ -543,7 +560,7 @@ async function seedProd() {
     // Reevaluation Configuration
     console.log('\\n🔄 Seeding Reevaluation Config...');
     await db.insert(configReevaluation).values({
-      delaiMinimumJours: 30,
+      delaiMinimumJours: 1, // Minimum delay for reevaluation
       maxReevaluationsParDemande: 2,
       motifsNonReevaluables: [
         'Fraude avérée',

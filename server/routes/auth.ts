@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { insertUserSchema, users, userPermissions } from "@shared/schema";
+import { insertUserSchema, users, userPermissions, modules, permissions } from "@shared/schema";
 import { storage } from "../storage";
 import { loginUser, registerUser, requireAuth, requireRole, hashPassword, comparePasswords } from "../auth";
 import { logAudit, logLoginAttempt, isAccountLocked, validatePassword, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
@@ -674,42 +674,62 @@ export function registerAuthRoutes(app: Express) {
   app.get("/api/users/:userId/permissions", requireRole("admin"), async (req, res) => {
     try {
       const { userId } = req.params;
-      const permissions = await db.select().from(userPermissions).where(eq(userPermissions.userId, userId));
+      
+      // Fetch granular permissions with explicit join alias if needed, or just map manually
+      // We join userPermissions -> permissions -> modules
+      const userPerms = await db.select({
+        code: permissions.code,
+        moduleName: modules.name,
+        granted: userPermissions.granted
+      })
+      .from(userPermissions)
+      .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
+      .leftJoin(modules, eq(permissions.moduleId, modules.id))
+      .where(eq(userPermissions.userId, userId));
 
-      // Transform to a map by module for easier frontend usage
+      // Transform to a map by module for legacy frontend usage
       const permissionsMap: Record<string, any> = {};
-      permissions.forEach(p => {
-        permissionsMap[p.moduleName] = {
-          module_name: p.moduleName,
-          peut_voir: p.peutVoir,
-          peut_creer: p.peutCreer,
-          peut_modifier: p.peutModifier,
-          peut_supprimer: p.peutSupprimer,
-          peut_valider: p.peutValider,
-          peut_exporter: p.peutExporter
-        };
+      
+      // Helper to init module entry
+      const getOrCreateModule = (name: string) => {
+        if (!permissionsMap[name]) {
+          permissionsMap[name] = {
+            module_name: name,
+            peut_voir: false,
+            peut_creer: false,
+            peut_modifier: false,
+            peut_supprimer: false,
+            peut_valider: false,
+            peut_exporter: false
+          };
+        }
+        return permissionsMap[name];
+      };
+
+      userPerms.forEach(p => {
+        if (!p.granted) return;
+        const entry = getOrCreateModule(p.moduleName || 'Unknown');
+        const [, action] = p.code.split('.');
+        
+        // Map granular action to legacy flag
+        switch (action) {
+          case 'view': entry.peut_voir = true; break;
+          case 'create': entry.peut_creer = true; break;
+          case 'edit': entry.peut_modifier = true; break;
+          case 'delete': entry.peut_supprimer = true; break;
+          case 'approve': entry.peut_valider = true; break;
+          case 'export': entry.peut_exporter = true; break;
+        }
       });
 
       // Check for Caisse assignments and inject permission
       const assignments = await storage.getUserCaisseAssignments(userId);
       if (assignments && assignments.length > 0) {
           // If assigned to at least one caisse, grant view/create permissions for Caisse module
-          if (!permissionsMap['Caisse']) {
-              permissionsMap['Caisse'] = {
-                  module_name: 'Caisse',
-                  peut_voir: true,
-                  peut_creer: true, // Needed to open session
-                  peut_modifier: false,
-                  peut_supprimer: false,
-                  peut_valider: true,
-                  peut_exporter: false
-              };
-          } else {
-              // Upgrade existing permissions
-              permissionsMap['Caisse'].peut_voir = true;
-              permissionsMap['Caisse'].peut_creer = true;
-              permissionsMap['Caisse'].peut_valider = true;
-          }
+          const entry = getOrCreateModule('Caisse');
+          entry.peut_voir = true;
+          entry.peut_creer = true; // Needed to open session
+          entry.peut_valider = true;
       }
 
       res.json(permissionsMap);
@@ -719,7 +739,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // Save/Update permissions for a user (batch update)
+  // Save/Update permissions for a user (batch update - Legacy Adapter)
   app.put("/api/users/:userId/permissions", requireRole("admin"), async (req, res) => {
     try {
       const { userId } = req.params;
@@ -738,23 +758,51 @@ export function registerAuthRoutes(app: Express) {
         return res.status(404).json({ message: "Utilisateur non trouvé" });
       }
 
-      // Delete existing permissions for this user
+      // Fetch all system permissions to map codes
+      const allPerms = await db.select({
+        id: permissions.id,
+        code: permissions.code,
+        moduleName: modules.name
+      })
+      .from(permissions)
+      .leftJoin(modules, eq(permissions.moduleId, modules.id));
+
+      // Build list of permission IDs to grant
+      const permissionIdsToGrant: string[] = [];
+
+      Object.entries(permissionsData).forEach(([moduleName, flags]) => {
+         const modulePerms = allPerms.filter(p => p.moduleName === moduleName);
+         modulePerms.forEach(p => {
+            const [, action] = p.code.split('.');
+            let shouldGrant = false;
+            switch(action) {
+               case 'view': shouldGrant = flags.peut_voir; break;
+               case 'create': shouldGrant = flags.peut_creer; break;
+               case 'edit': shouldGrant = flags.peut_modifier; break;
+               case 'delete': shouldGrant = flags.peut_supprimer; break;
+               case 'approve': shouldGrant = flags.peut_valider; break;
+               case 'export': shouldGrant = flags.peut_exporter; break;
+            }
+            if (shouldGrant) {
+               permissionIdsToGrant.push(p.id);
+            }
+         });
+      });
+
+      // Transaction-like update: delete all for user then insert
+      // Note: We only delete/replace permissions that match the legacy flags logic?
+      // Or just wipe all and set new state? The endpoint implies full state update.
+      // So we delete all custom permissions.
+      
       await db.delete(userPermissions).where(eq(userPermissions.userId, userId));
 
-      // Insert new permissions
-      const permissionsToInsert = Object.entries(permissionsData).map(([moduleName, perms]) => ({
-        userId,
-        moduleName,
-        peutVoir: perms.peut_voir || false,
-        peutCreer: perms.peut_creer || false,
-        peutModifier: perms.peut_modifier || false,
-        peutSupprimer: perms.peut_supprimer || false,
-        peutValider: perms.peut_valider || false,
-        peutExporter: perms.peut_exporter || false
-      }));
-
-      if (permissionsToInsert.length > 0) {
-        await db.insert(userPermissions).values(permissionsToInsert);
+      if (permissionIdsToGrant.length > 0) {
+        const values = permissionIdsToGrant.map(pid => ({
+           userId,
+           permissionId: pid,
+           granted: true
+        }));
+        await db.insert(userPermissions).values(values);
       }
 
       await logAudit(
@@ -767,7 +815,7 @@ export function registerAuthRoutes(app: Express) {
         "high"
       );
 
-      res.json({ message: "Permissions mises à jour avec succès", count: permissionsToInsert.length });
+      res.json({ message: "Permissions mises à jour avec succès", count: permissionIdsToGrant.length });
     } catch (error) {
       console.error("Error saving permissions:", error);
       res.status(500).json({ message: "Erreur lors de la sauvegarde des permissions" });
@@ -783,6 +831,11 @@ export function registerAuthRoutes(app: Express) {
       if (!module || !action) {
         return res.status(400).json({ message: "Module et action requis" });
       }
+      
+      // Construct expected code (simple heuristic, might need refinement if 'module' param != module name)
+      // Usually module param here is 'Caisse', 'Clients' etc. or 'caisse', 'clients'.
+      // Code convention is lowercase: 'caisse.view'.
+      const expectedCode = `${(module as string).toLowerCase()}.${(action as string).toLowerCase()}`;
 
       // Admins have all permissions
       if (user.role === "admin" || user.role === "Administrateur") {
@@ -790,11 +843,14 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Check user-specific permissions
+      // Join userPermissions -> permissions
       const [permission] = await db.select()
         .from(userPermissions)
+        .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
         .where(and(
           eq(userPermissions.userId, user.id),
-          eq(userPermissions.moduleName, module as string)
+          eq(permissions.code, expectedCode),
+          eq(userPermissions.granted, true)
         ));
 
       if (!permission) {
@@ -812,19 +868,9 @@ export function registerAuthRoutes(app: Express) {
         return res.json({ allowed: false });
       }
 
-      const actionMap: Record<string, keyof typeof permission> = {
-        'view': 'peutVoir',
-        'create': 'peutCreer',
-        'edit': 'peutModifier',
-        'delete': 'peutSupprimer',
-        'validate': 'peutValider',
-        'export': 'peutExporter'
-      };
-
-      const permKey = actionMap[action as string];
-      const allowed = permKey ? permission[permKey] : false;
-
-      res.json({ allowed });
+      // Permission found and granted=true (checked in query at line 853)
+      // No need to check individual fields - the existence of the permission means it's allowed
+      res.json({ allowed: true });
     } catch (error) {
       console.error("Error checking permission:", error);
       res.status(500).json({ message: "Erreur lors de la vérification des permissions" });

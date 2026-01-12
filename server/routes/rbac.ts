@@ -425,8 +425,14 @@ export function registerRbacRoutes(app: Express) {
         ));
 
       // Get user-specific custom permissions (overrides)
-      const customPerms = await db.select()
+      // Get user-specific custom permissions (granular overrides)
+      // Joined with permissions table to get the code
+      const customPerms = await db.select({
+         code: permissions.code,
+         granted: userPermissions.granted
+      })
         .from(userPermissions)
+        .leftJoin(permissions, eq(userPermissions.permissionId, permissions.id))
         .where(eq(userPermissions.userId, userId));
 
       // Build permissions map from role permissions
@@ -446,34 +452,28 @@ export function registerRbacRoutes(app: Express) {
         }
       });
 
-      // Apply custom permission overrides (userPermissions table)
-      // This uses the legacy module-based permissions (peutVoir, peutCreer, etc.)
-      const actionMapping: Record<string, string> = {
-        'peutVoir': 'view',
-        'peutCreer': 'create',
-        'peutModifier': 'edit',
-        'peutSupprimer': 'delete',
-        'peutValider': 'approve',
-        'peutExporter': 'export'
-      };
-
+      // Apply custom permission overrides
       customPerms.forEach(cp => {
-        const moduleName = cp.moduleName.toLowerCase();
-        if (!permissionsMap[moduleName]) {
-          permissionsMap[moduleName] = [];
-        }
+         if (!cp.code) return;
+         
+         const parts = cp.code.split('.');
+         const moduleName = parts[0].toLowerCase();
+         // Action is everything after the first dot
+         const action = parts.slice(1).join('.');
 
-        // Add or remove permissions based on custom settings
-        Object.entries(actionMapping).forEach(([key, action]) => {
-          const hasPermission = (cp as any)[key];
-          const index = permissionsMap[moduleName].indexOf(action);
+         if (!permissionsMap[moduleName]) {
+            permissionsMap[moduleName] = [];
+         }
 
-          if (hasPermission && index === -1) {
-            permissionsMap[moduleName].push(action);
-          } else if (!hasPermission && index !== -1) {
-            permissionsMap[moduleName].splice(index, 1);
-          }
-        });
+         const index = permissionsMap[moduleName].indexOf(action);
+         
+         if (cp.granted && index === -1) {
+             // Add permission if granted and not present
+             permissionsMap[moduleName].push(action);
+         } else if (!cp.granted && index !== -1) {
+             // Remove permission if denied and present
+             permissionsMap[moduleName].splice(index, 1);
+         }
       });
 
       res.json({
@@ -500,7 +500,7 @@ export function registerRbacRoutes(app: Express) {
         return res.status(404).json({ message: "Utilisateur non trouvé" });
       }
 
-      // Get all permissions
+      // Get all system permissions
       const allPerms = await db.select({
         id: permissions.id,
         code: permissions.code,
@@ -510,7 +510,7 @@ export function registerRbacRoutes(app: Express) {
         .from(permissions)
         .leftJoin(modules, eq(permissions.moduleId, modules.id));
 
-      // Get role permissions
+      // Get role permissions used for inheritance
       const rolePerms = await db.select({
         permissionId: rolePermissions.permissionId,
         granted: rolePermissions.granted,
@@ -520,38 +520,29 @@ export function registerRbacRoutes(app: Express) {
 
       const rolePermIds = new Set(rolePerms.filter(rp => rp.granted).map(rp => rp.permissionId));
 
-      // Get custom user permissions
-      const customPerms = await db.select()
+      // Get custom user permissions (granular)
+      // Get custom user permissions (granular)
+      const customPerms = await db.select({
+        permissionId: userPermissions.permissionId,
+        granted: userPermissions.granted
+      })
         .from(userPermissions)
         .where(eq(userPermissions.userId, userId));
+      
+      const customPermMap = new Map(customPerms.map(cp => [cp.permissionId, cp]));
 
-      // Build response in format expected by useUserPermissions hook
+      // Build response
       const result = allPerms.map(p => {
         const hasRolePerm = rolePermIds.has(p.id);
-        const customPerm = customPerms.find(cp => {
-          const [module] = p.code.split('.');
-          return cp.moduleName.toLowerCase() === module;
-        });
+        const customPerm = customPermMap.get(p.id);
 
         let granted = hasRolePerm;
         let source = 'role';
 
         // Check for custom override
         if (customPerm) {
-          const [, action] = p.code.split('.');
-          const actionKey = {
-            'view': 'peutVoir',
-            'create': 'peutCreer',
-            'edit': 'peutModifier',
-            'delete': 'peutSupprimer',
-            'approve': 'peutValider',
-            'export': 'peutExporter'
-          }[action];
-
-          if (actionKey && (customPerm as any)[actionKey] !== undefined) {
-            granted = (customPerm as any)[actionKey];
-            source = 'custom';
-          }
+           granted = customPerm.granted;
+           source = 'custom';
         }
 
         // Admin has all permissions
@@ -587,64 +578,34 @@ export function registerRbacRoutes(app: Express) {
         return res.status(400).json({ message: "permission_id requis" });
       }
 
-      // Get permission details
-      const [perm] = await db.select({
-        code: permissions.code,
-        moduleName: modules.name,
-      })
-        .from(permissions)
-        .leftJoin(modules, eq(permissions.moduleId, modules.id))
-        .where(eq(permissions.id, permission_id));
-
+      // Verify permission exists
+      const [perm] = await db.select().from(permissions).where(eq(permissions.id, permission_id));
       if (!perm) {
         return res.status(404).json({ message: "Permission non trouvée" });
       }
 
-      const [, action] = perm.code.split('.');
-      const moduleName = perm.moduleName || perm.code.split('.')[0];
-
-      // Map action to column name
-      const actionColumn = {
-        'view': 'peutVoir',
-        'create': 'peutCreer',
-        'edit': 'peutModifier',
-        'delete': 'peutSupprimer',
-        'approve': 'peutValider',
-        'export': 'peutExporter'
-      }[action];
-
-      if (!actionColumn) {
-        return res.status(400).json({ message: "Action non supportée" });
-      }
-
       // Check if custom permission record exists
-      const [existing] = await db.select()
+      const [existing] = await db.select({
+        id: userPermissions.id
+      })
         .from(userPermissions)
         .where(and(
           eq(userPermissions.userId, userId),
-          eq(userPermissions.moduleName, moduleName)
+          eq(userPermissions.permissionId, permission_id) // Now using permissionId
         ));
 
       if (existing) {
-        // Update existing
+        // Update existing (granular override)
         await db.update(userPermissions)
-          .set({ [actionColumn]: granted, updatedAt: new Date() })
+          .set({ granted, updatedAt: new Date() })
           .where(eq(userPermissions.id, existing.id));
       } else {
-        // Create new with default false and set the specific permission
-        const newPerm: any = {
+        // Create new granular override
+        await db.insert(userPermissions).values({
           userId,
-          moduleName,
-          peutVoir: false,
-          peutCreer: false,
-          peutModifier: false,
-          peutSupprimer: false,
-          peutValider: false,
-          peutExporter: false,
-        };
-        newPerm[actionColumn] = granted;
-
-        await db.insert(userPermissions).values(newPerm);
+          permissionId: permission_id,
+          granted
+        });
       }
 
       await logAudit(
@@ -652,7 +613,7 @@ export function registerRbacRoutes(app: Express) {
         "TOGGLE_USER_PERMISSION",
         "user_permissions",
         userId,
-        { permissionId: permission_id, action, granted },
+        { permissionId: permission_id, granted, code: perm.code },
         "success",
         "high"
       );

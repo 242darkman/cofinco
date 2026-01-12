@@ -263,37 +263,6 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 confirmMessage={confirmMessage}
               />
             )}
-
-            {activeTab === 'permissions' && (
-              <ModulePermissionsView
-                modules={modules}
-                permissions={filteredPermissions}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                roleHasPermission={roleHasPermission}
-                selectedRole={selectedRole}
-              />
-            )}
-
-            {activeTab === 'custom' && (
-              <UserCustomPermissionsManager
-                users={users}
-                permissions={permissions}
-                selectedUserId={selectedUserId}
-                onUserChange={setSelectedUserId}
-                userPermissions={userPermissions}
-                getUserDisplayName={getUserDisplayName}
-                getUserPermissionStatus={getUserPermissionStatus}
-                toggleUserPermission={handleToggleUserPermission}
-                onActivateAll={handleActivateAll}
-                onBlockAll={handleBlockAll}
-                onResetPermissions={handleResetPermissions}
-                activePermissionsCount={countActivePermissions()}
-                getAvailablePermissionsToAdd={() => getAvailablePermissionsToAdd(permissions)}
-                getAvailablePermissionsToRemove={() => getAvailablePermissionsToRemove(permissions)}
-                confirmMessage={confirmMessage}
-              />
-            )}
           </div>
         </div>
       </Card>

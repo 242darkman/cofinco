@@ -32,13 +32,11 @@ export const CATEGORY_LABELS: Record<string, string> = {
 
 export const ADMIN_TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: 'BarChart3' },
-  { id: 'profils', label: 'Profils', icon: 'Award' },
+  { id: 'profils', label: 'Personnel', icon: 'Award' },
   { id: 'users', label: 'Utilisateurs', icon: 'Users' },
   { id: 'logs', label: 'Logs', icon: 'Activity' },
   { id: 'sessions', label: 'Sessions', icon: 'Monitor' },
-  { id: 'roles', label: 'Rôles', icon: 'Shield' },
-  { id: 'permissions', label: 'Permissions', icon: 'Key' },
-  { id: 'custom', label: 'Permissions Custom', icon: 'UserPlus' },
+  { id: 'roles', label: 'Gestion des Accès', icon: 'Shield' },
   { id: 'settings', label: 'Paramètres', icon: 'Settings' },
   { id: 'maintenance', label: 'Maintenance', icon: 'Power' },
   { id: 'caisses', label: 'Caisses', icon: 'Wallet' },

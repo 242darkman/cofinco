@@ -58,6 +58,12 @@ export interface IStorage {
     getUpcomingEcheances(filter?: { agence?: string }): Promise<{ client: string; amount: number; date: string; status: string }[]>;
     createCredit(credit: InsertCredit): Promise<Credit>;
     updateCredit(id: string, credit: Partial<InsertCredit>): Promise<Credit | undefined>;
+    createDecaissementWithLedger(data: {
+        creditId: string;
+        compteId: string;
+        montant: string;
+        numeroCredit: string;
+    }, userId?: string): Promise<{ credit: Credit; mouvement: any }>;
 
     // Credit Plans
     getCreditPlan(id: string): Promise<UserCreditPlan | undefined>;
@@ -108,6 +114,10 @@ export interface IStorage {
     getCompte(id: string): Promise<Compte | undefined>;
     getComptesByClient(clientId: string): Promise<Compte[]>;
     getAllComptes(filter?: { agence?: string }): Promise<Compte[]>;
+    getAllComptesWithClients(
+      filter?: { agence?: string },
+      options?: { search?: string; page?: number; limit?: number; typeCompte?: string }
+    ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
     createCompte(compte: InsertCompte): Promise<Compte>;
     updateCompte(id: string, compte: Partial<InsertCompte>): Promise<Compte | undefined>;
     createClientAccount(
@@ -129,6 +139,14 @@ export interface IStorage {
       observations?: string;
       idempotencyKey?: string;
     }, userId?: string): Promise<{ transaction: TransactionCompte; mouvement: any }>;
+
+    provisionCoffreWithLedger(data: {
+      agenceId: string;
+      montant: string;
+      motif: string;
+      description?: string;
+      idempotencyKey?: string;
+    }, userId?: string): Promise<{ mouvement: any }>;
 
     // Mouvements Financiers (Central Ledger)
     getMouvementsFinanciers(filter?: {
@@ -187,6 +205,34 @@ export interface IStorage {
     getTontinePenalites(tontineId: string): Promise<any[]>;
     updateTontinePenalite(id: string, penalite: Partial<InsertTontinePenalite>): Promise<TontinePenalite | undefined>;
 
+    // Prochain bénéficiaire
+    getProchainBeneficiaire(tontineId: string): Promise<any | null>;
+    tirerProchainBeneficiaire(tontineId: string): Promise<any | null>;
+    getMembresEligiblesBenefice(tontineId: string): Promise<any[]>;
+
+    // Distributions Tontine
+    getDistributionsByTontine(tontineId: string): Promise<any[]>;
+    getDistribution(id: string): Promise<any | undefined>;
+    createTontineDistribution(data: {
+      tontineId: string;
+      membreId: string;
+      tourNumero: number;
+      montantTotal: string;
+      dateDistribution?: Date;
+      modePaiement?: string;
+      referencePaiement?: string;
+      notes?: string;
+    }, userId?: string): Promise<any>;
+    cancelTontineDistribution(id: string): Promise<boolean>;
+    getDistributionStats(tontineId: string): Promise<{
+      totalDistribue: number;
+      nombreDistributions: number;
+      membresAyantRecu: number;
+      membresEnAttente: number;
+      prochainTour: number;
+      soldeDisponible: number;
+    }>;
+
     // Tontine Plans
     getTontinePlan(id: string): Promise<TontinePlan | undefined>;
     getAllTontinePlans(filter?: { agenceId?: string; actif?: boolean }): Promise<TontinePlan[]>;
@@ -211,6 +257,29 @@ export interface IStorage {
     getOperationsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: string): Promise<OperationCaisse[]>;
     getMouvementsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: 'retrait' | 'depot' | string): Promise<any[]>;
     createOperationCaisse(operation: InsertOperationCaisse): Promise<OperationCaisse>;
+    createCashTransactionWithLedger(data: {
+      sessionId: string;
+      typeOperation: string;
+      montant: string;
+      methodePaiement: string;
+      clientId?: string;
+      compteId?: string;
+      description?: string;
+      idempotencyKey?: string;
+    }, userId?: string): Promise<{ 
+      operation: OperationCaisse; 
+      transaction?: TransactionCompte; 
+      mouvement: any 
+    }>;
+    createOperationCaisseWithLedger(data: {
+      sessionId: string;
+      typeOperation: string;
+      montant: string;
+      methodePaiement: string;
+      clientId?: string;
+      description?: string;
+      idempotencyKey?: string;
+    }, userId?: string): Promise<{ operation: OperationCaisse; mouvement: any }>;
     updateOperationCaisse(id: string, operation: Partial<InsertOperationCaisse>): Promise<OperationCaisse | undefined>;
 
     // Caisse Management (Physical)

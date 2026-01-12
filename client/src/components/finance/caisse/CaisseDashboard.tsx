@@ -89,6 +89,7 @@ export default function CaisseDashboard({
   const [loading, setLoading] = useState(true);
   const [showOuverture, setShowOuverture] = useState(false);
   const [showPaiement, setShowPaiement] = useState(false);
+  const [initialPaymentType, setInitialPaymentType] = useState<string | undefined>(undefined);
   const [caissesSeparees, setCaissesSeparees] = useState<any[]>([]);
   
   // Super-User mode: Admin can supervise a specific active session
@@ -175,6 +176,28 @@ export default function CaisseDashboard({
     }
   }, [currentSession]);
 
+  // Heartbeat - envoie un signal au serveur toutes les 5 minutes pour éviter le timeout de session
+  useEffect(() => {
+    if (!currentSession?.id || currentSession.statut !== 'Ouverte') return;
+
+    // Envoyer un heartbeat immédiatement à l'ouverture
+    const sendHeartbeat = async () => {
+      try {
+        await sessionCaisseApi.heartbeat(currentSession.id);
+      } catch (error) {
+        // Silencieux - le heartbeat est optionnel
+        console.debug('Heartbeat failed:', error);
+      }
+    };
+
+    sendHeartbeat();
+
+    // Puis toutes les 5 minutes
+    const interval = setInterval(sendHeartbeat, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [currentSession?.id, currentSession?.statut]);
+
   const handleOuvertureCaisse = async () => {
     await loadSessionActive();
     await loadCaissesSeparees();
@@ -186,12 +209,38 @@ export default function CaisseDashboard({
     setActiveTab('rapprochement');
   };
 
+  const handleDepotRapide = () => {
+    if (currentSession) {
+      setInitialPaymentType('Encaissement Divers');
+      setShowPaiement(true);
+    } else {
+      alert('Veuillez ouvrir une session de caisse');
+    }
+  };
+
+  const handleRetraitRapide = () => {
+    if (currentSession) {
+      setInitialPaymentType('Décaissement Divers');
+      setShowPaiement(true);
+    } else {
+      alert('Veuillez ouvrir une session de caisse');
+    }
+  };
+
+  const handleArreteCaisse = () => {
+    if (currentSession) {
+        setActiveTab('rapprochement');
+    } else {
+        alert('Veuillez ouvrir une session de caisse');
+    }
+  };
+
   const totalEntrees = transactions
-    .filter(t => ['Dépôt', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Encaissement', 'Cotisation Tontine'].includes(t.type_operation))
+    .filter(t => ['Dépôt', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Encaissement', 'Cotisation Tontine', 'Approvisionnement coffre'].includes(t.type_operation))
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
   const totalSorties = transactions
-    .filter(t => ['Retrait', 'Décaissement', 'Prêt'].includes(t.type_operation))
+    .filter(t => ['Retrait', 'Décaissement', 'Prêt', 'Versement coffre'].includes(t.type_operation))
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
   const soldeActuel = currentSession
@@ -289,6 +338,9 @@ export default function CaisseDashboard({
         <CaisseQuickActions 
           caisseId={currentSession.caisse_id || ''} 
           agenceId={currentSession.agence_id || ''} 
+          onDepot={handleDepotRapide}
+          onRetrait={handleRetraitRapide}
+          onArrete={handleArreteCaisse}
         />
       )}
       
@@ -402,11 +454,13 @@ export default function CaisseDashboard({
                       <p className="text-xs text-slate-500">Aucune transaction aujourd'hui</p>
                   </div>
               ) : (
-                  transactions.slice(0, 5).map((tx) => (
+                  transactions.slice(0, 5).map((tx) => {
+                      const isEntree = ['Dépôt', 'Encaissement', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Cotisation Tontine', 'Approvisionnement coffre'].includes(tx.type_operation);
+                      return (
                       <div key={tx.id} onClick={() => setActiveTab('operations')} className="p-3 sm:p-4 flex items-center justify-between hover:bg-surface-elevated transition-colors cursor-pointer group">
                           <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${['Dépôt', 'Encaissement'].includes(tx.type_operation) ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                                  {['Dépôt', 'Encaissement'].includes(tx.type_operation) ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isEntree ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                                  {isEntree ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                               </div>
                               <div>
                                   <p className="text-sm font-medium text-white group-hover:text-cyan-400 transition-colors line-clamp-1">{tx.description || tx.type_operation}</p>
@@ -417,11 +471,11 @@ export default function CaisseDashboard({
                                   </div>
                               </div>
                           </div>
-                          <span className={`text-sm font-bold whitespace-nowrap ${['Dépôt', 'Encaissement'].includes(tx.type_operation) ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {['Dépôt', 'Encaissement'].includes(tx.type_operation) ? '+' : '-'}{formattedMoney(tx.montant)}
+                          <span className={`text-sm font-bold whitespace-nowrap ${isEntree ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {isEntree ? '+' : '-'}{formattedMoney(tx.montant)}
                           </span>
                       </div>
-                  ))
+                  );})
               )}
            </div>
        </Card>
@@ -540,8 +594,10 @@ export default function CaisseDashboard({
         <CaissePaiementModal
           onClose={() => {
             setShowPaiement(false);
+            setInitialPaymentType(undefined);
             onPaiementModalClose?.();
           }}
+          initialType={initialPaymentType}
           sessionId={currentSession.id}
           onSuccess={() => {
             loadTransactionsJour();

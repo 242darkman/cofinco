@@ -38,7 +38,7 @@ interface Tontine {
   nombreMembres: number;
   nombreMembresActuel?: number;
   nombreMembresMax?: number;
-  totalCollecte: number;
+  totalCollecte?: number; // Somme réelle des contributions validées
   tourActuel: number;
   createdAt: string;
   updatedAt: string;
@@ -242,7 +242,7 @@ export default function Tontines() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
            <StatCard title="Membres" value={`${selectedTontine.nombreMembresActuel || 0}/${selectedTontine.nombreMembresMax || selectedTontine.nombreMembres || 0}`} icon={Users} color="primary" />
            <StatCard title="Contribution" value={`${(selectedTontine.montantCotisation || 0).toLocaleString()} FCFA`} icon={DollarSign} color="success" />
-           <StatCard title="Total Collecté" value={`${((selectedTontine.montantCotisation || 0) * (selectedTontine.nombreMembresActuel || 0)).toLocaleString()} FCFA`} icon={TrendingUp} color="warning" />
+           <StatCard title="Total Collecté" value={`${(selectedTontine.totalCollecte || 0).toLocaleString()} FCFA`} icon={TrendingUp} color="warning" />
            <StatCard title="Tour Actuel" value={selectedTontine.tourActuel || 1} icon={Calendar} color="primary" />
         </div>
 

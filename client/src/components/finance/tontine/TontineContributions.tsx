@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search } from 'lucide-react';
+import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search, Info } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import { Pagination } from '../../ui/Pagination';
 import { SkeletonContributionCard } from '../../ui/Skeleton';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { contributionTontineApi, tontineMembreApi } from '../../../lib/api-client';
+import { contributionTontineApi, tontineMembreApi, tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
@@ -42,8 +42,8 @@ interface TontineMembre {
   id: string;
   client_id: string;
   position_ordre: number;
-  status: string;
-  clients: {
+  statut: string;
+  client: {
     nom: string;
     prenom?: string;
   };
@@ -87,7 +87,7 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
             </span>
             Détails de la contribution
           </h3>
-          <IconButton icon={X} onClick={onClose} size="sm" />
+          <IconButton icon={X} onClick={onClose} size="sm" aria-label="Fermer" />
         </div>
         
         <div className="p-6 space-y-6">
@@ -183,6 +183,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
   const [selectedContribution, setSelectedContribution] = useState<TontineContribution | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [tontine, setTontine] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     membre_id: '',
@@ -204,6 +205,16 @@ export default function TontineContributions({ tontineId }: TontineContributions
     if (tontineId) {
       fetchContributions();
       fetchMembres();
+      fetchTontine();
+    }
+  }, [tontineId]);
+
+  const fetchTontine = useCallback(async () => {
+    try {
+        const data = await tontineApi.getById(tontineId);
+        setTontine(data);
+    } catch (error) {
+        console.error("Erreur chargement tontine", error);
     }
   }, [tontineId]);
 
@@ -225,7 +236,8 @@ export default function TontineContributions({ tontineId }: TontineContributions
     if (!tontineId) return;
     try {
       const data = await tontineMembreApi.getByTontine(tontineId);
-      const membresActifs = data?.filter((m: TontineMembre) => m.status === 'Actif') || [];
+      // Ensure we handle both status (frontend alias potentially) or statut (backend raw)
+      const membresActifs = data?.filter((m: any) => (m.statut === 'Actif' || m.status === 'Actif')) || [];
       setMembres(membresActifs);
     } catch (error) {
       console.error('Erreur chargement membres:', error);
@@ -289,15 +301,23 @@ export default function TontineContributions({ tontineId }: TontineContributions
       setSubmitting(true);
       try {
         await contributionTontineApi.create({
-          tontine_id: tontineId,
-          membre_id: formData.membre_id,
-          client_id: membre.client_id,
-          montant: formData.montant,
-          tour_numero: formData.tour_numero,
-          mode_paiement: formData.mode_paiement,
-          reference_paiement: paymentRef || formData.reference_paiement || null,
-          operateur_mobile: operator || selectedOperator || null,
-          notes: sanitizeInput(formData.notes) || null,
+          tontineId: tontineId,
+          clientId: membre.client_id, // Note: clientId is required by schema, not membre_id directly although logic uses it
+          // membreId is not in the insert schema check, but we usually need it. 
+          // However, the schema `insertContributionTontineSchema` has tontineId, clientId, mouvementId...
+          // Wait, let's check schema again. `contributionsTontine` table has tontineId, clientId.
+          // It does NOT have membreId. So passing membre_id is useless for the API.
+          
+          typeOperation: 'Versement', // Required by schema
+          montant: String(formData.montant), // Must be string
+          tourNumero: formData.tour_numero,
+          methodePaiement: formData.mode_paiement === 'Cash' ? 'Espèces' : formData.mode_paiement,
+          reference: paymentRef || formData.reference_paiement || `REF-${Date.now()}`, // Required. fallback if empty
+          // referenceExterne: ... // Optional
+          // operateur_mobile is not in schema directly? 
+          // If existing logic used it, it might have been for notes or ignored.
+          // Let's put extra info in notes or observations
+          observations: sanitizeInput(formData.notes) || (operator ? `Opérateur: ${operator}` : null),
         });
 
         setShowAddForm(false);
@@ -306,7 +326,9 @@ export default function TontineContributions({ tontineId }: TontineContributions
         fetchContributions();
         fetchMembres();
 
-        toast.success('Contribution enregistrée avec succès');
+        // Feedback plus détaillé
+        const membreNom = membre.client?.nom || 'Membre';
+        toast.success(`Contribution de ${formData.montant.toLocaleString()} FCFA enregistrée pour ${membreNom} (Tour #${formData.tour_numero})`);
       } catch (error) {
         toast.error(handleApiError(error, "Erreur lors de l'ajout de la contribution"));
       } finally {
@@ -607,7 +629,21 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   id="membre-select"
                   value={formData.membre_id}
                   onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, membre_id: e.target.value }));
+                    const newMembreId = e.target.value;
+                    let newTour = 1;
+                    
+                    // Auto-calculate next tour
+                    if (newMembreId) {
+                        const memberContribs = contributions.filter(c => c.membre_id === newMembreId && c.statut === 'Validée');
+                        const maxTour = memberContribs.length > 0 ? Math.max(...memberContribs.map(c => c.tour_numero)) : 0;
+                        newTour = maxTour + 1;
+                    }
+
+                    setFormData((prev) => ({ 
+                        ...prev, 
+                        membre_id: newMembreId,
+                        tour_numero: newTour
+                    }));
                     if (errors.membre_id) setErrors((prev) => ({ ...prev, membre_id: undefined }));
                   }}
                   className={`w-full bg-slate-950 text-white px-3 py-2.5 rounded-lg border focus:outline-none focus:border-emerald-500 text-sm ${
@@ -619,7 +655,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   <option value="">Sélectionner...</option>
                   {membres.map((membre) => (
                     <option key={membre.id} value={membre.id}>
-                      {escapeHtml(membre.clients?.nom || 'Inconnu')} (Pos. #{membre.position_ordre})
+                      {escapeHtml(membre.client?.nom || 'Inconnu')} (Pos. #{membre.position_ordre})
                     </option>
                   ))}
                 </select>
@@ -652,6 +688,15 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     aria-invalid={!!errors.montant}
                     aria-describedby={errors.montant ? 'montant-error' : undefined}
                   />
+                  {formData.montant > 0 && tontine && (
+                      <div className="text-[10px] text-cyan-400 mt-1 flex items-center gap-1">
+                          <Info size={10} />
+                          <span>
+                             Couvre ~{Math.floor(formData.montant / Number(tontine.montantCotisation))} tours
+                             (Unit: {formatMoney(Number(tontine.montantCotisation))})
+                          </span>
+                      </div>
+                  )}
                   {errors.montant && (
                     <p id="montant-error" className="text-red-400 text-xs mt-1" role="alert">
                       {errors.montant}
@@ -689,12 +734,19 @@ export default function TontineContributions({ tontineId }: TontineContributions
                       className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition ${
                         formData.mode_paiement === mode
                           ? 'bg-emerald-600 border-emerald-500 text-white'
-                          : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                          : mode !== 'Cash' 
+                            ? 'bg-slate-800/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
+                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                       }`}
+                      disabled={mode !== 'Cash'}
                     >
                       {getModeIcon(mode)} {mode}
                     </button>
                   ))}
+                  <div className="col-span-2 text-[10px] text-slate-500 italic text-center mt-1">
+                    * Mobile Money, Virement et Chèque bientôt disponibles
+                  </div>
+
                 </div>
               </div>
 

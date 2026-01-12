@@ -163,7 +163,8 @@ export function registerComptesRoutes(app: Express) {
   // ============================================================================
 
   /**
-   * GET /api/comptes - Lister les comptes (filtré par agence)
+   * GET /api/comptes - Lister les comptes avec clients, recherche et pagination
+   * Query params: search, page, limit, typeCompte
    */
   app.get(
     "/api/comptes",
@@ -174,8 +175,16 @@ export function registerComptesRoutes(app: Express) {
         const agenceFilter = req.agenceFilter as { agence?: string } | null;
         const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
 
-        const comptes = await storage.getAllComptes(filter);
-        res.json(addSnakeCaseAliasesDeep(comptes));
+        // Parse query parameters
+        const options = {
+          search: req.query.search as string | undefined,
+          page: req.query.page ? parseInt(req.query.page as string) : 1,
+          limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+          typeCompte: req.query.typeCompte as string | undefined,
+        };
+
+        const result = await storage.getAllComptesWithClients(filter, options);
+        res.json(result);
       } catch (error: any) {
         console.error("Error listing comptes:", error);
         res.status(500).json({ message: error.message });

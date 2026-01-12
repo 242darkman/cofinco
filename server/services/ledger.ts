@@ -5,7 +5,8 @@ import {
   comptes,
   credits,
   sessionsCaisse,
-  tontines
+  tontines,
+  caisses
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -347,6 +348,26 @@ export async function updateTontineSolde(
 }
 
 /**
+ * Update caisse solde within a transaction (Atomic Update)
+ */
+export async function updateCaisseSolde(
+  tx: PgTransaction<any, any, any>,
+  caisseId: string,
+  delta: number
+): Promise<string> {
+  const [updated] = await tx.update(caisses)
+    .set({ 
+      solde: sql`${caisses.solde} + ${delta}`,
+      updatedAt: new Date()
+    })
+    .where(eq(caisses.id, caisseId))
+    .returning({ solde: caisses.solde });
+  
+  if (!updated) throw new Error(`Caisse ${caisseId} not found`);
+  return updated.solde || "0";
+}
+
+/**
  * Check idempotency key uniqueness
  */
 export async function checkIdempotencyKey(idempotencyKey: string): Promise<boolean> {
@@ -404,6 +425,7 @@ export default {
   updateCreditSolde,
   updateSessionSolde,
   updateTontineSolde,
+  updateCaisseSolde,
   checkIdempotencyKey,
   executeWithLedger,
 };

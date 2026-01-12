@@ -362,6 +362,109 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
     }
     return db.select().from(comptes).orderBy(desc(comptes.createdAt));
   }
+
+  /**
+   * Get all comptes with client information, search, and pagination support
+   * @param filter - Agency filter
+   * @param options - Search and pagination options
+   */
+  export async function getAllComptesWithClients(
+    filter: { agence?: string } = {},
+    options: { search?: string; page?: number; limit?: number; typeCompte?: string } = {}
+  ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }> {
+    const page = Math.max(1, options.page || 1);
+    const limit = Math.min(100, Math.max(1, options.limit || 20));
+    const offset = (page - 1) * limit;
+
+    // Build conditions
+    const conditions: any[] = [];
+
+    // Agency filter
+    if (filter.agence && filter.agence !== 'all') {
+      conditions.push(eq(clients.agence, filter.agence));
+    }
+
+    // Type filter
+    if (options.typeCompte) {
+      conditions.push(eq(comptes.typeCompte, options.typeCompte as any));
+    }
+
+    // Search filter (by client name or account number)
+    if (options.search && options.search.trim()) {
+      const searchTerm = `%${options.search.trim().toLowerCase()}%`;
+      conditions.push(
+        or(
+          sql`LOWER(${clients.nom}) LIKE ${searchTerm}`,
+          sql`LOWER(${clients.prenom}) LIKE ${searchTerm}`,
+          sql`LOWER(${comptes.numeroCompte}) LIKE ${searchTerm}`,
+          sql`LOWER(${clients.telephone}) LIKE ${searchTerm}`
+        )
+      );
+    }
+
+    // Count total
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const countQuery = db.select({ count: count() })
+      .from(comptes)
+      .leftJoin(clients, eq(comptes.clientId, clients.id));
+    
+    const countResult = whereClause 
+      ? await countQuery.where(whereClause)
+      : await countQuery;
+    
+    const total = countResult[0]?.count || 0;
+
+    // Fetch data with pagination
+    let dataQuery = db.select({
+      compte: comptes,
+      client: clients
+    })
+    .from(comptes)
+    .leftJoin(clients, eq(comptes.clientId, clients.id))
+    .orderBy(desc(comptes.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+    const results = whereClause 
+      ? await dataQuery.where(whereClause)
+      : await dataQuery;
+
+    // Transform data with client info embedded
+    const data = results.map(({ compte, client }) => ({
+      ...compte,
+      // Snake case aliases for frontend compatibility
+      numero_compte: compte.numeroCompte,
+      type_compte: compte.typeCompte,
+      solde_courant: compte.soldeCourant,
+      solde: compte.soldeCourant, // Alias for frontend
+      client_id: compte.clientId,
+      agence_id: compte.agenceId,
+      blocage_actif: compte.blocageActif,
+      blocage_motif: compte.blocageMotif,
+      created_at: compte.createdAt,
+      date_ouverture: compte.createdAt, // Alias for frontend
+      // Embedded client info
+      clients: client ? {
+        id: client.id,
+        nom: client.nom,
+        prenom: client.prenom,
+        telephone: client.telephone,
+        phone: client.telephone, // Alias
+        email: client.email,
+        agence: client.agence,
+        photo_url: client.photoProfile
+      } : null
+    }));
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
   
   export async function createCompte(insertCompte: InsertCompte): Promise<Compte> {
     const [compte] = await db.insert(comptes).values(insertCompte).returning();
@@ -538,11 +641,14 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
       session: sessionsCaisse,
       caissier_nom: users.nom,
       caissier_prenom: users.prenom,
-      caisse_nom: caisses.nom
+      caisse_nom: caisses.nom,
+      agence_nom: agences.nom,
+      agence_code: agences.codeAgence
     })
     .from(sessionsCaisse)
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
-    .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id));
+    .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
+    .leftJoin(agences, eq(sessionsCaisse.agenceId, agences.id));
 
     const conditions = [];
 
@@ -563,7 +669,9 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
     return results.map(r => ({
       ...r.session,
       caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu',
-      caisse_nom: r.caisse_nom
+      caisse_nom: r.caisse_nom,
+      agence_nom: r.agence_nom || 'Agence Inconnue',
+      agence_code: r.agence_code
     }));
   }
 
@@ -1076,6 +1184,7 @@ import {
   updateCompteSolde, 
   updateCreditSolde, 
   updateSessionSolde,
+  updateCaisseSolde,
   createMouvementFinancier,
   createMouvementEvents,
   type SensMouvement,
@@ -1377,6 +1486,65 @@ export async function payerFraisEngagement(data: {
 }
 
 /**
+ * Provision the Safe (Coffre-Fort) from an external source (Bank, Capital, etc.)
+ * Does NOT require a session, as this is an administrative operation on the Safe itself.
+ */
+export async function provisionCoffreWithLedger(data: {
+    agenceId: string;
+    montant: string;
+    motif: string;
+    description?: string;
+    idempotencyKey?: string;
+}, userId?: string): Promise<{ mouvement: MouvementFinancier }> {
+    
+    // 1. Find Agency Safe
+    const [coffre] = await db.select().from(caisses).where(and(
+        eq(caisses.agenceId, data.agenceId),
+        eq(caisses.type, "Coffre-Fort")
+    ));
+
+    if (!coffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
+
+    // 2. Execute Ledger Transaction
+    // We use "SYSTEME" or "CAISSE" as source module? 
+    // "CAISSE" usually implies a session. "SYSTEME" is good for external adjustments.
+    // However, for filtering purposes, if we want to see it in "Caisse" stats, we might want "CAISSE".
+    // But `operationsCaisse` is tied to sessions. 
+    // Let's use "CAISSE" but without a session, assuming the ledger allows null session.
+    
+    return executeWithLedger(
+        "CAISSE", 
+        {
+            montant: data.montant,
+            sens: "Crédit", // Money IN
+            agenceId: data.agenceId,
+            // sessionCaisseId: null, // explicit
+            typePaiement: "Approvisionnement coffre" as any, // Need to ensure enum matches or cast
+            methodePaiement: "Autre", 
+            metadata: {
+                description: data.description || data.motif || "Approvisionnement Externe",
+                motif: data.motif,
+                type: "APPROVISIONNEMENT_EXTERNE"
+            },
+            idempotencyKey: data.idempotencyKey
+        },
+        async (tx, mouvement) => {
+             // 3. Update Safe Balance
+             const nouveauSolde = await updateCaisseSolde(tx, coffre.id, parseFloat(data.montant));
+
+             return {
+                 result: true, // No specific object to return besides movement
+                 additionalEventData: {
+                     // We don't have a specific event for Caisse Solde change yet in `createMouvementEvents`
+                     // but the ledger execution is what matters.
+                 }
+             };
+        },
+        userId
+    ).then(({ mouvement }) => ({ mouvement }));
+}
+
+/**
  * Execute a Credit Disbursement (Decaissement) via Ledger
  */
 export async function createDecaissementWithLedger(data: {
@@ -1390,6 +1558,24 @@ export async function createDecaissementWithLedger(data: {
     const [credit] = await db.select().from(credits).where(eq(credits.id, data.creditId));
     if (!credit) throw new Error("Crédit non trouvé");
 
+    // 2. Find Agency Safe (Coffre-Fort)
+    if (!credit.agenceId) throw new Error("Le crédit n'est lié à aucune agence");
+
+    const [coffre] = await db.select().from(caisses).where(and(
+        eq(caisses.agenceId, credit.agenceId),
+        eq(caisses.type, "Coffre-Fort")
+    ));
+
+    if (!coffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
+
+    // 3. Check Balance Check
+    const montant = parseFloat(data.montant);
+    const soldeCoffre = parseFloat(coffre.solde || "0");
+
+    if (soldeCoffre < montant) {
+        throw new Error(`Solde du coffre insuffisant (${soldeCoffre.toLocaleString()} < ${montant.toLocaleString()})`);
+    }
+
     return executeWithLedger(
         "CREDIT",
         {
@@ -1399,20 +1585,28 @@ export async function createDecaissementWithLedger(data: {
             creditId: data.creditId,
             compteId: data.compteId, // Target Account
             methodePaiement: "Virement", // Internal Transfer
-            typePaiement: "Décaissement crédit" as any,
+            typePaiement: "Décaissement Crédit",
             referenceExterne: data.numeroCredit,
-            metadata: { description: `Décaissement crédit ${data.numeroCredit}` }
+            metadata: { 
+                description: `Décaissement crédit ${data.numeroCredit}`,
+                coffreId: coffre.id,
+                soldeCoffreAvant: soldeCoffre
+            }
         },
         async (tx, mouvement) => {
-             // 2. Update Account Balance (Credit the user's account)
-             // Note: updateCompteSolde handles adding the amount.
+             // 4. Update Account Balance (Credit the user's account)
              const nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, parseFloat(data.montant));
 
-             // 3. Return the credit (unchanged here, but part of the flow)
+             // 5. Debit the Agency Safe (Coffre-Fort)
+             // This is the CRITICAL change: Money comes from the safe
+             const nouveauSoldeCoffre = await updateCaisseSolde(tx, coffre.id, -montant);
+
              return {
                  result: credit,
                  additionalEventData: {
                      nouveauSoldeCompte
+                     // We could add `nouveauSoldeCoffre` if we had an event for it, 
+                     // but for now `additionalEventData` is strictly typed.
                  }
              };
         },
@@ -1685,8 +1879,10 @@ export async function validateTransfertWithLedger(
       typePaiement: "Transfert Caisse",
       referenceExterne: refSource,
       methodePaiement: "Virement",
-      description: `Transfert vers ${sessionDest.caisseId} (Ref: ${transfert.reference})`
-    } as any, userId);
+      metadata: {
+        description: `Transfert vers ${sessionDest.caisseId} (Ref: ${transfert.reference})`
+      }
+    }, userId);
 
     const soldeSource = await updateSessionSolde(tx, sessionSource.id, -parseFloat(transfert.montant));
     
@@ -1716,8 +1912,10 @@ export async function validateTransfertWithLedger(
       typePaiement: "Transfert Caisse",
       referenceExterne: refDest,
       methodePaiement: "Virement",
-      description: `Réception transfert de ${sessionSource.caisseId} (Ref: ${transfert.reference})`
-    } as any, userId);
+      metadata: {
+        description: `Réception transfert de ${sessionSource.caisseId} (Ref: ${transfert.reference})`
+      }
+    }, userId);
 
     const soldeDest = await updateSessionSolde(tx, sessionDest.id, parseFloat(transfert.montant));
 

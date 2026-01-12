@@ -7,9 +7,12 @@ import { TransfertCoffreModal } from "./TransfertCoffreModal";
 interface CaisseQuickActionsProps {
   caisseId: string;
   agenceId: string;
+  onDepot?: () => void;
+  onRetrait?: () => void;
+  onArrete?: () => void;
 }
 
-export function CaisseQuickActions({ caisseId, agenceId }: CaisseQuickActionsProps) {
+export function CaisseQuickActions({ caisseId, agenceId, onDepot, onRetrait, onArrete }: CaisseQuickActionsProps) {
   const [openTransfert, setOpenTransfert] = useState(false);
 
   return (
@@ -33,6 +36,7 @@ export function CaisseQuickActions({ caisseId, agenceId }: CaisseQuickActionsPro
           <Card 
             className="cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group"
             padding="sm"
+            onClick={onDepot}
           >
             <div className="flex flex-col items-center gap-3 py-2">
               <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
@@ -45,6 +49,7 @@ export function CaisseQuickActions({ caisseId, agenceId }: CaisseQuickActionsPro
           <Card 
             className="cursor-pointer hover:border-red-500/50 hover:bg-red-500/5 transition-all group"
             padding="sm"
+            onClick={onRetrait}
           >
             <div className="flex flex-col items-center gap-3 py-2">
               <div className="p-3 rounded-xl bg-red-500/10 text-red-400 group-hover:scale-110 transition-transform">
@@ -57,6 +62,7 @@ export function CaisseQuickActions({ caisseId, agenceId }: CaisseQuickActionsPro
           <Card 
             className="cursor-pointer hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group"
             padding="sm"
+            onClick={onArrete}
           >
             <div className="flex flex-col items-center gap-3 py-2">
               <div className="p-3 rounded-xl bg-orange-500/10 text-orange-400 group-hover:scale-110 transition-transform">

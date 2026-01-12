@@ -15,7 +15,7 @@ import {
 import { storage } from "../storage";
 import { getComptesByClient } from "../storage/finance";
 import { requireAuth, requireRole } from "../auth";
-import { requireAgenceAccess } from "../middleware";
+import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
 import { z } from "zod";
@@ -28,6 +28,7 @@ import {
 import { getWsInstance } from "../ws-server";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
+import * as sessionService from "../services/caisse/session-service";
 
 export function registerFinanceRoutes(app: Express) {
   // Credit Plans Routes
@@ -202,9 +203,9 @@ export function registerFinanceRoutes(app: Express) {
         // Si programmé, le crédit est "En attente" (du décaissement), sinon "Actif"
         statut: estProgramme ? 'En attente' as const : 'Actif' as const,
         echeance: demande.frequenceRemboursement,
-        dateDebut: dateDecaissement,
-        dateFin: data.dateFin,
-        dateSolvabilite: data.dateSolvabilite,
+        dateDebut: new Date(dateDecaissement),
+        dateFin: data.dateFin ? new Date(data.dateFin) : null,
+        dateSolvabilite: data.dateSolvabilite ? new Date(data.dateSolvabilite) : null,
         soldeRestant: data.soldeRestant || (montantDecaissement * (1 + parseFloat(demande.tauxInteret.toString()) / 100)).toString(),
         agenceId: compteCourant.agenceId,
       };
@@ -414,6 +415,49 @@ export function registerFinanceRoutes(app: Express) {
       }
       
       res.json(addSnakeCaseAliasesDeep(demande));
+  });
+
+  app.patch("/api/demandes-credit/:id", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur'), async (req, res) => {
+      const { id } = req.params;
+      const updateData = normalizeKeysDeep(req.body) as any;
+
+      // Verify existence
+      const existing = await storage.getDemandeCredit(id);
+      if (!existing) return res.status(404).json({ message: "Demande non trouvée" });
+
+      // Update
+      const updated = await storage.updateDemandeCredit(id, updateData);
+      
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ 
+            type: "CREDIT_UPDATE", 
+            payload: { 
+              type: 'demande_updated', 
+              id, 
+              statut: updateData.statut 
+            } 
+          });
+
+           // Si approuvée, notifier en temps réel
+           if (updateData.statut === 'Approuvée') {
+              const userAgence = req.session.user?.agence;
+              if (userAgence) {
+                wsInstance.broadcastToAgency(userAgence, {
+                  type: "LIVE_ACTIVITY",
+                  payload: {
+                    action: `Crédit Approuvé: #${existing.numeroDemande}`,
+                    user: req.session.user?.nom || 'Système',
+                    type: 'validation',
+                    timestamp: new Date().toISOString()
+                  }
+                });
+              }
+           }
+      }
+
+      res.json(addSnakeCaseAliasesDeep(updated));
   });
 
   app.delete("/api/demandes-credit/:id", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
@@ -651,7 +695,7 @@ export function registerFinanceRoutes(app: Express) {
       if (enquete.demandeId) {
           let nouveauStatutDemande = 'En enquête'; // Default
           if (decision === 'approuve' || decision === 'reduit') {
-              nouveauStatutDemande = 'Enquête terminée'; // Prêt pour décision finale
+              nouveauStatutDemande = 'Approuvée'; // Prêt pour décaissement
           } else if (decision === 'rejete') {
               nouveauStatutDemande = 'Rejetée'; // Rejetée suite enquête
           }
@@ -757,8 +801,8 @@ export function registerFinanceRoutes(app: Express) {
                 const montant = Number(op.montant || 0);
                 
                 // Logic In/Out expanded for new Enum types
-                const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit'];
-                const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais'];
+                const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre'];
+                const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre'];
 
                 if (IN_TYPES.includes(op.typeOperation)) {
                     solde += montant;
@@ -811,9 +855,9 @@ export function registerFinanceRoutes(app: Express) {
             
             for (const op of ops) {
                 const montant = Number(op.montant || 0);
-                if (['Versement', 'Depot', 'Encaissement'].includes(op.typeOperation)) {
+                if (['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre'].includes(op.typeOperation)) {
                     solde += montant;
-                } else if (['Retrait', 'Decaissement'].includes(op.typeOperation)) {
+                } else if (['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre'].includes(op.typeOperation)) {
                     solde -= montant;
                 }
             }
@@ -893,15 +937,13 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(session || null));
   });
 
-  app.get("/api/sessions-caisse", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence', 'superviseur'), requireAgenceAccess(), async (req, res) => {
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
-      // Allow filtering by agenceId from query if not restricted by role (admin)
-      // If restricted, req.agenceFilter takes precedence
-      const requestedAgenceId = req.query.agenceId as string;
+  app.get("/api/sessions-caisse", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence', 'superviseur'), requireAgenceIdAccess(), async (req, res) => {
+      // Use requireAgenceIdAccess for more robust agence filtering (uses UUIDs from userAgences)
+      const agenceId = req.selectedAgenceId || req.query.agenceId as string;
       const requestedStatut = req.query.statut as string;
 
       const filter = { 
-        agence: agenceFilter ? agenceFilter.agence : requestedAgenceId,
+        agence: agenceId,
         statut: requestedStatut
       };
       
@@ -927,69 +969,77 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Session caisse (roles: admin, chef, caisse, et autres si assignés)
+  // Utilise le service atomique pour éviter les race conditions
   app.post("/api/sessions-caisse", requireAuth, async (req, res) => {
       // 1. Validate Roles & Assignments
       const user = req.session.user;
       if (!user) return res.status(401).json({ message: "Non authentifié" });
 
       const isManager = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role);
-      
+
       const data = normalizeKeysDeep(req.body) as any;
-      
-      // Fix Zod date validation (expects Date object, received string)
-      if (data.dateOuverture && typeof data.dateOuverture === 'string') {
-          data.dateOuverture = new Date(data.dateOuverture);
-      }
-      
-      // Parse data
-      let parsed; 
-      try {
-        parsed = insertSessionCaisseSchema.parse(data);
-      } catch (e) {
-         console.error("Validation Error:", e);
-         return res.status(400).json({ message: "Données invalides", details: e });
+
+      // Validation basique des données requises
+      if (!data.caisseId) {
+          return res.status(400).json({ message: "Vous devez sélectionner une caisse physique." });
       }
 
       // Check Assignment if not Manager
       if (!isManager) {
-          if (!parsed.caisseId) return res.status(400).json({ message: "Caisse ID manquant" });
-          
-          const assignments = await storage.getCaisseAssignments(parsed.caisseId);
+          const assignments = await storage.getCaisseAssignments(data.caisseId);
           const isAssigned = assignments.some(a => a.userId === user.id);
-          
+
           if (!isAssigned) {
               return res.status(403).json({ message: "Accès refusé. Vous n'êtes pas assigné à cette caisse." });
           }
       }
 
-      // 2. Check concurrency: Is this Caisse already open?
-      if (parsed.caisseId) {
-          const activeSessions = await storage.getActiveSessions();
-          const isOccupied = activeSessions.some(s => s.caisseId === parsed.caisseId && s.statut === 'Ouverte');
-          if (isOccupied) {
-             return res.status(409).json({ message: "Cette caisse est déjà occupée par une autre session ouverte." });
-          }
-      } else {
-          return res.status(400).json({ message: "Vous devez sélectionner une caisse physique." });
+      // 2. Utiliser le service atomique pour l'ouverture de session
+      // Ce service gère les race conditions, la validation du billetage et l'audit
+      const result = await sessionService.openSessionAtomic({
+          caissierId: data.caissierId || user.id,
+          caisseId: data.caisseId,
+          agenceId: data.agenceId,
+          soldeInitial: data.soldeInitial || "0",
+          billetageOuverture: data.billetageOuverture || {},
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+      });
+
+      if (!result.success) {
+          // Mapper les codes d'erreur vers les codes HTTP appropriés
+          const statusMap: Record<string, number> = {
+              CAISSE_OCCUPIED: 409,
+              USER_HAS_SESSION: 409,
+              INVALID_BILLETAGE: 400,
+              DB_ERROR: 500,
+          };
+          const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+          return res.status(status).json({
+              message: result.error,
+              errorCode: result.errorCode
+          });
       }
 
-      // 3. Check if user already has an open session? 
-      const activeSessions = await storage.getActiveSessions();
-      const userHasSession = activeSessions.some(s => s.caissierId === parsed.caissierId && s.statut === 'Ouverte');
-      if (userHasSession) {
-          return res.status(409).json({ message: "Vous avez déjà une session ouverte." });
-      }
-
-      const session = await storage.createSessionCaisse(parsed);
-      
-      // Update UI real-time
+      // 3. Update UI real-time
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: parsed.caisseId } });
+          wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: data.caisseId } });
           wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
       }
 
-      res.json(addSnakeCaseAliasesDeep(session));
+      // 4. Log d'audit (déjà fait dans le service, mais on peut ajouter un log supplémentaire ici)
+      await logAudit(
+          req,
+          "SESSION_OPENED",
+          "caisse",
+          result.session.id,
+          { caisseId: data.caisseId, soldeInitial: result.session.soldeInitial },
+          "success",
+          "low"
+      );
+
+      res.json(addSnakeCaseAliasesDeep(result.session));
   });
 
   // Clôture de session
@@ -1035,8 +1085,8 @@ export function registerFinanceRoutes(app: Express) {
       for (const op of ops) {
           const montant = Number(op.montant);
           
-          const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit'];
-          const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais'];
+          const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre'];
+          const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre'];
 
           if (IN_TYPES.includes(op.typeOperation)) {
               soldeTheorique += montant;
@@ -1077,10 +1127,152 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(closedSession));
   });
 
+  // ============================================================================
+  // ROUTES DE MONITORING ET HEARTBEAT (Production)
+  // ============================================================================
+
+  // Heartbeat - mise à jour de l'activité de la session
+  app.post("/api/sessions-caisse/:id/heartbeat", requireAuth, async (req, res) => {
+      const { id } = req.params;
+      const user = req.session.user!;
+
+      // Vérifier que l'utilisateur est propriétaire de la session
+      const session = await storage.getSessionCaisse(id);
+      if (!session) {
+          return res.status(404).json({ message: "Session introuvable" });
+      }
+      if (session.caissierId !== user.id) {
+          return res.status(403).json({ message: "Non autorisé" });
+      }
+
+      const success = await sessionService.updateSessionHeartbeat(id);
+
+      if (success) {
+          res.json({ success: true, timestamp: new Date().toISOString() });
+      } else {
+          res.status(400).json({ success: false, message: "Session non active" });
+      }
+  });
+
+  // Sessions à risque (inactives depuis trop longtemps)
+  app.get("/api/sessions-caisse/risky", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+      try {
+          const riskySessions = await sessionService.getRiskySessions();
+          res.json(addSnakeCaseAliasesDeep(riskySessions));
+      } catch (error: any) {
+          console.error("Erreur récupération sessions à risque:", error);
+          res.status(500).json({ message: error.message });
+      }
+  });
+
+  // Sessions avec écarts significatifs (monitoring)
+  app.get("/api/sessions-caisse/ecarts", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+      try {
+          const threshold = req.query.threshold ? Number(req.query.threshold) : undefined;
+          const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
+          res.json(addSnakeCaseAliasesDeep(sessionsWithEcarts));
+      } catch (error: any) {
+          console.error("Erreur récupération écarts:", error);
+          res.status(500).json({ message: error.message });
+      }
+  });
+
+  // Fermer les sessions expirées (route admin pour déclencher manuellement ou via cron)
+  app.post("/api/sessions-caisse/close-expired", requireAuth, requireRole('admin', 'Administrateur'), async (req, res) => {
+      try {
+          const timeoutHours = req.body.timeoutHours ? Number(req.body.timeoutHours) : 12;
+          const closedSessions = await sessionService.closeExpiredSessions(timeoutHours);
+
+          // Notifier via WebSocket
+          const wsInstance = getWsInstance();
+          if (wsInstance && closedSessions.length > 0) {
+              closedSessions.forEach(s => {
+                  wsInstance.broadcast({
+                      type: "SESSION_TIMEOUT",
+                      payload: { sessionId: s.sessionId, caisseId: s.caisseId }
+                  });
+              });
+              wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+          }
+
+          res.json({
+              success: true,
+              closedCount: closedSessions.length,
+              closedSessions
+          });
+      } catch (error: any) {
+          console.error("Erreur fermeture sessions expirées:", error);
+          res.status(500).json({ message: error.message });
+      }
+  });
+
+  // Forcer la fermeture d'une session (admin)
+  app.post("/api/sessions-caisse/:id/force-close", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+      const { id } = req.params;
+      const user = req.session.user!;
+
+      const session = await storage.getSessionCaisse(id);
+      if (!session) {
+          return res.status(404).json({ message: "Session introuvable" });
+      }
+      if (session.statut !== 'Ouverte') {
+          return res.status(400).json({ message: "Session déjà fermée" });
+      }
+
+      const result = await sessionService.closeSessionAtomic({
+          sessionId: id,
+          billetageFermeture: {},
+          soldeReel: "0",
+          observations: `Fermeture forcée par ${user.nom || user.username} - ${req.body.reason || 'Sans raison spécifiée'}`,
+          closedBy: user.id,
+          closedReason: "admin",
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+      });
+
+      if (!result.success) {
+          return res.status(500).json({ message: result.error });
+      }
+
+      // Update UI real-time
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+          wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: session.caisseId } });
+          wsInstance.broadcast({ type: "SESSION_FORCE_CLOSED", payload: { sessionId: id } });
+          wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(result.session));
+  });
+
+  // ============================================================================
+
   app.get("/api/caisses/status", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
     const agenceId = req.query.agenceId as string;
     const caisses = await storage.getCaissesWithStatus(agenceId);
     res.json(addSnakeCaseAliasesDeep(caisses));
+  });
+
+  // Opérations caisse du jour (pour la session active de l'utilisateur)
+  app.get("/api/operations-caisse/today", requireAuth, async (req, res) => {
+      try {
+        const user = req.session.user!;
+
+        // Récupérer la session active de l'utilisateur
+        const activeSession = await storage.getActiveSessionForUser(user.id);
+
+        if (!activeSession) {
+          return res.json([]); // Pas de session active, pas d'opérations
+        }
+
+        // Récupérer toutes les opérations de cette session
+        const operations = await storage.getOperationsBySession(activeSession.id);
+
+        res.json(addSnakeCaseAliasesDeep(operations));
+      } catch (error: any) {
+        console.error("Erreur récupération opérations du jour:", error);
+        res.status(500).json({ message: error.message });
+      }
   });
 
   // Opération caisse (roles: admin, chef, caisse)
@@ -1133,7 +1325,7 @@ export function registerFinanceRoutes(app: Express) {
                 clientId: parsed.clientId || undefined,
                 compteId: targetCompteId,
                 description: parsed.description || undefined,
-                idempotencyKey: parsed.idempotencyKey
+                idempotencyKey: parsed.idempotencyKey || undefined
             }, user.id);
 
             // Side Effects (Loyalty, WS) - Kept outside transaction critical path for now or could be moved to events
@@ -1175,7 +1367,7 @@ export function registerFinanceRoutes(app: Express) {
                 methodePaiement: parsed.methodePaiement || 'Espèces',
                 clientId: parsed.clientId || undefined,
                 description: parsed.description || undefined,
-                idempotencyKey: parsed.idempotencyKey
+                idempotencyKey: parsed.idempotencyKey || undefined
             }, user.id);
 
             res.json(addSnakeCaseAliasesDeep(operation));

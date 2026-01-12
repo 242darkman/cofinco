@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, boolean, timestamp, uuid, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, uuid, date, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -88,20 +88,20 @@ export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).omit({
 export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
 
-// User Permissions table - Permissions personnalisées par utilisateur et module
+// User Permissions table - Permissions personnalisées par utilisateur (granulaire)
 export const userPermissions = pgTable("user_permissions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  moduleName: text("module_name").notNull(), // 'Caisse', 'Clients', 'Épargnes', 'Crédits', 'Tontines', 'Comptabilité', 'Administration'
-  peutVoir: boolean("peut_voir").notNull().default(false),
-  peutCreer: boolean("peut_creer").notNull().default(false),
-  peutModifier: boolean("peut_modifier").notNull().default(false),
-  peutSupprimer: boolean("peut_supprimer").notNull().default(false),
-  peutValider: boolean("peut_valider").notNull().default(false),
-  peutExporter: boolean("peut_exporter").notNull().default(false),
+  // Link directly to permissions table instead of copying module/action structure
+  permissionId: uuid("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
+  granted: boolean("granted").notNull().default(true),
+  
+  // Metadata for audit/tracking
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  unq: unique().on(t.userId, t.permissionId),
+}));
 
 export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;

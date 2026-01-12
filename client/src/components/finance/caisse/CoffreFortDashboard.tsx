@@ -23,9 +23,10 @@ import {
 import { toast } from 'sonner';
 
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
-import { coffreApi } from "@/lib/api-client";
+import { coffreApi, sessionCaisseApi } from "@/lib/api-client";
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { CoffreAdminPanel } from './CoffreAdminPanel';
+import { ProvisionCoffreModal } from './ProvisionCoffreModal';
 import { usePermissions } from '../../auth/ProtectedFeature';
 
 interface CoffreFortDashboardProps {
@@ -39,9 +40,16 @@ interface ConfirmAction {
 }
 
 export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
+  // Fetch transferts
   const { data: transfertsData, isLoading, refetch } = useQuery({
-    queryKey: ["transferts-coffre", agenceId],
-    queryFn: () => coffreApi.listTransferts({ agenceId, limit: 10 }),
+    queryKey: ['transferts-coffre', agenceId],
+    queryFn: () => coffreApi.listTransferts({
+      agenceId,
+      limit: 50, // Increased limit to ensure recent requests are visible
+      page: 1
+    }),
+    enabled: !!agenceId,
+    refetchInterval: 30000,
   });
 
   const { data: statsData, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
@@ -57,6 +65,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const [activeTab, setActiveTab] = useState('operations');
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showProvisionModal, setShowProvisionModal] = useState(false);
 
   const transferts = transfertsData?.data || [];
 
@@ -94,7 +103,18 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const handleExecute = async (id: string) => {
     setActionLoading(id);
     try {
-      await coffreApi.executeTransfert(id);
+      // Récupérer la session active de l'utilisateur pour lier l'opération
+      let sessionId: string | undefined;
+      try {
+        const activeSession = await sessionCaisseApi.getActive();
+        if (activeSession?.id) {
+          sessionId = activeSession.id;
+        }
+      } catch {
+        // Pas de session active - la résolution automatique côté backend prendra le relais
+      }
+
+      await coffreApi.executeTransfert(id, sessionId);
       toast.success("Transfert exécuté", {
         description: "Les fonds ont été déplacés avec succès."
       });
@@ -417,7 +437,20 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold tracking-tight">Coffre-Fort</h2>
+        <div className="flex items-center gap-4">
+             <h2 className="text-2xl font-bold tracking-tight">Coffre-Fort</h2>
+             {canConfigure && (
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                    onClick={() => setShowProvisionModal(true)}
+                >
+                    <ArrowDownRight size={14} className="mr-2" />
+                    Approvisionner
+                </Button>
+             )}
+        </div>
         
         {/* Simple Tab Switcher if TabGroup not suitable or for quick toggle */}
         <div className="flex space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
@@ -426,8 +459,17 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'operations' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
            >
              <div className="flex items-center gap-2">
-               <Wallet size={16} />
-               Opérations
+               <ArrowRightLeft size={16} />
+               Transferts
+             </div>
+           </button>
+           <button
+             onClick={() => setActiveTab('historique')}
+             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'historique' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+           >
+             <div className="flex items-center gap-2">
+               <Clock size={16} />
+               Historique
              </div>
            </button>
            {canConfigure && (
@@ -446,6 +488,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
       {activeTab === 'admin' ? (
         <CoffreAdminPanel agenceId={agenceId} />
+      ) : activeTab === 'historique' ? (
+         <CoffreFortHistorique agenceId={agenceId} />
       ) : (
         <>
         {/* Header Stats */}
@@ -505,6 +549,110 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         cancelText="Annuler"
         isLoading={!!actionLoading}
       />
+
+      <ProvisionCoffreModal 
+        open={showProvisionModal} 
+        onOpenChange={setShowProvisionModal}
+        agenceId={agenceId}
+      />
     </div>
   );
+}
+
+function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
+    const { data, isLoading, refetch } = useQuery({
+        queryKey: ['coffre-mouvements', agenceId],
+        queryFn: () => coffreApi.getMouvements({ agenceId, limit: 100 }),
+    });
+
+    const mouvements = data?.data || [];
+
+    const columns = [
+        {
+            key: 'dateOperation',
+            label: 'Date',
+            format: (_: any, row: any) => (
+                <div className="flex flex-col">
+                    <span className="text-sm text-white font-medium">
+                        {format(new Date(row.dateOperation), "dd MMM yyyy", { locale: fr })}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                        {format(new Date(row.dateOperation), "HH:mm", { locale: fr })}
+                    </span>
+                </div>
+            )
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            format: (_: any, row: any) => {
+                const isCredit = row.sens === 'Crédit';
+                return (
+                    <div className="flex items-center gap-2">
+                        <Badge 
+                            variant={isCredit ? 'success' : 'warning'} 
+                            icon={isCredit ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}
+                            value={isCredit ? 'Entrée' : 'Sortie'}
+                        />
+                        <span className="text-sm text-slate-300">
+                            {row.typePaiement || row.metadata?.type || row.sourceModule}
+                        </span>
+                    </div>
+                );
+            }
+        },
+        {
+            key: 'description', 
+            label: 'Description',
+            format: (_: any, row: any) => (
+                <div className="flex flex-col max-w-[300px]">
+                    <span className="text-sm text-white truncate">
+                        {row.metadata?.description || row.metadata?.motif || row.reference}
+                    </span>
+                     {row.initiator && (
+                        <span className="text-xs text-slate-500">
+                            Par {row.initiator.prenom} {row.initiator.nom}
+                        </span>
+                    )}
+                </div>
+            )
+        },
+        {
+            key: 'montant',
+            label: 'Montant',
+            align: 'right' as const,
+            format: (val: any, row: any) => (
+                <span className={`font-bold font-mono ${row.sens === 'Crédit' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {row.sens === 'Crédit' ? '+' : '-'} {Number(val).toLocaleString()} FCFA
+                </span>
+            )
+        }
+    ];
+
+    if (isLoading) return (
+        <div className="grid grid-cols-1 gap-4">
+             <SkeletonCard className="h-96" />
+        </div>
+    );
+
+    return (
+        <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+                <div>
+                    <h3 className="font-bold text-white text-lg">Historique des Mouvements</h3>
+                    <p className="text-slate-400 text-sm">Traçabilité complète des opérations du coffre</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                    <Loader2 size={14} className="mr-2" />
+                    Actualiser
+                </Button>
+            </div>
+            
+            <ResponsiveTable 
+                data={mouvements}
+                columns={columns}
+                emptyMessage="Aucun mouvement enregistré."
+            />
+        </Card>
+    );
 }

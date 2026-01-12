@@ -25,7 +25,16 @@ export function usePermissions() {
         throw new Error('Erreur lors de la récupération des permissions');
       }
       const data = await response.json();
-      setPermissions(data);
+      // Deduplicate by code
+      const uniqueData = (data || []).reduce((acc: Permission[], current: Permission) => {
+        const x = acc.find(item => item.code === current.code);
+        if (!x) {
+          return acc.concat([current]);
+        } else {
+          return acc;
+        }
+      }, []);
+      setPermissions(uniqueData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur serveur');
       console.error('Erreur fetch permissions:', err);

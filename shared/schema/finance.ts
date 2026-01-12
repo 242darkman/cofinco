@@ -640,6 +640,10 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   billetageFermeture: json("billetage_fermeture"),
   agenceId: uuid("agence_id").references(() => agences.id), // Agence de la session caisse
   caisseId: uuid("caisse_id").notNull().references(() => caisses.id), // Physical caisse link
+  // Colonnes pour robustesse production
+  lastActivity: timestamp("last_activity").defaultNow(), // Heartbeat - dernière activité
+  timeoutAt: timestamp("timeout_at"), // Date d'expiration prévue
+  closedReason: text("closed_reason").default("manual"), // manual, timeout, admin
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -742,6 +746,22 @@ export const insertCaisseTransfertSchema = createInsertSchema(caisseTransferts).
 export type InsertCaisseTransfert = z.infer<typeof insertCaisseTransfertSchema>;
 export type CaisseTransfert = typeof caisseTransferts.$inferSelect;
 
+// ========== AUDIT SESSIONS CAISSE ==========
+export const sessionsCaisseAuditLogs = pgTable("sessions_caisse_audit_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull().references(() => sessionsCaisse.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // OPENED, CLOSED, TIMEOUT, ADMIN_CLOSED, HEARTBEAT
+  statutAvant: text("statut_avant"),
+  statutApres: text("statut_apres"),
+  details: jsonb("details").notNull().default({}),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type SessionCaisseAuditLog = typeof sessionsCaisseAuditLogs.$inferSelect;
+
 // ========== REEVALUATION WORKFLOW TABLES ==========
 
 // Configuration for reevaluation rules
@@ -749,7 +769,7 @@ export const configReevaluation = pgTable("config_reevaluation", {
   id: uuid("id").primaryKey().defaultRandom(),
   
   // Eligibility rules
-  delaiMinimumJours: integer("delai_minimum_jours").notNull().default(30),
+  delaiMinimumJours: integer("delai_minimum_jours").notNull().default(1), // Minimum delay reduced to 1 day
   maxReevaluationsParDemande: integer("max_reevaluations_par_demande").notNull().default(2),
   motifsNonReevaluables: text("motifs_non_reevaluables").array(), // ['Fraude avérée', 'Client blacklisté']
   

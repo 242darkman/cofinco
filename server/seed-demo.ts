@@ -363,6 +363,7 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
   ],
   'Administration': [
     { name: 'Gérer les utilisateurs', code: 'admin.users', description: 'Accès gestion utilisateurs' },
+    { name: 'Voir les utilisateurs', code: 'users.view', description: 'Voir la liste des utilisateurs' },
     { name: 'Créer utilisateurs', code: 'users.create', description: 'Créer des utilisateurs' },
     { name: 'Modifier utilisateurs', code: 'users.edit', description: 'Modifier des utilisateurs' },
     { name: 'Supprimer utilisateurs', code: 'users.delete', description: 'Supprimer des utilisateurs' },
@@ -388,73 +389,103 @@ const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; descr
   ],
 };
 
+// Based on client/src/lib/rbac-config.ts
+// Keys are in snake_case for backend consistency, permissions aligned with client config
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  'Administrateur': ['*'],
-  'Chef d\'Agence': [
+  'admin': ['*'],
+  'chef_agence': [ // Chef d'Agence
     'dashboard.view',
-    'caisse.view', 'caisse.open', 'caisse.close', 'caisse.deposit', 'caisse.withdraw', 'caisse.transfer',
-    'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
+    'clients.view', 'clients.create', 'clients.edit', 'clients.delete',
+    'credits.view', 'credits.create', 'credits.edit', 'credits.approve', 'credits.delete',
     'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
+    'epargnes.view', 'epargnes.create', 'epargnes.edit',
+    'tontines.view', 'tontines.create', 'tontines.edit', 'tontines.manage',
+    'comptabilite.view',
     'remboursements.view', 'remboursements.create',
-    'clients.view', 'clients.create', 'clients.edit',
-    'epargnes.view', 'epargnes.create', 'epargnes.deposit', 'epargnes.withdraw',
-    'tontines.view', 'tontines.create', 'tontines.manage',
-    'comptabilite.view', 'comptabilite.reports',
-    'agent.view',
-    'transferts.view',
     'rapports.view', 'rapports.export',
-    'rh.view', 'rh.create', 'rh.edit',
-    'communications.view',
-    'communications.view',
-    'messages.view', 'messages.send',
+    'agent.view', 'agent.manage',
+    'caisse.view', 'caisse.manage',
+    'caisseagent.view', 'caisseagent.manage', 'caisseagent.approve', 'caisseagent.reject', 'caisseagent.suspend',
+    'rh.view', 'rh.create', 'rh.edit', 'rh.manage',
+    'paie.view', 'paie.create', 'paie.approve',
+    'users.view', 'users.create', 'users.edit',
     'coffre.view', 'coffre.transfert.init', 'coffre.transfert.validate', 'coffre.transfert.execute', 'coffre.config.view',
-  ],
-  'Agent Caisse': [
-    'dashboard.view',
-    'caisse.view', 'caisse.open', 'caisse.close', 'caisse.deposit', 'caisse.withdraw',
-    'clients.view', 'clients.create',
-    'epargnes.view', 'epargnes.deposit', 'epargnes.withdraw',
-    'credits.view', 'credits.collect',
-    'remboursements.view', 'remboursements.create',
-    'remboursements.view', 'remboursements.create',
-    'messages.view', 'messages.send',
-    'coffre.view',
-  ],
-  'Agent Terrain': [
-    'dashboard.view',
-    'clients.view', 'clients.create',
-    'agent.view', 'agent.collect', 'agent.visit',
-    'credits.view', 'credits.collect',
-    'epargnes.view', 'epargnes.deposit',
+    'incidents.view', 'incidents.manage', 'incidents.edit',
+    'visites.view',
+    'prospection.view',
+    'paiements.view',
     'communications.view',
     'messages.view', 'messages.send',
   ],
-  'Comptable': [
+  'caissier': [ // Agent Caisse
     'dashboard.view',
-    'comptabilite.view', 'comptabilite.write', 'comptabilite.reports',
+    'clients.view', 'clients.create',
+    'epargnes.view', 'epargnes.create', 'epargnes.edit',
+    'caisse.view', 'caisse.create', 'caisse.edit',
+    'remboursements.view', 'remboursements.create',
+    'communications.view',
+    'rh.view', // Pointage uniquement
+  ],
+  'terrain': [ // Agent Terrain
+    'dashboard.view',
+    'clients.view', 'clients.create',
+    'agent.view', 'agent.create',
+    'prospection.view', 'prospection.create',
+    'caisseagent.view', 'caisseagent.create', // Peut créer des opérations, pas les approuver
+    'incidents.view', 'incidents.create',
+    'visites.view', 'visites.create',
+    'paiements.view', 'paiements.create',
+    'communications.view',
+    'rh.view', // Pointage uniquement
+  ],
+  
+  'comptable': [ // Comptable
+    'dashboard.view',
+    'clients.view',
     'credits.view',
     'epargnes.view',
-    'rapports.view', 'rapports.export', 'rapports.schedule',
-    'caisse.view',
-    'audit.view',
+    'comptabilite.view', 'comptabilite.create', 'comptabilite.edit', 'comptabilite.export',
+    'rapports.view', 'rapports.export',
+    'rh.view', // Pointage uniquement
   ],
-  'Gestionnaire Crédit': [
+  
+  'gestionnaire_credit': [ // Gestionnaire Crédit
     'dashboard.view',
-    'credits.view', 'credits.create', 'credits.approve', 'credits.reject', 'credits.disburse', 'credits.collect',
-    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
     'clients.view', 'clients.create', 'clients.edit',
+    'credits.view', 'credits.create', 'credits.edit', 'credits.approve',
+    'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
     'remboursements.view', 'remboursements.create',
+    'rapports.view', 'rapports.export',
+    'rh.view', // Pointage uniquement
+  ],
+  
+  'superviseur': [ // Superviseur
+    'dashboard.view',
+    'clients.view',
+    'agent.view', 'agent.manage',
+    'tontines.view', 'tontines.manage',
+    'caisseagent.view', 'caisseagent.approve', 'caisseagent.reject',
+    'rapports.view',
+    'communications.view',
+    'rh.view', // Pointage uniquement
+  ],
+  
+  // Additional roles for seed users
+  'rh': [
+    'dashboard.view',
+    'rh.view', 'rh.create', 'rh.edit', 'rh.delete', 'rh.manage',
+    'paie.view', 'paie.create', 'paie.edit',
     'rapports.view',
   ],
-  'Superviseur': [
+  'direction': [
+    '*', // Direction has full access like admin
+  ],
+  'agent': [
     'dashboard.view',
-    'caisse.view',
-    'credits.view',
     'clients.view',
-    'epargnes.view',
-    'tontines.view',
-    'agent.view',
-    'rapports.view', 'rapports.export',
+    'communications.view',
+    'messages.view', 'messages.send',
+    'rh.view',
   ],
 };
 
@@ -744,9 +775,9 @@ async function seedDemo() {
         seuilDoubleValidation: '5000000', // 5 millions
         separationInitiateurValideur: true,
         actif: true,
-        rolesInitiateurs: ['Chef d\'Agence', 'Agent Caisse'],
-        rolesValideurs: ['Chef d\'Agence', 'Superviseur'],
-        rolesExecuteurs: ['Chef d\'Agence'],
+        rolesInitiateurs: ['chef_agence', 'caissier'],
+        rolesValideurs: ['chef_agence', 'superviseur'],
+        rolesExecuteurs: ['chef_agence'],
       });
     }
     console.log('   ✅ Coffre configs created');
@@ -1126,7 +1157,7 @@ async function seedDemo() {
       {
         username: 'rh_manager',
         password: hashedDefault,
-        role: 'rh',
+        role: ROLES.SUPERVISEUR,  // Changed from 'rh' to use standard role
         nom: 'Mouyabi',
         prenom: 'Claudine',
         email: 'rh@cofin.com',
@@ -1143,7 +1174,7 @@ async function seedDemo() {
       {
         username: 'direction',
         password: hashedDefault,
-        role: 'direction',
+        role: ROLES.ADMIN,  // Changed from 'direction' to use standard role
         nom: 'Nguimbi',
         prenom: 'Alain',
         email: 'direction@cofin.com',
@@ -1160,7 +1191,7 @@ async function seedDemo() {
       {
         username: 'agent_interne',
         password: hashedDefault,
-        role: 'agent',
+        role: ROLES.TERRAIN,  // Changed from 'agent' to use standard role
         nom: 'Support',
         prenom: 'Interne',
         email: 'agent.interne@cofin.com',
@@ -1267,28 +1298,38 @@ async function seedDemo() {
 
     await db.insert(userAgences).values(userAgencesData);
 
-    await db.insert(userPermissions).values([
-      {
-        userId: staffGroups.Caissiers[0]?.id,
-        moduleName: 'Caisse',
-        peutVoir: true,
-        peutCreer: true,
-        peutModifier: false,
-        peutSupprimer: false,
-        peutValider: true,
-        peutExporter: false,
-      },
-      {
-        userId: staffGroups.Agents[0]?.id,
-        moduleName: 'Clients',
-        peutVoir: true,
-        peutCreer: true,
-        peutModifier: true,
-        peutSupprimer: false,
-        peutValider: false,
-        peutExporter: false,
-      },
-    ]);
+    // Seed Granular User Permissions
+    const demoUserPermissionsToInsert: { userId: string; code: string }[] = [];
+    
+    // Permission: Caissier can view/create in Caisse
+    if (staffGroups.Caissiers[0]?.id) {
+       demoUserPermissionsToInsert.push(
+          { userId: staffGroups.Caissiers[0].id, code: 'caisse.view' },
+          { userId: staffGroups.Caissiers[0].id, code: 'caisse.create' },
+          { userId: staffGroups.Caissiers[0].id, code: 'caisse.open' },
+          { userId: staffGroups.Caissiers[0].id, code: 'caisse.deposit' }
+       );
+    }
+
+    // Permission: Agent can view/create/edit Clients
+    if (staffGroups.Agents[0]?.id) {
+       demoUserPermissionsToInsert.push(
+          { userId: staffGroups.Agents[0].id, code: 'clients.view' },
+          { userId: staffGroups.Agents[0].id, code: 'clients.create' },
+          { userId: staffGroups.Agents[0].id, code: 'clients.edit' }
+       );
+    }
+
+    for (const up of demoUserPermissionsToInsert) {
+       const permId = insertedPermissions[up.code];
+       if (permId) {
+          await db.insert(userPermissions).values({
+             userId: up.userId,
+             permissionId: permId,
+             granted: true
+          });
+       }
+    }
 
     await db.insert(loginAttempts).values([
       { username: 'admin', ipAddress: '192.168.1.10', success: true, reason: null },
@@ -1983,7 +2024,7 @@ async function seedDemo() {
     
     // 1. Insert global reevaluation config
     await db.insert(configReevaluation).values({
-      delaiMinimumJours: 30,
+      delaiMinimumJours: 1, // Reduced from 30 to 1 day for faster testing
       maxReevaluationsParDemande: 2,
       motifsNonReevaluables: [
         'Fraude avérée',
@@ -4022,7 +4063,7 @@ async function seedDemo() {
         else if (user.role === ROLES.CAISSE) roleSystem = 'caissier';
         else if (user.role === ROLES.TERRAIN) roleSystem = 'terrain';
         else if (user.role === ROLES.COMPTABLE) roleSystem = 'comptable';
-        else if (user.role === ROLES.CREDIT) roleSystem = 'credit';
+        else if (user.role === ROLES.CREDIT) roleSystem = 'gestionnaire_credit';
 
         return {
           userId: user.id,
