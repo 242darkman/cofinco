@@ -10,6 +10,7 @@ import CreditRequestForm from './CreditRequestForm';
 import EnqueteCreditForm from './EnqueteCreditForm';
 import CreditApprovalModal from './CreditApprovalModal';
 import CreditDisbursementModal from './CreditDisbursementModal';
+import CreditCommissionRejectionModal from './CreditCommissionRejectionModal';
 import CreditFeesPaymentModal from './CreditFeesPaymentModal';
 import EnqueteDetailModal from './EnqueteDetailModal';
 import ReferenceTable from './CreditRemboursement';
@@ -50,6 +51,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const [selectedDemande, setSelectedDemande] = useState<any>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showDisbursementModal, setShowDisbursementModal] = useState(false); // New modal state
+  const [showCommissionRejectionModal, setShowCommissionRejectionModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showFeesModal, setShowFeesModal] = useState(false);
   const [creditsPage, setCreditsPage] = useState(1);
@@ -382,21 +384,37 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               onPageChange: setDemandesPage
             }}
             actions={(item) => (
-               <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
-                 <Button 
-                    size="sm" 
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white"
-                    onClick={(e) => { 
-                      e.stopPropagation();
-                      setSelectedDemande(item);
-                      setShowDisbursementModal(true);
-                    }}
-                 >
-                   <DollarSign size={16} className="mr-1" />
-                   Décaisser
-                 </Button>
-               </ProtectedFeature>
-            )}
+               <div className="flex gap-2">
+                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'reject' }}>
+                   <Button 
+                      size="sm" 
+                      variant="danger"
+                      onClick={(e) => { 
+                        e.stopPropagation();
+                        setSelectedDemande(item);
+                        setShowCommissionRejectionModal(true);
+                      }}
+                   >
+                     <XCircle size={16} className="mr-1" />
+                     Rejeter
+                   </Button>
+                 </ProtectedFeature>
+                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
+                   <Button 
+                      size="sm" 
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                      onClick={(e) => { 
+                        e.stopPropagation();
+                        setSelectedDemande(item);
+                        setShowDisbursementModal(true);
+                      }}
+                   >
+                     <DollarSign size={16} className="mr-1" />
+                     Décaisser
+                   </Button>
+                 </ProtectedFeature>
+               </div>
+             )}
           />
         </Card>
       )}
@@ -672,6 +690,21 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             setShowFeesModal(false);
           }}
           onNavigate={onModuleChange}
+        />
+       )}
+
+       {selectedDemande && showCommissionRejectionModal && (
+        <CreditCommissionRejectionModal
+          demande={selectedDemande}
+          onClose={() => {
+            setShowCommissionRejectionModal(false);
+            setSelectedDemande(null);
+          }}
+          onSuccess={() => {
+            setShowCommissionRejectionModal(false);
+            setSelectedDemande(null);
+            demandes.fetchDemandes();
+          }}
         />
       )}
     </div>
