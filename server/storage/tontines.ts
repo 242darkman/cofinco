@@ -1,4 +1,4 @@
-import { tontines, membresTontine, contributionsTontine, clients, users, tontineRegles, tontinePenalites, tontineDistributions, tontinePlans } from "@shared/schema";
+import { tontines, membresTontine, contributionsTontine, clients, users, tontineRegles, tontinePenalites, tontineDistributions, tontinePlans, tontineAlertes } from "@shared/schema";
 import { type Tontine, type InsertTontine, type MembreTontine, type InsertMembreTontine, type ContributionTontine, type InsertContributionTontine,
     type TontineRegle, type InsertTontineRegle, type TontinePenalite, type InsertTontinePenalite,
     type TontinePlan, type InsertTontinePlan,
@@ -141,8 +141,17 @@ export async function updateTontine(id: string, updateData: Partial<InsertTontin
 }
 
 export async function deleteTontine(id: string): Promise<boolean> {
+  // Delete all dependencies first to avoid FK constraints
+  await db.delete(tontineAlertes).where(eq(tontineAlertes.tontineId, id));
+  await db.delete(tontineDistributions).where(eq(tontineDistributions.tontineId, id));
+  await db.delete(tontinePenalites).where(eq(tontinePenalites.tontineId, id));
+  await db.delete(tontineRegles).where(eq(tontineRegles.tontineId, id));
   await db.delete(contributionsTontine).where(eq(contributionsTontine.tontineId, id));
+  
+  // Then delete members
   await db.delete(membresTontine).where(eq(membresTontine.tontineId, id));
+  
+  // Finally delete the tontine
   const result = await db.delete(tontines).where(eq(tontines.id, id));
   return result.rowCount ? result.rowCount > 0 : false;
 }
