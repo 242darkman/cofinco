@@ -534,7 +534,6 @@ export async function recordCommitteeDecision(
         dureeValeur: reevaluation.nouvelleDureeValeur || undefined,
         dureeUnite: reevaluation.nouvelleDureeUnite || undefined,
         reevaluationEnCours: false,
-        updatedAt: new Date()
       })
       .where(eq(demandesCredit.id, reevaluation.demandeId));
   }

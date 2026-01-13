@@ -36,10 +36,21 @@ export default function AgentTerrainMap() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
 
-  const { latitude, longitude, accuracy, startWatching, stopWatching } = useGeolocation({
-    watch: trackingEnabled,
-    throttleMs: 30000,
+  const { latitude, longitude, accuracy, getCurrentPosition, cancelCapture } = useGeolocation({
+    desiredAccuracy: 30,
+    maxWait: 30000,
   });
+
+  // Toggle tracking with manual polling
+  const toggleTracking = () => {
+    if (trackingEnabled) {
+      cancelCapture();
+      setTrackingEnabled(false);
+    } else {
+      getCurrentPosition();
+      setTrackingEnabled(true);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -93,15 +104,7 @@ export default function AgentTerrainMap() {
     }
   }, [trackingEnabled, accuracy]);
 
-  const toggleTracking = () => {
-    if (trackingEnabled) {
-      stopWatching();
-      setTrackingEnabled(false);
-    } else {
-      startWatching();
-      setTrackingEnabled(true);
-    }
-  };
+
 
   return (
     <div className="h-[600px] flex flex-col space-y-4">

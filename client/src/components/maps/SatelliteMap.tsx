@@ -59,8 +59,8 @@ function LocationMarker({ onLocationUpdate, onAddressFound }: {
   onAddressFound?: (address: AddressInfo) => void;
 }) {
   const { latitude, longitude, accuracy, loading, error, getCurrentPosition } = useGeolocation({ 
-    watch: true, 
-    throttleMs: 10000 
+    desiredAccuracy: 30, 
+    maxWait: 10000 
   });
   const map = useMap();
 

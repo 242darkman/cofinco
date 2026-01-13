@@ -138,7 +138,6 @@ export function TransfertCoffreModal({
 
             <FormField
               label="Montant (FCFA)"
-              name="montant"
               type="number"
               placeholder="0"
               required
@@ -148,7 +147,6 @@ export function TransfertCoffreModal({
 
             <FormField
               label="Motif"
-              name="motif"
               placeholder="Ex: Approvisionnement journée"
               required
               {...register('motif')}
@@ -157,7 +155,6 @@ export function TransfertCoffreModal({
 
             <TextareaField
               label="Commentaire (Optionnel)"
-              name="commentaire"
               placeholder="Détails supplémentaires..."
               {...register('commentaire')}
             />

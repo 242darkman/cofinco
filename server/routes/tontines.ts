@@ -350,7 +350,7 @@ export function registerTontineRoutes(app: Express) {
   // Créer une distribution
   app.post("/api/tontine-distributions", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
     try {
-      const data = normalizeKeysDeep(req.body);
+      const data = normalizeKeysDeep(req.body) as Record<string, any>;
 
       // Validation des champs requis
       if (!data.tontineId) {

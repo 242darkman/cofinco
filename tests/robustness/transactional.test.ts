@@ -1,7 +1,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { executeWithLedger, updateCompteSolde } from '@server/services/ledger';
-import { db } from '@server/db';
+import { executeWithLedger, updateCompteSolde } from '../../server/services/ledger';
+import { db } from '../../server/db';
 import { comptes, mouvementsFinanciers, users, clients } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { faker } from '@faker-js/faker';
@@ -74,7 +74,7 @@ describe('Robustesse Transactionnelle', () => {
           typePaiement: 'Retrait Courant',
           idempotencyKey
         },
-        async (tx, mouvement) => {
+        async (tx: any, mouvement: any) => {
            return { result: 'success' };
         }
       );
@@ -93,7 +93,7 @@ describe('Robustesse Transactionnelle', () => {
           typePaiement: 'Retrait Courant',
           idempotencyKey
         },
-        async (tx, mouvement) => {
+        async (tx: any, mouvement: any) => {
            return { result: 'should_not_happen' };
         }
       )).rejects.toThrow(/Duplicate idempotency key/);
@@ -112,7 +112,7 @@ describe('Robustesse Transactionnelle', () => {
              compteId: testCompteId,
              typePaiement: 'Retrait Courant'
           },
-          async (tx, mouvement) => {
+          async (tx: any, mouvement: any) => {
              // 1. Simulate balance update (this logic is usually inside services like retraitESpeces)
              // We manually touch the DB to verify rollback
              const [compte] = await tx.select().from(comptes).where(eq(comptes.id, testCompteId));
@@ -164,7 +164,7 @@ describe('Robustesse Transactionnelle', () => {
               typePaiement: 'Retrait Courant',
               referenceExterne: `conc-test-${faker.string.uuid()}-${idx}`
             },
-            async (tx, mouvement) => {
+            async (tx: any, mouvement: any) => {
               // Use the robust atomic update function
               // This should handle concurrency correctly via SQL `solde = solde - amount`
               
