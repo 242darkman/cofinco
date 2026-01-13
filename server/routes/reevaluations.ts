@@ -714,18 +714,41 @@ export function registerReevaluationRoutes(app: Express) {
   app.get("/api/reevaluations", async (req: Request, res: Response) => {
     try {
       const { statut, limit = '50', offset = '0' } = req.query;
-      
-      let query = db.select().from(reevaluationsCredit);
-      
+
+      // Build query with client join
+      let baseQuery = db.select({
+        id: reevaluationsCredit.id,
+        numeroReevaluation: reevaluationsCredit.numeroReevaluation,
+        numeroVersion: reevaluationsCredit.numeroVersion,
+        demandeId: reevaluationsCredit.demandeId,
+        clientId: reevaluationsCredit.clientId,
+        statut: reevaluationsCredit.statut,
+        montantInitialDemande: reevaluationsCredit.montantInitialDemande,
+        nouveauMontantDemande: reevaluationsCredit.nouveauMontantDemande,
+        scoreRejetInitial: reevaluationsCredit.scoreRejetInitial,
+        nouveauScore: reevaluationsCredit.nouveauScore,
+        deltaScore: reevaluationsCredit.deltaScore,
+        elementsNouveaux: reevaluationsCredit.elementsNouveaux,
+        createdAt: reevaluationsCredit.createdAt,
+        dateDecisionComite: reevaluationsCredit.dateDecisionComite,
+        decisionComite: reevaluationsCredit.decisionComite,
+        client: {
+          nom: clients.nom,
+          prenom: clients.prenom
+        }
+      })
+      .from(reevaluationsCredit)
+      .leftJoin(clients, eq(reevaluationsCredit.clientId, clients.id));
+
       if (statut) {
-        query = query.where(eq(reevaluationsCredit.statut, statut as any)) as any;
+        baseQuery = baseQuery.where(eq(reevaluationsCredit.statut, statut as any)) as any;
       }
-      
-      const reevaluations = await query
+
+      const reevaluations = await baseQuery
         .orderBy(desc(reevaluationsCredit.createdAt))
         .limit(parseInt(limit as string))
         .offset(parseInt(offset as string));
-      
+
       res.json({
         success: true,
         reevaluations,
@@ -736,9 +759,9 @@ export function registerReevaluationRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Error listing reevaluations:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: { code: "SERVER_ERROR", message: error.message } 
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: error.message }
       });
     }
   });
