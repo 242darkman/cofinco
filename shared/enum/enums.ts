@@ -120,7 +120,7 @@ export const statutSessionCaisseEnum = pgEnum("statut_session_caisse_enum", [
   "Suspendue",
 ]);
 
-export const typeOperationCaisseEnum = pgEnum("type_operation_caisse_enum", [
+export const typeOperationCaisseEnum = pgEnum("type_operation_caisse", [
   "Dépôt épargne",
   "Retrait épargne",
   "Décaissement crédit",
@@ -130,7 +130,23 @@ export const typeOperationCaisseEnum = pgEnum("type_operation_caisse_enum", [
   "Ajustement",
   "Transfert caisse",
   "Approvisionnement coffre",
-  "Versement coffre"
+  "Versement coffre",
+  // Added for CaissePaiementModal compatibility
+  "Versement Épargne",
+  "Versement Courant",
+  "Retrait Courant",
+  "Versement Bloqué",
+  "Retrait Bloqué",
+  "Encaissement Divers",
+  "Décaissement Divers",
+  "Frais Bancaires",
+  // Tontine specific (often handled separately but good to have)
+  "Cotisation Tontine",
+  "Retrait Tontine",
+  // Aliases for robustness
+  "Remboursement Prêt",
+  "Décaissement Prêt",
+  "Retrait Épargne"
 ]);
 
 export const statutTransfertCaisseEnum = pgEnum("statut_transfert_caisse_enum", [

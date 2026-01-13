@@ -50,7 +50,7 @@ const TYPES_OPERATIONS = [
   { value: 'Retrait Tontine', label: 'Retrait Tontine', isEntree: false },
   { value: 'Remboursement Prêt', label: 'Remboursement Prêt', isEntree: true },
   { value: 'Décaissement Prêt', label: 'Décaissement Prêt', isEntree: false },
-  { value: 'Versement Épargne', label: 'Versement Compte Épargne', isEntree: true },
+  { value: 'Dépôt épargne', label: 'Versement Compte Épargne', isEntree: true },
   { value: 'Retrait Épargne', label: 'Retrait Compte Épargne', isEntree: false },
   { value: 'Versement Courant', label: 'Versement Compte Courant', isEntree: true },
   { value: 'Retrait Courant', label: 'Retrait Compte Courant', isEntree: false },
@@ -575,7 +575,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                   <option value="Décaissement Prêt">Décaissement Prêt</option>
                 </optgroup>
                 <optgroup label="Compte Épargne">
-                  <option value="Versement Épargne">Versement Compte Épargne</option>
+                  <option value="Dépôt épargne">Versement Compte Épargne</option>
                   <option value="Retrait Épargne">Retrait Compte Épargne</option>
                 </optgroup>
                 <optgroup label="Compte Courant">
