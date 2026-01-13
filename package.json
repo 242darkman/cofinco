@@ -1,6 +1,6 @@
 {
   "name": "cofinco",
-  "version": "1.5.1",
+  "version": "1.5.4",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -88,6 +88,7 @@
     "react": "^19.2.0",
     "react-day-picker": "^9.11.1",
     "react-dom": "^19.2.0",
+    "react-geolocated": "^4.4.0",
     "react-hook-form": "^7.66.0",
     "react-leaflet": "^5.0.0",
     "react-resizable-panels": "^2.1.9",

@@ -6,7 +6,8 @@ import {
   credits,
   sessionsCaisse,
   tontines,
-  caisses
+  caisses,
+  users
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -80,6 +81,30 @@ export function generateReference(sourceModule: SourceModule): string {
 }
 
 /**
+ * Validate that a user ID exists in the database
+ * Returns the user ID if valid, undefined if not found
+ * This prevents foreign key constraint violations
+ */
+export async function validateUserId(
+  tx: PgTransaction<any, any, any>,
+  userId?: string
+): Promise<string | undefined> {
+  if (!userId) return undefined;
+  
+  const [userExists] = await tx.select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  
+  if (!userExists) {
+    console.warn(`Warning: User ID ${userId} does not exist. Will use null for created_by`);
+    return undefined;
+  }
+  
+  return userId;
+}
+
+/**
  * Create a mouvement financier within a transaction
  */
 export async function createMouvementFinancier(
@@ -88,6 +113,9 @@ export async function createMouvementFinancier(
   createdBy?: string
 ): Promise<MouvementFinancier> {
   const reference = generateReference(data.sourceModule);
+  
+  // Validate user existence if createdBy is provided
+  const validatedUserId = await validateUserId(tx, createdBy);
   
   const [mouvement] = await tx.insert(mouvementsFinanciers).values({
     montant: data.montant,
@@ -106,7 +134,7 @@ export async function createMouvementFinancier(
     referenceExterne: data.referenceExterne,
     idempotencyKey: data.idempotencyKey,
     metadata: data.metadata,
-    createdBy,
+    createdBy: validatedUserId,
     dateOperation: new Date(),
   }).returning();
   
@@ -428,4 +456,5 @@ export default {
   updateCaisseSolde,
   checkIdempotencyKey,
   executeWithLedger,
+  validateUserId,
 };

@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Save, DollarSign, Briefcase, FileText, Camera, Upload, MapPin, TrendingUp, AlertCircle, User, Loader2, CheckCircle, Calendar, Video, WifiOff, Clock } from 'lucide-react';
 import CameraCapture from '../../shared/CameraCapture';
+import GpsCapture from '../../shared/GpsCapture';
+import { GpsSignalQuality } from '../../../hooks/useGeolocation';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 
@@ -42,7 +44,17 @@ interface GeoLocation {
   longitude: number | null;
   accuracy: number | null;
   timestamp: Date | null;
-  distanceFromClient?: number | null; // Distance from client's declared address
+  distanceFromClient?: number | null;
+  signalQuality?: GpsSignalQuality;
+  address?: {
+    road?: string;
+    suburb?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postcode?: string;
+    display_name?: string;
+  };
 }
 
 export default function EnqueteCreditForm({ clientId, clientNom, initialData, onClose, onSave }: EnqueteCreditFormProps) {
@@ -55,10 +67,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     longitude: null,
     accuracy: null,
     timestamp: null,
-    distanceFromClient: null
+    distanceFromClient: null,
+    signalQuality: undefined,
+    address: undefined
   });
-  const [geoLoading, setGeoLoading] = useState(false);
-  const [geoError, setGeoError] = useState<string | null>(null);
   
   // Seniority state (value + unit)
   const [seniorityValue, setSeniorityValue] = useState<string>('');
@@ -261,59 +273,57 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     'Autre'
   ];
 
-  const captureGeolocation = () => {
-    if (!navigator.geolocation) {
-      setGeoError('La géolocalisation n\'est pas supportée par votre navigateur');
-      return;
+  /**
+   * Callback quand le composant GpsCapture capture une position
+   */
+  const handleGpsCapture = useCallback((data: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    timestamp: Date;
+    signalQuality: GpsSignalQuality;
+  }) => {
+    // Calculer la distance depuis l'adresse du client si disponible
+    let distance = null;
+    if (selectedClient?.latitude && selectedClient?.longitude) {
+      distance = haversineDistance(
+        data.latitude,
+        data.longitude,
+        parseFloat(selectedClient.latitude),
+        parseFloat(selectedClient.longitude)
+      );
     }
 
-    setGeoLoading(true);
-    setGeoError(null);
+    setGeoLocation(prev => ({
+      ...prev,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      accuracy: data.accuracy,
+      timestamp: data.timestamp,
+      distanceFromClient: distance,
+      signalQuality: data.signalQuality,
+    }));
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        let distance = null;
-        if (selectedClient && selectedClient.latitude && selectedClient.longitude) {
-            distance = haversineDistance(
-                position.coords.latitude,
-                position.coords.longitude,
-                parseFloat(selectedClient.latitude),
-                parseFloat(selectedClient.longitude)
-            );
-        }
+    toast.success(`Position GPS capturée! Précision: ±${Math.round(data.accuracy)}m`);
+  }, [selectedClient]);
 
-        setGeoLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: new Date(),
-          distanceFromClient: distance
-        });
-        setGeoLoading(false);
-      },
-      (error) => {
-        let errorMessage = 'Erreur lors de la capture de la position';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Permission de géolocalisation refusée';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Position non disponible';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'Délai de géolocalisation dépassé';
-            break;
-        }
-        setGeoError(errorMessage);
-        setGeoLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-  };
+  /**
+   * Callback quand l'adresse est résolue via reverse geocoding
+   */
+  const handleAddressResolved = useCallback((address: {
+    road?: string;
+    suburb?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postcode?: string;
+    display_name?: string;
+  }) => {
+    setGeoLocation(prev => ({
+      ...prev,
+      address,
+    }));
+  }, []);
 
   const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -563,67 +573,49 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </div>
           </div>
 
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <label className="block text-sm font-semibold text-slate-300 mb-3">
-              <MapPin size={16} className="inline mr-2" />
-              Géolocalisation du site d'activité
-            </label>
-            
-            <div className="flex flex-wrap gap-4 items-center">
-              <button
-                type="button"
-                onClick={captureGeolocation}
-                disabled={geoLoading}
-                className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition flex items-center gap-2 disabled:opacity-50"
-                data-testid="button-capture-gps"
-              >
-                {geoLoading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Capture en cours...
-                  </>
-                ) : (
-                  <>
-                    <MapPin size={18} />
-                    Capturer la position GPS
-                  </>
-                )}
-              </button>
+          {/* Composant de capture GPS amélioré */}
+          <GpsCapture
+            onCapture={handleGpsCapture}
+            onAddressResolved={handleAddressResolved}
+            clientCoords={
+              selectedClient?.latitude && selectedClient?.longitude
+                ? { latitude: parseFloat(selectedClient.latitude), longitude: parseFloat(selectedClient.longitude) }
+                : null
+            }
+          />
 
-              {geoLocation.latitude && geoLocation.longitude && (
-                <div className="flex items-center gap-2 text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-                  <CheckCircle size={18} />
-                  <span className="text-sm">
-                    Position capturée ({geoLocation.latitude.toFixed(6)}, {geoLocation.longitude.toFixed(6)})
-                  </span>
+          {/* Affichage de l'adresse résolue */}
+          {geoLocation.address && (
+            <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
+              <div className="flex items-start gap-2 mb-2">
+                <MapPin size={16} className="text-cyan-400 flex-shrink-0 mt-1" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-cyan-400 mb-1">Adresse du site</div>
+                  <div className="text-sm text-white leading-relaxed">
+                    {geoLocation.address.road && (
+                      <div>{geoLocation.address.road}</div>
+                    )}
+                    {geoLocation.address.suburb && (
+                      <div className="text-slate-300">{geoLocation.address.suburb}</div>
+                    )}
+                    <div className="text-slate-300">
+                      {[
+                        geoLocation.address.city,
+                        geoLocation.address.state,
+                        geoLocation.address.postcode
+                      ].filter(Boolean).join(', ')}
+                    </div>
+                    {geoLocation.address.country && (
+                      <div className="text-slate-400 text-xs mt-1">{geoLocation.address.country}</div>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
+              <div className="text-xs text-cyan-300/70 mt-2 italic border-t border-cyan-500/20 pt-2">
+                Source: OpenStreetMap
+              </div>
             </div>
-
-            {geoLocation.latitude && (
-              <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
-                <div className="bg-slate-700/50 p-2 rounded">
-                  <span className="text-slate-400">Latitude:</span>
-                  <span className="text-white ml-2" data-testid="text-latitude">{geoLocation.latitude.toFixed(6)}</span>
-                </div>
-                <div className="bg-slate-700/50 p-2 rounded">
-                  <span className="text-slate-400">Longitude:</span>
-                  <span className="text-white ml-2" data-testid="text-longitude">{geoLocation.longitude?.toFixed(6)}</span>
-                </div>
-                <div className="bg-slate-700/50 p-2 rounded">
-                  <span className="text-slate-400">Précision:</span>
-                  <span className="text-white ml-2" data-testid="text-accuracy">{geoLocation.accuracy?.toFixed(0)}m</span>
-                </div>
-              </div>
-            )}
-
-            {geoError && (
-              <div className="mt-2 text-red-400 text-sm flex items-center gap-2">
-                <AlertCircle size={16} />
-                {geoError}
-              </div>
-            )}
-          </div>
+          )}
 
             {/* GPS Security Warning */}
             {geoLocation.distanceFromClient !== null && geoLocation.distanceFromClient !== undefined && geoLocation.distanceFromClient > 200 && (

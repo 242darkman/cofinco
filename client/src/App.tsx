@@ -5,7 +5,7 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingScreen from './components/ui/LoadingScreen';
 import AppShell from './components/layout/AppShell';
 import { authService } from './lib/auth';
-import { LocationTracker } from '@/components/agent/LocationTracker';
+import LocationTracker from '@/components/agent/LocationTracker';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { AgenceProvider } from './contexts/AgenceContext';
