@@ -7,7 +7,7 @@ import { type Tontine, type InsertTontine, type MembreTontine, type InsertMembre
 import { db } from "../db";
 import { eq, desc, and, sql, getTableColumns } from "drizzle-orm";
 
-import { executeWithLedger, updateTontineSolde, updateSessionSolde } from "../services/ledger";
+import { executeWithLedger, updateTontineSolde, updateSessionSolde, validateUserId } from "../services/ledger";
 
 
 // Tontine Plans
@@ -351,6 +351,10 @@ export async function createContributionTontineWithLedger(
         // Create Operation Caisse for traceability
         // Note: 'Dépôt' is not in typeOperationCaisseEnum. Using 'Ajustement' or similar for now until 'Versement Tontine' is added to that enum too.
         // Actually, let's use 'Ajustement' with clear description.
+        
+        // Validate userId
+        const validatedUserId = await validateUserId(tx, userId);
+        
         await tx.insert(operationsCaisse).values({
             sessionId: sessionCaisseId,
             mouvementId: mouvement.id,
@@ -359,7 +363,7 @@ export async function createContributionTontineWithLedger(
             methodePaiement: "Espèces" as any,
             reference: `TON-IN-${data.reference}`,
             description: `Versement Tontine ref: ${data.reference}`,
-            createdBy: userId
+            createdBy: validatedUserId
         });
       }
 

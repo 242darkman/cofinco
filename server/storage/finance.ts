@@ -1187,6 +1187,7 @@ import {
   updateCaisseSolde,
   createMouvementFinancier,
   createMouvementEvents,
+  validateUserId,
   type SensMouvement,
   type MouvementFinancier
 } from "../services/ledger";
@@ -1248,7 +1249,10 @@ export async function createTransactionCompteWithLedger(data: {
         nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, sessionDelta);
       }
 
-      // 3. Create transaction épargne
+      // 3. Validate userId
+      const validatedUserId = await validateUserId(tx, userId);
+
+      // 4. Create transaction épargne
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId: data.compteId,
         mouvementId: mouvement.id,
@@ -1257,7 +1261,7 @@ export async function createTransactionCompteWithLedger(data: {
         soldeApres: nouveauSolde,
         methodePaiement: data.methodePaiement as any,
         observations: data.observations,
-        createdBy: userId,
+        createdBy: validatedUserId,
       }).returning();
 
       return {
@@ -1313,7 +1317,10 @@ export async function createOperationCaisseWithLedger(data: {
       // 1. Update session solde théorique
       const nouveauSolde = await updateSessionSolde(tx, data.sessionId, sessionDelta);
 
-      // 2. Create operation caisse
+      // 2. Validate userId
+      const validatedUserId = await validateUserId(tx, userId);
+
+      // 3. Create operation caisse
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionId,
         mouvementId: mouvement.id,
@@ -1323,7 +1330,7 @@ export async function createOperationCaisseWithLedger(data: {
         reference,
         description: data.description,
         clientId: data.clientId,
-        createdBy: userId,
+        createdBy: validatedUserId,
         idempotencyKey: data.idempotencyKey,
       }).returning();
 
@@ -1381,7 +1388,10 @@ export async function createRemboursementWithLedger(data: {
         nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, parseFloat(data.montant));
       }
 
-      // 3. Create remboursement
+      // 3. Validate userId
+      const validatedUserId = await validateUserId(tx, userId);
+
+      // 4. Create remboursement
       const [remboursement] = await tx.insert(remboursements).values({
         creditId: data.creditId,
         mouvementId: mouvement.id,
@@ -1389,7 +1399,7 @@ export async function createRemboursementWithLedger(data: {
         dateRemboursement: new Date(),
         methodePaiement: data.methodePaiement as any,
         observations: data.observations,
-        createdBy: userId,
+        createdBy: validatedUserId,
         idempotencyKey: data.idempotencyKey,
       }).returning();
 
@@ -1454,7 +1464,10 @@ export async function payerFraisEngagement(data: {
         nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, parseFloat(data.montant));
       }
 
-      // 4. Créer l'opération caisse
+      // 4. Validate userId
+      const validatedUserId = await validateUserId(tx, userId);
+
+      // 5. Créer l'opération caisse
       const reference = `FRAIS-${demande.numeroDemande}-${Date.now()}`;
       // Note: sessionId not-null constraint handled by strict check above or type safety
       const [operation] = await tx.insert(operationsCaisse).values({
@@ -1470,7 +1483,7 @@ export async function payerFraisEngagement(data: {
         reference,
         description: `Paiement frais d'engagement demande ${demande.numeroDemande}`,
         clientId: demande.clientId,
-        createdBy: userId,
+        createdBy: validatedUserId,
         idempotencyKey: data.idempotencyKey,
       }).returning();
 
@@ -1798,6 +1811,9 @@ export async function createCashTransactionWithLedger(data: {
             ? (compte.typeCompte === 'Courant' ? 'Dépôt Courant' : 'Dépôt Épargne')
             : (compte.typeCompte === 'Courant' ? 'Retrait Courant' : 'Retrait Épargne');
 
+          // Validate userId
+          const validatedUserIdForTx = await validateUserId(tx, userId);
+
           // Create Transaction Record
           const [createdTx] = await tx.insert(transactionsCompte).values({
               compteId: data.compteId,
@@ -1807,12 +1823,15 @@ export async function createCashTransactionWithLedger(data: {
               soldeApres: nouveauSoldeCompte,
               methodePaiement: data.methodePaiement as any,
               observations: data.description || `Opération Caisse: ${data.typeOperation}`,
-              createdBy: userId
+              createdBy: validatedUserIdForTx
           }).returning();
           transaction = createdTx;
       }
 
-      // 3. Create Operation Caisse Record
+      // 3. Validate userId for operation
+      const validatedUserIdForOp = await validateUserId(tx, userId);
+
+      // 4. Create Operation Caisse Record
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionId,
         mouvementId: mouvement.id,
@@ -1822,7 +1841,7 @@ export async function createCashTransactionWithLedger(data: {
         reference: opReference,
         description: data.description,
         clientId: data.clientId,
-        createdBy: userId,
+        createdBy: validatedUserIdForOp,
         idempotencyKey: data.idempotencyKey,
       }).returning();
 
