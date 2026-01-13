@@ -155,7 +155,7 @@ export function registerFinanceRoutes(app: Express) {
 
       // Accept both 'Approuvée' and 'Approuvée après réévaluation' for disbursement
       const statutsEligiblesDecaissement = ['Approuvée', 'Approuvée après réévaluation'];
-      if (!statutsEligiblesDecaissement.includes(demande.statut)) {
+      if (!demande.statut || !statutsEligiblesDecaissement.includes(demande.statut)) {
         return res.status(400).json({ message: `La demande doit être approuvée pour être décaissée (statut actuel: ${demande.statut})` });
       }
 
@@ -515,7 +515,7 @@ export function registerFinanceRoutes(app: Express) {
 
       // Verify status is eligible for commission rejection
       const statutsEligiblesCommission = ['Approuvée', 'Approuvée après réévaluation'];
-      if (!statutsEligiblesCommission.includes(demande.statut)) {
+      if (!demande.statut || !statutsEligiblesCommission.includes(demande.statut)) {
         return res.status(400).json({
           message: `Cette demande ne peut pas être rejetée depuis la commission (statut actuel: ${demande.statut}). Seules les demandes approuvées peuvent être rejetées à cette étape.`
         });
@@ -1509,6 +1509,41 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/factures", requireAuth, async (req, res) => {
       const factures = await storage.getAllFactures();
       res.json(addSnakeCaseAliasesDeep(factures));
+  });
+
+  // Get single facture with lines and client info
+  app.get("/api/factures/:id", requireAuth, async (req, res) => {
+    try {
+      const facture = await storage.getFacture(req.params.id);
+      if (!facture) {
+        return res.status(404).json({ message: "Facture non trouvée" });
+      }
+
+      // Get invoice lines
+      const lignes = await storage.getLignesByFacture(facture.id);
+      
+      // Get client info if available
+      let client = null;
+      if (facture.clientId) {
+        client = await storage.getClient(facture.clientId);
+      }
+
+      // Get modele info if available
+      let modele = null;
+      if (facture.modeleId) {
+        modele = await storage.getModeleFacture(facture.modeleId);
+      }
+
+      res.json(addSnakeCaseAliasesDeep({
+        ...facture,
+        lignes,
+        client,
+        modele
+      }));
+    } catch (error: any) {
+      console.error("Erreur récupération facture:", error);
+      res.status(500).json({ message: error.message || "Erreur lors de la récupération de la facture" });
+    }
   });
 
   // Create facture (roles: admin, chef, comptable)

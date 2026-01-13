@@ -1417,6 +1417,7 @@ export async function createRemboursementWithLedger(data: {
 
 /**
  * Payer les frais d'engagement pour une demande de crédit
+ * Génère automatiquement une facture/reçu après paiement
  */
 export async function payerFraisEngagement(data: {
   demandeId: string;
@@ -1424,7 +1425,7 @@ export async function payerFraisEngagement(data: {
   methodePaiement: string;
   sessionCaisseId?: string;
   idempotencyKey?: string;
-}, userId?: string): Promise<{ demande: DemandeCredit; operation: OperationCaisse; mouvement: MouvementFinancier }> {
+}, userId?: string): Promise<{ demande: DemandeCredit; operation: OperationCaisse; mouvement: MouvementFinancier; facture: Facture }> {
   
   // 1. Récupérer la demande
   const [demande] = await db.select().from(demandesCredit).where(eq(demandesCredit.id, data.demandeId));
@@ -1436,7 +1437,7 @@ export async function payerFraisEngagement(data: {
       throw new Error("Une session de caisse active est requise pour le paiement des frais en espèces");
   }
 
-  return executeWithLedger(
+  const ledgerResult = await executeWithLedger(
     "CREDIT",
     {
       montant: data.montant,
@@ -1469,13 +1470,8 @@ export async function payerFraisEngagement(data: {
 
       // 5. Créer l'opération caisse
       const reference = `FRAIS-${demande.numeroDemande}-${Date.now()}`;
-      // Note: sessionId not-null constraint handled by strict check above or type safety
       const [operation] = await tx.insert(operationsCaisse).values({
-        sessionId: data.sessionCaisseId!, // Safe assertion if logic ensures it (Espèces requires it, others might not?)
-        // WAIT: If methodePaiement is NOT Espèces (e.g. Virement), sessionCaisseId might be undefined.
-        // But operationsCaisse REQUIRES a sessionId in the DB schema? 
-        // Let's check schema/operationsCaisse. If it's nullable, fine. If not, we have a problem for non-cash fees.
-        // Assuming for now fees are always collected via a session (even transfers handled by a cashier).
+        sessionId: data.sessionCaisseId!,
         mouvementId: mouvement.id,
         typeOperation: "Frais Engagement" as any,
         montant: data.montant,
@@ -1488,14 +1484,107 @@ export async function payerFraisEngagement(data: {
       }).returning();
 
       return {
-        result: { demande: updatedDemande, operation },
+        result: { demande: updatedDemande, operation, validatedUserId },
         additionalEventData: {
           nouveauSoldeSession,
         },
       };
     },
     userId
-  ).then(({ result, mouvement }) => ({ ...result, mouvement }));
+  );
+
+  // 6. Create facture/receipt AFTER successful payment (outside transaction for simplicity)
+  const facture = await createFactureForFraisEngagement({
+    demandeId: data.demandeId,
+    numeroDemande: demande.numeroDemande,
+    clientId: demande.clientId,
+    montant: data.montant,
+    agentId: ledgerResult.result.validatedUserId,
+    operationCaisseId: ledgerResult.result.operation.id,
+    sessionCaisseId: data.sessionCaisseId,
+  });
+
+  return {
+    demande: ledgerResult.result.demande,
+    operation: ledgerResult.result.operation,
+    mouvement: ledgerResult.mouvement,
+    facture,
+  };
+}
+
+/**
+ * Create a facture (invoice/receipt) for credit engagement fees
+ * This is called automatically after successful fee payment
+ */
+export async function createFactureForFraisEngagement(data: {
+  demandeId: string;
+  numeroDemande: string;
+  clientId: string;
+  montant: string;
+  agentId?: string;
+  operationCaisseId?: string;
+  sessionCaisseId?: string;
+}): Promise<Facture> {
+  // 1. Get or create the "FRAIS_ENGAGEMENT" template
+  let modele = await getModeleFactureByCode("FRAIS_ENGAGEMENT");
+  
+  if (!modele) {
+    // Create default template if not exists
+    [modele] = await db.insert(modelesFactures).values({
+      nom: "Reçu Frais d'Engagement",
+      code: "FRAIS_ENGAGEMENT",
+      description: "Reçu de paiement des frais d'engagement pour demande de crédit",
+      typeDocument: "recu",
+      prefixeNumero: "REC",
+      dernierNumero: 0,
+      mentionsLegales: "Ce reçu atteste du paiement des frais d'engagement. Ce document ne constitue pas une approbation de crédit.",
+      afficherTva: false,
+      isActive: true,
+    }).returning();
+  }
+  
+  // 2. Increment invoice number
+  const nextNum = await incrementModeleFactureNumero(modele.id);
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const numeroFacture = `${modele.prefixeNumero}-${dateStr}-${String(nextNum).padStart(4, '0')}`;
+  
+  // 3. Get shift from session if available
+  let shiftId: string | undefined;
+  if (data.sessionCaisseId) {
+    const [session] = await db.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, data.sessionCaisseId));
+    // Note: SessionsCaisse doesn't have a direct shiftId, we skip shift linking for now
+  }
+  
+  // 4. Create the facture
+  const montantTotal = parseFloat(data.montant);
+  const [facture] = await db.insert(factures).values({
+    numero: numeroFacture,
+    modeleId: modele.id,
+    clientId: data.clientId,
+    agentId: data.agentId,
+    dateFacture: new Date(),
+    sousTotal: data.montant,
+    montantTva: "0",
+    montantTotal: data.montant,
+    montantPaye: data.montant,
+    statut: "payee",
+    modePaiement: "Espèces",
+    operationCaisseId: data.operationCaisseId,
+    notes: `Frais d'engagement pour demande de crédit ${data.numeroDemande}`,
+  }).returning();
+  
+  // 5. Create ligne facture
+  await db.insert(lignesFactures).values({
+    factureId: facture.id,
+    description: `Frais d'engagement - Demande de crédit N° ${data.numeroDemande}`,
+    quantite: 1,
+    prixUnitaire: data.montant,
+    montant: data.montant,
+    typeOperation: "Frais Engagement",
+    referenceId: data.demandeId,
+  });
+  
+  return facture;
 }
 
 /**

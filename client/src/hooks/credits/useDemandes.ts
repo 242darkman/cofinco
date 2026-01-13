@@ -135,14 +135,17 @@ export function useDemandes() {
           throw new Error(errData.message || 'Erreur paiement frais');
       }
 
+      const data = await response.json();
       await fetchDemandes();
-      return true;
+      
+      // Return the full response including facture
+      return { success: true, facture: data.facture };
     } catch (err) {
       console.error('Erreur paiement frais:', err);
       const message = err instanceof Error ? err.message : 'Erreur paiement frais';
       setError(message);
       toast.error(message);
-      return false;
+      return { success: false, facture: null };
     }
   };
 

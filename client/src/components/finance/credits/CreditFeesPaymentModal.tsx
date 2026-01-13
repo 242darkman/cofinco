@@ -5,6 +5,8 @@ import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { formatMoney } from '../../../lib/format';
 import { toast } from 'sonner';
 import { sessionCaisseApi, authApi } from '../../../lib/api-client';
+import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
+import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 
 interface CreditFeesPaymentModalProps {
   demande: any;
@@ -18,6 +20,10 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
   const [amount, setAmount] = useState('5000'); // Default fee
   const [method, setMethod] = useState('Espèces');
   const [loading, setLoading] = useState(false);
+  
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [paidFacture, setPaidFacture] = useState<any>(null);
   
   // Session State
   const [checkingSession, setCheckingSession] = useState(true);
@@ -63,11 +69,12 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
     try {
       // If we took a session, pass its ID. otherwise pass nothing (backend uses user's active session)
       const targetSessionId = takenSession?.id;
-      const success = await payerFrais(demande.id, parseFloat(amount), method, targetSessionId);
-      if (success) {
-        toast.success(`Frais de ${formatMoney(parseFloat(amount))} payés pour la demande ${demande.numero_demande}`);
+      const result = await payerFrais(demande.id, parseFloat(amount), method, targetSessionId);
+      if (result.success && result.facture) {
+        // Show success modal with facture instead of just toast
+        setPaidFacture(result.facture);
+        setShowSuccessModal(true);
         onSuccess();
-        onClose();
       }
     } catch (error) {
        console.error(error);
@@ -75,6 +82,11 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    onClose();
   };
 
   const fetchAgencyCaisses = async () => {
@@ -155,6 +167,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
   const isAdmin = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(userRole);
 
   return (
+    <>
     <Modal isOpen={true} onClose={onClose} title="Paiement des Frais d'Engagement" size="md">
         <div className="space-y-6">
             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
@@ -302,5 +315,33 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
             )}
         </div>
     </Modal>
+
+    {/* Success Modal with Invoice/Receipt */}
+    {showSuccessModal && paidFacture && (
+      <UniversalPaymentSuccessModal
+        isOpen={showSuccessModal}
+        onClose={handleSuccessClose}
+        data={{
+          title: 'Reçu de Paiement',
+          reference: paidFacture.numero || `FRAIS-${demande.numero_demande}`,
+          date: paidFacture.date_facture || new Date(),
+          type: 'Frais d\'Engagement',
+          client: demande.clients ? {
+            nom: demande.clients.nom || '',
+            prenom: demande.clients.prenom || '',
+            telephone: demande.clients.phone || demande.clients.telephone,
+          } : undefined,
+          items: [{
+            description: `Frais d'engagement - Demande de crédit N° ${demande.numero_demande}`,
+            montant: parseFloat(paidFacture.montant_total || amount),
+          }],
+          total: parseFloat(paidFacture.montant_total || amount),
+          modePaiement: method,
+          devise: 'FCFA',
+          notes: `Demande de crédit: ${formatMoney(demande.montant_demande)}`,
+        } as ReceiptData}
+      />
+    )}
+    </>
   );
 }

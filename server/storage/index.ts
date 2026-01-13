@@ -86,7 +86,7 @@ export interface IStorage {
       methodePaiement: string;
       sessionCaisseId?: string;
       idempotencyKey?: string;
-    }, userId?: string): Promise<{ demande: DemandeCredit; operation: OperationCaisse; mouvement: any }>;
+    }, userId?: string): Promise<{ demande: DemandeCredit; operation: OperationCaisse; mouvement: any; facture: Facture }>;
 
 
     // Enquetes
