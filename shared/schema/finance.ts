@@ -199,7 +199,12 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertEnqueteCreditSchema = createInsertSchema(enquetesCredit).omit({ id: true, createdAt: true });
+export const insertEnqueteCreditSchema = createInsertSchema(enquetesCredit).omit({ id: true, createdAt: true }).extend({
+  geoLatitude: z.coerce.string().optional().nullable(),
+  geoLongitude: z.coerce.string().optional().nullable(),
+  geoAccuracy: z.coerce.string().optional().nullable(),
+  geoTimestamp: z.coerce.date().optional().nullable(),
+});
 export type InsertEnqueteCredit = z.infer<typeof insertEnqueteCreditSchema>;
 export type EnqueteCredit = typeof enquetesCredit.$inferSelect;
 
