@@ -1994,6 +1994,21 @@ async function seedDemo() {
         dureeUnite = 'Mois';
       }
 
+      
+      // Determine rejection details if status is 'Rejetée'
+      const motifRejet = statut === 'Rejetée' 
+        ? randomFromArray([
+            'Capacité de remboursement insuffisante',
+            'Score crédit trop faible',
+            'Revenus non vérifiables',
+            'Historique de crédit négatif',
+            'Garanties insuffisantes',
+            'Endettement excessif'
+          ]) 
+        : null;
+      
+      const dateRejet = statut === 'Rejetée' ? daysAgo(randomBetween(1, 180)) : null;
+
       demandesData.push({
         numeroDemande: `DEM-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
         clientId: client.id,
@@ -2012,6 +2027,8 @@ async function seedDemo() {
         scoreCredit: randomBetween(35, 95),
         montantApprouve: isApproved ? generateRealisticAmount(montantDemande * 0.7, montantDemande, 50000) : null,
         statut,
+        motifRejet,
+        dateRejet,
         createdBy: staffGroups.Credits[i % staffGroups.Credits.length]?.id || staffGroups.Agents[0]?.id,
         createdAt: daysAgo(randomBetween(1, 180)),
       });
