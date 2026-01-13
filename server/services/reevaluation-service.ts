@@ -152,16 +152,28 @@ export async function createReevaluation(
     // Generate Reevaluation Number manually (since trigger might be missing)
     numeroReevaluation: await (async () => {
       const year = new Date().getFullYear();
-      // Count existing reevaluations for this year
-      // Note: This is a simple implementation. In high concurrency, use a sequence or lock.
-      const countResult = await db.execute(sql`
-        SELECT COUNT(*) as count 
+      // Use MAX instead of COUNT to safely increment even if records were deleted
+      const pattern = `REEV-${year}-%`;
+      const result = await db.execute(sql`
+        SELECT MAX(numero_reevaluation) as last_num
         FROM ${reevaluationsCredit} 
-        WHERE EXTRACT(YEAR FROM ${reevaluationsCredit.createdAt}) = ${year}
+        WHERE numero_reevaluation LIKE ${pattern}
       `);
       
-      const count = Number(countResult.rows[0]?.count || 0) + 1;
-      return `REEV-${year}-${count.toString().padStart(4, '0')}`;
+      let nextNum = 1;
+      const lastNumStr = result.rows[0]?.last_num;
+      
+      if (lastNumStr && typeof lastNumStr === 'string') {
+        const parts = lastNumStr.split('-');
+        if (parts.length === 3) {
+          const lastSeq = parseInt(parts[2], 10);
+          if (!isNaN(lastSeq)) {
+            nextNum = lastSeq + 1;
+          }
+        }
+      }
+      
+      return `REEV-${year}-${nextNum.toString().padStart(4, '0')}`;
     })(),
     numeroVersion: 0, // Will be set by trigger
   } as InsertReevaluationCredit).returning();
@@ -501,6 +513,19 @@ export async function recordCommitteeDecision(
     })
     .where(eq(reevaluationsCredit.id, reevaluationId))
     .returning();
+  
+  // 5. If approved, update the parent DemandeCredit to 'Approuvée' to enable Disbursement
+  if (finalStatut === 'Approuvée') {
+    await db.update(demandesCredit)
+      .set({
+        statut: 'Approuvée',
+        montantApprouve: montantApprouve?.toString() || reevaluation.nouveauMontantDemande,
+        dureeValeur: reevaluation.nouvelleDureeValeur || undefined,
+        dureeUnite: reevaluation.nouvelleDureeUnite || undefined,
+        updatedAt: new Date()
+      })
+      .where(eq(demandesCredit.id, reevaluation.demandeId));
+  }
   
   // 5. Audit log
   await createAuditLog({

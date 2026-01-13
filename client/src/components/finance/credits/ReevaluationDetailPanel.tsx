@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatMoney } from '../../../lib/format';
+import { CreditTimeline } from './CreditTimeline';
 
 interface Reevaluation {
   id: string;
@@ -826,6 +827,14 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
           )}
         </div>
       )}
+
+      {/* Historique Timeline */}
+      <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+         <h3 className="text-sm font-bold text-slate-400 mb-4 flex items-center gap-2">
+           <History size={16} /> Historique du Dossier
+         </h3>
+         <CreditTimeline demandeId={reevaluation.demandeId} compact />
+      </div>
 
       {/* Actions */}
       {getActionButtons()}

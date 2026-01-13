@@ -19,9 +19,10 @@ interface ReevaluationWorkflowPageProps {
   demandeId?: string; // If provided, filters to this demande only
   onClose?: () => void;
   embedded?: boolean; // If true, renders without full page wrapper
+  onWorkflowChange?: () => void;
 }
 
-export function ReevaluationWorkflowPage({ demandeId, onClose, embedded = false }: ReevaluationWorkflowPageProps) {
+export function ReevaluationWorkflowPage({ demandeId, onClose, embedded = false, onWorkflowChange }: ReevaluationWorkflowPageProps) {
   const [selectedReevaluation, setSelectedReevaluation] = useState<Reevaluation | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
 
@@ -39,6 +40,7 @@ export function ReevaluationWorkflowPage({ demandeId, onClose, embedded = false 
     // Refresh list when status changes
     setViewMode('list');
     setSelectedReevaluation(null);
+    onWorkflowChange?.();
   };
 
   const content = (

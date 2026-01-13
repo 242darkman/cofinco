@@ -521,7 +521,8 @@ export function registerFinanceRoutes(app: Express) {
       // Update demande status to Rejetée
       const updated = await storage.updateDemandeCredit(id, { 
         statut: 'Rejetée',
-        motifRejet: motif_rejet.trim()
+        motifRejet: motif_rejet.trim(),
+        dateRejet: new Date()
       });
 
       // Log audit

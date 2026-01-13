@@ -51,7 +51,7 @@ export default function CreditCommissionRejectionModal({
         throw new Error(data.message || 'Erreur lors du rejet de la demande');
       }
 
-      toast.success(`Demande ${demande.numero_demande} rejetée. Le client peut demander une réévaluation après 1 jour.`);
+      toast.success(`Demande ${demande.numero_demande} rejetée. Le client peut demander une réévaluation immédiatement.`);
       onSuccess();
     } catch (err: any) {
       console.error('Erreur rejet commission:', err);
@@ -87,7 +87,7 @@ export default function CreditCommissionRejectionModal({
             <p className="font-semibold mb-1">Attention</p>
             <p className="text-yellow-300/90">
               Cette demande a déjà été approuvée. Le rejet à cette étape annulera l'approbation initiale.
-              Le client pourra demander une réévaluation après 1 jour.
+              Le client pourra demander une réévaluation immédiatement.
             </p>
           </div>
         </div>

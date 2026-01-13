@@ -2093,9 +2093,10 @@ async function seedDemo() {
         { statut: 'Demandée', eligible: null },
         { statut: 'Autorisée', eligible: true },
         { statut: 'En comité', eligible: true },
+        { statut: 'Approuvée', eligible: true },
       ];
       
-      for (let i = 0; i < Math.min(3, rejectedDemandes.length); i++) {
+      for (let i = 0; i < Math.min(4, rejectedDemandes.length); i++) {
         const demande = rejectedDemandes[i];
         const statusInfo = reevaluationStatuses[i];
         const elementsNouveaux = [
@@ -2133,14 +2134,22 @@ async function seedDemo() {
       const insertedReevaluations = await db.insert(reevaluationsCredit).values(reevaluationsData).returning();
       
       // Update demandes to reflect reevaluation in progress
+      // Update demandes to reflect reevaluation status
       for (const reeval of insertedReevaluations) {
+        let demandeUpdate: any = {
+           reevaluationEnCours: !['Approuvée', 'Montant réduit', 'Rejetée définitivement'].includes(reeval.statut),
+           derniereReevaluationId: reeval.id,
+           dateDerniereReevaluation: reeval.createdAt,
+           statut: 'Réévaluation en cours'
+        };
+
+        if (['Approuvée', 'Montant réduit'].includes(reeval.statut)) {
+           demandeUpdate.statut = 'Approuvée';
+           demandeUpdate.montantApprouve = reeval.nouveauMontantDemande || reeval.montantInitialDemande;
+        }
+
         await db.update(demandesCredit)
-          .set({
-            reevaluationEnCours: reeval.statut !== 'Approuvée' && reeval.statut !== 'Rejetée définitivement',
-            derniereReevaluationId: reeval.id,
-            dateDerniereReevaluation: reeval.createdAt,
-            statut: 'Réévaluation en cours'
-          })
+          .set(demandeUpdate)
           .where(eq(demandesCredit.id, reeval.demandeId));
       }
       
@@ -2153,8 +2162,8 @@ async function seedDemo() {
           statutAvant: null,
           statutApres: 'Demandée',
           details: {
-            description: 'Réévaluation créée',
-            elementsNouveaux: reeval.elementsNouveaux
+             description: 'Réévaluation créée',
+             elementsNouveaux: reeval.elementsNouveaux
           },
           userId: reeval.createdBy,
           roleUtilisateur: 'Agent',

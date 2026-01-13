@@ -22,7 +22,7 @@ import {
 } from "../services/reevaluation-service";
 import { checkEligibilityQuick, CreateReevaluationPayload } from "../services/reevaluation-validator";
 import { db } from "../db";
-import { reevaluationsCredit, enquetesComplementaires, demandesCredit } from "@shared/schema/finance";
+import { reevaluationsCredit, enquetesComplementaires, demandesCredit, enquetesCredit, credits } from "@shared/schema/finance";
 import { clients } from "@shared/schema/clients";
 import { users } from "@shared/schema/auth";
 import { eq, desc, sql } from "drizzle-orm";
@@ -35,7 +35,7 @@ const createReevaluationSchema = z.object({
     valeurAjoutee: z.number().optional(),
     documents: z.array(z.string()).optional()
   })).min(1, "Au moins un élément nouveau requis"),
-  justification: z.string().min(50, "Justification doit contenir au moins 50 caractères"),
+  justification: z.string().min(10, "Justification doit contenir au moins 10 caractères"),
   nouveauMontantDemande: z.number().optional(),
   nouvelleDureeValeur: z.number().optional(),
   nouvelleDureeUnite: z.enum(["Jour", "Semaine", "Mois"]).optional(),
@@ -239,10 +239,14 @@ export function registerReevaluationRoutes(app: Express) {
       // Get all reevaluations
       const reevaluations = await getReevaluationsByDemande(demandeId);
       
+      // Get linked enquete and credit
+      const [enquete] = await db.select().from(enquetesCredit).where(eq(enquetesCredit.demandeId, demandeId));
+      const [credit] = enquete ? await db.select().from(credits).where(eq(credits.enqueteId, enquete.id)) : [undefined];
+      
       // Build timeline events
       const timeline: any[] = [];
       
-      // Demande creation event
+      // 1. Demande creation
       timeline.push({
         id: `demande-created-${demande.id}`,
         type: 'DEMANDE',
@@ -252,8 +256,33 @@ export function registerReevaluationRoutes(app: Express) {
         statut: 'En attente'
       });
       
-      // Add reevaluation events
+      // 2. Enquete
+      if (enquete) {
+        timeline.push({
+          id: `enquete-${enquete.id}`,
+          type: 'ENQUETE',
+          date: enquete.createdAt,
+          titre: 'Enquête réalisée',
+          description: `Score global: ${enquete.scoreGlobal ?? 'N/A'}/100`,
+          statut: enquete.statut
+        });
+      }
+
+      // 3. Rejet initial (if any)
+      if (demande.dateRejet) {
+        timeline.push({
+          id: `demande-rejet-${demande.id}`,
+          type: 'DECISION',
+          date: demande.dateRejet,
+          titre: 'Demande rejetée',
+          description: demande.motifRejet || 'Aucun motif précisé',
+          statut: 'Rejetée'
+        });
+      }
+      
+      // 4. Reevaluations & Decisions
       for (const reeval of reevaluations) {
+        // Reevaluation request
         timeline.push({
           id: `reeval-${reeval.id}`,
           type: 'REEVALUATION',
@@ -261,13 +290,37 @@ export function registerReevaluationRoutes(app: Express) {
           titre: `Réévaluation #${reeval.numeroVersion}`,
           description: `Nouveaux éléments: ${((reeval.elementsNouveaux as any[]) || []).map(e => e.type).join(', ')}`,
           statut: reeval.statut,
-          details: {
+           details: {
             numeroReevaluation: reeval.numeroReevaluation,
             scoreAvant: reeval.scoreRejetInitial,
             scoreApres: reeval.nouveauScore,
             deltaScore: reeval.deltaScore
           }
         });
+        
+        // Committee Decision
+        if (reeval.dateDecisionComite && reeval.decisionComite) {
+             timeline.push({
+                id: `reeval-decision-${reeval.id}`,
+                type: 'DECISION',
+                date: reeval.dateDecisionComite,
+                titre: `Décision Comité #${reeval.numeroVersion}`,
+                description: `Décision: ${reeval.decisionComite} ${reeval.commentaireComite ? `- ${reeval.commentaireComite}` : ''}`,
+                statut: reeval.decisionComite
+            });
+        }
+      }
+
+      // 5. Disbursement (Credit created)
+      if (credit) {
+         timeline.push({
+            id: `credit-disbursed-${credit.id}`,
+            type: 'DECAISSEMENT',
+            date: credit.createdAt,
+            titre: 'Crédit décaissé',
+            description: `Montant financé: ${credit.montant} FCFA`,
+            statut: 'Actif'
+         });
       }
       
       // Sort by date

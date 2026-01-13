@@ -172,7 +172,7 @@ export const REEVALUATION_RULES = {
    * Rule 7: Justification minimum length
    */
   validateJustification: (justification: string | undefined): ValidationResult => {
-    const MIN_LENGTH = 50;
+    const MIN_LENGTH = 10;
     const length = justification?.trim().length || 0;
     
     if (length < MIN_LENGTH) {

@@ -560,7 +560,13 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
       {/* Réévaluations Tab */}
       {activeTab === 'reevaluations' && (
-        <ReevaluationWorkflowPage embedded />
+        <ReevaluationWorkflowPage 
+          embedded 
+          onWorkflowChange={() => {
+            demandes.fetchDemandes();
+            credits.fetchCredits();
+          }}
+        />
       )}
 
       {/* Modals */}
@@ -618,6 +624,11 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             setShowApprovalModal(false);
             setSelectedDemande(null);
             demandes.fetchDemandes();
+          }}
+          onManageReevaluation={() => {
+            setShowApprovalModal(false);
+            setSelectedDemande(null);
+            setActiveTab('reevaluations');
           }}
         />
       )}

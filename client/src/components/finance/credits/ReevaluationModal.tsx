@@ -559,7 +559,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                     {formatMoney(demande.montantDemande)}
                   </div>
                   <div className="text-sm text-slate-400">
-                    {demande.dureeValeur} {demande.dureeUnite}
+                    {demande.dureeValeur} {demande.dureeUnite}{(demande.dureeValeur > 1 && demande.dureeUnite !== "Mois") ? "s" : ""}
                   </div>
                   {demande.scoreCredit && (
                     <div className="mt-2 text-sm text-red-400">
@@ -574,7 +574,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                     {formatMoney(formData.nouveauMontantDemande)}
                   </div>
                   <div className="text-sm text-slate-400">
-                    {formData.nouvelleDureeValeur || demande.dureeValeur} {formData.nouvelleDureeUnite || demande.dureeUnite}
+                    {formData.nouvelleDureeValeur || demande.dureeValeur} {(formData.nouvelleDureeUnite || demande.dureeUnite)}{(Number(formData.nouvelleDureeValeur || demande.dureeValeur) > 1 && (formData.nouvelleDureeUnite || demande.dureeUnite) !== "Mois") ? "s" : ""}
                   </div>
                   {Number(formData.nouveauMontantDemande) < Number(demande.montantDemande) && formData.nouveauMontantDemande !== '' && (
                     <div className="mt-2 text-sm text-emerald-400">

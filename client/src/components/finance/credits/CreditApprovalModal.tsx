@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, Star, MessageSquare, UserCheck, RefreshCw } from 'lucide-react';
+import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, Star, MessageSquare, UserCheck, RefreshCw, Clock } from 'lucide-react';
 import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -9,6 +9,7 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
 import { ReevaluationModal } from './ReevaluationModal';
+import { CreditTimeline } from './CreditTimeline';
 
 interface Demande {
   id: string;
@@ -50,6 +51,7 @@ interface CreditApprovalModalProps {
   demande: Demande;
   onClose: () => void;
   onSuccess: () => void;
+  onManageReevaluation?: () => void;
 }
 
 interface Guarantee {
@@ -67,7 +69,7 @@ const GUARANTEE_TYPES = [
   { value: 'Dépôt', label: 'Dépôt' },
 ] as const;
 
-export default function CreditApprovalModal({ demande, onClose, onSuccess }: CreditApprovalModalProps) {
+export default function CreditApprovalModal({ demande, onClose, onSuccess, onManageReevaluation }: CreditApprovalModalProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canApproveCredits = hasPermission('credits', 'approve');
@@ -439,15 +441,14 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                   demandeId={demande.id}
                   onEligibilityChange={setIsEligibleForReevaluation}
                 />
-                {isEligibleForReevaluation && (
-                  <button
-                    onClick={() => setShowReevaluationModal(true)}
-                    className="mt-4 w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
-                  >
-                    <RefreshCw size={20} />
-                    Demander une réévaluation
-                  </button>
-                )}
+                
+                <button
+                  onClick={() => setShowReevaluationModal(true)}
+                  className="mt-4 w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                >
+                  <RefreshCw size={20} />
+                  Gérer la Réévaluation
+                </button>
               </div>
             )}
 
@@ -743,6 +744,15 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess }: Cre
                  })}
               </div>
             )}
+
+            {/* Workflow Timeline */}
+            <div className="bg-slate-700/30 rounded-lg p-6">
+               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <Clock size={18} className="text-amber-400" />
+                  Historique du Workflow
+               </h3>
+               <CreditTimeline demandeId={demande.id} compact />
+            </div>
 
             {/* Approval Form */}
             {action === 'approve' && (
