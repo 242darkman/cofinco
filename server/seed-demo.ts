@@ -2026,7 +2026,7 @@ async function seedDemo() {
     
     // 1. Insert global reevaluation config
     await db.insert(configReevaluation).values({
-      delaiMinimumJours: 1, // Reduced from 30 to 1 day for faster testing
+      delaiMinimumJours: 0, // Reduced to 0 (immediate)
       maxReevaluationsParDemande: 2,
       motifsNonReevaluables: [
         'Fraude avérée',

@@ -60,7 +60,7 @@ export async function getConfigReevaluation(agenceId?: string): Promise<ConfigRe
     // Return default config if none exists
     return {
       id: 'default',
-      delaiMinimumJours: 1, // Reduced from 30 to 1 day
+      delaiMinimumJours: 0, // Reduced to 0 (immediate)
       maxReevaluationsParDemande: 2,
       motifsNonReevaluables: ['Fraude avérée', 'Client blacklisté', 'Faux documents'],
       elementsNouveauxObligatoires: true,

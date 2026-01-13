@@ -562,7 +562,7 @@ async function seedProd() {
     // Reevaluation Configuration
     console.log('\\n🔄 Seeding Reevaluation Config...');
     await db.insert(configReevaluation).values({
-      delaiMinimumJours: 1, // Minimum delay for reevaluation
+      delaiMinimumJours: 0, // Reduced to 0 (immediate)
       maxReevaluationsParDemande: 2,
       motifsNonReevaluables: [
         'Fraude avérée',

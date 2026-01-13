@@ -97,7 +97,9 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
           <div className={`text-sm font-bold ${
             eligibility.delaiOk ? 'text-emerald-400' : 'text-red-400'
           }`}>
-            {eligibility.joursDepuisRejet}j / {eligibility.delaiMinimum}j
+            {eligibility.delaiMinimum > 0 
+              ? `${eligibility.joursDepuisRejet}j / ${eligibility.delaiMinimum}j` 
+              : 'Immédiat'}
           </div>
         </div>
         
