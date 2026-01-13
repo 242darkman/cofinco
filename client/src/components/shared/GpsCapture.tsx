@@ -373,7 +373,10 @@ export default function GpsCapture({
     if (latitude !== null && longitude !== null && !loading && onAddressResolved) {
       fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=fr&addressdetails=1&zoom=18`,
-        { headers: { 'User-Agent': 'Asset-Tracker-Microfinance-App' } }
+        { 
+          credentials: 'omit',
+          headers: { 'User-Agent': 'Asset-Tracker-Microfinance-App' } 
+        }
       )
         .then((res) => res.json())
         .then((data) => {

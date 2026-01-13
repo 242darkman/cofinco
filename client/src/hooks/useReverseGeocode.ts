@@ -89,6 +89,7 @@ export function useReverseGeocode(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
         {
           signal: abortControllerRef.current.signal,
+          credentials: 'omit', // Important: Bypass global fetch 'include' default which causes CORS errors on external APIs
           headers: {
             'Accept-Language': 'fr-FR', // Prefer French results
           }
