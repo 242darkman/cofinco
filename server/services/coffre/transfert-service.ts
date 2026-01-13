@@ -3,6 +3,7 @@ import {
   transfertsCoffreCaisse,
   transfertsCoffreAuditLogs,
   caisses,
+  coffresForts,
   configCoffreFort,
   users,
   agences,
@@ -405,35 +406,42 @@ export class TransfertCoffreService {
       .orderBy(desc(transfertsCoffreAuditLogs.timestamp));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Récupérer ou créer le coffre-fort d'une agence
-  // ─────────────────────────────────────────────────────────────────────────
-  async getOrCreateCoffreFort(agenceId: string) {
-    // Chercher un coffre existant
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Récupérer le coffre-fort d'une agence (migré vers coffresForts)
+  // ─────────────────────────────────────────────────────────────────────────────
+  async getOrCreateCoffreFort(agenceId: string): Promise<{ id: string; solde: string; nom: string }> {
+    // Chercher dans la nouvelle table coffresForts
     const [existing] = await db.select()
-      .from(caisses)
-      .where(and(
-        eq(caisses.agenceId, agenceId),
-        eq(caisses.type, "Coffre-Fort")
-      ));
+      .from(coffresForts)
+      .where(eq(coffresForts.ownerId, agenceId));
 
     if (existing) {
-      return existing;
+      return { id: existing.id, solde: existing.solde, nom: existing.nom };
     }
 
-    // Récupérer le nom de l'agence
+    // Si pas trouvé, vérifier le coffre du siège (ownerType = SIEGE)
+    const [coffreSiege] = await db.select()
+      .from(coffresForts)
+      .where(eq(coffresForts.ownerType, "SIEGE"));
+
+    if (coffreSiege) {
+      return { id: coffreSiege.id, solde: coffreSiege.solde, nom: coffreSiege.nom };
+    }
+
+    // Aucun coffre trouvé - créer automatiquement pour l'agence
     const [agence] = await db.select().from(agences).where(eq(agences.id, agenceId));
     
-    // Créer le coffre-fort automatiquement
-    const [coffreFort] = await db.insert(caisses).values({
-      nom: `Coffre-Fort ${agence?.nom || "Agence"}`,
-      agenceId,
-      type: "Coffre-Fort",
+    const [coffreFort] = await db.insert(coffresForts).values({
+      code: `CF-${agence?.codeAgence || agenceId.slice(0, 8)}`,
+      nom: `Coffre-fort ${agence?.nom || "Agence"}`,
+      ownerType: "AGENCE",
+      ownerId: agenceId,
+      devise: "XAF",
       solde: "0",
-      statut: "Ouverte", // Le coffre est toujours "ouvert"
+      statut: "Actif",
     }).returning();
 
-    return coffreFort;
+    return { id: coffreFort.id, solde: coffreFort.solde, nom: coffreFort.nom };
   }
 
   // ─────────────────────────────────────────────────────────────────────────

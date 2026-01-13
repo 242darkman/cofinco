@@ -265,3 +265,84 @@ export const statutOperationTerrainEnum = pgEnum("statut_operation_terrain_enum"
   "REJECTED",    // Rejetée, aucune écriture
   "CANCELLED",   // Annulée par l'agent/admin
 ]);
+
+// ========== TRANSFERTS INTER-COFFRES ENUMS ==========
+
+export const ownerTypeCoffreEnum = pgEnum("owner_type_coffre_enum", [
+  "AGENCE",
+  "SIEGE",
+]);
+
+export const statutCoffreEnum = pgEnum("statut_coffre_enum", [
+  "Actif",
+  "Suspendu",
+  "Fermé",
+]);
+
+export const typeTransfertInterCoffreEnum = pgEnum("type_transfert_inter_coffre_enum", [
+  "AGENCE_VERS_SIEGE",
+  "AGENCE_VERS_AGENCE",
+  "SIEGE_VERS_AGENCE",
+]);
+
+export const statutTransfertInterCoffreEnum = pgEnum("statut_transfert_inter_coffre_enum", [
+  "Brouillon",           // Draft - éditable
+  "Soumis",              // Submitted - en attente approbation N1
+  "Approuvé N1",         // Approved Level 1 - en attente approbation N2
+  "Approuvé N2",         // Approved Level 2 - prêt pour dispatch
+  "En transit",          // In Transit - fonds en route
+  "Reçu",                // Received - conforme
+  "Reçu avec écart",     // Received with discrepancy
+  "Rejeté",              // Rejected - terminal
+  "Annulé",              // Cancelled - terminal
+]);
+
+export const typeConditionnementEnum = pgEnum("type_conditionnement_enum", [
+  "Sac scellé",
+  "Mallette",
+  "Enveloppe",
+  "Autre",
+]);
+
+export const typeDocumentTransfertEnum = pgEnum("type_document_transfert_enum", [
+  "BON_TRANSFERT",
+  "BON_SORTIE",
+  "BON_ENTREE",
+]);
+
+export const statutReconciliationEnum = pgEnum("statut_reconciliation_enum", [
+  "En attente",
+  "Rapproché",
+  "Écart détecté",
+]);
+
+export const typeTacheRegularisationEnum = pgEnum("type_tache_regularisation_enum", [
+  "ECART_RECEPTION",
+  "RECONCILIATION_EN_ATTENTE",
+]);
+
+export const statutTacheRegularisationEnum = pgEnum("statut_tache_regularisation_enum", [
+  "Ouverte",
+  "En cours",
+  "Résolue",
+  "Escaladée",
+]);
+
+export const prioriteTacheEnum = pgEnum("priorite_tache_enum", [
+  "Basse",
+  "Normale",
+  "Haute",
+  "Critique",
+]);
+
+export const actionAuditTransfertEnum = pgEnum("action_audit_transfert_enum", [
+  "CREATED",
+  "SUBMITTED",
+  "APPROVED_L1",
+  "APPROVED_L2",
+  "REJECTED",
+  "DISPATCHED",
+  "RECEIVED",
+  "RECEIVED_WITH_DISCREPANCY",
+  "CANCELLED",
+]);

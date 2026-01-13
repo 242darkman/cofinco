@@ -27,6 +27,7 @@ import { caisseAgentRouter } from "./routes/caisse-agent";
 import { uploadRouter } from "./routes/upload";
 import { maintenanceRouter } from "./routes/maintenance";
 import { checkMaintenanceMode } from "./middleware/maintenance";
+import { transfertsInterCoffresRouter } from "./routes/transferts-inter-coffres";
 
 export function registerRoutes(app: Express): Server {
   // Apply Maintenance Middleware globally
@@ -37,6 +38,7 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/caisse-agent", caisseAgentRouter);
   app.use("/api/uploads", uploadRouter);
   app.use("/api/maintenance-mode", maintenanceRouter);
+  app.use("/api/transferts-inter-coffres", transfertsInterCoffresRouter);
 
   // Register modular routes
   registerAuthRoutes(app);

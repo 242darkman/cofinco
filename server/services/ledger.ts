@@ -174,6 +174,7 @@ export async function createMouvementEvents(
     nouveauSoldeCompte?: string;
     nouveauSoldeCredit?: string;
     nouveauSoldeSession?: string;
+    nouveauSoldeCoffre?: string;
   }
 ): Promise<void> {
   const payload = {

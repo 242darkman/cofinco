@@ -18,7 +18,8 @@ import {
   MoreHorizontal,
   Play,
   Ban,
-  Eye
+  Eye,
+  Vault
 } from "lucide-react";
 import { toast } from 'sonner';
 
@@ -28,6 +29,7 @@ import { SkeletonCard } from '@/components/ui/Skeleton';
 import { CoffreAdminPanel } from './CoffreAdminPanel';
 import { ProvisionCoffreModal } from './ProvisionCoffreModal';
 import { usePermissions } from '../../auth/ProtectedFeature';
+import TransfertInterCoffresModule from '../transfert-coffres/TransfertInterCoffresModule';
 
 interface CoffreFortDashboardProps {
   agenceId: string;
@@ -453,19 +455,30 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         </div>
         
         {/* Simple Tab Switcher if TabGroup not suitable or for quick toggle */}
-        <div className="flex space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+        <div className="flex space-x-1 sm:space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
            <button
              onClick={() => setActiveTab('operations')}
-             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'operations' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'operations' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
            >
              <div className="flex items-center gap-2">
                <ArrowRightLeft size={16} />
-               Transferts
+               <span className="hidden sm:inline">Transferts</span>
+               <span className="sm:hidden">Caisse</span>
+             </div>
+           </button>
+           <button
+             onClick={() => setActiveTab('intercoffres')}
+             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'intercoffres' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+           >
+             <div className="flex items-center gap-2">
+               <Vault size={16} />
+               <span className="hidden sm:inline">Inter-Coffres</span>
+               <span className="sm:hidden">Coffres</span>
              </div>
            </button>
            <button
              onClick={() => setActiveTab('historique')}
-             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'historique' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'historique' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
            >
              <div className="flex items-center gap-2">
                <Clock size={16} />
@@ -475,11 +488,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
            {canConfigure && (
            <button
              onClick={() => setActiveTab('admin')}
-             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'admin' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'admin' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
            >
              <div className="flex items-center gap-2">
                <Settings size={16} />
-               Administration
+               <span className="hidden sm:inline">Administration</span>
+               <span className="sm:hidden">Admin</span>
              </div>
            </button>
            )}
@@ -488,6 +502,11 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
       {activeTab === 'admin' ? (
         <CoffreAdminPanel agenceId={agenceId} />
+      ) : activeTab === 'intercoffres' ? (
+        <TransfertInterCoffresModule
+          onBack={() => setActiveTab('operations')}
+          userAgenceId={agenceId}
+        />
       ) : activeTab === 'historique' ? (
          <CoffreFortHistorique agenceId={agenceId} />
       ) : (

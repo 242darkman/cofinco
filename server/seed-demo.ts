@@ -110,6 +110,15 @@ import {
   transfertsCoffreAuditLogs,
   scoringHistory,
   enquetesComplementaires,
+  // Inter-vault transfer tables
+  coffresForts,
+  comptesLiaison,
+  transfertsInterCoffres,
+  documentsTransfert,
+  transfertsInterCoffresAuditLogs,
+  reconciliationsLiaison,
+  tachesRegularisation,
+  configTransfertInterCoffres,
 } from '@shared/schema';
 import { hashPassword, ROLES } from './auth';
 import { eq } from 'drizzle-orm';
@@ -543,6 +552,16 @@ async function seedDemo() {
     await db.delete(transfertsCoffreCaisse);
     await db.delete(configCoffreFort);
 
+    // Inter-vault transfer dependencies (delete in correct order)
+    await db.delete(tachesRegularisation);
+    await db.delete(reconciliationsLiaison);
+    await db.delete(transfertsInterCoffresAuditLogs);
+    await db.delete(documentsTransfert);
+    await db.delete(transfertsInterCoffres);
+    await db.delete(comptesLiaison);
+    await db.delete(configTransfertInterCoffres);
+    await db.delete(coffresForts);
+
     // Pivot Ledger & Financial movements should be cleared before accounts/clients
     await db.delete(mouvementsFinanciers);
     
@@ -783,6 +802,140 @@ async function seedDemo() {
       });
     }
     console.log('   ✅ Coffre configs created');
+
+    // 2c. SEED COFFRES-FORTS (VAULTS) FOR AGENCIES
+    console.log('   🔐 Seeding Coffres-Forts (Vaults)...');
+    const insertedCoffres: Record<string, string> = {};
+    
+    // Coffre du Siège (central vault) - lié à l'agence Siège
+    const siegeAgenceId = insertedAgences['Siège'];
+    const [coffreSiege] = await db.insert(coffresForts).values({
+      code: 'CF-SIEGE',
+      nom: 'Coffre-Fort Siège',
+      ownerType: 'SIEGE',
+      ownerId: siegeAgenceId, // Lié à l'agence Siège pour que l'API le trouve
+      devise: 'XAF',
+      solde: '50000000', // 50 millions de solde initial
+      plafondEncaisse: '200000000', // 200 millions max
+      soldeMinimum: '5000000', // 5 millions minimum
+      statut: 'Actif',
+      description: 'Coffre-fort central du siège',
+    }).returning();
+    insertedCoffres['Siège'] = coffreSiege.id;
+
+    // Coffres pour chaque agence
+    const agencesCoffresConfig = [
+      { nom: 'Agence Nord', code: 'CF-NORD', solde: '15000000', plafond: '50000000', minimum: '2000000' },
+      { nom: 'Agence Sud', code: 'CF-SUD', solde: '12000000', plafond: '50000000', minimum: '2000000' },
+      { nom: 'Agence Est', code: 'CF-EST', solde: '10000000', plafond: '40000000', minimum: '1500000' },
+    ];
+
+    for (const cfg of agencesCoffresConfig) {
+      const agenceId = insertedAgences[cfg.nom];
+      if (agenceId) {
+        const [coffre] = await db.insert(coffresForts).values({
+          code: cfg.code,
+          nom: `Coffre-Fort ${cfg.nom}`,
+          ownerType: 'AGENCE',
+          ownerId: agenceId,
+          devise: 'XAF',
+          solde: cfg.solde,
+          plafondEncaisse: cfg.plafond,
+          soldeMinimum: cfg.minimum,
+          statut: 'Actif',
+          description: `Coffre-fort de l'${cfg.nom}`,
+        }).returning();
+        insertedCoffres[cfg.nom] = coffre.id;
+      }
+    }
+    console.log('   ✅ Coffres-Forts created');
+
+    // 2d. SEED COMPTES DE LIAISON (Internal liaison accounts)
+    console.log('   💼 Seeding Comptes de Liaison...');
+    
+    // Compte de liaison du siège
+    await db.insert(comptesLiaison).values({
+      code: 'LIAISON-SIEGE',
+      intitule: 'Compte de liaison - Siège',
+      numeroComptable: '581000',
+      entiteType: 'SIEGE',
+      entiteId: null,
+      soldeCourant: '0',
+      actif: true,
+    });
+
+    // Comptes de liaison pour chaque agence
+    const liaisonConfigs = [
+      { nom: 'Agence Nord', code: 'LIAISON-NORD', numero: '581001' },
+      { nom: 'Agence Sud', code: 'LIAISON-SUD', numero: '581002' },
+      { nom: 'Agence Est', code: 'LIAISON-EST', numero: '581003' },
+    ];
+
+    for (const cfg of liaisonConfigs) {
+      const agenceId = insertedAgences[cfg.nom];
+      if (agenceId) {
+        await db.insert(comptesLiaison).values({
+          code: cfg.code,
+          intitule: `Compte de liaison - ${cfg.nom}`,
+          numeroComptable: cfg.numero,
+          entiteType: 'AGENCE',
+          entiteId: agenceId,
+          soldeCourant: '0',
+          actif: true,
+        });
+      }
+    }
+    console.log('   ✅ Comptes de Liaison created');
+
+    // 2e. SEED CONFIGURATION TRANSFERTS INTER-COFFRES
+    console.log('   ⚙️ Seeding Config Transferts Inter-Coffres...');
+    
+    // Configuration globale (Siège)
+    await db.insert(configTransfertInterCoffres).values({
+      agenceId: null, // Global config
+      montantMinTransfert: '50000',
+      montantMaxTransfert: '100000000', // 100 millions max
+      seuilAlertePlafond: '80',
+      approbationDoubleNiveau: true,
+      nombreAgentsTransportMin: '2',
+      scelleObligatoireSiMontantSuperieur: '10000000', // Scellé obligatoire au-delà de 10M
+      separationCreateurApprobateurN1: true,
+      separationApprobateurN1N2: true,
+      separationApprobateurRecepteur: true,
+      rolesCreateurs: ['Agent Caisse', 'Comptable', 'Chef d\'Agence'],
+      rolesApprobateursN1: ['Chef d\'Agence', 'Trésorier'],
+      rolesApprobateursN2: ['Directeur', 'Directeur Financier'],
+      rolesRecepteurs: ['Trésorier', 'Chef d\'Agence', 'Comptable'],
+      delaiMaxReconciliation: '3',
+      alerteReconciliationActive: true,
+      actif: true,
+    });
+
+    // Configuration par agence (hérite de globale mais peut être personnalisée)
+    for (const [nom, id] of Object.entries(insertedAgences)) {
+      if (nom !== 'Siège') {
+        await db.insert(configTransfertInterCoffres).values({
+          agenceId: id,
+          montantMinTransfert: '25000',
+          montantMaxTransfert: '50000000', // 50 millions max par agence
+          seuilAlertePlafond: '75',
+          approbationDoubleNiveau: true,
+          nombreAgentsTransportMin: '2',
+          scelleObligatoireSiMontantSuperieur: '5000000', // 5M pour agences
+          separationCreateurApprobateurN1: true,
+          separationApprobateurN1N2: true,
+          separationApprobateurRecepteur: true,
+          rolesCreateurs: ['Agent Caisse', 'Chef d\'Agence'],
+          rolesApprobateursN1: ['Chef d\'Agence'],
+          rolesApprobateursN2: ['Directeur'],
+          rolesRecepteurs: ['Chef d\'Agence', 'Comptable'],
+          delaiMaxReconciliation: '5',
+          alerteReconciliationActive: true,
+          actif: true,
+        });
+      }
+    }
+    console.log('   ✅ Config Transferts Inter-Coffres created');
 
     // 3. SEED RBAC MODULES & PERMISSIONS
     console.log('\n🔐 Seeding Modules & Permissions...');
@@ -3017,15 +3170,14 @@ async function seedDemo() {
     // 13. SEED CAISSE & OPERATIONS - Enrichi avec historique sur 3 mois
     console.log('\n🏧 Seeding Caisse Operations...');
 
-    // Créer plus de caisses (une par agence + coffres-forts)
+    // Créer les caisses physiques (les coffres-forts sont maintenant dans la table coffresForts)
     const caissesData = [
       { nom: 'Caisse Siège 1', agenceId: insertedAgences['Siège'], type: 'Physique', solde: '1500000', statut: 'Ouverte' },
       { nom: 'Caisse Siège 2', agenceId: insertedAgences['Siège'], type: 'Physique', solde: '750000', statut: 'Ouverte' },
       { nom: 'Caisse Nord 1', agenceId: insertedAgences['Agence Nord'], type: 'Physique', solde: '800000', statut: 'Ouverte' },
       { nom: 'Caisse Sud 1', agenceId: insertedAgences['Agence Sud'], type: 'Physique', solde: '600000', statut: 'Fermée' },
       { nom: 'Caisse Est 1', agenceId: insertedAgences['Agence Est'], type: 'Physique', solde: '500000', statut: 'Ouverte' },
-      { nom: 'Coffre-Fort Siège', agenceId: insertedAgences['Siège'], type: 'Coffre-Fort', solde: '5000000', statut: 'Fermée' },
-      { nom: 'Coffre-Fort Nord', agenceId: insertedAgences['Agence Nord'], type: 'Coffre-Fort', solde: '2000000', statut: 'Fermée' },
+      // Note: Coffres-forts supprimés - gérés dans la table coffresForts depuis la migration
     ];
 
     const insertedCaisses = await db.insert(caisses).values(caissesData).returning();
@@ -4739,6 +4891,15 @@ async function seedDemo() {
     console.log(`   - Caissiers        : 8 personnes (2 par agence)`);
     console.log(`   - Gestionnaires    : 8 personnes (2 par agence)`);
     console.log(`   - Agents Terrain   : 8 personnes (2 par agence)`);
+    console.log('');
+    console.log('🔐 COFFRES-FORTS');
+    console.log('─────────────────────────────────────────────────────────────');
+    console.log('   CF-SIEGE  : Coffre-Fort Siège     (50M XAF, plafond 200M)');
+    console.log('   CF-NORD   : Coffre-Fort Nord      (15M XAF, plafond 50M)');
+    console.log('   CF-SUD    : Coffre-Fort Sud       (12M XAF, plafond 50M)');
+    console.log('   CF-EST    : Coffre-Fort Est       (10M XAF, plafond 40M)');
+    console.log('   + 4 comptes de liaison comptables (581000-581003)');
+    console.log('   + Configurations transferts inter-coffres par agence');
     console.log('═══════════════════════════════════════════════════════════════\n');
 
   } catch (error) {

@@ -3,7 +3,7 @@ import {
     comptes, transactionsCompte, plansEpargne, objectifsEpargne,
     sessionsCaisse, operationsCaisse, shiftsCaisse, caisseSecurityCodes, caisseCodeUsages, comptageBillets,
     factures, lignesFactures, modelesFactures, caisses, clients, agences, caisseAssignations, users,
-    dureesSuggerees, mouvementsFinanciers, evenementsOutbox
+    dureesSuggerees, mouvementsFinanciers, evenementsOutbox, coffresForts
   } from "@shared/schema";
   import {
     type Credit, type InsertCredit, type DemandeCredit, type InsertDemandeCredit,
@@ -1595,7 +1595,7 @@ export async function createFactureForFraisEngagement(data: {
 
 /**
  * Provision the Safe (Coffre-Fort) from an external source (Bank, Capital, etc.)
- * Does NOT require a session, as this is an administrative operation on the Safe itself.
+ * Uses the new unified coffresForts table.
  */
 export async function provisionCoffreWithLedger(data: {
     agenceId: string;
@@ -1605,46 +1605,53 @@ export async function provisionCoffreWithLedger(data: {
     idempotencyKey?: string;
 }, userId?: string): Promise<{ mouvement: MouvementFinancier }> {
     
-    // 1. Find Agency Safe
-    const [coffre] = await db.select().from(caisses).where(and(
-        eq(caisses.agenceId, data.agenceId),
-        eq(caisses.type, "Coffre-Fort")
-    ));
+    // 1. Find Agency Safe from coffresForts (new unified table)
+    const [coffre] = await db.select().from(coffresForts).where(
+        eq(coffresForts.ownerId, data.agenceId)
+    );
 
-    if (!coffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
+    // Fallback to siege coffre if agency coffre not found
+    let targetCoffre = coffre;
+    if (!targetCoffre) {
+        const [coffreSiege] = await db.select().from(coffresForts).where(
+            eq(coffresForts.ownerType, "SIEGE")
+        );
+        targetCoffre = coffreSiege;
+    }
+
+    if (!targetCoffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
 
     // 2. Execute Ledger Transaction
-    // We use "SYSTEME" or "CAISSE" as source module? 
-    // "CAISSE" usually implies a session. "SYSTEME" is good for external adjustments.
-    // However, for filtering purposes, if we want to see it in "Caisse" stats, we might want "CAISSE".
-    // But `operationsCaisse` is tied to sessions. 
-    // Let's use "CAISSE" but without a session, assuming the ledger allows null session.
-    
     return executeWithLedger(
         "CAISSE", 
         {
             montant: data.montant,
             sens: "Crédit", // Money IN
             agenceId: data.agenceId,
-            // sessionCaisseId: null, // explicit
-            typePaiement: "Approvisionnement coffre" as any, // Need to ensure enum matches or cast
+            typePaiement: "Approvisionnement coffre" as any,
             methodePaiement: "Autre", 
             metadata: {
                 description: data.description || data.motif || "Approvisionnement Externe",
                 motif: data.motif,
-                type: "APPROVISIONNEMENT_EXTERNE"
+                type: "APPROVISIONNEMENT_EXTERNE",
+                coffreId: targetCoffre.id,
+                coffreCode: targetCoffre.code
             },
             idempotencyKey: data.idempotencyKey
         },
         async (tx, mouvement) => {
-             // 3. Update Safe Balance
-             const nouveauSolde = await updateCaisseSolde(tx, coffre.id, parseFloat(data.montant));
+             // 3. Update Safe Balance in coffresForts
+             const currentSolde = parseFloat(targetCoffre.solde || "0");
+             const newSolde = currentSolde + parseFloat(data.montant);
+             
+             await tx.update(coffresForts)
+                 .set({ solde: newSolde.toString(), updatedAt: new Date() })
+                 .where(eq(coffresForts.id, targetCoffre.id));
 
              return {
-                 result: true, // No specific object to return besides movement
+                 result: true,
                  additionalEventData: {
-                     // We don't have a specific event for Caisse Solde change yet in `createMouvementEvents`
-                     // but the ledger execution is what matters.
+                     nouveauSoldeCoffre: newSolde.toString()
                  }
              };
         },
@@ -1654,6 +1661,7 @@ export async function provisionCoffreWithLedger(data: {
 
 /**
  * Execute a Credit Disbursement (Decaissement) via Ledger
+ * Uses the new unified coffresForts table.
  */
 export async function createDecaissementWithLedger(data: {
     creditId: string;
@@ -1666,19 +1674,27 @@ export async function createDecaissementWithLedger(data: {
     const [credit] = await db.select().from(credits).where(eq(credits.id, data.creditId));
     if (!credit) throw new Error("Crédit non trouvé");
 
-    // 2. Find Agency Safe (Coffre-Fort)
+    // 2. Find Agency Safe (coffresForts - new unified table)
     if (!credit.agenceId) throw new Error("Le crédit n'est lié à aucune agence");
 
-    const [coffre] = await db.select().from(caisses).where(and(
-        eq(caisses.agenceId, credit.agenceId),
-        eq(caisses.type, "Coffre-Fort")
-    ));
+    const [coffre] = await db.select().from(coffresForts).where(
+        eq(coffresForts.ownerId, credit.agenceId)
+    );
 
-    if (!coffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
+    // Fallback to siege coffre if agency coffre not found
+    let targetCoffre = coffre;
+    if (!targetCoffre) {
+        const [coffreSiege] = await db.select().from(coffresForts).where(
+            eq(coffresForts.ownerType, "SIEGE")
+        );
+        targetCoffre = coffreSiege;
+    }
 
-    // 3. Check Balance Check
+    if (!targetCoffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
+
+    // 3. Check Balance
     const montant = parseFloat(data.montant);
-    const soldeCoffre = parseFloat(coffre.solde || "0");
+    const soldeCoffre = parseFloat(targetCoffre.solde || "0");
 
     if (soldeCoffre < montant) {
         throw new Error(`Solde du coffre insuffisant (${soldeCoffre.toLocaleString()} < ${montant.toLocaleString()})`);
@@ -1697,7 +1713,8 @@ export async function createDecaissementWithLedger(data: {
             referenceExterne: data.numeroCredit,
             metadata: { 
                 description: `Décaissement crédit ${data.numeroCredit}`,
-                coffreId: coffre.id,
+                coffreId: targetCoffre.id,
+                coffreCode: targetCoffre.code,
                 soldeCoffreAvant: soldeCoffre
             }
         },
@@ -1705,16 +1722,16 @@ export async function createDecaissementWithLedger(data: {
              // 4. Update Account Balance (Credit the user's account)
              const nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, parseFloat(data.montant));
 
-             // 5. Debit the Agency Safe (Coffre-Fort)
-             // This is the CRITICAL change: Money comes from the safe
-             const nouveauSoldeCoffre = await updateCaisseSolde(tx, coffre.id, -montant);
+             // 5. Debit the Agency Safe (coffresForts)
+             const newSoldeCoffre = soldeCoffre - montant;
+             await tx.update(coffresForts)
+                 .set({ solde: newSoldeCoffre.toString(), updatedAt: new Date() })
+                 .where(eq(coffresForts.id, targetCoffre.id));
 
              return {
                  result: credit,
                  additionalEventData: {
                      nouveauSoldeCompte
-                     // We could add `nouveauSoldeCoffre` if we had an event for it, 
-                     // but for now `additionalEventData` is strictly typed.
                  }
              };
         },

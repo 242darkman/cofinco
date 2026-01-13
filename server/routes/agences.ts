@@ -1,11 +1,12 @@
 import { Express } from "express";
 import { db } from "../db";
-import { agences, userAgences, users } from "../../shared/schema";
+import { agences, userAgences, users, coffresForts, comptesLiaison } from "../../shared/schema";
 import { employes } from "../../shared/schema/employes";
 import { clients } from "../../shared/schema/clients";
 import { eq, and, ilike, or, desc, asc, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../auth";
 import { logAudit } from "../audit";
+import { CoffresFortsService } from "../services/transfert-inter-coffres";
 
 export function registerAgencesRoutes(app: Express) {
   // ============================================
@@ -119,11 +120,12 @@ export function registerAgencesRoutes(app: Express) {
     }
   });
 
-  // POST /api/agences - Créer une agence
+  // POST /api/agences - Créer une agence (avec coffre-fort atomique)
   app.post("/api/agences", requireRole("admin"), async (req, res) => {
     try {
       const data = req.body;
       const userId = (req as any).session?.userId;
+      const coffresService = new CoffresFortsService();
 
       // Vérifier que le code_agence est unique
       const existing = await db
@@ -135,41 +137,86 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(400).json({ error: "Ce code agence existe déjà" });
       }
 
-      const [newAgence] = await db
-        .insert(agences)
-        .values({
-          codeAgence: data.code_agence || data.codeAgence,
-          nom: data.nom,
-          typeAgence: data.type_agence || data.typeAgence || "Secondaire",
-          adresse: data.adresse,
-          ville: data.ville,
-          region: data.region,
-          pays: data.pays || "Congo-Brazzaville",
-          telephone: data.telephone,
-          email: data.email,
-          responsableId: data.responsable_id || data.responsableId,
-          responsableNom: data.responsable_nom || data.responsableNom,
-          responsablePhone: data.responsable_phone || data.responsablePhone,
-          statut: data.statut || "Actif",
-          dateOuverture: data.date_ouverture || data.dateOuverture,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          notes: data.notes
-        })
-        .returning();
+      // Transaction atomique: créer agence + coffre-fort
+      const result = await db.transaction(async (tx) => {
+        // 1. Créer l'agence
+        const [newAgence] = await tx
+          .insert(agences)
+          .values({
+            codeAgence: data.code_agence || data.codeAgence,
+            nom: data.nom,
+            typeAgence: data.type_agence || data.typeAgence || "Secondaire",
+            adresse: data.adresse,
+            ville: data.ville,
+            region: data.region,
+            pays: data.pays || "Congo-Brazzaville",
+            telephone: data.telephone,
+            email: data.email,
+            responsableId: data.responsable_id || data.responsableId,
+            responsableNom: data.responsable_nom || data.responsableNom,
+            responsablePhone: data.responsable_phone || data.responsablePhone,
+            statut: data.statut || "Actif",
+            dateOuverture: data.date_ouverture || data.dateOuverture,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            notes: data.notes
+          })
+          .returning();
 
-      await logAudit(req, "CREATE", "agences", newAgence.id, {
-        nom: newAgence.nom,
-        codeAgence: newAgence.codeAgence
+        // 2. Créer le coffre-fort associé (obligatoire)
+        const coffreCode = `CF-${newAgence.codeAgence}`;
+        const coffreNom = `Coffre-fort ${newAgence.nom}`;
+
+        const [newCoffre] = await tx
+          .insert(coffresForts)
+          .values({
+            code: coffreCode,
+            nom: coffreNom,
+            ownerType: "AGENCE",
+            ownerId: newAgence.id,
+            devise: "XAF",
+            solde: "0",
+            plafondEncaisse: data.plafondEncaisseCoffre?.toString() || null,
+            soldeMinimum: data.soldeMinimumCoffre?.toString() || "0",
+            statut: "Actif",
+          })
+          .returning();
+
+        // 3. Créer le compte de liaison associé
+        const [newCompteLiaison] = await tx
+          .insert(comptesLiaison)
+          .values({
+            code: `LIAISON-${newAgence.codeAgence}`,
+            intitule: `Compte de liaison - ${newAgence.nom}`,
+            numeroComptable: "581200",
+            entiteType: "AGENCE",
+            entiteId: newAgence.id,
+            soldeCourant: "0",
+            actif: true,
+          })
+          .returning();
+
+        return { agence: newAgence, coffre: newCoffre, compteLiaison: newCompteLiaison };
+      });
+
+      await logAudit(req, "CREATE", "agences", result.agence.id, {
+        nom: result.agence.nom,
+        codeAgence: result.agence.codeAgence,
+        coffreId: result.coffre.id,
+        compteLiaisonId: result.compteLiaison.id
       });
 
       // Notify
       const wsInstance = require("../ws-server").getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_new', id: newAgence.id } });
+          wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_new', id: result.agence.id } });
       }
 
-      res.status(201).json(newAgence);
+      res.status(201).json({
+        ...result.agence,
+        coffre: result.coffre,
+        compteLiaison: result.compteLiaison
+      });
     } catch (error: any) {
       console.error("Erreur POST /api/agences:", error);
       res.status(500).json({ error: error.message });

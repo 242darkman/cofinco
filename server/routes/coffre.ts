@@ -251,15 +251,10 @@ coffreRouter.get("/mouvements", async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
 
-    // 1. Récupérer le coffre-fort de l'agence
+    // 1. Récupérer le coffre-fort de l'agence (nouveau système unifié)
     const [coffre] = await db.select()
-      .from(schema.caisses)
-      .where(
-        and(
-          eq(schema.caisses.agenceId, agenceId),
-          eq(schema.caisses.type, "Coffre-Fort")
-        )
-      );
+      .from(schema.coffresForts)
+      .where(eq(schema.coffresForts.ownerId, agenceId));
 
     if (!coffre) {
       return res.json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
@@ -276,9 +271,11 @@ coffreRouter.get("/mouvements", async (req, res) => {
     
     const conditions = and(
         eq(schema.mouvementsFinanciers.agenceId, agenceId),
-        sql`(${schema.mouvementsFinanciers.metadata}->>'caisseId' = ${coffre.id} 
+        sql`(${schema.mouvementsFinanciers.metadata}->>'coffreId' = ${coffre.id} 
+            OR ${schema.mouvementsFinanciers.metadata}->>'caisseId' = ${coffre.id}
             OR ${schema.mouvementsFinanciers.typePaiement} = 'Approvisionnement coffre'
-            OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'APPROVISIONNEMENT_EXTERNE')`
+            OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'APPROVISIONNEMENT_EXTERNE'
+            OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'TRANSFERT_INTER_COFFRES')`
     );
 
     const [countResult] = await db.select({ count: sql<number>`count(*)` })
@@ -319,27 +316,30 @@ coffreRouter.get("/mouvements", async (req, res) => {
   }
 });
 
-// 7. Récupérer le solde (Updated comment number)
+// 7. Récupérer le solde (Migré vers coffresForts)
 coffreRouter.get("/stats", async (req, res) => {
   try {
     const agenceId = req.query.agenceId as string;
     if (!agenceId) return res.status(400).json({ error: "Missing agenceId" });
 
-    // Récupérer la caisse de type 'Coffre-Fort' pour cette agence
+    // Récupérer le coffre-fort de l'agence depuis la nouvelle table unifiée
     const [coffre] = await db.select()
-      .from(schema.caisses)
-      .where(
-        and(
-          eq(schema.caisses.agenceId, agenceId),
-          eq(schema.caisses.type, "Coffre-Fort")
-        )
-      );
+      .from(schema.coffresForts)
+      .where(eq(schema.coffresForts.ownerId, agenceId));
 
     if (!coffre) {
+      // Essayer de trouver le coffre du siège si c'est le siège
+      const [coffreSiege] = await db.select()
+        .from(schema.coffresForts)
+        .where(eq(schema.coffresForts.ownerType, "SIEGE"));
+      
+      if (coffreSiege) {
+        return res.json({ solde: Number(coffreSiege.solde), coffreId: coffreSiege.id, code: coffreSiege.code });
+      }
       return res.json({ solde: 0 });
     }
 
-    res.json({ solde: Number(coffre.solde) });
+    res.json({ solde: Number(coffre.solde), coffreId: coffre.id, code: coffre.code });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
