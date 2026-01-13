@@ -1014,7 +1014,7 @@ export function registerFinanceRoutes(app: Express) {
     if (!caisse) return res.status(404).json({ message: "Caisse non trouvée" });
 
     // Check Agency Access
-    if (user.role !== 'admin' && user.role !== 'admin_generale' && caisse.agenceId !== user.agenceId) {
+    if (user.role !== 'admin' && user.role !== 'admin_generale' && user.role !== 'Administrateur' && caisse.agenceId !== user.agenceId) {
         return res.status(403).json({ message: "Accès refusé à cette agence" });
     }
 
