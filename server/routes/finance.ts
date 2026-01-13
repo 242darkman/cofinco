@@ -1390,19 +1390,47 @@ export function registerFinanceRoutes(app: Express) {
         // Targeted Account Resolution
         let targetCompteId = data.compteId;
         
-        // If no specific account provided but client is, try to find the client's default savings account
-        // Only if it's a deposit/withdraw that requires an account
-        const opsRequiringAccount = ['retrait', 'retrait épargne', 'dépôt', 'depot', 'dépôt épargne', 'versement'];
-        if (opsRequiringAccount.includes((parsed.typeOperation || '').toLowerCase())) {
-             if (!targetCompteId && parsed.clientId) {
+        // Auto-resolve account if not provided but client is
+        if (!targetCompteId && parsed.clientId) {
+             const opType = (parsed.typeOperation || '').toLowerCase();
+             
+             // Check if operation implies an account interaction
+             const impliesAccount = 
+                opType.includes('versement') || 
+                opType.includes('retrait') || 
+                opType.includes('dépôt') || 
+                opType.includes('depot') ||
+                opType.includes('compte');
+
+             if (impliesAccount) {
                  const clientAccounts = await storage.getComptesByClient(parsed.clientId);
-                 const defaultAccount = clientAccounts.find(c => c.typeCompte === 'Épargne' && c.statut === 'Actif') || clientAccounts[0];
-                 if (defaultAccount) {
-                     targetCompteId = defaultAccount.id;
+                 
+                 // Smart matching based on operation name
+                 let targetType: string | undefined;
+                 if (opType.includes('courant')) targetType = 'Courant';
+                 else if (opType.includes('bloqué') || opType.includes('bloque')) targetType = 'Bloqué';
+                 else if (opType.includes('épargne') || opType.includes('epargne')) targetType = 'Épargne';
+                 
+                 let foundAccount;
+                 if (targetType) {
+                     foundAccount = clientAccounts.find(c => c.typeCompte === targetType && c.statut === 'Actif');
                  } else {
-                     return res.status(400).json({ message: "Aucun compte actif trouvé pour ce client. Impossible d'effectuer cette opération." });
+                     // Default fallback (usually Epargne)
+                     foundAccount = clientAccounts.find(c => c.typeCompte === 'Épargne' && c.statut === 'Actif') || clientAccounts[0];
                  }
-            }
+
+                 if (foundAccount) {
+                     targetCompteId = foundAccount.id;
+                 } else {
+                     // Only strictly block if we identified a specific target type that is missing
+                     // For generic operations like "Encaissement Divers" creating a movement is enough?
+                     // But "Versement Courant" MUST fail if no Courant account.
+                     if (targetType) {
+                         return res.status(400).json({ message: `Aucun compte ${targetType} actif trouvé pour ce client.` });
+                     }
+                     // Else fallback to generic operation without account update (just cash movement)
+                 }
+             }
         }
 
         // --- NEW LEDGER FLOW ---

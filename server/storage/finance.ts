@@ -1291,7 +1291,12 @@ export async function createOperationCaisseWithLedger(data: {
 }, userId?: string): Promise<{ operation: OperationCaisse; mouvement: MouvementFinancier }> {
   
   // Determine sens based on operation type
-  const isDebit = ["Retrait épargne", "Décaissement crédit"].includes(data.typeOperation);
+  const opLower = data.typeOperation.toLowerCase();
+  const isDebit = opLower.startsWith("retrait") || 
+                  opLower.startsWith("décaissement") || 
+                  opLower.startsWith("sort") || // Sortie
+                  opLower.startsWith("frais");
+                  
   const sens: SensMouvement = isDebit ? "Débit" : "Crédit";
   const sessionDelta = isDebit ? -parseFloat(data.montant) : parseFloat(data.montant);
 
@@ -1838,14 +1843,32 @@ export async function createCashTransactionWithLedger(data: {
   let cashDelta: number; // Impact on Cash Session
   let accountDelta: number = 0; // Impact on Client Account
 
-  if (IN_TYPES.includes(opType)) {
-      sens = "Crédit"; // Credit to the system (Cash in)
+  // Robust direction detection
+  const isDebit = opType.startsWith('retrait') || 
+                  opType.startsWith('décaissement') || 
+                  opType.startsWith('frais') ||
+                  OUT_TYPES.some(t => opType.includes(t));
+
+  const isCredit = opType.startsWith('versement') || 
+                   opType.startsWith('dépôt') || 
+                   opType.startsWith('depot') || 
+                   opType.startsWith('encaissement') || 
+                   opType.startsWith('remboursement') ||
+                   IN_TYPES.some(t => opType.includes(t));
+
+  if (isCredit) {
+      sens = "Crédit"; // Credit to the system (Cash in) or Account?
+      // WAIT. "Versement" means + on Account (Credit) BUT + on Cash (Debit? No, Cash In is DEBIT for Caisse asset? Standard banking: Client Credit = Liability for bank. Caisse In = Asset increase.)
+      // In this system:
+      // "Crédit" usually means Money IN to the system/caisse?
+      // Let's check sessionDelta in previous function. Debit = -, Credit = +. So Credit = Cash In.
+      // Account Delta: Deposit -> + Balance.
       cashDelta = parseFloat(data.montant);
-      accountDelta = parseFloat(data.montant); // Account balance increases (Deposit)
-  } else if (OUT_TYPES.includes(opType)) {
-      sens = "Débit"; // Debit from the system (Cash out)
+      accountDelta = parseFloat(data.montant); 
+  } else if (isDebit) {
+      sens = "Débit"; // Debit from system (Cash out)
       cashDelta = -parseFloat(data.montant);
-      accountDelta = -parseFloat(data.montant); // Account balance decreases (Withdrawal)
+      accountDelta = -parseFloat(data.montant); 
   } else {
       // Default or Neutral - Assume no cash impact unless specified? 
       // safer to require explicit types, but for now fallback to Neutral/Info
