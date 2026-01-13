@@ -10,8 +10,8 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
-import { usePrinter } from '../../../hooks/useReceiptPrinter';
-import { ReceiptTemplate, ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
+import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
 
 interface Client {
@@ -74,8 +74,9 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [presenceVerified, setPresenceVerified] = useState<PresenceConfirmationData | null>(null);
 
-  // Receipt Printer Hook
-  const { componentRef, printData, print, isPrinting } = usePrinter();
+  // Universal Modal State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
 
   // Billetage State
   const [showBilletage, setShowBilletage] = useState(false);
@@ -474,11 +475,11 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setPresenceVerified(null);
   }, []);
 
-  // Fonction pour imprimer le reçu
-  const handlePrintReceipt = useCallback(() => {
+  // Fonction pour afficher le reçu via le modal universel
+  const handleShowReceipt = useCallback(() => {
     if (!lastOperationData) return;
 
-    const receiptData: ReceiptData = {
+    const rData: ReceiptData = {
       title: `Reçu de ${lastOperationData.typeOperation}`,
       reference: lastOperationData.reference,
       date: lastOperationData.date,
@@ -498,16 +499,24 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         {
           description: `${lastOperationData.typeOperation} - ${lastOperationData.typeDetaille || 'Espèces'}`,
           montant: lastOperationData.montant,
-          details: description || undefined
+          quantite: 1
         }
       ],
       total: lastOperationData.montant,
       modePaiement: 'Espèces',
       devise: 'FCFA'
     };
+    
+    setReceiptData(rData);
+    setShowSuccessModal(true);
+  }, [lastOperationData, user]);
 
-     print(receiptData);
-  }, [lastOperationData, user, description, print]);
+  // Déclencher l'affichage du reçu quand une opération est réussie
+  useEffect(() => {
+      if (lastOperationData) {
+          handleShowReceipt();
+      }
+  }, [lastOperationData, handleShowReceipt]);
 
   // Fermer le dialogue d'impression et réinitialiser
   const handleClosePrintDialog = useCallback((shouldPrint: boolean) => {

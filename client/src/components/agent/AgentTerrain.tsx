@@ -8,6 +8,8 @@ import AgentTerrainPaiement from './AgentTerrainPaiement';
 import ProspectionForm from './ProspectionForm';
 import AgentTerrainExtended from './AgentTerrainExtended';
 import AgentTerrainMap from './AgentTerrainMap';
+import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
+import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -70,6 +72,10 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [filterStatut, setFilterStatut] = useState<string>('all');
+
+  // History Receipt State
+  const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
+  const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
 
   useEffect(() => {
     if (activeView) {
@@ -156,6 +162,37 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     { key: 'montant_collecte', label: 'Montant', format: (val) => val ? `${Number(val).toLocaleString()} FCFA` : '-' },
     { key: 'statut', label: 'Statut', badge: true }
   ];
+
+  const handleShowHistoryReceipt = (visite: Visite) => {
+      if (!visite.montant_collecte) return;
+      
+      const rData: ReceiptData = {
+          title: `Reçu ${visite.type_visite}`,
+          reference: `VIS-${visite.id.substring(0, 8)}`,
+          date: new Date(visite.date_visite),
+          type: visite.type_visite,
+          client: {
+              nom: visite.clients?.nom || 'Client',
+              prenom: '',
+              telephone: visite.clients?.phone
+          },
+          items: [{
+              description: visite.notes || visite.type_visite,
+              montant: toNumber(visite.montant_collecte),
+              quantite: 1
+          }],
+          total: toNumber(visite.montant_collecte),
+          modePaiement: 'Espèces', 
+          notes: 'Duplicata historique visite',
+          agent: {
+              nom: agents.find(a => a.id === visite.agent_id)?.nom || 'Agent',
+              prenom: agents.find(a => a.id === visite.agent_id)?.prenom || ''
+          }
+      };
+      
+      setHistoryReceiptData(rData);
+      setShowHistoryReceipt(true);
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -296,6 +333,17 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 columns={visiteColumns}
                 emptyMessage="Aucune visite"
                 loading={loading}
+                actions={(visite) => visite.montant_collecte && visite.montant_collecte > 0 ? (
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-slate-400 hover:text-white"
+                        onClick={(e) => { e.stopPropagation(); handleShowHistoryReceipt(visite); }}
+                        title="Voir le reçu"
+                    >
+                        <FileText size={16} />
+                    </Button>
+                ) : null}
             />
          </Card>
       )}
@@ -334,6 +382,13 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       {showAgentProfile && selectedAgent && <AgentTerrainProfile agentId={selectedAgent.id} onClose={() => { setShowAgentProfile(false); setSelectedAgent(null); }} onEdit={() => { setEditingAgent(selectedAgent); setShowAgentProfile(false); setShowAgentForm(true); }} />}
       {showPaiementForm && <AgentTerrainPaiement agentId={selectedAgent?.id} onClose={() => { setShowPaiementForm(false); setSelectedAgent(null); }} onSuccess={() => { setShowPaiementForm(false); setSelectedAgent(null); loadData(); }} />}
       {showProspectionForm && <ProspectionForm agentId={selectedAgent?.id} onClose={() => { setShowProspectionForm(false); setSelectedAgent(null); }} onSuccess={() => { setShowProspectionForm(false); setSelectedAgent(null); loadData(); }} />}
+    
+      <UniversalPaymentSuccessModal 
+        isOpen={showHistoryReceipt}
+        onClose={() => setShowHistoryReceipt(false)}
+        term="Fermer"
+        data={historyReceiptData}
+      />
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
+import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
+import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <div className={`flex items-center justify-center font-bold text-red-500 bg-red-100 rounded-lg p-2 ${className}`}>
@@ -72,7 +74,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
   const [loadingTontines, setLoadingTontines] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
-  const [receiptData, setReceiptData] = useState<any>(null);
+  const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
 
   // Client Summary State
   const [clientCredits, setClientCredits] = useState<any[]>([]);
@@ -381,7 +383,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   // Fermer le reçu
   const handleCloseReceipt = useCallback(() => {
     setShowReceipt(false);
-    setReceiptData(null);
+    setReceiptData(undefined);
     onSuccess();
     onClose();
   }, [onSuccess, onClose]);
@@ -410,20 +412,41 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
       }
 
       const clientName = `${clients.find(c => c.id === formData.client_id)?.nom || ''} ${clients.find(c => c.id === formData.client_id)?.prenom || ''}`.trim() || 'Client';
-      const receiptInfo = {
-        ...operationData,
-        clientName,
-        description: formData.description
+      
+      const rData: ReceiptData = {
+        title: `Reçu de ${formData.type_operation}`,
+        reference: operationData.reference,
+        date: new Date(),
+        type: formData.type_operation,
+        client: {
+          nom: clients.find(c => c.id === formData.client_id)?.nom || 'Client',
+          prenom: clients.find(c => c.id === formData.client_id)?.prenom || '',
+          telephone: formData.numero_telephone
+        },
+        items: [
+          {
+            description: formData.description || formData.type_operation,
+            montant: parseFloat(operationData.montant),
+            quantite: 1
+          }
+        ],
+        total: parseFloat(operationData.montant),
+        modePaiement: formData.mode_paiement,
+        devise: 'FCFA',
+        agent: {
+          nom: 'Caissier', // Ideally get from user context if available
+          prenom: ''
+        }
       };
 
       // Sauvegarder le reçu dans la Loge
-      await saveReceiptToLoge(receiptInfo);
+      await saveReceiptToLoge(rData);
 
       toast.dismiss(loadingId);
       toast.success('Paiement enregistré avec succès !');
 
       // Afficher le reçu visuellement
-      setReceiptData(receiptInfo);
+      setReceiptData(rData);
       setShowReceipt(true);
     } catch (error) {
       toast.dismiss(loadingId);
@@ -911,6 +934,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                 Vous n'avez pas la permission d'effectuer des paiements
               </div>
             )}
+
             <button
               type="button"
               onClick={onClose}
@@ -923,107 +947,17 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
         </form>
       </div>
 
-
-      {/* Modal Reçu */}
-      {showReceipt && receiptData && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="receipt-title"
-        >
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <header className="bg-blue-900 text-white px-6 py-4 text-center rounded-t-lg">
-              <h3 id="receipt-title" className="text-2xl font-bold">COFIN&CO-M</h3>
-              <p className="text-blue-200">Reçu de Paiement</p>
-              <div className="mt-2">
-                <span className="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                  <CheckCircle2 size={14} className="inline mr-1" aria-hidden="true" />
-                  VALIDÉ
-                </span>
-              </div>
-            </header>
-
-            <div className="p-6 space-y-3">
-              <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                <span className="text-gray-500">Référence:</span>
-                <span className="font-bold text-blue-900">{escapeHtml(receiptData.reference)}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                <span className="text-gray-500">Date:</span>
-                <span className="font-bold text-blue-900">
-                  <time dateTime={new Date().toISOString()}>
-                    {new Date().toLocaleDateString('fr-FR')} {new Date().toLocaleTimeString('fr-FR')}
-                  </time>
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                <span className="text-gray-500">Client:</span>
-                <span className="font-bold text-blue-900">{escapeHtml(receiptData.clientName)}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                <span className="text-gray-500">Opération:</span>
-                <span className="font-bold text-blue-900">{escapeHtml(receiptData.type_operation)}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                <span className="text-gray-500">Mode:</span>
-                <span className="font-bold text-blue-900">{escapeHtml(receiptData.mode_paiement)}</span>
-              </div>
-              {receiptData.numero_telephone && (
-                <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                  <span className="text-gray-500">Téléphone:</span>
-                  <span className="font-bold text-blue-900">{escapeHtml(receiptData.numero_telephone)}</span>
-                </div>
-              )}
-              {receiptData.numero_transaction && (
-                <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                  <span className="text-gray-500">N° Transaction:</span>
-                  <span className="font-bold text-blue-900">{escapeHtml(receiptData.numero_transaction)}</span>
-                </div>
-              )}
-
-              <div className="text-center py-6">
-                <p className="text-4xl font-bold text-green-600">
-                  {formatMoney(Number(receiptData.montant))}
-                </p>
-              </div>
-
-              <div className="flex justify-between py-2 border-b border-dashed border-gray-300">
-                <span className="text-gray-500">Description:</span>
-                <span className="font-bold text-blue-900 text-right max-w-[60%]">
-                  {escapeHtml(receiptData.description)}
-                </span>
-              </div>
-            </div>
-
-            <footer className="border-t border-gray-200 p-4 text-center text-gray-500 text-sm">
-              <p>Merci pour votre confiance</p>
-              <p className="font-semibold">COFIN&CO-M - Microfinance</p>
-            </footer>
-
-            <div className="p-4 bg-gray-50 rounded-b-lg flex gap-3">
-              <button
-                onClick={printReceiptOnly}
-                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                data-testid="button-print-receipt"
-                aria-label="Imprimer le reçu"
-              >
-                <Printer size={20} aria-hidden="true" />
-                Imprimer
-              </button>
-              <button
-                onClick={handleCloseReceipt}
-                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                data-testid="button-close-receipt"
-                aria-label="Terminer et fermer"
-              >
-                <Check size={20} aria-hidden="true" />
-                Terminer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Universal Success Modal */}
+      <UniversalPaymentSuccessModal 
+        isOpen={showReceipt}
+        onClose={() => {
+            setShowReceipt(false);
+            onSuccess();
+            onClose();
+        }}
+        term="Terminer"
+        data={receiptData}
+      />
     </div>
   );
 }

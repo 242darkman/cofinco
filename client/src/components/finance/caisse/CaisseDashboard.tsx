@@ -19,6 +19,8 @@ import CaisseSupervision from './CaisseSupervision';
 import CaissePaiementModal from './CaissePaiementModal';
 import CaisseEspeces from './CaisseEspeces';
 import CaisseMobileMoney from './CaisseMobileMoney';
+import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
+import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 
 import CaisseAccessControl from './CaisseAccessControl';
 import CaisseClientInfos from './CaisseClientInfos';
@@ -49,6 +51,9 @@ interface Transaction {
   reference: string;
   description: string;
   created_at: string;
+  client_nom?: string; // Optional extended data
+  client_prenom?: string;
+  client_telephone?: string;
 }
 
 interface CaisseProps {
@@ -96,6 +101,10 @@ export default function CaisseDashboard({
   const [supervisedSession, setSupervisedSession] = useState<SessionCaisse | null>(null);
 
   const [accessGranted, setAccessGranted] = useState(userRole === 'Administrateur');
+
+  // History Receipt State
+  const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
+  const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
 
   // Actual session being used (own or supervised)
   const currentSession = supervisedSession || sessionActive;
@@ -470,6 +479,17 @@ export default function CaisseDashboard({
                                       <span>{tx.mode_paiement}</span>
                                   </div>
                               </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleShowHistoryReceipt(tx);
+                                }}
+                              >
+                                  <FileText size={14} />
+                              </Button>
                           </div>
                           <span className={`text-sm font-bold whitespace-nowrap ${isEntree ? 'text-emerald-400' : 'text-red-400'}`}>
                               {isEntree ? '+' : '-'}{formattedMoney(tx.montant)}
@@ -487,8 +507,47 @@ export default function CaisseDashboard({
 
 
 
+  const handleShowHistoryReceipt = (tx: Transaction) => {
+      // Construct receipt data from transaction
+      // Note: Client details might be sparse if not included in the transaction view
+      // Ideally backend view should include client info.
+      
+      const rData: ReceiptData = {
+          title: `Reçu ${tx.type_operation}`,
+          reference: tx.reference,
+          date: new Date(tx.created_at),
+          type: tx.type_operation,
+          client: {
+              nom: tx.client_nom || 'Client',
+              prenom: tx.client_prenom || 'Inconnu',
+              telephone: tx.client_telephone
+          },
+          items: [{
+              description: tx.description || tx.type_operation,
+              montant: toNumber(tx.montant),
+              quantite: 1
+          }],
+          total: toNumber(tx.montant),
+          modePaiement: tx.mode_paiement,
+          notes: 'Duplicata issu de l\'historique',
+          agent: {
+              nom: currentSession?.caissier_nom || 'Caissier',
+              prenom: ''
+          }
+      };
+      
+      setHistoryReceiptData(rData);
+      setShowHistoryReceipt(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
+        <UniversalPaymentSuccessModal 
+            isOpen={showHistoryReceipt}
+            onClose={() => setShowHistoryReceipt(false)}
+            term="Fermer"
+            data={historyReceiptData}
+        />
         
       <div className="w-full min-h-screen flex flex-col p-4 md:p-6">
         {/* App Header */}

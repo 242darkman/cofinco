@@ -5,8 +5,8 @@ import { Modal, Button, FormField, SelectField, TextareaField, Card } from '../u
 import { usePermissions } from '../auth/ProtectedFeature';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
-import { ReceiptTemplate } from '../ui/printable/ReceiptTemplate';
-import { usePrinter } from '../../hooks/useReceiptPrinter';
+import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
+import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { securityConfigApi, SecurityConfigResponse } from '../../lib/api-client';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
@@ -45,7 +45,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const { hasPermission } = usePermissions();
   const canCreatePayments = hasPermission('agent_terrain', 'create') || hasPermission('paiements', 'create');
 
-  const { componentRef, printData, print, isPrinting } = usePrinter();
+
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -60,8 +60,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
   const [loadingTontines, setLoadingTontines] = useState(false);
   
-  // State for success modal and printing
+  // State for success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [lastPaymentInfo, setLastPaymentInfo] = useState<any>(null);
 
   const [formData, setFormData] = useState({
@@ -332,7 +333,39 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         });
       }
 
-      // Store payment info for printing and show success modal
+      // Prepare Receipt Data
+      const agent = agents.find(a => a.id === paiementData.agent_id);
+      const agentName = agent ? `${agent.nom} ${agent.prenom}` : 'Agent Terrain';
+
+      const rData: ReceiptData = {
+        title: 'REÇU DE PAIEMENT TERRAIN',
+        reference: paiementData.reference || `PAY-${Date.now()}`,
+        date: new Date(),
+        type: paiementData.type_paiement,
+        client: {
+          nom: selectedClient.nom,
+          prenom: selectedClient.prenom,
+          email: selectedClient.email,
+          telephone: selectedClient.phone || selectedClient.telephone,
+          numeroCompte: selectedClient.numero_compte
+        },
+        agent: {
+          nom: agentName,
+          prenom: ''
+        },
+        items: [{
+          description: `Paiement ${paiementData.type_paiement}`,
+          details: paiementData.notes || 'Paiement terrain',
+          montant: parseFloat(paiementData.montant),
+          quantite: 1
+        }],
+        total: parseFloat(paiementData.montant),
+        modePaiement: paiementData.methode_paiement,
+        devise: 'FCFA',
+        notes: validationMethod
+      };
+
+      setReceiptData(rData);
       setLastPaymentInfo(paiementData);
       setShowSuccessModal(true);
       
@@ -362,40 +395,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
   };
 
-  const handlePrint = () => {
-    if (!lastPaymentInfo || !selectedClient) return;
-    
-    // Find agent name
-    const agent = agents.find(a => a.id === lastPaymentInfo.agent_id);
-    const agentName = agent ? `${agent.nom} ${agent.prenom}` : 'Agent Terrain';
-
-    print({
-      title: 'REÇU DE PAIEMENT TERRAIN',
-      reference: lastPaymentInfo.reference || 'N/A',
-      date: new Date(),
-      type: lastPaymentInfo.type_paiement,
-      client: {
-        nom: selectedClient.nom,
-        prenom: selectedClient.prenom,
-        email: selectedClient.email,
-        telephone: selectedClient.phone || selectedClient.telephone,
-        numeroCompte: selectedClient.numero_compte
-      },
-      agent: {
-        nom: agentName,
-        prenom: ''
-      },
-      items: [{
-        description: `Paiement ${lastPaymentInfo.type_paiement}`,
-        details: lastPaymentInfo.notes || 'Paiement terrain',
-        montant: parseFloat(lastPaymentInfo.montant),
-        quantite: 1
-      }],
-      total: parseFloat(lastPaymentInfo.montant),
-      modePaiement: lastPaymentInfo.methode_paiement
-    });
-  };
-
   const handleCloseSuccess = () => {
     setShowSuccessModal(false);
     setLastPaymentInfo(null);
@@ -405,63 +404,13 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
   return (
     <>
-      {/* Hidden Receipt Template for Printing */}
-      {printData && (
-        <div style={{ display: "none" }}>
-          <ReceiptTemplate ref={componentRef} data={printData} />
-        </div>
-      )}
-
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center transform scale-100 animate-in zoom-in-95">
-            <div className="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-amber-500/10 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-              <CheckCircle2 size={32} strokeWidth={3} />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">Paiement Enregistré</h3>
-            <p className="text-slate-400 mb-4 text-sm leading-relaxed">
-              Le paiement de <strong className="text-white font-mono text-base ml-1">{lastPaymentInfo?.montant?.toLocaleString()} FCFA</strong> a été soumis et est <strong>en attente de validation</strong>.
-            </p>
-
-            {/* Indicateur de présence vérifiée */}
-            {presenceVerified && (
-              <div className="bg-blue-950/30 border border-blue-500/30 rounded-lg p-3 mb-4 text-left">
-                <div className="flex items-center gap-2 mb-2">
-                  <UserCheck size={14} className="text-blue-400" />
-                  <span className="text-xs font-semibold text-blue-300">Présence vérifiée (Pour Validation)</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500/10 text-[10px] text-blue-300 border border-blue-500/20">
-                    {presenceVerified.verificationMethod === 'piece_identite' && "Pièce d'identité"}
-                    {presenceVerified.verificationMethod === 'reconnaissance_visuelle' && 'Client connu'}
-                    {presenceVerified.verificationMethod === 'signature' && 'Signature'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3">
-              <Button 
-                variant="secondary" 
-                onClick={handlePrint}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-slate-700 border-slate-600"
-                disabled={isPrinting}
-              >
-                <Printer size={18} /> 
-                <span>Imprimer Reçu</span>
-              </Button>
-              <Button 
-                variant="primary" 
-                className="w-full py-3"
-                onClick={handleCloseSuccess}
-              >
-                Terminer
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Universal Success Modal */}
+      <UniversalPaymentSuccessModal 
+        isOpen={showSuccessModal}
+        onClose={handleCloseSuccess}
+        term="Terminer"
+        data={receiptData}
+      />
 
       <Modal
         isOpen={!showSuccessModal} // Hide main modal when success modal shows to reduce clutter

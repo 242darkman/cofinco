@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Smartphone, TrendingUp, TrendingDown, Loader2, X, CheckCircle, ArrowRight } from 'lucide-react';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
+import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
+import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -25,9 +27,10 @@ type TypeRetrait = 'Retrait Compte Courant' | 'Retrait Épargne' | 'Décaissemen
 interface CaisseMobileMoneyProps {
   sessionId: string;
   onTransactionComplete: () => void;
+  user?: any; // Add user prop
 }
 
-export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: CaisseMobileMoneyProps) {
+export default function CaisseMobileMoney({ sessionId, onTransactionComplete, user }: CaisseMobileMoneyProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [typeOperation, setTypeOperation] = useState<TypeOperation | null>(null);
@@ -39,7 +42,10 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
   const [frais, setFrais] = useState('0');
   const [loading, setLoading] = useState(false);
   const [operationData, setOperationData] = useState<any>(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Success Modal State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
   
   // Security configuration
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
@@ -216,12 +222,38 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
       });
 
       toast.success(`${typeOperation} ${operateur} de ${parseFloat(montant).toLocaleString()} FCFA effectué avec succès !`);
-      setSuccessMessage(`${typeOperation} ${operateur} de ${parseFloat(montant).toLocaleString()} FCFA effectué avec succès !`);
+      
+      // Prepare Receipt Data
+      const rData: ReceiptData = {
+        title: `Reçu ${typeOperation} Mobile Money`,
+        reference: data.operation.reference,
+        date: new Date(),
+        type: typeOperation || '',
+        client: {
+          nom: selectedClient?.nom || '',
+          prenom: selectedClient?.prenom || '',
+          telephone: selectedClient?.telephone || selectedClient?.phone,
+          numeroCompte: selectedClient?.numero_compte
+        },
+        items: [
+           {
+              description: `${typeOperation} - ${data.operation.sous_type_operation}`,
+              details: `Via ${operateur} - Transaction: ${numeroTransaction}`,
+              montant: parseFloat(montant),
+              quantite: 1
+           }
+        ],
+        total: parseFloat(montant),
+        modePaiement: operateur,
+        notes: `ID Transaction Mobile: ${numeroTransaction}`,
+        agent: {
+             nom: user?.nom || 'Caissier',
+             prenom: user?.prenom || ''
+        }
+      };
 
-      setTimeout(() => {
-        reinitialiserFormulaire();
-        onTransactionComplete();
-      }, 2000);
+      setReceiptData(rData);
+      setShowSuccessModal(true);
 
     } catch (error: any) {
       console.error('Erreur validation:', error);
@@ -229,7 +261,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
     } finally {
       setLoading(false);
     }
-  }, [typeOperation, operateur, montant, sessionId, onTransactionComplete]);
+  }, [typeOperation, operateur, montant, sessionId, onTransactionComplete, selectedClient, numeroTransaction, user]);
 
   // Execute operation directly (deposit bypass)
   const executeOperationDirect = useCallback(async (data: any) => {
@@ -263,13 +295,24 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
     setNumeroTransaction('');
     setFrais('0');
     setSearchTerm('');
-    setSuccessMessage('');
-    setOperationData(null);
-    setPresenceVerified(null);
+    setReceiptData(undefined);
+    setShowSuccessModal(false);
+  };
+
+  const handleCloseSuccess = () => {
+    setShowSuccessModal(false);
+    reinitialiserFormulaire();
+    onTransactionComplete();
   };
 
   return (
     <div className="flex flex-col justify-center min-h-[calc(100vh-160px)] p-4 font-sans selection:bg-emerald-500/30">
+      <UniversalPaymentSuccessModal 
+        isOpen={showSuccessModal}
+        onClose={handleCloseSuccess}
+        term="Terminer"
+        data={receiptData}
+      />
       <div className="w-full max-w-sm mx-auto">
         <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 shadow-2xl shadow-emerald-900/10 rounded-2xl overflow-hidden ring-1 ring-white/5">
           {/* Header */}
@@ -284,15 +327,6 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
           </div>
 
           <div className="p-5 space-y-6">
-            {successMessage ? (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 text-center animate-in fade-in zoom-in duration-300">
-                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-400">
-                  <CheckCircle size={32} />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2">Transaction Réussie!</h3>
-                <p className="text-emerald-400/90 text-sm">{successMessage}</p>
-              </div>
-            ) : (
               <>
                 {/* Client Search */}
                 {!selectedClient ? (
@@ -475,7 +509,6 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
                   </div>
                 )}
               </>
-            )}
           </div>
         </Card>
       </div>
