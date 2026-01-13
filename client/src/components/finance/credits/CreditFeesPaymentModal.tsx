@@ -70,11 +70,18 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
       // If we took a session, pass its ID. otherwise pass nothing (backend uses user's active session)
       const targetSessionId = takenSession?.id;
       const result = await payerFrais(demande.id, parseFloat(amount), method, targetSessionId);
-      if (result.success && result.facture) {
-        // Show success modal with facture instead of just toast
-        setPaidFacture(result.facture);
-        setShowSuccessModal(true);
+      if (result.success) {
+        toast.success(`Frais de ${formatMoney(parseFloat(amount))} payés avec succès`);
+        if (result.facture) {
+          // Show success modal with facture
+          setPaidFacture(result.facture);
+          setShowSuccessModal(true);
+        }
         onSuccess();
+        // Don't close immediately if showing success modal, let the modal handle it or user close it
+        if (!result.facture) {
+            onClose();
+        }
       }
     } catch (error) {
        console.error(error);
