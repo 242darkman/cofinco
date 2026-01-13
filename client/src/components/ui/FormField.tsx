@@ -21,7 +21,7 @@ export interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputEleme
   label: string;
   name: string;
   error?: string;
-  helperText?: string;
+  helperText?: React.ReactNode;
   icon?: LucideIcon;
   rightIcon?: LucideIcon;
   onRightIconClick?: () => void;

@@ -182,8 +182,26 @@ export const configCoffreFort = pgTable(
     rolesValideurs: json("roles_valideurs").default('["chef_agence", "superviseur"]'),
     rolesExecuteurs: json("roles_executeurs").default('["caissier", "chef_caisse", "chef_agence"]'),
     
-    // Billetage obligatoire
-    billetageObligatoire: boolean("billetage_obligatoire").notNull().default(false),
+    // --- Sécurité & Accès ---
+    horairesOuverture: json("horaires_ouverture").$type<{ debut: string; fin: string }>().default({ debut: "08:00", fin: "18:00" }),
+    joursOuvrables: json("jours_ouvrables").$type<string[]>().default(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]),
+    tentativesMaxParJour: numeric("tentatives_max_par_jour").default("20"),
+    verouillageApresEchec: boolean("verouillage_apres_echec").notNull().default(true),
+
+    // --- Limites Financières ---
+    montantMinTransfert: numeric("montant_min_transfert").default("100"),
+    plafondJournalierSortant: numeric("plafond_journalier_sortant"), // Null = illimité
+    plafondJournalierEntrant: numeric("plafond_journalier_entrant"),
+
+    // --- Alertes Solde ---
+    seuilSoldeMin: numeric("seuil_solde_min").default("1000000"), // Alerte warning
+    seuilSoldeCritique: numeric("seuil_solde_critique").default("100000"), // Alerte critique
+    alerteEmailActif: boolean("alerte_email_actif").notNull().default(false),
+
+    // --- Contrôle & Audit ---
+    justificatifObligatoire: boolean("justificatif_obligatoire").notNull().default(false),
+    billetageObligatoireSiMontantSup: numeric("billetage_obligatoire_si_montant_sup"),
+    comptageDoublePersonne: boolean("comptage_double_personne").notNull().default(false),
     
     actif: boolean("actif").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -378,10 +378,31 @@ coffreRouter.put("/config", async (req, res) => {
   try {
     const schema = z.object({
       agenceId: z.string().uuid(),
-      seuilDoubleValidation: z.string().optional(), // numeric string
+      // Sécurité & Workflow
+      seuilDoubleValidation: z.string().optional(),
       separationInitiateurValideur: z.boolean().optional(),
+      verouillageApresEchec: z.boolean().optional(),
+      horairesOuverture: z.object({ debut: z.string(), fin: z.string() }).optional(),
+      joursOuvrables: z.array(z.string()).optional(),
+      tentativesMaxParJour: z.string().optional(),
+
+      // Limites
       montantMaxTransfert: z.string().optional().nullable(),
-      actif: z.boolean().optional(),
+      montantMinTransfert: z.string().optional(),
+      plafondJournalierSortant: z.string().optional().nullable(),
+      plafondJournalierEntrant: z.string().optional().nullable(),
+
+      // Alertes
+      seuilSoldeMin: z.string().optional(),
+      seuilSoldeCritique: z.string().optional(),
+      alerteEmailActif: z.boolean().optional(),
+
+      // Audit
+      justificatifObligatoire: z.boolean().optional(),
+      billetageObligatoireSiMontantSup: z.string().optional().nullable(),
+      comptageDoublePersonne: z.boolean().optional(),
+
+       actif: z.boolean().optional(),
     });
 
     const body = schema.parse(req.body);

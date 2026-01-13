@@ -33,6 +33,56 @@ export class TransfertCoffreService {
   }) {
     // 1. Récupérer ou créer le coffre-fort de l'agence
     const coffreFort = await this.getOrCreateCoffreFort(params.agenceId);
+
+    // 1b. Récupérer la configuration du coffre
+    const [config] = await db.select().from(configCoffreFort).where(eq(configCoffreFort.agenceId, params.agenceId));
+    
+    if (config) {
+        // --- CHECK 1: Coffre Actif ---
+        if (!config.actif) {
+            return { success: false, errorCode: "COFFRE_INACTIF", error: "Le coffre-fort est actuellement désactivé par l'administration." };
+        }
+
+        // --- CHECK 2: Limites Montant ---
+        const montant = params.montant;
+        if (config.montantMinTransfert && montant < parseFloat(config.montantMinTransfert)) {
+            return { success: false, errorCode: "MONTANT_MIN_NON_ATTEINT", error: `Le montant minimum est de ${config.montantMinTransfert} FCFA` };
+        }
+        if (config.montantMaxTransfert && montant > parseFloat(config.montantMaxTransfert)) {
+            return { success: false, errorCode: "MONTANT_MAX_DEPASSE", error: `Le montant maximum est de ${config.montantMaxTransfert} FCFA` };
+        }
+
+        // --- CHECK 3: Horaires & Jours ---
+        const now = new Date();
+        const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+        const currentDay = days[now.getDay()];
+        
+        // Jours Ouvrables
+        const joursOuvrables = config.joursOuvrables as string[] || [];
+        if (joursOuvrables.length > 0 && !joursOuvrables.includes(currentDay)) {
+             return { success: false, errorCode: "JOUR_NON_OUVRE", error: `Opérations non autorisées le ${currentDay}` };
+        }
+
+        // Horaires
+        const horaires = config.horairesOuverture as { debut: string, fin: string };
+        if (horaires && horaires.debut && horaires.fin) {
+             const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+             if (currentTime < horaires.debut || currentTime > horaires.fin) {
+                 return { success: false, errorCode: "HORS_HORAIRES", error: `Opérations autorisées entre ${horaires.debut} et ${horaires.fin}` };
+             }
+        }
+
+        // --- CHECK 4: Billetage Obligatoire ---
+        if (config.billetageObligatoireSiMontantSup && montant >= parseFloat(config.billetageObligatoireSiMontantSup)) {
+            if (!params.billetage || Object.keys(params.billetage).length === 0) {
+                 return { success: false, errorCode: "BILLETAGE_REQUIS", error: "Le billetage est obligatoire pour ce montant." };
+            }
+        }
+        
+        // --- CHECK 5: Plafond Journalier (Coûteux, fait en dernier) ---
+        // TODO: Implémenter la vérification du plafond journalier si nécessaire
+        // Cela nécessite d'agréger les transferts du jour pour cette agence
+    }
     
     // 2. Récupérer la caisse concernée
     const [caisse] = await db.select().from(caisses).where(eq(caisses.id, params.caisseId));
