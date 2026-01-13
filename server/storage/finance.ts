@@ -479,7 +479,7 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
   // Atomic Account Creation with Initial Transaction
   export async function createClientAccount(
     clientId: string,
-    data: { typeCompte: string; soldeInitial: number; tauxInteret?: number; statut: string; methodePaiement?: string },
+    data: { typeCompte: string; soldeInitial: number; tauxInteret?: number; statut: string; methodePaiement?: string; agenceId?: string | null },
     userId: string | undefined
   ): Promise<Compte> {
     return await db.transaction(async (tx) => {
@@ -492,6 +492,7 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
       // 2. Create Account
       const [compte] = await tx.insert(comptes).values({
         clientId,
+        agenceId: data.agenceId, // Add this line
         numeroCompte,
         typeCompte: data.typeCompte as any,
         soldeCourant: data.soldeInitial.toString(),

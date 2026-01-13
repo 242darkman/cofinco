@@ -412,7 +412,8 @@ export function registerClientRoutes(app: Express) {
             typeCompte: 'Courant',
             soldeInitial: 0,
             tauxInteret: 0,
-            statut: 'Actif'
+            statut: 'Actif',
+            agenceId: client.agenceId
           }, req.session.user?.id);
           console.log(`✅ Compte courant ${compteCourant.numeroCompte} créé automatiquement pour le client ${client.nom}`);
         } catch (accountError) {
