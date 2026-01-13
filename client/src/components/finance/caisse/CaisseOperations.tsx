@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, User, CreditCard, Coins, Users, CheckCircle, XCircle, Loader, ArrowLeft, ArrowUpRight, ArrowDownLeft, Wallet, ShieldCheck, Banknote } from 'lucide-react';
-import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
 import { Card, Button, SearchInput, Badge, FormField, SelectField } from '../../ui';
 import { clientSearchApi, clientApi, creditApi, tontineApi, operationCaisseApi, systemSettingsApi, factureApi, validationOtpApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -68,7 +67,6 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   // Global State
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [smsValidationEnabled, setSmsValidationEnabled] = useState(true);
   
   // Selection State
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,29 +84,11 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   const [montant, setMontant] = useState('');
   
   // Dialogs & Validation
-  const [showOTP, setShowOTP] = useState(false);
-  const [otpData, setOtpData] = useState<any>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [montantError, setMontantError] = useState<string | null>(null);
   const [lastOperationReference, setLastOperationReference] = useState<string | null>(null);
 
   const { componentRef, printData, print, isPrinting } = usePrinter();
-
-  // Initial Load
-  useEffect(() => {
-    loadSystemSettings();
-  }, []);
-
-  const loadSystemSettings = useCallback(async () => {
-    try {
-      const data = await systemSettingsApi.get();
-      if (data) {
-        setSmsValidationEnabled(data.sms_payment_validation_enabled !== false);
-      }
-    } catch (error) {
-      console.error('Erreur chargement paramètres:', error);
-    }
-  }, []);
   
   // Real-time Update Listener
   const refreshClientData = useCallback(async (clientId: string) => {
@@ -194,7 +174,6 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     setMontant('');
     setSearchTerm('');
     setSuccessMessage('');
-    setOtpData(null);
     setMontantError(null);
     setLastOperationReference(null);
     setClientComptes([]);
@@ -248,7 +227,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
         telephone_client: selectedClient!.telephone,
         type: typeOperationStr,
         montant: montant, 
-        statut_otp: smsValidationEnabled ? 'En attente' : 'Non requis',
+        statut_otp: 'Non requis', // OTP désactivé
         // Optional links
         compte_id: selectedDestination?.type === 'Compte' ? selectedDestination.id : undefined,
         credit_id: selectedDestination?.type === 'Credit' ? selectedDestination.id : undefined,
@@ -263,36 +242,16 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
       const operationInserted = await operationCaisseApi.create(operationPayload);
       setLastOperationReference(operationInserted.reference || `OP-${Date.now()}`);
 
-      if (smsValidationEnabled) {
-        const codeOTP = Math.floor(100000 + Math.random() * 900000).toString();
-        await validationOtpApi.create({
-          operation_id: operationInserted.id,
-          client_id: selectedClient!.id,
-          telephone: selectedClient!.telephone,
-          code_otp: codeOTP,
-          statut: 'En attente'
-        });
-
-        toast.dismiss(loadingId);
-        setOtpData({
-          operationId: operationInserted.id,
-          codeOTP,
-          telephone: selectedClient!.telephone,
-          operationType: typeOperationStr,
-          amount: parseFloat(montant)
-        });
-        setShowOTP(true);
-      } else {
-        toast.dismiss(loadingId);
-        await finaliserOperationSansOTP(operationInserted.id, typeOperationStr);
-      }
+      // OTP désactivé - exécuter directement
+      toast.dismiss(loadingId);
+      await finaliserOperationSansOTP(operationInserted.id, typeOperationStr);
     } catch (error) {
       toast.dismiss(loadingId);
       handleApiError(error, `Erreur lors du ${direction.toLowerCase()}`);
     } finally {
       setLoading(false);
     }
-  }, [sessionId, selectedClient, selectedDestination, direction, montant, smsValidationEnabled]);
+  }, [sessionId, selectedClient, selectedDestination, direction, montant]);
 
    const finaliserOperationSansOTP = async (opId: string, typeOp: string) => {
        try {
@@ -415,7 +374,6 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
       {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
       <SuccessModal />
       <ConfirmDialog isOpen={showConfirmDialog} title="Confirmer" message={`Valider le ${direction.toLowerCase()} de ${formatMoney(parseFloat(montant || '0'))} ?`} onConfirm={confirmerOperation} onClose={() => setShowConfirmDialog(false)} />
-      <OTPValidationSimple isOpen={showOTP} onClose={() => setShowOTP(false)} onValidate={async (val) => { if(val) { setShowOTP(false); await finaliserOperationSansOTP(otpData?.operationId, 'OTP Validated'); }}} phoneNumber={otpData?.telephone || ''} generatedCode={otpData?.codeOTP || ''} operationType={otpData?.operationType || ''} amount={otpData?.amount || 0} />
 
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
         <Card className="flex-1 flex flex-col bg-slate-900/95 backdrop-blur-xl border border-slate-800/50 shadow-2xl rounded-[32px] overflow-hidden">

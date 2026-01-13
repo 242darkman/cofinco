@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, Printer, Eye, CreditCard, TrendingUp, PiggyBank } from 'lucide-react';
-import OTPValidationModal from '../../auth/OTPValidationModal';
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -68,9 +67,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showOTPModal, setShowOTPModal] = useState(false);
-  const [pendingOperation, setPendingOperation] = useState<any>(null);
-  const [clientInfo, setClientInfo] = useState<any>(null);
+
   const [clientTontines, setClientTontines] = useState<ClientTontine[]>([]);
   const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
   const [loadingTontines, setLoadingTontines] = useState(false);
@@ -246,9 +243,6 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
       const montant = parseFloat(formData.montant);
       const reference = formData.reference || genererReference();
 
-      const client = await clientApi.getById(formData.client_id);
-      setClientInfo(client);
-
       const isMobileMoney = formData.mode_paiement === 'Airtel Money' || formData.mode_paiement === 'MTN Mobile Money';
 
       const operationData = {
@@ -266,8 +260,9 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
       };
 
       toast.dismiss(loadingId);
-      setPendingOperation(operationData);
-      setShowOTPModal(true);
+      
+      // OTP désactivé - exécuter l'opération directement
+      await executeOperationDirect(operationData);
     } catch (error) {
       toast.dismiss(loadingId);
       const errorMessage = handleApiError(error, 'Erreur lors de la préparation');
@@ -387,40 +382,36 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   const handleCloseReceipt = useCallback(() => {
     setShowReceipt(false);
     setReceiptData(null);
-    setPendingOperation(null);
-    setClientInfo(null);
     onSuccess();
     onClose();
   }, [onSuccess, onClose]);
 
-  // Succès de la validation OTP
-  const handleOTPSuccess = useCallback(async (validationData: any) => {
+  // Exécuter l'opération directement (sans OTP)
+  const executeOperationDirect = useCallback(async (operationData: any) => {
     const loadingId = toast.loading('Enregistrement du paiement...');
 
     try {
       setLoading(true);
 
-      // Créer l'opération de caisse via api-client
-      await operationCaisseApi.create({
-        ...pendingOperation,
-        validation_id: validationData.isValidation_id,
-        statut: 'VALIDE'
-      });
-
-      // Si c'est une cotisation tontine, l'enregistrer
+      // **Cotisations Tontine** : utiliser l'endpoint tontine qui gère déjà le ledger
       if (formData.type_operation === 'Cotisation Tontine' && selectedTontine) {
         await tontineApi.addContribution(selectedTontine.tontineId, {
           clientId: formData.client_id,
-          montant: pendingOperation.montant,
+          montant: operationData.montant,
           methodePaiement: formData.mode_paiement,
-          reference: pendingOperation.reference
+          reference: operationData.reference
+        });
+      } else {
+        // **Autres opérations** : créer l'opération de caisse
+        await operationCaisseApi.create({
+          ...operationData,
+          statut: 'Posté' 
         });
       }
 
-
-      const clientName = clients.find(c => c.id === formData.client_id)?.nom || 'Client';
+      const clientName = `${clients.find(c => c.id === formData.client_id)?.nom || ''} ${clients.find(c => c.id === formData.client_id)?.prenom || ''}`.trim() || 'Client';
       const receiptInfo = {
-        ...pendingOperation,
+        ...operationData,
         clientName,
         description: formData.description
       };
@@ -434,7 +425,6 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
       // Afficher le reçu visuellement
       setReceiptData(receiptInfo);
       setShowReceipt(true);
-      setShowOTPModal(false);
     } catch (error) {
       toast.dismiss(loadingId);
       const errorMessage = handleApiError(error, 'Erreur lors de l\'enregistrement');
@@ -443,7 +433,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
     } finally {
       setLoading(false);
     }
-  }, [pendingOperation, formData, selectedTontine, clients, saveReceiptToLoge]);
+  }, [formData, selectedTontine, clients, saveReceiptToLoge]);
 
   // Montant formaté mémorisé
   const formattedMontant = useMemo(() => {
@@ -493,7 +483,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                 onChange={(value: string | number) => setFormData({ ...formData, client_id: String(value) })}
                 options={clients.map(c => ({
                   value: c.id,
-                  label: c.nom || 'Sans Nom',
+                  label: `${c.nom || ''} ${c.prenom || ''}`.trim() || 'Sans Nom',
                   subLabel: [c.telephone, c.email].filter(Boolean).join(' • '),
                   image: c.photo 
                 }))}
@@ -508,7 +498,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                 <div className="col-span-1 md:col-span-2 bg-slate-700/30 rounded-lg p-3 flex flex-wrap gap-4 items-center mb-2">
                     <div className="flex items-center gap-2">
                         <User className="text-blue-400" size={18} />
-                        <span className="text-slate-300 text-sm">Client: <strong className="text-white">{clients.find(c => c.id === formData.client_id)?.nom}</strong></span>
+                        <span className="text-slate-300 text-sm">Client: <strong className="text-white">{clients.find(c => c.id === formData.client_id)?.nom} {clients.find(c => c.id === formData.client_id)?.prenom}</strong></span>
                     </div>
                     
                     <div className="h-4 w-px bg-slate-600 hidden sm:block"></div>
@@ -933,27 +923,6 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
         </form>
       </div>
 
-      {/* Modal OTP */}
-      {showOTPModal && pendingOperation && clientInfo && (
-        <OTPValidationModal
-          isOpen={showOTPModal}
-          onClose={() => {
-            setShowOTPModal(false);
-            setPendingOperation(null);
-            setClientInfo(null);
-            setLoading(false);
-          }}
-          onSuccess={handleOTPSuccess}
-          transactionType={formData.type_operation}
-          transactionReference={pendingOperation.reference}
-          clientId={formData.client_id}
-          clientName={clientInfo.nom}
-          clientPhone={clientInfo.phone}
-          montant={pendingOperation.montant}
-          createdBy={pendingOperation.userId}
-          createdByRole="CAISSIER"
-        />
-      )}
 
       {/* Modal Reçu */}
       {showReceipt && receiptData && (

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Smartphone, TrendingUp, TrendingDown, Loader2, X, CheckCircle, ArrowRight } from 'lucide-react';
-import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
+import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
+import { securityConfigApi, SecurityConfigResponse } from '../../../lib/api-client';
+import { toast } from '../../../lib/toast';
 
 interface Client {
   id: string;
@@ -36,14 +38,47 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
   const [numeroTransaction, setNumeroTransaction] = useState('');
   const [frais, setFrais] = useState('0');
   const [loading, setLoading] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
-  const [otpData, setOtpData] = useState<any>(null);
+  const [operationData, setOperationData] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState('');
+  
+  // Security configuration
+  const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
+  const [showPresenceModal, setShowPresenceModal] = useState(false);
+  const [presenceVerified, setPresenceVerified] = useState<PresenceConfirmationData | null>(null);
 
   const operateurs = [
     { name: 'Airtel Money' as Operateur, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/50', logo: '/airtel-logo.png' },
     { name: 'MTN Mobile Money' as Operateur, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', logo: '/mtn-logo.png' }
   ];
+
+  // Load security config on mount
+  useEffect(() => {
+    const loadSecurityConfig = async () => {
+      try {
+        const config = await securityConfigApi.getConfig();
+        setSecurityConfig(config);
+      } catch (error) {
+        console.error('Erreur chargement config sécurité:', error);
+        // Default: OTP disabled, presence required for withdrawals
+        setSecurityConfig({
+          otpEnabled: false,
+          requireAccountHolderPresence: true,
+          operationsRequiringPresence: ['Retrait', 'Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine'],
+          presenceVerificationThreshold: 0
+        });
+      }
+    };
+    loadSecurityConfig();
+  }, []);
+
+  // Check if operation requires presence verification
+  const requiresPresenceVerification = useCallback((opType: string, subType?: string): boolean => {
+    if (!securityConfig?.requireAccountHolderPresence) return false;
+    const typeToCheck = subType || opType;
+    return securityConfig.operationsRequiringPresence.some(
+      op => op.toLowerCase() === typeToCheck.toLowerCase() || opType.toLowerCase() === 'retrait'
+    );
+  }, [securityConfig]);
 
   const rechercherClient = async () => {
     if (!searchTerm.trim()) return;
@@ -68,11 +103,18 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
 
   const preparerOperation = async () => {
     if (!typeOperation || !montant || parseFloat(montant) <= 0 || !numeroTransaction) {
+      toast.warning('Veuillez remplir tous les champs requis');
       return;
     }
 
-    if (typeOperation === 'Dépôt' && !typeDepot) return;
-    if (typeOperation === 'Retrait' && !typeRetrait) return;
+    if (typeOperation === 'Dépôt' && !typeDepot) {
+      toast.warning('Veuillez sélectionner la destination du dépôt');
+      return;
+    }
+    if (typeOperation === 'Retrait' && !typeRetrait) {
+      toast.warning('Veuillez sélectionner la source du retrait');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -81,7 +123,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
       const fraisNum = parseFloat(frais);
       const typeDetaille = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
 
-      const operationData = {
+      const operation = {
         session_id: sessionId,
         client_id: selectedClient!.id,
         type_operation: typeOperation,
@@ -111,50 +153,69 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
         statut: 'Validé'
       };
 
-      setOtpData({
-        operation: operationData,
-        mobileMoney: mobileMoneyData,
-        type: 'caisse_mobile_money'
-      });
+      setOperationData({ operation, mobileMoney: mobileMoneyData });
 
-      setShowOTP(true);
+      // Decide validation type based on security config
+      const isWithdrawal = requiresPresenceVerification(typeOperation!, typeDetaille || undefined);
+
+      if (isWithdrawal) {
+        // Withdrawal - require account holder presence
+        setShowPresenceModal(true);
+      } else {
+        // Deposit - execute directly (OTP bypass)
+        setLoading(false);
+        await executeOperationDirect({ operation, mobileMoney: mobileMoneyData });
+      }
     } catch (error: any) {
       console.error('Erreur:', error);
-    } finally {
+      toast.error('Erreur lors de la préparation de l\'opération');
       setLoading(false);
+    } finally {
+      if (requiresPresenceVerification(typeOperation!, typeDepot || typeRetrait || undefined)) {
+        setLoading(false);
+      }
     }
   };
 
-  const validerOperation = async (code: string) => {
+
+  // Central function to execute operation (used by both direct and presence validation)
+  const executeOperation = useCallback(async (data: any) => {
     try {
       setLoading(true);
 
+      // Create mobile money transaction
       const mmResponse = await fetch('/api/mobile-money-transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(otpData.mobileMoney)
+        credentials: 'include',
+        body: JSON.stringify(data.mobileMoney)
       });
       if (!mmResponse.ok) throw new Error('Erreur transaction mobile money');
 
+      // Create caisse operation
       const opResponse = await fetch('/api/operations-caisse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          ...otpData.operation,
-          montant: String(otpData.operation.montant)
+          ...data.operation,
+          montant: String(data.operation.montant)
         })
       });
       if (!opResponse.ok) throw new Error('Erreur opération caisse');
 
+      // Update session balance
       await fetch(`/api/sessions-caisse/${sessionId}/update-solde`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           type: typeOperation,
           montant: parseFloat(montant)
         })
       });
 
+      toast.success(`${typeOperation} ${operateur} de ${parseFloat(montant).toLocaleString()} FCFA effectué avec succès !`);
       setSuccessMessage(`${typeOperation} ${operateur} de ${parseFloat(montant).toLocaleString()} FCFA effectué avec succès !`);
 
       setTimeout(() => {
@@ -164,11 +225,34 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
 
     } catch (error: any) {
       console.error('Erreur validation:', error);
+      toast.error(error.message || 'Erreur lors de l\'opération');
     } finally {
       setLoading(false);
-      setShowOTP(false);
     }
-  };
+  }, [typeOperation, operateur, montant, sessionId, onTransactionComplete]);
+
+  // Execute operation directly (deposit bypass)
+  const executeOperationDirect = useCallback(async (data: any) => {
+    await executeOperation(data);
+  }, [executeOperation]);
+
+  // Execute operation after presence verification (withdrawal)
+  const validerOperationAvecPresence = useCallback(async (presenceData: PresenceConfirmationData) => {
+    setShowPresenceModal(false);
+    setPresenceVerified(presenceData);
+    
+    if (operationData) {
+      // Add presence verification data for audit trail
+      const operationWithPresence = {
+        ...operationData,
+        operation: {
+          ...operationData.operation,
+          presence_verification: presenceData
+        }
+      };
+      await executeOperation(operationWithPresence);
+    }
+  }, [operationData, executeOperation]);
 
   const reinitialiserFormulaire = () => {
     setSelectedClient(null);
@@ -180,7 +264,8 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
     setFrais('0');
     setSearchTerm('');
     setSuccessMessage('');
-    setOtpData(null);
+    setOperationData(null);
+    setPresenceVerified(null);
   };
 
   return (
@@ -395,19 +480,17 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete }: 
         </Card>
       </div>
 
-      {showOTP && otpData && selectedClient && (
-        <OTPValidationSimple
-          isOpen={showOTP}
-          onClose={() => setShowOTP(false)}
-          onValidate={(isValid) => {
-            if (isValid) {
-              validerOperation('valid');
-            }
-          }}
-          phoneNumber={selectedClient.telephone || selectedClient.phone || ''}
-          generatedCode="123456"
-          operationType={`${typeOperation} ${operateur}`}
+      {/* Account Holder Presence Modal (for withdrawals) */}
+      {showPresenceModal && selectedClient && (
+        <AccountHolderPresenceModal
+          isOpen={showPresenceModal}
+          onClose={() => setShowPresenceModal(false)}
+          onConfirm={validerOperationAvecPresence}
+          clientName={`${selectedClient.nom} ${selectedClient.prenom}`}
+          clientPhone={selectedClient.telephone || selectedClient.phone}
+          operationType={typeOperation || 'Retrait'}
           amount={parseFloat(montant)}
+          isLoading={loading}
         />
       )}
     </div>
