@@ -98,6 +98,7 @@ function ResponsiveTable<T extends Record<string, any>>({
       'En cours d\'analyse': 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
       'Annulée': 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30',
       'Rejetée': 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30',
+      'Approuvée après réévaluation': 'bg-violet-500/20 text-violet-600 dark:text-violet-400 border-violet-500/30',
     };
 
     const colorClass = colorMap[value] || 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30';

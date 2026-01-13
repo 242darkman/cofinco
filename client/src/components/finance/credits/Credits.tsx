@@ -194,6 +194,29 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
 
+  // Commission crédit specific columns with reevaluation indicator
+  const commissionColumns: TableColumn<any>[] = [
+    {
+      key: 'numero_demande',
+      label: 'Numéro',
+      primary: true,
+      format: (val, item) => (
+        <span className="flex items-center gap-2">
+          {val}
+          {item.statut === 'Approuvée après réévaluation' && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-500/20 text-violet-400 border border-violet-500/30">
+              <RefreshCw size={10} />
+              Réévalué
+            </span>
+          )}
+        </span>
+      )
+    },
+    { key: 'clients.nom', label: 'Client', format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
+    { key: 'montant_approuve', label: 'Montant Approuvé', align: 'right', format: (val, item) => formatMoney(val || item.montant_demande) },
+    { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
+  ];
+
   const enqueteColumns: TableColumn<any>[] = [
     { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
     { key: 'type_activite', label: 'Activité' },
@@ -367,9 +390,9 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => d.statut === 'Approuvée')
+              .filter(d => d.statut === 'Approuvée' || d.statut === 'Approuvée après réévaluation')
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
-            columns={demandeColumns}
+            columns={commissionColumns}
             loading={isLoading}
             onRowClick={(item) => {
               setSelectedDemande(item);
@@ -379,7 +402,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === 'Approuvée').length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === 'Approuvée' || d.statut === 'Approuvée après réévaluation').length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             actions={(item) => (

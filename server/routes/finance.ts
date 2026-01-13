@@ -153,7 +153,9 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(404).json({ message: "Demande de crédit non trouvée" });
       }
 
-      if (demande.statut !== 'Approuvée') {
+      // Accept both 'Approuvée' and 'Approuvée après réévaluation' for disbursement
+      const statutsEligiblesDecaissement = ['Approuvée', 'Approuvée après réévaluation'];
+      if (!statutsEligiblesDecaissement.includes(demande.statut)) {
         return res.status(400).json({ message: `La demande doit être approuvée pour être décaissée (statut actuel: ${demande.statut})` });
       }
 
@@ -511,10 +513,11 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(404).json({ message: "Demande non trouvée" });
       }
 
-      // Verify status is "Approuvée"
-      if (demande.statut !== 'Approuvée') {
-        return res.status(400).json({ 
-          message: `Cette demande ne peut pas être rejetée depuis la commission (statut actuel: ${demande.statut}). Seules les demandes approuvées peuvent être rejetées à cette étape.` 
+      // Verify status is eligible for commission rejection
+      const statutsEligiblesCommission = ['Approuvée', 'Approuvée après réévaluation'];
+      if (!statutsEligiblesCommission.includes(demande.statut)) {
+        return res.status(400).json({
+          message: `Cette demande ne peut pas être rejetée depuis la commission (statut actuel: ${demande.statut}). Seules les demandes approuvées peuvent être rejetées à cette étape.`
         });
       }
 

@@ -514,14 +514,16 @@ export async function recordCommitteeDecision(
     .where(eq(reevaluationsCredit.id, reevaluationId))
     .returning();
   
-  // 5. If approved, update the parent DemandeCredit to 'Approuvée' to enable Disbursement
+  // 5. If approved, update the parent DemandeCredit to 'Approuvée après réévaluation'
+  // This status indicates the reevaluation was approved and the demand is ready for commission credit disbursement
   if (finalStatut === 'Approuvée') {
     await db.update(demandesCredit)
       .set({
-        statut: 'Approuvée',
+        statut: 'Approuvée après réévaluation',
         montantApprouve: montantApprouve?.toString() || reevaluation.nouveauMontantDemande,
         dureeValeur: reevaluation.nouvelleDureeValeur || undefined,
         dureeUnite: reevaluation.nouvelleDureeUnite || undefined,
+        reevaluationEnCours: false,
         updatedAt: new Date()
       })
       .where(eq(demandesCredit.id, reevaluation.demandeId));
