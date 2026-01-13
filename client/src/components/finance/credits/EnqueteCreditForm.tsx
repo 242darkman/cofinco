@@ -593,9 +593,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   longitude={geoLocation.longitude} 
                   className="text-white"
                 />
-                <div className="text-xs text-cyan-300/70 mt-2 italic border-t border-cyan-500/20 pt-2">
-                  Source: OpenStreetMap (Nominatim)
-                </div>
+
              </div>
           )}
 
