@@ -263,6 +263,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          queryClient.invalidateQueries({ queryKey: ["/api/my-permissions"] });
          queryClient.invalidateQueries({ queryKey: ["/api/user-permissions"] });
          queryClient.invalidateQueries({ queryKey: ["/api/rbac"] });
+         queryClient.invalidateQueries({ queryKey: ["/api/rbac"] });
+         window.dispatchEvent(new CustomEvent('rbac-update', { detail: message.payload }));
          break;
 
       case "AGENCE_UPDATE":

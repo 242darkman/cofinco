@@ -46,8 +46,11 @@ import AppShell from './components/layout/AppShell';
 import PlatformSidebarContent from './components/layout/PlatformSidebarContent';
 import PlatformHeader from './components/layout/PlatformHeader';
 import { PLATFORM_MENU_ITEMS } from './constants/menuItems';
+import { getRouteByKey, canAccessRoute } from './lib/routes-config';
 import ForcePasswordChange from './components/auth/ForcePasswordChange';
 import { ProtectedFeature } from './components/auth/ProtectedFeature';
+import { usePermissionsContext } from './contexts/PermissionsContext';
+import { authService } from './lib/auth';
 import ClientFilters from './components/client/ClientFilters';
 import { Button, IconButton, Card, Badge, ConfirmDialog } from './components/ui';
 import ComptabiliteSageOHADA from './components/finance/accounting/ComptabiliteSageOHADA';
@@ -70,6 +73,29 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
   const [currentModule, setCurrentModule] = useState('dashboard');
   const [currentSubModule, setCurrentSubModule] = useState<string | undefined>();
   const [moduleData, setModuleData] = useState<any>(null);
+  const { permissionsVersion } = usePermissionsContext();
+  
+  // Security: Check if user still has access to current module
+  useEffect(() => {
+    // Skip check for dashboard (always accessible)
+    if (currentModule === 'dashboard') return;
+
+    // We can use getRouteByKey logic here or direct check
+    // Ideally we check if canAllAccessRoute(currentModule)
+    // For simplicity, we assume module name mapping is handled or we use authService directly if we know the module name
+    // But currentModule is a route key, not necessarily a module name. 
+    // Let's use ROUTES config to check access.
+    
+    // Find the route config for currentModule
+    const route = getRouteByKey(currentModule);
+    
+    if (route && !canAccessRoute(route, currentUser?.role || 'user')) {
+       // Access revoked!
+       console.warn(`[Security] Access to module ${currentModule} revoked. Redirecting...`);
+       showNotification('error', "Votre accès à ce module a été révoqué.");
+       setCurrentModule('dashboard');
+    }
+  }, [currentModule, permissionsVersion, currentUser]);
   
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');

@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { authService } from '@/lib/auth';
+import { usePermissionsContext } from '@/contexts/PermissionsContext';
 
 interface ProtectedFeatureProps {
   requiredRoles?: string[];
@@ -37,6 +38,10 @@ export function ProtectedFeature({
   children,
   fallback = null,
 }: ProtectedFeatureProps) {
+
+  // Subscribe to permission updates
+  usePermissionsContext(); 
+  
   const user = authService.getCurrentUser();
 
   if (!user) {
@@ -73,7 +78,11 @@ export function ProtectedFeature({
 /**
  * Hook pour vérifier les permissions
  */
+
 export function usePermissions() {
+  // Subscribe to updates to force re-render
+  usePermissionsContext();
+  
   const user = authService.getCurrentUser();
 
   return {

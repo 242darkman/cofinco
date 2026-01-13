@@ -9,6 +9,7 @@ import LocationTracker from '@/components/agent/LocationTracker';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { AgenceProvider } from './contexts/AgenceContext';
+import { PermissionsProvider } from './contexts/PermissionsContext';
 import { UpdatePrompt } from './components/shared/UpdatePrompt';
 
 // Lazy load heavy components
@@ -205,29 +206,31 @@ function App() {
     <FeatureFlagsProvider>
       <AgenceProvider>
         <WebSocketProvider>
-          <ErrorBoundary>
-            <Toaster position="top-right" richColors closeButton />
-            <UpdatePrompt />
-            <LocationTracker />
-            <Suspense fallback={null}>
-              {isAuthenticated && showSeasonalWelcome && (
-                <SeasonalWelcome
-                  userName={currentUser?.prenom || currentUser?.username}
-                  onComplete={() => setShowSeasonalWelcome(false)}
-                />
-              )}
-            </Suspense>
-            <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
-              {authService.isAgentCaisse() ? (
-                <AgentCaisseInterface
-                  agentId={currentUser.id}
-                  onLogout={handleLogout}
-                />
-              ) : (
-                <COFINPlatform currentUser={currentUser} onLogout={handleLogout} />
-              )}
-            </Suspense>
-          </ErrorBoundary>
+          <PermissionsProvider>
+            <ErrorBoundary>
+              <Toaster position="top-right" richColors closeButton />
+              <UpdatePrompt />
+              <LocationTracker />
+              <Suspense fallback={null}>
+                {isAuthenticated && showSeasonalWelcome && (
+                  <SeasonalWelcome
+                    userName={currentUser?.prenom || currentUser?.username}
+                    onComplete={() => setShowSeasonalWelcome(false)}
+                  />
+                )}
+              </Suspense>
+              <Suspense fallback={<LoadingScreen showLogo={true} message="Chargement du module..." />}>
+                {authService.isAgentCaisse() ? (
+                  <AgentCaisseInterface
+                    agentId={currentUser.id}
+                    onLogout={handleLogout}
+                  />
+                ) : (
+                  <COFINPlatform currentUser={currentUser} onLogout={handleLogout} />
+                )}
+              </Suspense>
+            </ErrorBoundary>
+          </PermissionsProvider>
         </WebSocketProvider>
       </AgenceProvider>
     </FeatureFlagsProvider>

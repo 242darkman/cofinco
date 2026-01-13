@@ -111,6 +111,12 @@ class AuthService {
       this.isAdminUser = data.isAdmin;
       this.permissionsLoaded = true;
 
+      // Sync role if changed
+      if (this.currentUser && data.role && this.currentUser.role !== data.role) {
+          console.log(`👤 Role updated: ${this.currentUser.role} -> ${data.role}`);
+          this.currentUser.role = this.mapRole(data.role);
+      }
+
       // Also populate legacy permissions array for backward compatibility
       this.permissions = [];
       for (const [module, actions] of Object.entries(data.permissions)) {
