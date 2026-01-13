@@ -2144,7 +2144,7 @@ async function seedDemo() {
         };
 
         if (['Approuvée', 'Montant réduit'].includes(reeval.statut)) {
-           demandeUpdate.statut = 'Approuvée';
+           demandeUpdate.statut = 'Approuvée après réévaluation';
            demandeUpdate.montantApprouve = reeval.nouveauMontantDemande || reeval.montantInitialDemande;
         }
 
@@ -2200,7 +2200,7 @@ async function seedDemo() {
       { lat: -4.3756, lng: 15.3890 }, // Masina
     ];
 
-    insertedDemandes.filter(d => ['Approuvée', 'Décaissée', 'En enquête'].includes(d.statut || '')).forEach((demande, idx) => {
+    insertedDemandes.filter(d => ['Approuvée', 'Approuvée après réévaluation', 'Décaissée', 'En enquête'].includes(d.statut || '')).forEach((demande, idx) => {
       const categorieActivite = randomFromArray(CATEGORIES_ACTIVITE);
       const typeActivite = randomFromArray(TYPES_ACTIVITE_PAR_CATEGORIE[categorieActivite] || ['Autre']);
       const gpsZone = randomFromArray(GPS_ZONES);
@@ -2258,7 +2258,7 @@ async function seedDemo() {
         ),
         scoreGlobal: demande.scoreCredit || randomBetween(40, 90),
         recommandation: demande.statut === 'Décaissée' ? 'Favorable' : randomFromArray(RECOMMANDATIONS),
-        statut: demande.statut === 'Décaissée' ? 'Validée' : demande.statut === 'Approuvée' ? 'Validée' : 'En cours',
+        statut: demande.statut === 'Décaissée' ? 'Validée' : ['Approuvée', 'Approuvée après réévaluation'].includes(demande.statut || '') ? 'Validée' : 'En cours',
         observations: faker.lorem.sentence(),
         createdBy: staffGroups.Agents[idx % staffGroups.Agents.length]?.id,
         createdAt: daysAgo(randomBetween(5, 60)),
