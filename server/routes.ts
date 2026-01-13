@@ -25,12 +25,19 @@ import { registerReevaluationRoutes } from "./routes/reevaluations";
 import { coffreRouter } from "./routes/coffre";
 import { caisseAgentRouter } from "./routes/caisse-agent";
 import { uploadRouter } from "./routes/upload";
+import { maintenanceRouter } from "./routes/maintenance";
+import { checkMaintenanceMode } from "./middleware/maintenance";
 
 export function registerRoutes(app: Express): Server {
+  // Apply Maintenance Middleware globally
+  app.use(checkMaintenanceMode);
+
   // ... existing routes
   app.use("/api/coffre", coffreRouter);
   app.use("/api/caisse-agent", caisseAgentRouter);
   app.use("/api/uploads", uploadRouter);
+  app.use("/api/maintenance-mode", maintenanceRouter);
+
   // Register modular routes
   registerAuthRoutes(app);
   registerClientRoutes(app);

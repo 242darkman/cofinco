@@ -284,7 +284,8 @@ export function registerEmployesRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const { getWsInstance } = await import("../ws-server");
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_updated', id: employeId } });
       }
@@ -326,7 +327,8 @@ export function registerEmployesRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const { getWsInstance } = await import("../ws-server");
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_deleted', id: employeId } });
       }
@@ -385,7 +387,8 @@ export function registerEmployesRoutes(app: Express) {
       );
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const { getWsInstance } = await import("../ws-server");
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "EMPLOYE_UPDATE", payload: { type: 'employe_new', id: employe.id } });
       }

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert, Shield } from 'lucide-react';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 import { sessionCaisseApi, authApi, userApi } from '../../../lib/api-client';
 import { useAgence } from '../../../contexts/AgenceContext';
 import { authService } from '../../../lib/auth';
+import SupervisionConfirmModal, { SupervisionSession } from './shared/SupervisionConfirmModal';
 
 // Types pour les filtres
 type CaissierStatusFilter = 'all' | 'en_caisse' | 'hors_caisse' | 'inactif';
@@ -33,7 +34,20 @@ function useSupervisionPermissions() {
   };
 }
 
-export default function CaisseSupervision({ onTakeControl }: { onTakeControl?: (session: any) => void }) {
+export interface SupervisionCallbackData {
+  session: any;
+  supervisionInfo: SupervisionSession;
+}
+
+export default function CaisseSupervision({
+  onTakeControl,
+  activeSupervision,
+  onSupervisionStart
+}: {
+  onTakeControl?: (session: any, supervisionInfo: SupervisionSession) => void;
+  activeSupervision?: SupervisionSession | null;
+  onSupervisionStart?: (data: SupervisionCallbackData) => void;
+}) {
   const [activeTab, setActiveTab] = useState<'sessions' | 'caissiers' | 'alertes'>('sessions');
   const [sessions, setSessions] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -45,6 +59,11 @@ export default function CaisseSupervision({ onTakeControl }: { onTakeControl?: (
 
   // Permissions dynamiques depuis la BDD
   const permissions = useSupervisionPermissions();
+
+  // Supervision confirmation modal state
+  const [showSupervisionConfirm, setShowSupervisionConfirm] = useState(false);
+  const [pendingSupervisionSession, setPendingSupervisionSession] = useState<any>(null);
+  const [confirmingSupervision, setConfirmingSupervision] = useState(false);
 
   // Filtres et pagination pour les caissiers
   const [searchQuery, setSearchQuery] = useState('');
@@ -274,6 +293,53 @@ export default function CaisseSupervision({ onTakeControl }: { onTakeControl?: (
     return `${hours}h ${Math.floor(diff % 60)}min`;
   };
 
+  // Handle clicking "Prendre la main" - opens confirmation modal
+  const handleRequestSupervision = useCallback((session: any) => {
+    // Check if user already has an active supervision
+    if (activeSupervision) {
+      setPendingSupervisionSession(session);
+      setShowSupervisionConfirm(true);
+      return;
+    }
+    setPendingSupervisionSession(session);
+    setShowSupervisionConfirm(true);
+  }, [activeSupervision]);
+
+  // Handle confirmed supervision
+  const handleConfirmSupervision = useCallback((reason: string, reasonDetail?: string) => {
+    if (!pendingSupervisionSession || !currentUser) return;
+
+    setConfirmingSupervision(true);
+
+    const supervisionInfo: SupervisionSession = {
+      sessionId: pendingSupervisionSession.id,
+      targetCaissierName: pendingSupervisionSession.caissier_nom || 'Inconnu',
+      targetCaisseName: pendingSupervisionSession.caisse_nom || 'Caisse',
+      targetAgenceName: pendingSupervisionSession.agence_nom,
+      currentBalance: Number(pendingSupervisionSession.solde_theorique) || 0,
+      openedAt: pendingSupervisionSession.date_ouverture,
+      supervisorId: currentUser.id,
+      supervisorName: `${currentUser.prenom || ''} ${currentUser.nom || currentUser.name || ''}`.trim(),
+      reason,
+      reasonDetail,
+      startedAt: new Date(),
+      maxDurationMinutes: 30,
+    };
+
+    // Call parent callback
+    if (onTakeControl) {
+      onTakeControl(pendingSupervisionSession, supervisionInfo);
+    }
+    if (onSupervisionStart) {
+      onSupervisionStart({ session: pendingSupervisionSession, supervisionInfo });
+    }
+
+    // Close modal and reset state
+    setShowSupervisionConfirm(false);
+    setPendingSupervisionSession(null);
+    setConfirmingSupervision(false);
+  }, [pendingSupervisionSession, currentUser, onTakeControl, onSupervisionStart]);
+
   return (
     <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
       
@@ -495,13 +561,27 @@ export default function CaisseSupervision({ onTakeControl }: { onTakeControl?: (
                           {/* Bouton "Prendre la main" - visible si permission canTakeControl */}
                           {onTakeControl && permissions.canTakeControl && (
                             <button
-                              onClick={() => onTakeControl(session)}
-                              className="flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
-                                       bg-emerald-500 text-white
-                                       hover:bg-emerald-600 active:scale-[0.97]
-                                       transition-all touch-manipulation shadow-lg shadow-emerald-500/20"
+                              onClick={() => handleRequestSupervision(session)}
+                              disabled={!!activeSupervision && activeSupervision.sessionId !== session.id}
+                              className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
+                                       transition-all touch-manipulation
+                                       ${activeSupervision && activeSupervision.sessionId !== session.id
+                                         ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+                                         : activeSupervision?.sessionId === session.id
+                                           ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20'
+                                           : 'bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.97] shadow-lg shadow-emerald-500/20'
+                                       }`}
                             >
-                              Prendre la main
+                              {activeSupervision?.sessionId === session.id ? (
+                                <span className="flex items-center justify-center gap-1.5">
+                                  <Shield size={14} />
+                                  En supervision
+                                </span>
+                              ) : activeSupervision ? (
+                                'Supervision active'
+                              ) : (
+                                'Prendre la main'
+                              )}
                             </button>
                           )}
 
@@ -1146,6 +1226,19 @@ export default function CaisseSupervision({ onTakeControl }: { onTakeControl?: (
           </div>
         )}
       </Modal>
+
+      {/* MODAL CONFIRMATION SUPERVISION */}
+      <SupervisionConfirmModal
+        isOpen={showSupervisionConfirm}
+        onClose={() => {
+          setShowSupervisionConfirm(false);
+          setPendingSupervisionSession(null);
+        }}
+        onConfirm={handleConfirmSupervision}
+        session={pendingSupervisionSession}
+        isLoading={confirmingSupervision}
+        existingSupervision={activeSupervision}
+      />
     </div>
   );
 }

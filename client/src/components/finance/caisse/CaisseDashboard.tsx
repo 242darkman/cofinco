@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet,
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
-  PiggyBank, ArrowUpRight, ArrowDownRight, Shield
+  PiggyBank, ArrowUpRight, ArrowDownRight, Shield, Timer, AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
@@ -21,6 +21,7 @@ import CaisseEspeces from './CaisseEspeces';
 import CaisseMobileMoney from './CaisseMobileMoney';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { SupervisionSession } from './shared/SupervisionConfirmModal';
 
 import CaisseAccessControl from './CaisseAccessControl';
 import CaisseClientInfos from './CaisseClientInfos';
@@ -99,8 +100,13 @@ export default function CaisseDashboard({
   
   // Super-User mode: Admin can supervise a specific active session
   const [supervisedSession, setSupervisedSession] = useState<SessionCaisse | null>(null);
+  const [supervisionInfo, setSupervisionInfo] = useState<SupervisionSession | null>(null);
+  const [supervisionTimeElapsed, setSupervisionTimeElapsed] = useState(0);
 
   const [accessGranted, setAccessGranted] = useState(userRole === 'Administrateur');
+
+  // End of day reminder state
+  const [showEndOfDayReminder, setShowEndOfDayReminder] = useState(false);
 
   // History Receipt State
   const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
@@ -207,12 +213,97 @@ export default function CaisseDashboard({
     return () => clearInterval(interval);
   }, [currentSession?.id, currentSession?.statut]);
 
+  // Supervision timer - counts elapsed time since supervision started
+  useEffect(() => {
+    if (!supervisionInfo) {
+      setSupervisionTimeElapsed(0);
+      return;
+    }
+
+    const startTime = new Date(supervisionInfo.startedAt).getTime();
+
+    const updateElapsed = () => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000 / 60); // minutes
+      setSupervisionTimeElapsed(elapsed);
+    };
+
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [supervisionInfo]);
+
+  // End of day reminder - check at 17:00 if session is still open
+  useEffect(() => {
+    if (!sessionActive) return;
+
+    const checkEndOfDay = () => {
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+
+      // Show reminder at 17:00, 17:30, 18:00
+      if ((hour === 17 && (minute === 0 || minute === 30)) || (hour === 18 && minute === 0)) {
+        setShowEndOfDayReminder(true);
+        toast.warning('Rappel de fin de journée', {
+          description: 'Pensez à clôturer votre caisse avant de partir.',
+          duration: 10000,
+        });
+      }
+    };
+
+    // Check every minute
+    const interval = setInterval(checkEndOfDay, 60000);
+
+    // Also check on mount
+    checkEndOfDay();
+
+    return () => clearInterval(interval);
+  }, [sessionActive]);
+
   const handleOuvertureCaisse = async () => {
     await loadSessionActive();
     await loadCaissesSeparees();
     setSupervisedSession(null); // Clear supervision if we open our own
+    setSupervisionInfo(null);
     setShowOuverture(false);
   };
+
+  // Handle supervision start with full info
+  const handleSupervisionStart = useCallback((session: SessionCaisse, info: SupervisionSession) => {
+    setSupervisedSession(session);
+    setSupervisionInfo(info);
+    setActiveTab('dashboard');
+    toast.success(`Supervision activée`, {
+      description: `Vous supervisez maintenant ${info.targetCaisseName} (${info.targetCaissierName})`,
+    });
+  }, []);
+
+  // Handle supervision end
+  const handleSupervisionEnd = useCallback(() => {
+    if (supervisionInfo) {
+      toast.info('Supervision terminée', {
+        description: `Vous avez quitté la supervision de ${supervisionInfo.targetCaisseName}`,
+      });
+    }
+    setSupervisedSession(null);
+    setSupervisionInfo(null);
+  }, [supervisionInfo]);
+
+  // Extend supervision duration
+  const handleExtendSupervision = useCallback(() => {
+    if (!supervisionInfo) return;
+    setSupervisionInfo({
+      ...supervisionInfo,
+      maxDurationMinutes: supervisionInfo.maxDurationMinutes + 15,
+    });
+    toast.success('Supervision prolongée de 15 minutes');
+  }, [supervisionInfo]);
+
+  // Calculate remaining supervision time
+  const supervisionTimeRemaining = supervisionInfo
+    ? Math.max(0, supervisionInfo.maxDurationMinutes - supervisionTimeElapsed)
+    : 0;
 
   const handleFermetureCaisse = () => {
     setActiveTab('rapprochement');
@@ -330,13 +421,9 @@ export default function CaisseDashboard({
                     <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
                     <h2 className="text-lg font-bold text-white">Supervision</h2>
                  </div>
-                 <CaisseSupervision 
-                    onTakeControl={(session) => {
-                      setSupervisedSession(session);
-                      setActiveTab('dashboard');
-                      // We might need to refresh transactions for this specific user/session
-                      // but for now, let's keep it simple
-                    }} 
+                 <CaisseSupervision
+                    activeSupervision={supervisionInfo}
+                    onTakeControl={handleSupervisionStart}
                  />
             </div>
         );
@@ -570,11 +657,11 @@ export default function CaisseDashboard({
             </div>
             
             <div className="flex items-center gap-2">
-                 {supervisedSession && (
-                   <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setSupervisedSession(null)} 
+                 {supervisedSession && supervisionInfo && (
+                   <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSupervisionEnd}
                       className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
                    >
                      Quitter Supervision
@@ -607,19 +694,74 @@ export default function CaisseDashboard({
             </div>
         </div>
 
-        {supervisedSession && (
-          <div className="px-4 py-2 bg-amber-500/10 border-y border-amber-500/20 flex items-center justify-between -mx-4 md:-mx-6 mb-4 animate-in slide-in-from-top duration-500">
-             <div className="flex items-center gap-2 text-amber-500">
-                <Shield size={16} />
-                <span className="text-xs font-bold uppercase tracking-wider">Mode Supervision Active</span>
-                <span className="text-xs opacity-80">|</span>
-                <span className="text-xs font-medium">Caisse : <strong>{supervisedSession.caisse_nom}</strong></span>
-                <span className="text-xs opacity-80">|</span>
-                <span className="text-xs font-medium">Session de : <strong>{supervisedSession.caissier_nom}</strong></span>
-             </div>
-             <div className="text-[10px] text-amber-200/50 italic hidden sm:block">
-               Toutes les opérations effectuées seront enregistrées au nom de ce caissier
-             </div>
+        {supervisedSession && supervisionInfo && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border-y border-amber-500/20 -mx-4 md:-mx-6 mb-4 animate-in slide-in-from-top duration-500">
+            {/* Main supervision banner */}
+            <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              {/* Left side - Info */}
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/20 shrink-0">
+                  <Shield size={18} className="text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                      Mode Supervision
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      supervisionTimeRemaining <= 5
+                        ? 'bg-red-500/20 text-red-400 animate-pulse'
+                        : supervisionTimeRemaining <= 10
+                          ? 'bg-amber-500/20 text-amber-400'
+                          : 'bg-emerald-500/20 text-emerald-400'
+                    }`}>
+                      <Timer size={10} className="inline mr-1" />
+                      {supervisionTimeRemaining} min restantes
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-amber-300/80 flex-wrap">
+                    <span>
+                      <strong>{supervisionInfo.targetCaisseName}</strong>
+                    </span>
+                    <span className="opacity-50">•</span>
+                    <span>{supervisionInfo.targetCaissierName}</span>
+                    <span className="opacity-50">•</span>
+                    <span className="italic text-amber-300/60">{supervisionInfo.reason}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right side - Actions */}
+              <div className="flex items-center gap-2 shrink-0">
+                {supervisionTimeRemaining <= 10 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleExtendSupervision}
+                    className="text-amber-400 hover:bg-amber-500/20 text-xs"
+                  >
+                    <Timer size={14} className="mr-1" />
+                    +15 min
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSupervisionEnd}
+                  className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs"
+                >
+                  Quitter
+                </Button>
+              </div>
+            </div>
+
+            {/* Warning footer */}
+            <div className="px-4 py-1.5 bg-amber-950/30 border-t border-amber-500/10 flex items-center gap-2">
+              <AlertCircle size={12} className="text-amber-500/60 shrink-0" />
+              <p className="text-[10px] text-amber-300/50 italic">
+                Les opérations sont enregistrées au nom de <strong>{supervisionInfo.targetCaissierName}</strong> avec mention "Supervisé par {supervisionInfo.supervisorName}"
+              </p>
+            </div>
           </div>
         )}
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2 } from 'lucide-react';
 import { Card, Button, IconButton, LoadingSpinner, Badge } from '../../ui';
 import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -18,8 +18,14 @@ interface Caisse {
   statut: string;
   isOccupied: boolean;
   occupiedBy?: string;
+  occupiedByName?: string;
   solde: string;
   assignments?: string[];
+  lastSession?: {
+    date_fermeture?: string;
+    solde_reel?: number;
+    caissier_nom?: string;
+  };
 }
 
 interface Agence {
@@ -316,6 +322,37 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
     { name: 'pieces_5', label: '5', value: 5 },
   ];
 
+  // Format money helper
+  const formatMoney = (amount: number) => {
+    return new Intl.NumberFormat('fr-FR').format(amount);
+  };
+
+  // Format relative time
+  const formatLastClosure = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays === 0) {
+      if (diffHours < 1) return "Il y a moins d'une heure";
+      return `Il y a ${diffHours}h`;
+    } else if (diffDays === 1) {
+      return `Hier à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (diffDays < 7) {
+      return `Il y a ${diffDays} jours`;
+    } else {
+      return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+    }
+  };
+
+  // Selected caisse info
+  const selectedCaisseInfo = useMemo(() => {
+    return caisses.find(c => c.id === selectedCaisseId);
+  }, [caisses, selectedCaisseId]);
+
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-3">
       <Card variant="elevated" className="w-full max-w-lg max-h-[95vh] flex flex-col bg-surface-base" padding="none">
@@ -376,37 +413,100 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
               )}
 
               {/* Caisse Selector */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                     <label className="text-xs font-semibold text-content-secondary">Choisir la Caisse</label>
                     {loadingCaisses ? (
                         <div className="flex justify-center py-4"><LoadingSpinner size="sm" /></div>
+                    ) : caisses.length === 0 ? (
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
+                          <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+                          <p className="text-sm text-amber-400 font-medium">Aucune caisse disponible</p>
+                          <p className="text-xs text-amber-300/70 mt-1">
+                            Contactez votre superviseur pour être assigné à une caisse.
+                          </p>
+                        </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {caisses.map(caisse => (
-                                <button
-                                    key={caisse.id}
-                                    type="button"
-                                    disabled={caisse.isOccupied}
-                                    onClick={() => setSelectedCaisseId(caisse.id)}
-                                    className={`
-                                        relative p-3 rounded-xl border text-left transition-all
-                                        ${selectedCaisseId === caisse.id 
-                                            ? 'border-primary bg-primary/5 ring-1 ring-primary' 
-                                            : 'border-edge bg-surface-muted hover:border-primary/50'
-                                        }
-                                        ${caisse.isOccupied ? 'opacity-50 cursor-not-allowed grayscale' : ''}
-                                    `}
-                                >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        {caisse.type === 'Coffre-Fort' ? <Lock size={14} /> : <Monitor size={14} />}
-                                        <span className="text-sm font-bold">{caisse.nom}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className="text-content-muted">{caisse.type}</span>
-                                        {caisse.isOccupied && <span className="text-amber-500 font-bold">Occupée</span>}
-                                    </div>
-                                </button>
-                            ))}
+                        <div className="grid grid-cols-1 gap-2">
+                            {caisses.map(caisse => {
+                                const isSelected = selectedCaisseId === caisse.id;
+                                const hasLastSession = caisse.lastSession?.date_fermeture;
+
+                                return (
+                                    <button
+                                        key={caisse.id}
+                                        type="button"
+                                        disabled={caisse.isOccupied}
+                                        onClick={() => setSelectedCaisseId(caisse.id)}
+                                        className={`
+                                            relative p-3 rounded-xl border text-left transition-all
+                                            ${isSelected
+                                                ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
+                                                : 'border-edge bg-surface-muted hover:border-primary/50'
+                                            }
+                                            ${caisse.isOccupied ? 'opacity-60 cursor-not-allowed' : ''}
+                                        `}
+                                    >
+                                        {/* Selection indicator */}
+                                        {isSelected && (
+                                          <div className="absolute -top-1.5 -right-1.5">
+                                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                                              <CheckCircle2 size={12} className="text-white" />
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                {/* Caisse name and type */}
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className={`p-1.5 rounded-lg ${
+                                                      caisse.type === 'Coffre-Fort'
+                                                        ? 'bg-amber-500/10 text-amber-500'
+                                                        : 'bg-cyan-500/10 text-cyan-500'
+                                                    }`}>
+                                                      {caisse.type === 'Coffre-Fort' ? <Lock size={14} /> : <Monitor size={14} />}
+                                                    </div>
+                                                    <div>
+                                                      <span className="text-sm font-bold text-content-primary block">{caisse.nom}</span>
+                                                      <span className="text-[10px] text-content-muted">{caisse.type}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Status and last session info */}
+                                                {caisse.isOccupied ? (
+                                                    <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                                      <User size={12} className="text-amber-500" />
+                                                      <span className="text-xs text-amber-400">
+                                                        Occupée par <strong>{caisse.occupiedByName || 'un autre caissier'}</strong>
+                                                      </span>
+                                                    </div>
+                                                ) : hasLastSession ? (
+                                                    <div className="flex items-center gap-3 p-2 rounded-lg bg-surface-base/50 border border-edge/50">
+                                                      <div className="flex-1">
+                                                        <div className="flex items-center gap-1.5 text-[10px] text-content-muted mb-0.5">
+                                                          <Clock size={10} />
+                                                          <span>Dernière fermeture: {formatLastClosure(caisse.lastSession?.date_fermeture)}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                          <Wallet size={10} className="text-emerald-500" />
+                                                          <span className="text-xs font-semibold text-emerald-400 font-mono">
+                                                            {formatMoney(caisse.lastSession?.solde_reel || 0)} F
+                                                          </span>
+                                                          <span className="text-[10px] text-content-muted">solde final</span>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                                      <CheckCircle2 size={12} className="text-emerald-500" />
+                                                      <span className="text-xs text-emerald-400">Disponible - Première ouverture</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins, Printer } from 'lucide-react';
+import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins } from 'lucide-react';
 import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
 import { Card, Button, Badge } from '@/components/ui';
@@ -56,7 +56,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [searchLoading, setSearchLoading] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [otpData, setOtpData] = useState<any>(null);
-  const [successMessage, setSuccessMessage] = useState('');
   const [creditsActifs, setCreditsActifs] = useState<any[]>([]);
   const [creditSelectionne, setCreditSelectionne] = useState<any>(null);
   const [prochaineEcheance, setProchaineEcheance] = useState<any>(null);
@@ -67,7 +66,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [montantError, setMontantError] = useState<string | null>(null);
   const [lastOperationData, setLastOperationData] = useState<any>(null);
-  const [showPrintDialog, setShowPrintDialog] = useState(false);
 
   // Security configuration states
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
@@ -399,8 +397,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         date: new Date()
       });
 
-      setSuccessMessage(`${typeOperation} effectué avec succès !`);
-      setShowPrintDialog(true);
       return true;
     } catch (error) {
       if (loadingId) toast.dismiss(loadingId);
@@ -464,7 +460,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setMontant('');
     setDescription('');
     setSearchTerm('');
-    setSuccessMessage('');
     setOtpData(null);
     setCreditSelectionne(null);
     setTontineSelectionnee(null);
@@ -518,16 +513,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       }
   }, [lastOperationData, handleShowReceipt]);
 
-  // Fermer le dialogue d'impression et réinitialiser
-  const handleClosePrintDialog = useCallback((shouldPrint: boolean) => {
-    if (shouldPrint) {
-      handlePrintReceipt();
-    }
-    setShowPrintDialog(false);
-    setLastOperationData(null);
-    reinitialiserFormulaire();
-    onTransactionComplete();
-  }, [handlePrintReceipt, reinitialiserFormulaire, onTransactionComplete]);
+
 
   // Calcul du total billetage mémorisé
   const totalBilletage = useMemo(() => {
@@ -633,15 +619,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                   </div>
 
                   {/* Success Message */}
-                  {successMessage && (
-                    <div
-                      className="bg-emerald-950/30 border border-emerald-900/50 text-emerald-400 px-4 py-3 rounded-xl flex items-center gap-2 text-xs font-semibold animate-in zoom-in-95"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <CheckCircle size={14} aria-hidden="true" /> {successMessage}
-                    </div>
-                  )}
+
 
                   {/* Presence Verification Indicator */}
                   {presenceVerified && typeOperation === 'Retrait' && (
@@ -1008,22 +986,17 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       )}
 
       {/* Print Receipt Dialog */}
-      <ConfirmDialog
-        isOpen={showPrintDialog}
-        title="Opération réussie !"
-        message={lastOperationData ?
-          `${lastOperationData.typeOperation} de ${formatMoney(lastOperationData.montant)} effectué avec succès pour ${lastOperationData.client?.nom} ${lastOperationData.client?.prenom || ''}. Voulez-vous imprimer le reçu ?` :
-          'Opération effectuée avec succès. Voulez-vous imprimer le reçu ?'
-        }
-        onConfirm={() => handleClosePrintDialog(true)}
-        onClose={() => handleClosePrintDialog(false)}
-        variant="success"
-        confirmText={isPrinting ? "Impression..." : "Imprimer le reçu"}
-        cancelText="Fermer sans imprimer"
+      <UniversalPaymentSuccessModal 
+        isOpen={showSuccessModal}
+        onClose={() => {
+            setShowSuccessModal(false);
+            setLastOperationData(null);
+            reinitialiserFormulaire();
+            onTransactionComplete();
+        }}
+        term="Terminer"
+        data={receiptData}
       />
-
-      {/* Hidden Receipt Template for Printing */}
-      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
     </div>
   );
 }

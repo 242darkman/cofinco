@@ -1,6 +1,7 @@
-import React from 'react';
-import { Menu, X, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Menu, X, LogOut, Lock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { maintenanceApi } from '../../lib/api-client';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
@@ -27,6 +28,73 @@ export default function PlatformSidebarContent({
   const { t } = useLanguage();
   const { settings: systemSettings } = useSystemSettings();
   const agenceName = systemSettings?.find(s => s.cle === 'agence_name')?.valeur || 'COFIN&CO-M';
+
+  // Maintenance Status State
+  const [lockedModules, setLockedModules] = useState<Set<string>>(new Set());
+
+  // Fetch Maintenance Status on Mount
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const modules = await maintenanceApi.getStatus();
+        // Assume modules have properties: moduleName (camelCase)
+        const locked = new Set<string>(
+          modules
+            .filter((m: any) => m.isLocked)
+            .map((m: any) => String(m.moduleName))
+        );
+        setLockedModules(locked);
+      } catch (error) {
+        console.error("Failed to fetch sidebar maintenance status", error);
+      }
+    };
+    fetchStatus();
+
+    // Real-time Updates Listener
+    const handleMaintenanceUpdate = (event: CustomEvent) => {
+        const { moduleName, isLocked, isPlatform } = event.detail;
+        console.log('[Sidebar] Maintenance update received:', { moduleName, isLocked, isPlatform });
+        
+        setLockedModules(prev => {
+            const next = new Set(prev);
+            console.log('[Sidebar] Previous locked:', Array.from(prev));
+            
+            if (isPlatform) {
+                 if (isLocked) next.add('PLATFORM');
+                 else next.delete('PLATFORM');
+            } else {
+                 const name = String(moduleName);
+                 if (isLocked) {
+                     next.add(name);
+                     console.log(`[Sidebar] Locking ${name}`);
+                 } else {
+                     const deleted = next.delete(name);
+                     console.log(`[Sidebar] Unlocking ${name}, found=${deleted}`);
+                 }
+            }
+            console.log('[Sidebar] Next locked:', Array.from(next));
+            return next;
+        });
+    };
+
+    window.addEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
+
+    return () => {
+        window.removeEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
+    };
+  }, []);
+
+  // Configure Module Mapping: Route Key -> Maintenance Module Name
+  // This must match the backend list: 'PLATFORM', 'CAISSE', 'CREDITS', 'TONTINES', 'EPARGNE', 'RH', 'MESSAGES', 'ADMIN'
+  const routeToModuleMap: Record<string, string> = {
+    'credit': 'CREDITS',
+    'caisse': 'CAISSE',
+    'tontine': 'TONTINES',
+    'epargne': 'EPARGNE',
+    'rh': 'RH',
+    'messagerie': 'MESSAGES',
+    // Add others if needed
+  };
 
   const getMenuIcon = (key: string) => {
     const item = PLATFORM_MENU_ITEMS.find(m => m.key === key);
@@ -137,7 +205,18 @@ export default function PlatformSidebarContent({
   function renderRouteItem(route: RouteConfig) {
     const Icon = getMenuIcon(route.key);
     const isActive = currentModule === route.key;
-    const isDisabled = route.key === 'transfert' || route.key === 'bourse';
+    
+    // Check maintenance
+    const maintenanceModule = routeToModuleMap[route.key];
+    const isMaintenanceLocked = maintenanceModule ? lockedModules.has(maintenanceModule) : false;
+    const isPlatformLocked = lockedModules.has('PLATFORM');
+    
+    // Allow admin to bypass maintenance visual lock if needed, but for now we show lock to all
+    // Or better, check role:
+    const isAdmin = userRole === 'admin';
+    const showMaintenanceLock = (isMaintenanceLocked || isPlatformLocked) && !isAdmin;
+
+    const isDisabled = route.key === 'transfert' || route.key === 'bourse' || showMaintenanceLock;
 
     return (
       <button
@@ -156,20 +235,25 @@ export default function PlatformSidebarContent({
             ? 'bg-gradient-to-r from-accent/15 via-accent/5 to-transparent text-accent font-semibold shadow-sm ring-1 ring-accent/10'
             : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover'
           }
-          ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${isDisabled ? 'opacity-50 cursor-not-allowed grayscale-[0.5]' : 'cursor-pointer'}
         `}
       >
         {/* Active indicator with Glow */}
-        {isActive && (
+        {isActive && !isDisabled && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-accent rounded-r-full shadow-[0_0_12px_rgba(var(--accent-primary),0.6)]" />
         )}
 
-        {Icon && (
-          <Icon
-            size={20}
-            className={`shrink-0 transition-colors duration-300 ${isActive ? 'text-accent drop-shadow-sm' : 'group-hover:text-sidebar-text-active'}`}
-            aria-hidden="true"
-          />
+        {/* Maintenance Lock Overlay (or icon replacement) */}
+        {showMaintenanceLock ? (
+           <Lock size={20} className="shrink-0 text-amber-500/80" />
+        ) : (
+          Icon && (
+            <Icon
+              size={20}
+              className={`shrink-0 transition-colors duration-300 ${isActive ? 'text-accent drop-shadow-sm' : 'group-hover:text-sidebar-text-active'}`}
+              aria-hidden="true"
+            />
+          )
         )}
 
         {sidebarOpen && (
@@ -178,8 +262,12 @@ export default function PlatformSidebarContent({
               {t(route.labelKey || route.key)}
             </span>
             {isDisabled && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                Bientôt
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${
+                showMaintenanceLock 
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
+                  : 'bg-content-muted/20 text-content-muted border-content-muted/30'
+              }`}>
+                {showMaintenanceLock ? 'Maint.' : 'Bientôt'}
               </span>
             )}
           </>
@@ -195,7 +283,7 @@ export default function PlatformSidebarContent({
             shadow-lg border border-edge-subtle
           ">
             {t(route.labelKey || route.key)}
-            {isDisabled && ' (Bientôt)'}
+            {showMaintenanceLock ? ' (En Maintenance)' : isDisabled ? ' (Bientôt)' : ''}
           </div>
         )}
       </button>

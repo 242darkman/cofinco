@@ -8,13 +8,13 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 interface MaintenanceModule {
   id: string;
-  module_name: string;
-  is_locked: boolean;
-  locked_by: string | null;
-  locked_at: string | null;
+  moduleName: string;
+  isLocked: boolean;
+  lockedBy: string | null;
+  lockedAt: string | null;
   reason: string | null;
-  platform_wide: boolean;
-  updated_at: string;
+  platformWide: boolean;
+  updatedAt: string;
 }
 
 const AdminMaintenanceMode: React.FC = () => {
@@ -47,8 +47,12 @@ const AdminMaintenanceMode: React.FC = () => {
       const data = await maintenanceApi.getStatus();
 
       if (data) {
-        const platform = data.find((m: MaintenanceModule) => m.module_name === 'PLATFORM');
-        const otherModules = data.filter((m: MaintenanceModule) => m.module_name !== 'PLATFORM');
+        // Backend returns camelCase keys as defined in maintenance.ts route response (from Drizzle select)
+        // If data comes as snake_case from DB directly via raw query, we might need adapter, 
+        // but maintenanceRouter uses db.select().from(maintenanceModules) which returns camelCase properties from schema definition.
+        
+        const platform = data.find((m: MaintenanceModule) => m.moduleName === 'PLATFORM');
+        const otherModules = data.filter((m: MaintenanceModule) => m.moduleName !== 'PLATFORM');
 
         setPlatformModule(platform || null);
         setModules(otherModules);
@@ -63,6 +67,17 @@ const AdminMaintenanceMode: React.FC = () => {
   useEffect(() => {
     loadMaintenanceStatus();
     getCurrentUser();
+
+    // Listen for real-time updates
+    const handleMaintenanceUpdate = () => {
+      loadMaintenanceStatus();
+    };
+    
+    window.addEventListener('maintenance-update', handleMaintenanceUpdate);
+    
+    return () => {
+      window.removeEventListener('maintenance-update', handleMaintenanceUpdate);
+    };
   }, [loadMaintenanceStatus, getCurrentUser]);
 
   const executeModuleLock = useCallback(async (moduleId: string, newStatus: boolean, moduleName: string, reason: string | null) => {
@@ -70,10 +85,7 @@ const AdminMaintenanceMode: React.FC = () => {
     try {
       await maintenanceApi.toggleModule(moduleId, {
         is_locked: newStatus,
-        locked_by: newStatus ? currentUserId : null,
-        locked_at: newStatus ? new Date().toISOString() : null,
-        reason: reason,
-        updated_at: new Date().toISOString()
+        reason: reason
       });
 
       await loadMaintenanceStatus();
@@ -117,7 +129,7 @@ const AdminMaintenanceMode: React.FC = () => {
   const togglePlatformLock = useCallback(() => {
     if (!platformModule) return;
 
-    const newStatus = !platformModule.is_locked;
+    const newStatus = !platformModule.isLocked;
 
     if (newStatus) {
       openConfirm({
@@ -181,8 +193,8 @@ const AdminMaintenanceMode: React.FC = () => {
     );
   }
 
-  const lockedCount = modules.filter(m => m.is_locked).length;
-  const activeCount = modules.filter(m => !m.is_locked).length;
+  const lockedCount = modules.filter(m => m.isLocked).length;
+  const activeCount = modules.filter(m => !m.isLocked).length;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -252,14 +264,14 @@ const AdminMaintenanceMode: React.FC = () => {
               <div
                 key={module.id}
                 className={`p-3 sm:p-4 flex items-center justify-between gap-3 transition-colors ${
-                  module.is_locked ? 'bg-slate-800/30' : 'hover:bg-slate-800/20'
+                  module.isLocked ? 'bg-slate-800/30' : 'hover:bg-slate-800/20'
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    module.is_locked ? 'bg-amber-500/20' : 'bg-emerald-500/20'
+                    module.isLocked ? 'bg-amber-500/20' : 'bg-emerald-500/20'
                   }`}>
-                    {module.is_locked ? (
+                    {module.isLocked ? (
                       <Lock size={18} className="text-amber-400" />
                     ) : (
                       <CheckCircle size={18} className="text-emerald-400" />
@@ -269,15 +281,15 @@ const AdminMaintenanceMode: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-semibold text-white text-sm sm:text-base truncate">
-                        {module.module_name}
+                        {module.moduleName}
                       </h4>
                       <Badge
-                        value={module.is_locked ? 'Verrouillé' : 'Actif'}
-                        variant={module.is_locked ? 'warning' : 'success'}
+                        value={module.isLocked ? 'Verrouillé' : 'Actif'}
+                        variant={module.isLocked ? 'warning' : 'success'}
                         size="sm"
                       />
                     </div>
-                    {module.is_locked && module.reason && (
+                    {module.isLocked && module.reason && (
                       <p className="text-xs text-slate-500 mt-0.5 truncate">
                         {module.reason}
                       </p>
@@ -286,15 +298,15 @@ const AdminMaintenanceMode: React.FC = () => {
                 </div>
 
                 <Button
-                  variant={module.is_locked ? 'success' : 'secondary'}
+                  variant={module.isLocked ? 'success' : 'secondary'}
                   size="sm"
-                  onClick={() => toggleModuleLock(module.id, module.is_locked, module.module_name)}
-                  disabled={saving || (platformModule?.is_locked || false)}
-                  icon={module.is_locked ? Unlock : Lock}
+                  onClick={() => toggleModuleLock(module.id, module.isLocked, module.moduleName)}
+                  disabled={saving || (platformModule?.isLocked || false)}
+                  icon={module.isLocked ? Unlock : Lock}
                   className="flex-shrink-0"
                 >
                   <span className="hidden sm:inline">
-                    {module.is_locked ? 'Déverrouiller' : 'Verrouiller'}
+                    {module.isLocked ? 'Déverrouiller' : 'Verrouiller'}
                   </span>
                 </Button>
               </div>
@@ -306,21 +318,21 @@ const AdminMaintenanceMode: React.FC = () => {
       {/* Platform Lock Control - Bottom for emphasis */}
       {platformModule && (
         <Card className={`p-4 sm:p-5 border-2 ${
-          platformModule.is_locked
+          platformModule.isLocked
             ? 'bg-amber-950/20 border-amber-500/30'
             : 'bg-slate-900 border-slate-800'
         }`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className={`p-2 sm:p-3 rounded-xl ${
-                platformModule.is_locked ? 'bg-amber-500/20' : 'bg-emerald-500/20'
+                platformModule.isLocked ? 'bg-amber-500/20' : 'bg-emerald-500/20'
               }`}>
-                <Power size={22} className={platformModule.is_locked ? 'text-amber-400' : 'text-emerald-400'} />
+                <Power size={22} className={platformModule.isLocked ? 'text-amber-400' : 'text-emerald-400'} />
               </div>
               <div>
                 <h3 className="font-bold text-white text-sm sm:text-lg">Plateforme Complète</h3>
                 <p className="text-xs sm:text-sm text-slate-400">
-                  {platformModule.is_locked
+                  {platformModule.isLocked
                     ? 'PLATEFORME VERROUILLÉE'
                     : 'Plateforme opérationnelle'
                   }
@@ -329,23 +341,23 @@ const AdminMaintenanceMode: React.FC = () => {
             </div>
 
             <Button
-              variant={platformModule.is_locked ? 'success' : 'danger'}
+              variant={platformModule.isLocked ? 'success' : 'danger'}
               onClick={togglePlatformLock}
               disabled={saving}
-              icon={platformModule.is_locked ? Unlock : Lock}
+              icon={platformModule.isLocked ? Unlock : Lock}
               className="w-full sm:w-auto justify-center"
             >
-              {platformModule.is_locked ? 'Déverrouiller' : 'Verrouiller Tout'}
+              {platformModule.isLocked ? 'Déverrouiller' : 'Verrouiller Tout'}
             </Button>
           </div>
 
-          {platformModule.is_locked && platformModule.reason && (
+          {platformModule.isLocked && platformModule.reason && (
             <div className="mt-3 p-3 bg-slate-900/50 border border-amber-500/20 rounded-lg">
               <p className="text-xs text-amber-300">
                 <strong>Raison:</strong> {platformModule.reason}
               </p>
               <p className="text-xs text-slate-500 mt-1">
-                Verrouillé le: {new Date(platformModule.locked_at!).toLocaleString('fr-FR')}
+                Verrouillé le: {new Date(platformModule.lockedAt!).toLocaleString('fr-FR')}
               </p>
             </div>
           )}
@@ -362,7 +374,7 @@ const AdminMaintenanceMode: React.FC = () => {
         confirmText={confirmState.confirmText}
       >
         {/* Input for lock reason when locking */}
-        {(pendingModuleId || (platformModule && !platformModule.is_locked)) && (
+        {(pendingModuleId || (platformModule && !platformModule.isLocked)) && (
           <div className="mt-4">
             <label className="block text-sm font-medium text-content-secondary mb-2">
               Raison du verrouillage

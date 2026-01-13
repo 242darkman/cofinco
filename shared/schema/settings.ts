@@ -40,6 +40,21 @@ export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omi
 export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
 export type SystemSettings = typeof systemSettings.$inferSelect;
 
+// Maintenance Modules table (Granular Locking)
+export const maintenanceModules = pgTable("maintenance_modules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  moduleName: text("module_name").notNull().unique(), // 'CREDITS', 'CAISSE', 'PLATFORM'
+  isLocked: boolean("is_locked").notNull().default(false),
+  lockedBy: uuid("locked_by").references(() => users.id),
+  lockedAt: timestamp("locked_at"),
+  reason: text("reason"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMaintenanceModuleSchema = createInsertSchema(maintenanceModules).omit({ id: true, updatedAt: true });
+export type InsertMaintenanceModule = z.infer<typeof insertMaintenanceModuleSchema>;
+export type MaintenanceModule = typeof maintenanceModules.$inferSelect;
+
 // Feature Flags table
 export const featureFlags = pgTable("feature_flags", {
   id: uuid("id").primaryKey().defaultRandom(),
