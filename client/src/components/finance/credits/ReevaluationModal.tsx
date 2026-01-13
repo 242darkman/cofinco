@@ -23,8 +23,8 @@ interface GarantieAdditionnelle {
 interface ReevaluationFormData {
   elementsNouveaux: ElementNouveau[];
   justification: string;
-  nouveauMontantDemande: number;
-  nouvelleDureeValeur?: number;
+  nouveauMontantDemande: number | '';
+  nouvelleDureeValeur?: number | '';
   nouvelleDureeUnite?: string;
   nouvelleFrequence?: string;
   garantiesAdditionnelles: GarantieAdditionnelle[];
@@ -69,6 +69,7 @@ const TYPES_ELEMENTS = [
 ];
 
 const formatMoney = (amount: number | string) => {
+  if (amount === '' || amount === undefined || amount === null) return '0 FCFA';
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return new Intl.NumberFormat('fr-FR').format(num) + ' FCFA';
 };
@@ -151,7 +152,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
 
   const canGoNext = () => {
     if (step === 'elements') {
-      return formData.elementsNouveaux.length > 0 && formData.justification.length >= 50;
+      return formData.elementsNouveaux.length > 0 && formData.justification.length >= 10;
     }
     return true;
   };
@@ -165,6 +166,24 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
     }
   };
 
+  // Helper to handle number input changes smoothly
+  const handleNumberChange = (
+    field: keyof ReevaluationFormData,
+    value: string
+  ) => {
+    // Allow empty string to clear the input
+    if (value === '') {
+      setFormData(prev => ({ ...prev, [field]: '' }));
+      return;
+    }
+    
+    // Parse but keep as string if it ends with decimal point or is just minus
+    const num = parseFloat(value);
+    if (!isNaN(num)) {
+      setFormData(prev => ({ ...prev, [field]: num }));
+    }
+  };
+  
   if (!isOpen) return null;
 
   return (
@@ -279,14 +298,14 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                 <textarea
                   value={formData.justification}
                   onChange={(e) => setFormData(prev => ({ ...prev, justification: e.target.value }))}
-                  placeholder="Expliquez en détail pourquoi cette demande mérite une réévaluation (minimum 50 caractères)..."
+                  placeholder="Expliquez en détail pourquoi cette demande mérite une réévaluation (minimum 10 caractères)..."
                   className="w-full bg-slate-800/50 rounded-xl p-4 text-white border border-slate-700 focus:border-amber-500 focus:outline-none"
                   rows={4}
                 />
                 <div className={`text-xs mt-1 ${
-                  formData.justification.length >= 50 ? 'text-emerald-400' : 'text-slate-500'
+                  formData.justification.length >= 10 ? 'text-emerald-400' : 'text-slate-500'
                 }`}>
-                  {formData.justification.length}/50 caractères minimum
+                  {formData.justification.length}/10 caractères minimum
                 </div>
               </div>
             </div>
@@ -305,21 +324,19 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                   <input
                     type="number"
                     value={formData.nouveauMontantDemande}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      nouveauMontantDemande: parseFloat(e.target.value) || 0
-                    }))}
-                    className="w-full bg-slate-800/50 rounded-xl p-4 text-white text-xl font-bold border border-slate-700 focus:border-amber-500 focus:outline-none"
+                    onChange={(e) => handleNumberChange('nouveauMontantDemande', e.target.value)}
+                    className="w-full bg-slate-800/50 rounded-xl p-4 text-white text-xl font-bold border border-slate-700 focus:border-amber-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
+                    placeholder="0"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
                     FCFA
                   </span>
                 </div>
-                {formData.nouveauMontantDemande < Number(demande.montantDemande) && (
+                {Number(formData.nouveauMontantDemande) < Number(demande.montantDemande) && formData.nouveauMontantDemande !== '' && (
                   <div className="mt-2 text-sm text-emerald-400 flex items-center gap-2">
                     <TrendingDown size={14} />
-                    Réduction de {formatMoney(Number(demande.montantDemande) - formData.nouveauMontantDemande)}
-                    ({Math.round((1 - formData.nouveauMontantDemande / Number(demande.montantDemande)) * 100)}%)
+                    Réduction de {formatMoney(Number(demande.montantDemande) - Number(formData.nouveauMontantDemande))}
+                    ({Math.round((1 - Number(formData.nouveauMontantDemande) / Number(demande.montantDemande)) * 100)}%)
                   </div>
                 )}
               </div>
@@ -330,12 +347,15 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                   <label className="text-sm text-slate-400 mb-2 block">Durée</label>
                   <input
                     type="number"
-                    value={formData.nouvelleDureeValeur || demande.dureeValeur}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      nouvelleDureeValeur: parseInt(e.target.value) || undefined
-                    }))}
-                    className="w-full bg-slate-800/50 rounded-xl p-4 text-white border border-slate-700 focus:border-amber-500 focus:outline-none"
+                    value={formData.nouvelleDureeValeur === undefined ? demande.dureeValeur : formData.nouvelleDureeValeur}
+                    onChange={(e) => {
+                       const val = e.target.value;
+                       setFormData(prev => ({ 
+                         ...prev, 
+                         nouvelleDureeValeur: val === '' ? '' : parseInt(val)
+                       }));
+                    }}
+                    className="w-full bg-slate-800/50 rounded-xl p-4 text-white border border-slate-700 focus:border-amber-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none transition-all"
                   />
                 </div>
                 <div>
@@ -556,9 +576,9 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                   <div className="text-sm text-slate-400">
                     {formData.nouvelleDureeValeur || demande.dureeValeur} {formData.nouvelleDureeUnite || demande.dureeUnite}
                   </div>
-                  {formData.nouveauMontantDemande < Number(demande.montantDemande) && (
+                  {Number(formData.nouveauMontantDemande) < Number(demande.montantDemande) && formData.nouveauMontantDemande !== '' && (
                     <div className="mt-2 text-sm text-emerald-400">
-                      -{Math.round((1 - formData.nouveauMontantDemande / Number(demande.montantDemande)) * 100)}%
+                      -{Math.round((1 - Number(formData.nouveauMontantDemande) / Number(demande.montantDemande)) * 100)}%
                     </div>
                   )}
                 </div>
