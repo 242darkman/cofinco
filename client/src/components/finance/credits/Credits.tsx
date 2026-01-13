@@ -198,8 +198,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
     { key: 'type_activite', label: 'Activité' },
     { key: 'montant_demande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', badge: true },
-    { key: 'score_global', label: 'Score', hideOnMobile: true }
+    { key: 'statut', label: 'Statut', badge: true }
   ];
 
   return (

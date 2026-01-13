@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, Star, MessageSquare, UserCheck, RefreshCw, Clock } from 'lucide-react';
+import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, MessageSquare, UserCheck, RefreshCw, Clock } from 'lucide-react';
 import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -26,7 +26,6 @@ interface Demande {
   objet_credit: string;
   statut: string;
   motif_rejet?: string;
-  score_credit: number | null;
   revenus_mensuels?: number;
   type_revenu?: string;
   revenu_journalier?: number;
@@ -40,7 +39,6 @@ interface Demande {
     prenom?: string;
     email?: string;
     phone: string;
-    score?: number;
     taux_remboursement?: number;
     credit_total?: number;
     photo_url?: string;
@@ -292,12 +290,6 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     setErrors({});
   }, []);
 
-  const getScoreColor = useCallback((score: number) => {
-    if (score >= 70) return 'text-green-400';
-    if (score >= 50) return 'text-cyan-400';
-    return 'text-red-400';
-  }, []);
-
   const getEndettementColor = useCallback((taux: number) => {
     if (taux > 50) return 'text-red-400';
     if (taux > 40) return 'text-amber-400';
@@ -352,12 +344,6 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                   <div className="flex justify-between">
                     <dt className="text-slate-400">Téléphone:</dt>
                     <dd className="text-white">{demande.clients.phone}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Score Client:</dt>
-                    <dd className={`font-bold ${getScoreColor(demande.clients.score ?? 0)}`}>
-                      {demande.clients.score ?? 0}/100
-                    </dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-slate-400">Taux Remboursement:</dt>
@@ -453,14 +439,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
             )}
 
             {/* Financial Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="Indicateurs financiers">
-              <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/50 rounded-lg p-4">
-                <div className="text-blue-400 text-sm mb-1">Score Crédit</div>
-                <div className={`text-2xl font-bold ${getScoreColor(demande.score_credit ?? 0)}`}>
-                  {demande.score_credit ?? 0}/100
-                </div>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4" role="region" aria-label="Indicateurs financiers">
               <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/50 rounded-lg p-4">
                 <div className="text-green-400 text-sm mb-1">Revenus</div>
                 <div className="text-xl md:text-2xl font-bold text-white break-words">
@@ -515,7 +494,6 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                    };
 
                    const statutStyle = getStatutStyle(enquete.statut);
-                   const scoreColor = (enquete.score_global ?? 0) >= 70 ? 'text-emerald-400' : (enquete.score_global ?? 0) >= 50 ? 'text-amber-400' : 'text-red-400';
 
                    return (
                      <div
@@ -551,17 +529,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                            </div>
                          </div>
 
-                         <div className="flex items-center gap-4">
-                           {/* Quick score preview */}
-                           <div className="text-right hidden sm:block">
-                             <div className="text-slate-400 text-xs uppercase">Score</div>
-                             <div className={`text-xl font-bold ${scoreColor}`}>
-                               {enquete.score_global ?? '-'}<span className="text-sm text-slate-500">/100</span>
-                             </div>
-                           </div>
-                           <div className={`p-2 rounded-lg transition-colors ${isExpanded ? 'bg-white/10' : 'bg-transparent'}`}>
-                             {isExpanded ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
-                           </div>
+                         <div className={`p-2 rounded-lg transition-colors ${isExpanded ? 'bg-white/10' : 'bg-transparent'}`}>
+                           {isExpanded ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
                          </div>
                        </button>
 
@@ -579,15 +548,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                              </div>
                            )}
 
-                           {/* Score & Financial Overview */}
-                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                               <Star size={16} className={`mx-auto mb-1 ${scoreColor}`} />
-                               <div className={`text-lg font-bold ${scoreColor}`}>
-                                 {enquete.score_global != null ? `${enquete.score_global}/100` : 'En attente'}
-                               </div>
-                               <div className="text-xs text-slate-400">Score Global</div>
-                             </div>
+                           {/* Financial Overview */}
+                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                              <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                                <DollarSign size={16} className="mx-auto mb-1 text-green-400" />
                                <div className="text-lg font-bold text-white">
@@ -1004,7 +966,6 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
             clientId: demande.client_id,
             montantDemande: String(demande.montant_demande),
             motifRejet: demande.motif_rejet,
-            scoreCredit: demande.score_credit || undefined,
             dureeValeur: demande.duree_valeur,
             dureeUnite: demande.duree_unite,
           }}

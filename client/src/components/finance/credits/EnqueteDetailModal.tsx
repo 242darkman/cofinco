@@ -86,12 +86,6 @@ export default function EnqueteDetailModal({ enquete, onClose }: EnqueteDetailMo
                 value={enquete.statut?.toUpperCase()}
                 />
              </div>
-             {enquete.score_global && (
-                 <div className="text-right">
-                    <span className="text-slate-400 text-sm block">Score Global</span>
-                    <span className="text-2xl font-bold text-cyan-400">{enquete.score_global}/100</span>
-                 </div>
-             )}
           </div>
 
           {/* Informations Client */}

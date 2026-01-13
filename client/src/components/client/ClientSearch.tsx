@@ -40,8 +40,6 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
     if (filters.searchTerm) activeFilters.searchTerm = filters.searchTerm;
     if (filters.status && filters.status !== 'all') activeFilters.status = filters.status;
     if (filters.segment && filters.segment !== 'all') activeFilters.segment = filters.segment;
-    if (filters.scoreMin && filters.scoreMin > 0) activeFilters.scoreMin = filters.scoreMin;
-    if (filters.scoreMax && filters.scoreMax < 100) activeFilters.scoreMax = filters.scoreMax;
     if (filters.creditMin && filters.creditMin > 0) activeFilters.creditMin = filters.creditMin;
     if (filters.creditMax && filters.creditMax < 1000000) activeFilters.creditMax = filters.creditMax;
     if (filters.dateFrom) activeFilters.dateFrom = filters.dateFrom;
@@ -130,42 +128,6 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
                 <option value="Standard">Standard</option>
                 <option value="Nouveau">Nouveau</option>
               </select>
-            </div>
-          </div>
-
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-              <Award size={16} />
-              Plage de Score
-            </label>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Minimum</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={filters.scoreMin}
-                  onChange={(e) => setFilters(prev => ({ ...prev, scoreMin: Number(e.target.value) }))}
-                  className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Maximum</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={filters.scoreMax}
-                  onChange={(e) => setFilters(prev => ({ ...prev, scoreMax: Number(e.target.value) }))}
-                  className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-              <span>Score: {filters.scoreMin}</span>
-              <span>à</span>
-              <span>{filters.scoreMax}</span>
             </div>
           </div>
 

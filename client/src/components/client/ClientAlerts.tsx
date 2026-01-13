@@ -6,7 +6,7 @@ import { Card, Badge } from '../ui';
 interface ClientAlert {
   id: string;
   client_id: string;
-  alert_type: 'score_low' | 'payment_overdue' | 'document_missing' | 'kyc_pending';
+  alert_type: 'payment_overdue' | 'document_missing' | 'kyc_pending';
   alert_level: 'info' | 'warning' | 'critical';
   message: string;
   is_resolved: boolean;
@@ -54,18 +54,6 @@ export default function ClientAlerts({ client, onUpdate }: ClientAlertsProps) {
       const existingAlerts = clientData.alerts || [];
       const existingTypes = new Set(existingAlerts.filter((a: ClientAlert) => !a.is_resolved).map((a: ClientAlert) => a.alert_type));
       const newAlerts: ClientAlert[] = [];
-
-      if ((client.score || 0) < 40 && !existingTypes.has('score_low')) {
-        newAlerts.push({
-          id: crypto.randomUUID(),
-          client_id: client.id,
-          alert_type: 'score_low',
-          alert_level: 'warning',
-          message: `Score client très faible (${client.score}/100). Risque élevé.`,
-          is_resolved: false,
-          created_at: new Date().toISOString()
-        });
-      }
 
       const tauxRemboursement = Number(client.tauxRemboursement || 0);
       if (tauxRemboursement < 70 && !existingTypes.has('payment_overdue')) {

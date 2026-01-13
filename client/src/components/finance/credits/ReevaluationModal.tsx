@@ -45,7 +45,6 @@ interface Demande {
   dureeUnite: string;
   motifRejet?: string;
   dateRejet?: string;
-  scoreCredit?: number;
   clientId: string;
 }
 
@@ -561,11 +560,6 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                   <div className="text-sm text-slate-400">
                     {demande.dureeValeur} {demande.dureeUnite}{(demande.dureeValeur > 1 && demande.dureeUnite !== "Mois") ? "s" : ""}
                   </div>
-                  {demande.scoreCredit && (
-                    <div className="mt-2 text-sm text-red-400">
-                      Score: {demande.scoreCredit}/100
-                    </div>
-                  )}
                 </div>
                 
                 <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">

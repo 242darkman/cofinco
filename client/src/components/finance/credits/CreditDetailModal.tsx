@@ -252,12 +252,6 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                         <span className="text-slate-500 text-sm">Téléphone</span>
                         <span className="text-slate-300 text-sm">{client.telephone || '-'}</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500 text-sm">Score</span>
-                        <span className={`text-sm font-semibold ${client.score && client.score >= 70 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                          {client.score || 0}/100
-                        </span>
-                      </div>
                     </div>
                   </div>
                 )}

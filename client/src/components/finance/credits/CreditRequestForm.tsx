@@ -7,7 +7,8 @@ interface Client {
   id: string;
   nom: string;
   email: string;
-  score: number;
+  score?: number;
+  segment: string;
   taux_remboursement: number;
   credit_total: number;
   photo_url?: string;
@@ -226,7 +227,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         id: c.id,
         nom: `${c.nom} ${c.prenom || ''}`,
         email: c.email || '',
-        score: c.score || 50,
+        segment: c.segment || 'Standard',
         taux_remboursement: parseFloat(c.tauxRemboursement || c.taux_remboursement) || 100,
         credit_total: parseFloat(c.creditTotal || c.credit_total) || 0,
         photo_url: c.photoUrl || c.photo_url,
@@ -280,32 +281,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         tauxEndettement
       });
     }
-  };
-
-  const calculateCreditScore = () => {
-    const client = clients.find(c => c.id === formData.client_id);
-    if (!client) return 0;
-
-    let score = 0;
-
-    if (client.score >= 80) score += 30;
-    else if (client.score >= 60) score += 20;
-    else if (client.score >= 40) score += 10;
-
-    if (client.taux_remboursement >= 95) score += 25;
-    else if (client.taux_remboursement >= 85) score += 15;
-    else if (client.taux_remboursement >= 70) score += 5;
-
-    if (calculatedData.tauxEndettement < 30) score += 25;
-    else if (calculatedData.tauxEndettement < 40) score += 15;
-    else if (calculatedData.tauxEndettement < 50) score += 5;
-
-    const montant = parseFloat(formData.montant_demande) || 0;
-    if (montant < 50000) score += 20;
-    else if (montant < 100000) score += 15;
-    else if (montant < 200000) score += 10;
-
-    return Math.min(score, 100);
   };
 
   const validate = () => {
@@ -363,8 +338,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     setLoading(true);
 
     try {
-      const scoreCredit = calculateCreditScore();
-
       const overridePayload = rateOverrideEnabled
         ? {
             tauxInteretOverride: formData.taux_interet,
@@ -388,8 +361,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         typeRevenu: formData.type_revenu,
         revenuJournalier: formData.revenu_journalier,
         chargesMensuelles: formData.charges_mensuelles,
-        scoreCredit,
-        statut: scoreCredit >= 70 ? 'A enquêter' : 'En attente',
+        statut: 'En attente',
         ...overridePayload,
       });
 
@@ -403,12 +375,11 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   };
 
   const selectedClient = clients.find(c => c.id === formData.client_id);
-  const scoreCredit = calculateCreditScore();
 
   const clientOptions = useMemo(() => clients.map(client => ({
     value: client.id,
     label: client.nom,
-    subLabel: `Score: ${client.score} | Remb: ${client.taux_remboursement}%`,
+    subLabel: `Remb: ${client.taux_remboursement}%`,
     image: client.photo_url
   })), [clients]);
 
@@ -521,8 +492,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-lg">{selectedClient.nom}</h3>
-                  <div className="text-sm text-slate-400">Score Credit: <span className={selectedClient.score >= 70 ? "text-green-400" : "text-yellow-400"}>{selectedClient.score}</span></div>
-                  <div className="text-sm text-slate-400">Taux Remboursement: {selectedClient.taux_remboursement}%</div>
+                  <div className="text-sm text-slate-400">Taux Remboursement: <span className="text-cyan-400">{selectedClient.taux_remboursement}%</span></div>
+                  <div className="text-sm text-slate-400">Segment: {selectedClient.segment}</div>
                 </div>
               </div>
             </div>
@@ -906,25 +877,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
               </div>
             </div>
 
-            {selectedClient && (
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-400 text-sm">Score de Credit Calcule</span>
-                  <span className={`text-2xl font-bold ${scoreCredit >= 70 ? 'text-green-400' : scoreCredit >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                    {scoreCredit}/100
-                  </span>
-                </div>
-                <div className="w-full bg-slate-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${scoreCredit >= 70 ? 'bg-green-500' : scoreCredit >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                    style={{ width: `${scoreCredit}%` }}
-                  />
-                </div>
-                <div className="text-xs text-slate-400 mt-2">
-                  {scoreCredit >= 70 ? 'Profil favorable' : scoreCredit >= 50 ? 'Profil acceptable' : 'Profil a risque'}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </form>

@@ -34,16 +34,13 @@ export default function ClientStatsDashboard() {
     nouveaux: clients.filter(c => c.segment === 'Nouveau').length,
     creditTotal: clients.reduce((sum, c) => sum + (parseFloat(c.creditTotal as any) || 0), 0),
     epargneTotal: clients.reduce((sum, c) => sum + (parseFloat(c.epargneTotal as any) || 0), 0),
-    scoreMoyen: clients.length > 0 ? Math.round(clients.reduce((sum, c) => sum + (c.score || 0), 0) / clients.length) : 0,
     tauxRemboursementMoyen: clients.length > 0 ? Math.round(clients.reduce((sum, c) => sum + (parseFloat(c.tauxRemboursement as any) || 0), 0) / clients.length) : 0,
     pointsFideliteTotal: clients.reduce((sum, c) => sum + (c.pointsFidelite || 0), 0),
     nouveauxCeMois: clients.filter(c => {
       const inscriptionDate = new Date(c.dateInscription!);
       const now = new Date();
       return inscriptionDate.getMonth() === now.getMonth() && inscriptionDate.getFullYear() === now.getFullYear();
-    }).length,
-    bonScore: clients.filter(c => (c.score || 0) >= 70).length,
-    scoreFaible: clients.filter(c => (c.score || 0) < 40).length
+    }).length
   };
 
   const segmentDistribution = [
@@ -70,7 +67,7 @@ export default function ClientStatsDashboard() {
     <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-0">
       
       {/* Stats Grid - Fully Responsive No Scroll */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <div className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-700/50 rounded-xl p-4 flex flex-col justify-between shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -104,22 +101,6 @@ export default function ClientStatsDashboard() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-cyan-900/40 to-slate-900 border border-cyan-700/50 rounded-xl p-4 flex flex-col justify-between shadow-lg">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 bg-cyan-500/20 rounded-lg">
-              <Award size={18} className="text-cyan-400" />
-            </div>
-            <TrendingUp className="text-emerald-400" size={16} />
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Score Moyen</p>
-            <p className="text-2xl sm:text-3xl font-bold text-cyan-400">{stats.scoreMoyen}<span className="text-sm text-slate-500 font-normal">/100</span></p>
-            <p className="text-xs text-cyan-400/80 mt-1 font-medium">
-              {stats.bonScore} excellents
-            </p>
-          </div>
-        </div>
-
         <div className="bg-gradient-to-br from-purple-900/40 to-slate-900 border border-purple-700/50 rounded-xl p-4 flex flex-col justify-between shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -131,7 +112,7 @@ export default function ClientStatsDashboard() {
             <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">Remboursement</p>
             <p className="text-2xl sm:text-3xl font-bold text-purple-400">{stats.tauxRemboursementMoyen}%</p>
             <p className="text-xs text-purple-400/80 mt-1 font-medium">
-              Moyenne globale
+              Moyen global
             </p>
           </div>
         </div>
@@ -260,8 +241,8 @@ export default function ClientStatsDashboard() {
             </div>
 
             <div className="bg-slate-700/30 p-3 rounded-lg border border-slate-700/50">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Clients à risque</p>
-              <p className="text-xl font-bold text-amber-400">{stats.scoreFaible}</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Clients Suspendus</p>
+              <p className="text-xl font-bold text-amber-400">{stats.suspendus}</p>
             </div>
           </div>
         </div>
@@ -294,11 +275,11 @@ export default function ClientStatsDashboard() {
             <ul className="space-y-2 text-xs sm:text-sm text-slate-300">
                <li className="flex items-start gap-2 bg-slate-700/30 p-2 rounded">
                 <span className="text-amber-400 mt-0.5">•</span>
-                <span>{stats.scoreFaible} clients avec score faible (&lt;40)</span>
+                <span>{stats.suspendus} clients suspendus à vérifier</span>
               </li>
               <li className="flex items-start gap-2 bg-slate-700/30 p-2 rounded">
                 <span className="text-amber-400 mt-0.5">•</span>
-                <span>{stats.suspendus} clients suspendus à vérifier</span>
+                <span>{stats.inactifs} clients inactifs</span>
               </li>
             </ul>
           </div>

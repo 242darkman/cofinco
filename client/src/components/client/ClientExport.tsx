@@ -22,7 +22,6 @@ export default function ClientExport({ clients, onClose }: ClientExportProps) {
     { key: 'adresse', label: 'Adresse' },
     { key: 'status', label: 'Statut' },
     { key: 'segment', label: 'Segment' },
-    { key: 'score', label: 'Score' },
     { key: 'creditTotal', label: 'Crédit Total' },
     { key: 'epargneTotal', label: 'Épargne Total' },
     { key: 'tauxRemboursement', label: 'Taux Remboursement' },

@@ -24,10 +24,9 @@ interface DashboardStats {
   portefeuilleStats: {
     nombreClients: number;
     clientsActifs: number;
-    scoreMoyen: number;
   };
   performanceStats: {
-    scoreGlobal: number;
+    performance: number;
     niveau: number;
     points: number;
   };
@@ -112,12 +111,11 @@ export default function AgentDashboardComplet() {
 
       const portefeuilleStats = {
         nombreClients: visites.length > 0 ? new Set(visites.map((v: any) => v.clientId)).size : 0,
-        clientsActifs: visitesFiltered.length,
-        scoreMoyen: 82
+        clientsActifs: visitesFiltered.length
       };
 
       const performanceStats = {
-        scoreGlobal: Math.round((presenceStats.tauxPresence + recouvrementStats.tauxRecouvrement) / 2),
+        performance: Math.round((presenceStats.tauxPresence + recouvrementStats.tauxRecouvrement) / 2),
         niveau: 3,
         points: collecteStats.nombreCollectes * 10 + visitesFiltered.length * 5
       };
@@ -135,8 +133,8 @@ export default function AgentDashboardComplet() {
         presenceStats: { joursPresents: 0, tauxPresence: 0, heuresMoyennes: 0 },
         collecteStats: { montantTotal: 0, nombreCollectes: 0, montantMoyen: 0 },
         recouvrementStats: { montantRecouvre: 0, tauxRecouvrement: 0, dossiersActifs: 0 },
-        portefeuilleStats: { nombreClients: 0, clientsActifs: 0, scoreMoyen: 0 },
-        performanceStats: { scoreGlobal: 0, niveau: 1, points: 0 }
+        portefeuilleStats: { nombreClients: 0, clientsActifs: 0 },
+        performanceStats: { performance: 0, niveau: 1, points: 0 }
       });
     } finally {
       setLoading(false);
@@ -229,7 +227,7 @@ export default function AgentDashboardComplet() {
             value={stats.portefeuilleStats.clientsActifs}
             icon={Users}
             color="neutral"
-            trend={`Score: ${stats.portefeuilleStats.scoreMoyen.toFixed(0)}`}
+            trend={`${stats.portefeuilleStats.nombreClients} total`}
             className="p-2.5 sm:p-3"
         />
       </div>
@@ -284,8 +282,8 @@ export default function AgentDashboardComplet() {
             <div className="mt-6 grid grid-cols-3 gap-2">
                 <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-2 text-center">
                   <Star className="mx-auto text-cyan-500 mb-1" size={16} fill="currentColor" />
-                  <div className="text-base sm:text-lg font-bold text-white">{stats.performanceStats.scoreGlobal}</div>
-                  <div className="text-[10px] text-slate-400">Score Global</div>
+                  <div className="text-base sm:text-lg font-bold text-white">{stats.performanceStats.performance}%</div>
+                  <div className="text-[10px] text-slate-400">Performance</div>
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-center">
                   <Award className="mx-auto text-blue-500 mb-1" size={16} />

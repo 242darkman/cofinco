@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Client } from '@shared/schema';
-import { BarChart3, TrendingUp, DollarSign, Target, Award, MapPin, Phone, Mail, User } from 'lucide-react';
+import { DollarSign, Award, MapPin, Phone, Mail, User } from 'lucide-react';
 import Card from '../ui/Card';
 import ClientTags from './ClientTags';
 
@@ -9,21 +9,8 @@ interface ClientDetailsProps {
 }
 
 export default function ClientDetails({ client }: ClientDetailsProps) {
-  
-  const getScoreColor = (score: number) => {
-    if (score >= 70) return 'text-emerald-400';
-    if (score >= 40) return 'text-amber-400';
-    return 'text-red-400';
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 70) return 'Excellent';
-    if (score >= 40) return 'Moyen';
-    return 'Risque Élevé';
-  };
 
   const stats = {
-      score: client.score || 0,
       creditTotal: parseFloat(client.creditTotal as any) || 0,
       epargneTotal: parseFloat(client.epargneTotal as any) || 0,
       tauxRemboursement: parseFloat(client.tauxRemboursement as any) || 0,
@@ -33,38 +20,33 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
       
-      {/* 1. Score & Segment Card - Mobile First Compact */}
+      {/* 1. Segment & Fidélité Card - Mobile First Compact */}
       <Card variant="default" padding="sm" className="relative overflow-hidden border-slate-700/50 bg-slate-900/50">
          {/* Background Accent */}
          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-200 mb-4 relative z-10">
-             <BarChart3 size={16} className="text-slate-400" /> Score & Segment
+             <Award size={16} className="text-slate-400" /> Segment & Fidélité
          </h3>
 
          <div className="grid grid-cols-2 gap-3 relative z-10">
-             {/* Score Box */}
+             {/* Segment Box */}
              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-                 <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Score Actuel</p>
-                 <div className="flex items-baseline gap-1">
-                     <span className={`text-3xl font-bold ${getScoreColor(stats.score)}`}>
-                         {stats.score}
-                     </span>
-                     <span className="text-xs text-slate-500">/100</span>
-                 </div>
-                 <div className="mt-1 text-xs font-medium text-slate-400">
-                     {getScoreLabel(stats.score)}
+                 <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Segment</p>
+                 <p className="text-2xl font-bold text-white tracking-tight">{client.segment}</p>
+                 <div className="mt-2">
+                    <ClientTags clientId={client.id} compact={true} />
                  </div>
              </div>
 
-             {/* Segment Box */}
+             {/* Points Fidélité Box */}
              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex flex-col justify-between">
                  <div>
-                     <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Segment</p>
-                     <p className="text-lg font-bold text-white tracking-tight">{client.segment}</p>
+                     <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Points Fidélité</p>
+                     <p className="text-2xl font-bold text-cyan-400">{stats.pointsFidelite.toLocaleString()}</p>
                  </div>
-                 <div className="mt-2">
-                    <ClientTags clientId={client.id} compact={true} />
+                 <div className="mt-1 text-xs font-medium text-slate-400">
+                     {stats.tauxRemboursement}% remboursement
                  </div>
              </div>
          </div>

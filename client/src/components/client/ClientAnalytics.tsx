@@ -1,6 +1,6 @@
 import type { Client } from '@shared/schema';
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Target, Award, Calendar, BarChart3, PieChart, CreditCard, Wallet, Users, Activity } from 'lucide-react';
+import { DollarSign, Target, Award, CreditCard, Wallet, Users, Activity } from 'lucide-react';
 import ClientTags from './ClientTags';
 import { Card, Badge } from '../ui';
 
@@ -42,16 +42,14 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
   const creditTotal = Number(client.creditTotal) || 0;
   const epargneTotal = Number(client.epargneTotal) || 0;
   const tauxRemboursement = client.tauxRemboursement !== null ? Number(client.tauxRemboursement) : 0;
-  const score = typeof client.score === 'number' ? client.score : (client.score ? Number(client.score) : 0);
   const pointsFidelite = typeof client.pointsFidelite === 'number' ? client.pointsFidelite : (client.pointsFidelite ? Number(client.pointsFidelite) : 0);
-  
+
   const stats = {
     creditTotal,
     epargneTotal,
     tauxRemboursement,
-    score,
     pointsFidelite,
-    anciennete: client.dateInscription 
+    anciennete: client.dateInscription
       ? Math.floor((new Date().getTime() - new Date(client.dateInscription).getTime()) / (1000 * 60 * 60 * 24))
       : 0
   };
@@ -63,53 +61,22 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
     payments: activities.filter(a => a.activity_type === 'payment').length
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-400';
-    if (score >= 60) return 'text-cyan-400';
-    if (score >= 40) return 'text-amber-400';
-    return 'text-red-400';
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 80) return 'Excellent';
-    if (score >= 60) return 'Bon';
-    if (score >= 40) return 'Moyen';
-    return 'Risqué';
-  };
-
   return (
     <div className="space-y-4">
-      {/* 1. Score & Segment Card - Unified Pro View */}
+      {/* 1. Segment & Fidélité Card - Unified Pro View */}
       <Card variant="elevated" className="relative overflow-hidden border-blue-500/20">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
-        
+
         <div className="relative z-10 flex flex-col sm:flex-row gap-6">
-            {/* Score Circle Area */}
+            {/* Points Fidélité Area */}
             <div className="flex-1 flex items-center justify-center sm:justify-start gap-4">
-                <div className="relative w-20 h-20 flex items-center justify-center">
-                    {/* Background Circle */}
-                    <svg className="absolute w-full h-full transform -rotate-90">
-                        <circle cx="40" cy="40" r="36" className="text-slate-700/50 fill-none stroke-[6]" strokeLinecap="round" />
-                        <circle 
-                            cx="40" cy="40" r="36" 
-                            className={`fill-none stroke-[6] transition-all duration-1000 ease-out ${
-                                stats.score >= 80 ? 'stroke-emerald-500' : 
-                                stats.score >= 60 ? 'stroke-cyan-500' : 
-                                stats.score >= 40 ? 'stroke-amber-500' : 'stroke-red-500'
-                            }`}
-                            strokeDasharray="226" 
-                            strokeDashoffset={226 - (226 * stats.score) / 100} 
-                            strokeLinecap="round" 
-                        />
-                    </svg>
-                    <div className="text-center">
-                        <span className={`text-2xl font-bold ${getScoreColor(stats.score)}`}>{stats.score}</span>
-                    </div>
+                <div className="relative w-20 h-20 flex items-center justify-center bg-cyan-500/10 rounded-full border border-cyan-500/30">
+                    <Award size={32} className="text-cyan-400" />
                 </div>
                 <div>
-                     <p className="text-xs text-slate-500 uppercase font-semibold">Score Crédit</p>
-                     <p className={`text-lg font-bold ${getScoreColor(stats.score)}`}>{getScoreLabel(stats.score)}</p>
-                     <p className="text-xs text-slate-400 mt-1">Calculé le {new Date().toLocaleDateString()}</p>
+                     <p className="text-xs text-slate-500 uppercase font-semibold">Points Fidélité</p>
+                     <p className="text-2xl font-bold text-cyan-400">{stats.pointsFidelite.toLocaleString()}</p>
+                     <p className="text-xs text-slate-400 mt-1">Membre depuis {stats.anciennete}j</p>
                 </div>
             </div>
 
