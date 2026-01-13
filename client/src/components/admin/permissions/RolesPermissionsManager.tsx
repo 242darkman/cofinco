@@ -37,6 +37,8 @@ export default function RolesPermissionsManager({
   }, {} as Record<string, Module[]>);
 
   const roleOptions = ADMIN_ROLES.map(role => ({ value: role, label: role }));
+  
+  const isSuperAdmin = selectedRole === 'Administrateur';
 
   return (
     <div className="space-y-4">
@@ -66,15 +68,31 @@ export default function RolesPermissionsManager({
              </div>
            </div>
 
-           {/* Info Banner */}
-           <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3 flex gap-3">
-             <AlertCircle size={16} className="text-blue-400 shrink-0 mt-0.5" />
-             <div className="space-y-1">
-               <p className="text-xs text-blue-300/90 leading-relaxed">
-                 <strong>Liaison active :</strong> Les modifications affectent immédiatement tous les utilisateurs ayant ce rôle.
-               </p>
+
+
+           {/* Special Banner for Admin */}
+           {isSuperAdmin && (
+             <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 flex gap-3 mb-4">
+               <Shield size={16} className="text-purple-400 shrink-0 mt-0.5" />
+               <div className="space-y-1">
+                 <p className="text-xs text-purple-300 leading-relaxed">
+                   <strong>Compte Super-Administrateur :</strong> Ce rôle dispose d'un accès complet et illimité au système par défaut. Ces permissions ne sont pas modifiables pour éviter tout verrouillage accidentel.
+                 </p>
+               </div>
              </div>
-           </div>
+           )}
+
+           {/* Info Banner - Only show if not admin */}
+           {!isSuperAdmin && (
+             <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3 flex gap-3">
+               <AlertCircle size={16} className="text-blue-400 shrink-0 mt-0.5" />
+               <div className="space-y-1">
+                 <p className="text-xs text-blue-300/90 leading-relaxed">
+                   <strong>Liaison active :</strong> Les modifications affectent immédiatement tous les utilisateurs ayant ce rôle.
+                 </p>
+               </div>
+             </div>
+           )}
 
            {/* Confirm Message */}
            {confirmMessage && (
@@ -110,30 +128,36 @@ export default function RolesPermissionsManager({
                               </span>
                            </div>
 
-                           <div className="p-1">
-                             {modulePerms.map((perm) => {
-                               const isGranted = roleHasPermission(selectedRole, perm.code);
-                               return (
-                                 <div 
-                                   key={perm.id}
-                                   onClick={() => toggleRolePermission(selectedRole, perm.code)}
-                                   className={`
-                                     flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all border mb-1 last:mb-0
-                                     ${isGranted 
-                                       ? 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10' 
-                                       : 'bg-transparent border-transparent hover:bg-surface-muted border-dashed hover:border-edge'
-                                     }
-                                   `}
-                                 >
+                             <div className="p-1">
+                               {modulePerms.map((perm) => {
+                                 // Force checked for super admin, otherwise check DB state
+                                 const isGranted = isSuperAdmin ? true : roleHasPermission(selectedRole, perm.code);
+                                 
+                                 return (
+                                   <div 
+                                     key={perm.id}
+                                     onClick={() => !isSuperAdmin && toggleRolePermission(selectedRole, perm.code)}
+                                     className={`
+                                       flex items-center justify-between p-2 rounded-lg transition-all border mb-1 last:mb-0
+                                       ${isSuperAdmin 
+                                         ? 'cursor-not-allowed bg-purple-500/5 border-purple-500/10 opacity-75' 
+                                         : 'cursor-pointer hover:bg-surface-muted'
+                                       }
+                                       ${isGranted && !isSuperAdmin
+                                         ? 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10' 
+                                         : !isSuperAdmin ? 'bg-transparent border-transparent border-dashed hover:border-edge' : ''
+                                       }
+                                     `}
+                                   >
                                    <div className="flex items-center gap-2 overflow-hidden">
-                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isGranted ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isGranted ? (isSuperAdmin ? 'bg-purple-400' : 'bg-emerald-400') : 'bg-slate-600'}`} />
                                      <span className={`text-xs truncate ${isGranted ? 'text-content-primary font-medium' : 'text-content-muted'}`}>
                                        {perm.name}
                                      </span>
                                    </div>
                                    
                                    {/* Toggle Switch Visual */}
-                                   <div className={`w-8 h-4 rounded-full relative transition-colors shrink-0 ${isGranted ? 'bg-emerald-500' : 'bg-slate-600/50'}`}>
+                                   <div className={`w-8 h-4 rounded-full relative transition-colors shrink-0 ${isGranted ? (isSuperAdmin ? 'bg-purple-500' : 'bg-emerald-500') : 'bg-slate-600/50'}`}>
                                       <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm ${isGranted ? 'left-4.5' : 'left-0.5'}`} style={{ left: isGranted ? 'calc(100% - 14px)' : '2px' }} />
                                    </div>
                                  </div>
