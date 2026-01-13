@@ -5,7 +5,7 @@ import GpsCapture from '../../shared/GpsCapture';
 import { GpsSignalQuality } from '../../../hooks/useGeolocation';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
-
+import { LocationDisplay } from '../../common/LocationDisplay';
 interface Client {
   id: string;
   nom: string;
@@ -584,37 +584,19 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             }
           />
 
-          {/* Affichage de l'adresse résolue */}
-          {geoLocation.address && (
-            <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
-              <div className="flex items-start gap-2 mb-2">
-                <MapPin size={16} className="text-cyan-400 flex-shrink-0 mt-1" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-cyan-400 mb-1">Adresse du site</div>
-                  <div className="text-sm text-white leading-relaxed">
-                    {geoLocation.address.road && (
-                      <div>{geoLocation.address.road}</div>
-                    )}
-                    {geoLocation.address.suburb && (
-                      <div className="text-slate-300">{geoLocation.address.suburb}</div>
-                    )}
-                    <div className="text-slate-300">
-                      {[
-                        geoLocation.address.city,
-                        geoLocation.address.state,
-                        geoLocation.address.postcode
-                      ].filter(Boolean).join(', ')}
-                    </div>
-                    {geoLocation.address.country && (
-                      <div className="text-slate-400 text-xs mt-1">{geoLocation.address.country}</div>
-                    )}
-                  </div>
+          {/* Affichage de l'adresse résolue via Hook */}
+          {geoLocation.latitude && geoLocation.longitude && (
+             <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
+                <div className="text-xs font-semibold text-cyan-400 mb-2">Adresse du site</div>
+                <LocationDisplay 
+                  latitude={geoLocation.latitude} 
+                  longitude={geoLocation.longitude} 
+                  className="text-white"
+                />
+                <div className="text-xs text-cyan-300/70 mt-2 italic border-t border-cyan-500/20 pt-2">
+                  Source: OpenStreetMap (Nominatim)
                 </div>
-              </div>
-              <div className="text-xs text-cyan-300/70 mt-2 italic border-t border-cyan-500/20 pt-2">
-                Source: OpenStreetMap
-              </div>
-            </div>
+             </div>
           )}
 
             {/* GPS Security Warning */}
