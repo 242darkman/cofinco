@@ -178,7 +178,17 @@ export async function createReevaluation(
     numeroVersion: 0, // Will be set by trigger
   } as InsertReevaluationCredit).returning();
   
-  // 5. Create audit log
+  // 5. Update the demande status to indicate reevaluation in progress
+  await db.update(demandesCredit)
+    .set({
+      statut: 'Réévaluation en cours',
+      reevaluationEnCours: true,
+      derniereReevaluationId: reevaluation.id,
+      dateDerniereReevaluation: new Date()
+    })
+    .where(eq(demandesCredit.id, demande.id));
+
+  // 6. Create audit log
   await createAuditLog({
     reevaluationId: reevaluation.id,
     demandeId: demande.id,
@@ -196,7 +206,7 @@ export async function createReevaluation(
     ipAddress: context?.ipAddress,
     userAgent: context?.userAgent
   });
-  
+
   return { success: true, reevaluation };
 }
 
