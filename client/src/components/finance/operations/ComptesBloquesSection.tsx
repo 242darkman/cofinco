@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Lock, Plus, Eye, TrendingUp, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Lock, Plus, Eye, TrendingUp, Calendar, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import CompteBloqueForm from './CompteBloqueForm';
 import CompteBloqueDetail from './CompteBloqueDetail';
 import StatCard from '../../ui/StatCard';
@@ -7,6 +7,7 @@ import ResponsiveTable from '../../ui/ResponsiveTable';
 import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';
 import IconButton from '../../ui/IconButton';
+import { formatClientName } from '../../../lib/format';
 
 interface CompteBloque {
   id: string;
@@ -20,15 +21,32 @@ interface CompteBloque {
   statut: string;
   clients: {
     nom: string;
+    prenom?: string;
     phone: string;
-  };
+  } | null;
 }
+
+const ITEMS_PER_PAGE = 10;
 
 export default function ComptesBloquesSection() {
   const [comptes, setComptes] = useState<CompteBloque[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedCompteId, setSelectedCompteId] = useState<string | null>(null);
+  
+  // Pagination & Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to page 1 on search
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadComptes();
@@ -57,7 +75,26 @@ export default function ComptesBloquesSection() {
     }
   };
 
+  // Filter comptes based on search
+  const filteredComptes = useMemo(() => {
+    if (!debouncedSearch) return comptes;
+    const searchLower = debouncedSearch.toLowerCase();
+    return comptes.filter(c => {
+      const clientName = c.clients ? `${c.clients.nom || ''} ${c.clients.prenom || ''}`.toLowerCase() : '';
+      const numero = (c.numero_compte || '').toLowerCase();
+      return clientName.includes(searchLower) || numero.includes(searchLower);
+    });
+  }, [comptes, debouncedSearch]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredComptes.length / ITEMS_PER_PAGE));
+  const paginatedComptes = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredComptes.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredComptes, currentPage]);
+
   const getJoursRestants = (dateEcheance: string) => {
+    if (!dateEcheance) return 0;
     const diff = new Date(dateEcheance).getTime() - new Date().getTime();
     const jours = Math.ceil(diff / (1000 * 3600 * 24));
     return jours > 0 ? jours : 0;
@@ -84,7 +121,9 @@ export default function ComptesBloquesSection() {
       format: (value: any, row: CompteBloque) => (
         <div>
           <div className="font-mono font-bold text-emerald-400">{value}</div>
-          <div className="text-xs text-slate-400">{row.clients?.nom}</div>
+          <div className="text-xs text-slate-400">
+            {row.clients ? formatClientName(row.clients.nom, row.clients.prenom) : 'N/A'}
+          </div>
         </div>
       )
     },
@@ -112,7 +151,9 @@ export default function ComptesBloquesSection() {
         const jours = getJoursRestants(value);
         return (
           <div className="flex flex-col">
-            <span className="text-white text-xs">{new Date(value).toLocaleDateString()}</span>
+            <span className="text-white text-xs">
+              {value ? new Date(value).toLocaleDateString() : 'N/A'}
+            </span>
             {row.statut === 'Actif' && jours > 0 && (
               <span className="text-[10px] text-amber-400">{jours}j restants</span>
             )}
@@ -146,18 +187,49 @@ export default function ComptesBloquesSection() {
     />
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-slate-400">Chargement...</div>
-      </div>
-    );
-  }
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
 
   return (
     <div className="space-y-4">
-      {/* Compact Header Actions - No redundant Title */}
-      <div className="flex justify-end pt-2">
+      {/* Header Actions */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
+        {/* Search Bar */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            type="text"
+            placeholder="Rechercher par client ou n° compte..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition text-sm"
+          />
+        </div>
+        
         <Button
           variant="secondary"
           size="sm"
@@ -212,13 +284,94 @@ export default function ComptesBloquesSection() {
       </div>
 
       <ResponsiveTable
-        data={comptes}
+        data={paginatedComptes}
         columns={columns}
         actions={actions}
         loading={loading}
-        emptyMessage="Aucun compte bloqué"
+        emptyMessage={debouncedSearch ? `Aucun résultat pour "${debouncedSearch}"` : "Aucun compte bloqué"}
         onRowClick={(row) => setSelectedCompteId(row.id)}
       />
+
+      {/* Professional Pagination */}
+      {filteredComptes.length > ITEMS_PER_PAGE && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
+          {/* Info */}
+          <div className="text-sm text-slate-400 order-2 sm:order-1">
+            Affichage {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredComptes.length)} sur {filteredComptes.length} comptes
+          </div>
+          
+          {/* Pagination Controls */}
+          <div className="flex items-center gap-1 order-1 sm:order-2">
+            {/* First Page */}
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              title="Première page"
+            >
+              <ChevronsLeft size={18} />
+            </button>
+            
+            {/* Previous Page */}
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              title="Page précédente"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            {/* Page Numbers */}
+            <div className="flex items-center gap-1 px-2">
+              {getPageNumbers().map((page, idx) => (
+                page === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-slate-500">...</span>
+                ) : (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page as number)}
+                    className={`w-8 h-8 rounded text-sm font-medium transition ${
+                      page === currentPage
+                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25'
+                        : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              ))}
+            </div>
+            
+            {/* Next Page */}
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              title="Page suivante"
+            >
+              <ChevronRight size={18} />
+            </button>
+            
+            {/* Last Page */}
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              title="Dernière page"
+            >
+              <ChevronsRight size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Items per page info when pagination is not needed */}
+      {filteredComptes.length > 0 && filteredComptes.length <= ITEMS_PER_PAGE && (
+        <div className="text-sm text-slate-500 text-center py-2">
+          {filteredComptes.length} compte{filteredComptes.length > 1 ? 's' : ''} affiché{filteredComptes.length > 1 ? 's' : ''}
+        </div>
+      )}
 
       {showForm && (
         <CompteBloqueForm
