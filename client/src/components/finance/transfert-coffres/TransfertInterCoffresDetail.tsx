@@ -236,7 +236,9 @@ export default function TransfertInterCoffresDetail({
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   {transfert.reference}
                   {transfert.verrouille && (
-                    <Lock size={16} className="text-amber-400" title="Transfert verrouillé" />
+                    <span title="Transfert verrouillé">
+                      <Lock size={16} className="text-amber-400" />
+                    </span>
                   )}
                 </h2>
                 <p className={`text-sm ${statutConfig.color}`}>{transfert.statut}</p>

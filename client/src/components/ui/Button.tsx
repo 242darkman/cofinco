@@ -10,7 +10,7 @@ import { LucideIcon } from 'lucide-react';
  * <Button variant="danger" size="sm" icon={Trash2}>Supprimer</Button>
  */
 
-export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'outline';
+export type ButtonVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'ghost' | 'outline';
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -89,6 +89,16 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         shadow-lg shadow-status-danger/30 hover:shadow-xl hover:shadow-status-danger/40
         focus:ring-status-danger
         dark:bg-red-500 dark:hover:bg-red-400 dark:border-red-400/60
+      `,
+
+      // Warning: Vibrant amber/orange
+      warning: `
+        bg-amber-500 text-white
+        hover:bg-amber-600
+        border border-amber-600/50
+        shadow-lg shadow-amber-500/30 hover:shadow-xl hover:shadow-amber-500/40
+        focus:ring-amber-500
+        dark:bg-amber-600 dark:hover:bg-amber-500 dark:border-amber-500/60
       `,
 
       // Ghost: More visible hover state

@@ -58,7 +58,7 @@ export interface OutboxEventData {
 /**
  * Generate a unique reference for a movement
  */
-export function generateReference(sourceModule: SourceModule): string {
+export function generateReference(sourceModule: SourceModule | "TIC"): string {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -66,7 +66,7 @@ export function generateReference(sourceModule: SourceModule): string {
   const time = Date.now().toString().slice(-6);
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
   
-  const prefixes: Record<SourceModule, string> = {
+  const prefixes: Record<SourceModule | "TIC", string> = {
     CAISSE: "CAI",
     EPARGNE: "EPG",
     CREDIT: "CRD",
@@ -75,6 +75,7 @@ export function generateReference(sourceModule: SourceModule): string {
     TRANSFERT: "TRF",
     SYSTEME: "SYS",
     CAISSE_AGENT: "CAG",
+    TIC: "TIC",
   };
   
   return `${prefixes[sourceModule]}-${year}${month}${day}-${time}${random}`;
