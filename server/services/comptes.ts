@@ -1009,6 +1009,7 @@ export async function getCompteStats(
     .select({
       createdAt: transactionsCompte.createdAt,
       soldeApres: transactionsCompte.soldeApres,
+      montant: transactionsCompte.montant,
     })
     .from(transactionsCompte)
     .where(
@@ -1021,29 +1022,40 @@ export async function getCompteStats(
     .orderBy(transactionsCompte.createdAt); // Ascending for traversal
 
   // 3. Build daily points
-  // If period is large (1Y), maybe aggregate by week? For now daily is fine for < 365 points.
-  // Although 365 points is a bit heavy, commonly accepted.
-  // Optimization: use 'eachDayOfInterval' and fill.
-  
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const dataPoints = [];
   let txIndex = 0;
 
   for (const day of days) {
     const dayEnd = endOfDay(day);
+    let dailyCredit = 0;
+    let dailyDebit = 0;
     
     // Process all transactions for this day
     while (
       txIndex < transactions.length && 
       transactions[txIndex].createdAt <= dayEnd
     ) {
-      currentBalance = parseFloat(transactions[txIndex].soldeApres || '0');
+      const tx = transactions[txIndex];
+      const newBalance = parseFloat(tx.soldeApres || '0');
+      const diff = newBalance - currentBalance;
+
+      // In case of slight floating point issues or 0 diff (rare but possible if logic allows)
+      if (diff > 0.0001) {
+        dailyCredit += diff;
+      } else if (diff < -0.0001) {
+        dailyDebit += Math.abs(diff);
+      }
+      
+      currentBalance = newBalance;
       txIndex++;
     }
 
     dataPoints.push({
       date: format(day, 'yyyy-MM-dd'),
-      balance: currentBalance
+      balance: currentBalance,
+      credit: dailyCredit,
+      debit: dailyDebit
     });
   }
 

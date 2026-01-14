@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useState, useEffect, useId } from 'react';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -7,6 +7,8 @@ import { fr } from 'date-fns/locale';
 interface StatPoint {
   date: string;
   balance: number;
+  credit?: number;
+  debit?: number;
 }
 
 interface StatsResponse {
@@ -18,6 +20,7 @@ interface StatsResponse {
 
 interface AccountStatsChartProps {
   compteId: string;
+  filter?: 'ALL' | 'CREDIT' | 'DEBIT'; // Added filter prop
 }
 
 const PERIODS = [
@@ -27,7 +30,7 @@ const PERIODS = [
   { label: '1A', value: '1Y' },
 ];
 
-export default function AccountStatsChart({ compteId }: AccountStatsChartProps) {
+export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountStatsChartProps) {
   const [data, setData] = useState<StatsResponse | null>(null);
   const [period, setPeriod] = useState<string>('1M');
   const [loading, setLoading] = useState(true);
@@ -62,12 +65,47 @@ export default function AccountStatsChart({ compteId }: AccountStatsChartProps) 
     }).format(val);
   };
 
+  const getChartConfig = () => {
+    switch (filter) {
+      case 'CREDIT':
+        return { 
+          title: 'Volume des Dépôts', 
+          color: '#10b981', 
+          dataKey: 'credit',
+          Type: BarChart,
+          Element: Bar
+        };
+      case 'DEBIT':
+        return { 
+          title: 'Volume des Retraits', 
+          color: '#ef4444', 
+          dataKey: 'debit',
+          Type: BarChart,
+          Element: Bar
+        };
+      default:
+        return { 
+          title: 'Évolution du solde', 
+          color: data?.trend === 'negative' ? '#ef4444' : '#10b981', 
+          dataKey: 'balance',
+          Type: AreaChart,
+          Element: Area
+        };
+    }
+  };
+
+  const config = getChartConfig();
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const val = payload[0].value;
+      const displayVal = filter === 'DEBIT' ? -val : val; // Optional: show debit as negative? Or just volume?
+      // Actually usually volume is positive number, visual context implies outflow.
+      
       return (
         <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl text-xs z-50">
           <p className="text-slate-400 mb-1">{format(new Date(label), 'd MMMM yyyy', { locale: fr })}</p>
-          <p className={`font-bold text-base ${payload[0].value < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+          <p className={`font-bold text-base`} style={{ color: config.color }}>
             {formatCurrency(payload[0].value)}
           </p>
         </div>
@@ -85,20 +123,33 @@ export default function AccountStatsChart({ compteId }: AccountStatsChartProps) 
     );
   }
 
-  // Calculate min/max for domain to prevent flat line issues
-  const minValue = data?.data_points?.reduce((min, p) => Math.min(min, p.balance), Infinity) || 0;
-  const maxValue = data?.data_points?.reduce((max, p) => Math.max(max, p.balance), -Infinity) || 0;
+  // Calculate min/max for domain to prevent flat line issues (Only relevant for Balance/Area)
+  const isBalance = filter === 'ALL';
+  const dataKey = config.dataKey as keyof StatPoint;
+  
+  const minValue = data?.data_points?.reduce((min, p) => Math.min(min, (p[dataKey] as number) || 0), Infinity) || 0;
+  const maxValue = data?.data_points?.reduce((max, p) => Math.max(max, (p[dataKey] as number) || 0), -Infinity) || 0;
+  
   const isFlat = minValue === maxValue;
 
-  // Force domain to show some range if flat
-  const domain: any = isFlat 
-    ? [minValue >= 0 ? 0 : 'auto', maxValue * 1.1 || 1000] 
-    : ['auto', 'auto'];
+  // Force domain
+  let domain: any = ['auto', 'auto'];
+  if (isBalance) {
+      domain = isFlat 
+        ? [minValue >= 0 ? 0 : 'auto', maxValue * 1.1 || 1000] 
+        : ['auto', 'auto'];
+  } else {
+      // For bars, usually start at 0
+      domain = [0, 'auto'];
+  }
+
+  const ChartComponent = config.Type as any;
+  const GraphicElement = config.Element as any;
 
   return (
     <div className="w-full space-y-4">
       <div className="flex items-center justify-between px-2">
-        <h3 className="text-sm font-medium text-slate-300">Évolution du solde</h3>
+        <h3 className="text-sm font-medium text-slate-300">{config.title}</h3>
         <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
           {PERIODS.map((p) => (
             <button
@@ -124,13 +175,15 @@ export default function AccountStatsChart({ compteId }: AccountStatsChartProps) 
         )}
         
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data?.data_points || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={data?.trend === 'negative' ? '#ef4444' : '#10b981'} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={data?.trend === 'negative' ? '#ef4444' : '#10b981'} stopOpacity={0} />
-              </linearGradient>
-            </defs>
+          <ChartComponent data={data?.data_points || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+             {isBalance && (
+                <defs>
+                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={config.color} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={config.color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+             )}
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
             <XAxis 
               dataKey="date" 
@@ -150,17 +203,20 @@ export default function AccountStatsChart({ compteId }: AccountStatsChartProps) 
               tickLine={false}
               domain={domain}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#475569', strokeDasharray: '4 4' }} />
-            <Area
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
+            
+            <GraphicElement
               type="monotone"
-              dataKey="balance"
-              stroke={data?.trend === 'negative' ? '#ef4444' : '#10b981'}
-              strokeWidth={2}
-              fillOpacity={1}
-              fill={`url(#${gradientId})`}
+              dataKey={config.dataKey}
+              stroke={isBalance ? config.color : undefined}
+              fill={isBalance ? `url(#${gradientId})` : config.color}
+              strokeWidth={isBalance ? 2 : 0}
+              fillOpacity={isBalance ? 1 : 0.8}
+              radius={!isBalance ? [4, 4, 0, 0] : undefined} // Rounded bars logic
               animationDuration={1000}
+              barSize={!isBalance ? 20 : undefined} // Specific for bars
             />
-          </AreaChart>
+          </ChartComponent>
         </ResponsiveContainer>
       </div>
     </div>

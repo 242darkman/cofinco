@@ -270,7 +270,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
           <div className="p-4 space-y-4">
              {/* Graphique */}
              <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-                <AccountStatsChart compteId={compteId} />
+                <AccountStatsChart compteId={compteId} filter={filter} />
              </div>
 
              {/* Table */}
