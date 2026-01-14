@@ -103,18 +103,21 @@ export function registerClientRoutes(app: Express) {
             console.log("[Debug] First client sample:", JSON.stringify(clients[0], null, 2));
         }
 
-        const lowerQ = query.toLowerCase().trim();
+        const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+        const lowerQ = normalize(query);
         // Split query into words for multi-term search (e.g., "nzaba joseph" -> ["nzaba", "joseph"])
         const searchTerms = lowerQ.split(/\s+/).filter(Boolean);
 
         const filtered = clients.filter(c => {
-            const nom = (c.nom || '').toLowerCase();
-            const prenom = (c.prenom || '').toLowerCase();
-            const email = (c.email || '').toLowerCase();
+            const nom = normalize(c.nom || '');
+            const prenom = normalize(c.prenom || '');
+            const email = (c.email || '').toLowerCase(); // Email shouldn't have accents usually, but safe to keep
             const telephone = c.telephone || '';
-            const fullName = `${nom} ${prenom}`.trim();
-            const fullNameReverse = `${prenom} ${nom}`.trim();
-
+            
+            // Reconstruct full normalized names for searching "First Last" or "Last First" as a continuous block if needed
+            // But individual term matching is more robust for "Last First"
+            
             // If multiple words, ALL words must match somewhere in client data
             if (searchTerms.length > 1) {
                 return searchTerms.every(term =>
@@ -125,7 +128,11 @@ export function registerClientRoutes(app: Express) {
                 );
             }
 
-            // Single word search - original logic
+            // Single word search - original logic refined
+            // Check matching against normalized combined strings too just in case
+            const fullName = `${nom} ${prenom}`;
+            const fullNameReverse = `${prenom} ${nom}`;
+            
             return (
                 nom.includes(lowerQ) ||
                 prenom.includes(lowerQ) ||
