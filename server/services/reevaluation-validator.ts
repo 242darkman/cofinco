@@ -50,10 +50,14 @@ export interface CreateReevaluationPayload {
  */
 export const REEVALUATION_RULES = {
   /**
-   * Rule 1: Demande must be in "Rejetée" status
+   * Rule 1: Demande must be in "Rejetée" status (or "Réévaluation en cours" if already created)
    */
   validateDemandeStatus: (demande: DemandeCredit): ValidationResult => {
-    if (demande.statut !== 'Rejetée') {
+    // Statuts valides pour une réévaluation:
+    // - "Rejetée": état initial permettant de créer une réévaluation
+    // - "Réévaluation en cours": réévaluation déjà créée (validation/processing en cours)
+    const statutsValides = ['Rejetée', 'Réévaluation en cours'];
+    if (!statutsValides.includes(demande.statut || '')) {
       return {
         valid: false,
         code: 'DEMANDE_NOT_REJECTED',
@@ -330,8 +334,12 @@ export function checkEligibilityQuick(
   
   const reevaluationEnCours = demande.reevaluationEnCours ?? false;
   
+  // Status check: for reevaluation validation, the status can be either 'Rejetée' (initial) 
+  // or 'Réévaluation en cours' (after reevaluation was created)
+  const statutValide = demande.statut === 'Rejetée' || demande.statut === 'Réévaluation en cours';
+  
   const estEligible = 
-    demande.statut === 'Rejetée' && 
+    statutValide && 
     delaiOk && 
     nombreOk && 
     !motifBlackliste && 
@@ -339,7 +347,7 @@ export function checkEligibilityQuick(
   
   // Determine refusal reason
   let motifRefus: string | undefined;
-  if (demande.statut !== 'Rejetée') {
+  if (!statutValide) {
     motifRefus = 'La demande doit être au statut Rejetée';
   } else if (!delaiOk) {
     motifRefus = `Délai minimum de ${config.delaiMinimumJours} jours non atteint`;

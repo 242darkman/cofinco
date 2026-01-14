@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, Filter, SortAsc } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, Filter, SortAsc, Image } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+
+// Helper to detect image URLs
+const isImage = (url: string) =>
+  /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(url) || url.startsWith('data:image');
 
 interface ClientDocument {
   id: string;
@@ -48,8 +52,53 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
       const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur chargement client');
       const client = await res.json();
-      const clientDocs = client.documents || [];
-      setDocuments(clientDocs.sort((a: ClientDocument, b: ClientDocument) => 
+
+      // Documents peuvent être dans 'documents' (nouveau format) ou 'photoUrl'/'photo_url' (legacy)
+      let clientDocs: ClientDocument[] = client.documents || [];
+
+      // Si pas de documents mais photoUrl existe, parser le format legacy
+      if (clientDocs.length === 0) {
+        const photoUrlField = client.photoUrl || client.photo_url;
+        if (photoUrlField) {
+          try {
+            const parsed = JSON.parse(photoUrlField);
+            if (Array.isArray(parsed)) {
+              // Format legacy: array of URLs strings ou objets
+              clientDocs = parsed.map((item: string | any, index: number) => {
+                if (typeof item === 'string') {
+                  // URL simple - convertir en document
+                  return {
+                    id: `legacy-${index}-${Date.now()}`,
+                    client_id: clientId,
+                    document_type: 'ID Card' as const,
+                    document_name: `Document ${index + 1}`,
+                    document_url: item,
+                    status: 'Pending' as const,
+                    created_at: client.created_at || new Date().toISOString()
+                  };
+                }
+                // Déjà un objet document
+                return item;
+              });
+            }
+          } catch {
+            // Si c'est une URL simple (pas JSON), créer un document
+            if (photoUrlField.startsWith('data:') || photoUrlField.startsWith('http')) {
+              clientDocs = [{
+                id: `legacy-0-${Date.now()}`,
+                client_id: clientId,
+                document_type: 'ID Card' as const,
+                document_name: 'Pièce d\'identité',
+                document_url: photoUrlField,
+                status: 'Pending' as const,
+                created_at: client.created_at || new Date().toISOString()
+              }];
+            }
+          }
+        }
+      }
+
+      setDocuments(clientDocs.sort((a: ClientDocument, b: ClientDocument) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       ));
     } catch (error) {
@@ -288,10 +337,22 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
             {documents.map((doc) => (
               <Card key={doc.id} variant="default" padding="sm" className="hover:border-slate-600 transition-colors">
                 <div className="flex items-start justify-between gap-3">
-                    {/* Icon & Info */}
+                    {/* Icon & Info with Thumbnail Preview */}
                     <div className="flex items-start gap-3 overflow-hidden">
-                        <div className="p-2.5 bg-slate-800 rounded-lg shrink-0">
-                            <FileText size={20} className="text-blue-400" />
+                        <div className="w-12 h-12 bg-slate-800 rounded-lg shrink-0 overflow-hidden flex items-center justify-center">
+                            {isImage(doc.document_url) ? (
+                              <img 
+                                src={doc.document_url} 
+                                alt={doc.document_name} 
+                                className="w-full h-full object-cover" 
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg class="text-blue-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
+                                }}
+                              />
+                            ) : (
+                              <FileText size={20} className="text-blue-400" />
+                            )}
                         </div>
                         <div className="min-w-0">
                              <p className="font-semibold text-white text-sm truncate pr-2">{doc.document_name}</p>

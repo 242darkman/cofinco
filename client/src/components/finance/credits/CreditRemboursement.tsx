@@ -717,16 +717,18 @@ export default function CreditRemboursement() {
                   ))}
                 </div>
               ) : echeances.length > 0 ? (
-                echeances.map(echeance => (
+                echeances.map(echeance => {
+                  const resteAPayer = echeance.montant_total - echeance.montant_paye + echeance.penalite;
+                  return (
                   <div
                     key={echeance.id}
                     role="listitem"
                     className="p-4 hover:bg-slate-700/30 transition"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-4">
                         <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                             echeance.statut === 'Payé' ? 'bg-green-500/20 text-green-400' :
                             echeance.statut === 'Retard' ? 'bg-red-500/20 text-red-400' :
                             'bg-cyan-500/20 text-cyan-400'
@@ -741,10 +743,27 @@ export default function CreditRemboursement() {
                           <div className="text-sm text-slate-400">
                             {new Date(echeance.date_echeance).toLocaleDateString('fr-FR')}
                           </div>
+                          <div className="text-xs text-cyan-400 mt-0.5">Remboursement Crédit</div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-6">
+                      <div className="flex flex-wrap items-center gap-4 sm:gap-6 ml-14 sm:ml-0">
+                        {/* Montant Payé */}
+                        <div className="text-center min-w-[80px]">
+                          <div className="text-xs text-slate-500 mb-0.5">Payé</div>
+                          <div className={`font-semibold ${echeance.montant_paye > 0 ? 'text-green-400' : 'text-slate-500'}`}>
+                            {formatMoney(echeance.montant_paye)}
+                          </div>
+                        </div>
+
+                        {/* Reste à payer */}
+                        <div className="text-center min-w-[80px]">
+                          <div className="text-xs text-slate-500 mb-0.5">Reste</div>
+                          <div className={`font-semibold ${resteAPayer > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                            {formatMoney(Math.max(0, resteAPayer))}
+                          </div>
+                        </div>
+
                         {echeance.jours_retard > 0 && (
                           <div className="flex items-center gap-1 text-red-400 text-sm">
                             <AlertTriangle size={14} aria-hidden="true" />
@@ -752,7 +771,7 @@ export default function CreditRemboursement() {
                           </div>
                         )}
 
-                        <div className="text-right">
+                        <div className="text-right min-w-[100px]">
                           <div className="text-white font-bold">{formatMoney(echeance.montant_total)}</div>
                           <div className={`text-xs ${
                             echeance.statut === 'Payé' ? 'text-green-400' :
@@ -765,7 +784,8 @@ export default function CreditRemboursement() {
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-8 text-center text-slate-400">
                   Aucune échéance disponible

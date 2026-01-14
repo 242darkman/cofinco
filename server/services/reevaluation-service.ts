@@ -6,6 +6,7 @@
 
 import { db } from '../db';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { differenceInDays } from 'date-fns';
 import { 
   demandesCredit, 
   reevaluationsCredit, 
@@ -246,17 +247,54 @@ export async function validateEligibility(
     throw new Error('Demande associée introuvable');
   }
   
-  // 4. Check eligibility
-  const eligibility = checkEligibilityQuick(demande, config);
+  // 4. Check eligibility - For an EXISTING reevaluation, we use the snapshot data
+  // stored in the reevaluation itself, not the current demande state (which has changed)
+  const joursDepuisRejet = reevaluation.dateRejetInitial
+    ? differenceInDays(new Date(), new Date(reevaluation.dateRejetInitial))
+    : 0;
+
+  const delaiOk = joursDepuisRejet >= config.delaiMinimumJours;
+
+  // La réévaluation actuelle a DÉJÀ été comptabilisée lors de sa création
+  // Donc on vérifie que le nombre est <= max (pas <)
+  const nombreOk = (demande.nombreReevaluations ?? 0) <= config.maxReevaluationsParDemande;
+
+  const motifBlackliste = reevaluation.motifRejetInitial
+    ? (config.motifsNonReevaluables || []).some((m: string) =>
+        reevaluation.motifRejetInitial!.toLowerCase().includes(m.toLowerCase())
+      )
+    : false;
+
+  // IMPORTANT: Pour une réévaluation EXISTANTE (déjà créée), on hérite des données
+  // validées lors de l'analyse initiale. On ne rejette PAS par défaut.
+  // On vérifie uniquement les règles d'éligibilité basées sur le snapshot.
+  const eligibilityResult = {
+    estEligible: delaiOk && nombreOk && !motifBlackliste,
+    delaiOk,
+    nombreOk,
+    motifBlackliste,
+    reevaluationEnCours: true, // Already in progress by definition
+    joursDepuisRejet,
+    delaiMinimum: config.delaiMinimumJours,
+    nombreReevaluations: demande.nombreReevaluations ?? 0,
+    maxAutorise: config.maxReevaluationsParDemande,
+    motifRefus: !delaiOk 
+      ? `Délai minimum de ${config.delaiMinimumJours} jours non atteint` 
+      : !nombreOk 
+        ? `Nombre maximum de réévaluations atteint` 
+        : motifBlackliste 
+          ? 'Le motif de rejet ne permet pas de réévaluation' 
+          : undefined
+  };
   
   // 5. Update reevaluation status
-  const nouveauStatut = eligibility.estEligible || override?.force ? 'Autorisée' : 'Refusée';
+  const nouveauStatut = eligibilityResult.estEligible || override?.force ? 'Autorisée' : 'Refusée';
   
   await db.update(reevaluationsCredit)
     .set({
       statut: nouveauStatut,
-      eligibiliteValidee: eligibility.estEligible || override?.force,
-      motifRefusEligibilite: eligibility.estEligible ? null : eligibility.motifRefus,
+      eligibiliteValidee: eligibilityResult.estEligible || override?.force,
+      motifRefusEligibilite: eligibilityResult.estEligible ? null : eligibilityResult.motifRefus,
       dateValidationEligibilite: new Date(),
       validePar: userId,
       updatedAt: new Date()
@@ -267,14 +305,14 @@ export async function validateEligibility(
   await createAuditLog({
     reevaluationId: reevaluation.id,
     demandeId: reevaluation.demandeId,
-    action: eligibility.estEligible ? 'ELIGIBILITE_VERIFIEE' : 'ELIGIBILITE_REFUSEE',
+    action: eligibilityResult.estEligible ? 'ELIGIBILITE_VERIFIEE' : 'ELIGIBILITE_REFUSEE',
     statutAvant: reevaluation.statut,
     statutApres: nouveauStatut,
     details: {
-      description: eligibility.estEligible 
+      description: eligibilityResult.estEligible 
         ? 'Éligibilité validée' 
-        : `Éligibilité refusée: ${eligibility.motifRefus}`,
-      eligibilite: eligibility,
+        : `Éligibilité refusée: ${eligibilityResult.motifRefus}`,
+      eligibilite: eligibilityResult,
       override: override?.force ? { motif: override.motif } : undefined
     },
     userId,
@@ -284,7 +322,7 @@ export async function validateEligibility(
   return {
     success: true,
     statut: nouveauStatut,
-    motifRefus: eligibility.estEligible ? undefined : eligibility.motifRefus
+    motifRefus: eligibilityResult.estEligible ? undefined : eligibilityResult.motifRefus
   };
 }
 

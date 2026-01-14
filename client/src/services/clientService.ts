@@ -1,4 +1,4 @@
-import { clientApi } from '../lib/api-client';
+import { clientApi, clientSearchApi } from '../lib/api-client';
 
 export interface Client {
   id: string;
@@ -35,23 +35,25 @@ export interface Client {
 export class ClientService {
   async getAll(filters?: {
     search?: string;
+    searchTerm?: string;
     status?: string;
     segment?: string;
   }): Promise<Client[]> {
     try {
-      const clients = await clientApi.getAll();
+      let clients;
+      const searchQuery = filters?.search || filters?.searchTerm;
+      
+      if (searchQuery) {
+        // Use backend search for robust full-text search (name, phone, email, full name)
+        clients = await clientSearchApi.search(searchQuery);
+      } else {
+        clients = await clientApi.getAll();
+      }
       
       let filteredClients = clients;
       
-      if (filters?.search) {
-        const searchLower = filters.search.toLowerCase();
-        filteredClients = filteredClients.filter(client => 
-          client.nom?.toLowerCase().includes(searchLower) ||
-          client.prenom?.toLowerCase().includes(searchLower) ||
-          client.telephone?.toLowerCase().includes(searchLower) ||
-          client.email?.toLowerCase().includes(searchLower)
-        );
-      }
+      // Removed client-side search filtering as it is now handled by the backend
+      // kept other filters (status, segment) as client-side filtering for now
       
       if (filters?.status) {
         filteredClients = filteredClients.filter(client => client.status === filters.status);

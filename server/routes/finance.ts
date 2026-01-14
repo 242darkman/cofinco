@@ -824,9 +824,19 @@ export function registerFinanceRoutes(app: Express) {
 
   app.post("/api/enquetes-credit/:id/valider", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
       const { decision, montant_approuve, commentaire, raison } = req.body;
-      
+
       const enquete = await storage.getEnqueteCredit(req.params.id);
       if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
+
+      // IDEMPOTENCE CHECK: Vérifier si l'enquête n'est pas déjà validée
+      const statutsTerminaux = ['Approuvé', 'Rejeté', 'Réduit'];
+      if (statutsTerminaux.includes(enquete.statut || '')) {
+          return res.status(409).json({
+              message: "Cette enquête a déjà été traitée",
+              statut_actuel: enquete.statut,
+              code: "ALREADY_PROCESSED"
+          });
+      }
 
       const updatedEnquete = await storage.updateEnqueteCredit(req.params.id, {
           statut: decision === 'approuve' ? 'Approuvé' : decision === 'rejete' ? 'Rejeté' : 'Réduit',

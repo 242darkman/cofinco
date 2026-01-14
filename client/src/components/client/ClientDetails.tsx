@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Client } from '@shared/schema';
-import { DollarSign, Award, MapPin, Phone, Mail, User } from 'lucide-react';
+import { DollarSign, Award, MapPin, Phone, Mail, User, Building2 } from 'lucide-react';
 import Card from '../ui/Card';
 import ClientTags from './ClientTags';
 
@@ -112,6 +112,18 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
                     <div className="overflow-hidden">
                         <p className="text-[10px] text-slate-500 uppercase">Adresse</p>
                         <p className="text-sm font-medium text-slate-200 truncate">{client.adresse}</p>
+                    </div>
+                </div>
+               )}
+
+               {(client.agence || (client as any).agence_nom) && (
+                <div className="bg-slate-800/30 rounded-lg p-2.5 border border-slate-700/30 flex items-center gap-3">
+                    <div className="bg-slate-700/50 p-1.5 rounded-md">
+                            <Building2 size={14} className="text-blue-400" />
+                    </div>
+                    <div className="overflow-hidden">
+                        <p className="text-[10px] text-slate-500 uppercase">Agence Affiliée</p>
+                        <p className="text-sm font-medium text-slate-200 truncate">{(client as any).agence_nom || client.agence}</p>
                     </div>
                 </div>
                )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, DollarSign, TrendingUp, FileText, Edit2, Trash2, Plus, Download, Eye, CheckCircle, Filter, BarChart3, Phone, Mail, MapPin, User, AlertCircle, RefreshCw, Upload, CreditCard, Map, List, ChevronRight, Calendar, Search, Shield, Zap, CheckCircle2 } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, FileText, Edit2, Trash2, Plus, Download, Eye, CheckCircle, Filter, BarChart3, Phone, Mail, MapPin, User, AlertCircle, RefreshCw, Upload, CreditCard, Map, List, ChevronRight, Calendar, Search, Shield, Zap, CheckCircle2, Building2 } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import Tontines from './components/finance/tontine/Tontines';
 import Credits from './components/finance/credits/Credits';
@@ -448,6 +448,15 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
                     <span className={(selectedClient.score || 0) >= 70 ? 'text-emerald-400 font-medium' : (selectedClient.score || 0) >= 40 ? 'text-amber-400 font-medium' : 'text-red-400 font-medium'}>
                         Score: {selectedClient.score ?? 0}
                     </span>
+                    {selectedClient.agence && (
+                      <>
+                        <span>•</span>
+                        <span className="text-slate-400 flex items-center gap-1">
+                          <Building2 size={12} />
+                          {selectedClient.agence}
+                        </span>
+                      </>
+                    )}
                 </div>
               </div>
             </div>

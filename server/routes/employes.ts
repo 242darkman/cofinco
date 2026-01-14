@@ -65,6 +65,71 @@ const updateEmployeWithUserSchema = z.object({
 export function registerEmployesRoutes(app: Express) {
 
   // ============================================
+  // GET - Vérifier et générer un username unique
+  // ============================================
+  app.get("/api/employes/check-username", requireAuth, async (req, res) => {
+    try {
+      const { username, fullName } = req.query;
+
+      // Si un username est fourni, vérifier s'il est disponible
+      if (username && typeof username === 'string') {
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser) {
+          // Username existe, générer une suggestion unique
+          let counter = 1;
+          let suggestion = `${username}${counter}`;
+          while (await storage.getUserByUsername(suggestion)) {
+            counter++;
+            suggestion = `${username}${counter}`;
+          }
+          return res.json({
+            available: false,
+            suggestion,
+            message: `Ce nom d'utilisateur existe déjà. Suggestion: ${suggestion}`
+          });
+        }
+        return res.json({ available: true, username });
+      }
+
+      // Si fullName est fourni, générer un username unique au format p.nom
+      if (fullName && typeof fullName === 'string') {
+        // Normaliser le nom (supprimer accents et caractères spéciaux)
+        const normalized = fullName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const parts = normalized.trim().split(/\s+/).filter(Boolean);
+
+        let baseUsername: string;
+        if (parts.length < 2) {
+          baseUsername = parts[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
+        } else {
+          const prenom = parts[0];
+          const nom = parts[parts.length - 1];
+          baseUsername = `${prenom.charAt(0).toLowerCase()}.${nom.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+        }
+
+        // Vérifier l'unicité et incrémenter si nécessaire
+        let finalUsername = baseUsername;
+        let counter = 0;
+        while (await storage.getUserByUsername(finalUsername)) {
+          counter++;
+          finalUsername = `${baseUsername}${counter}`;
+        }
+
+        return res.json({
+          available: true,
+          username: finalUsername,
+          baseUsername,
+          wasIncremented: counter > 0
+        });
+      }
+
+      return res.status(400).json({ message: "Paramètre 'username' ou 'fullName' requis" });
+    } catch (error) {
+      console.error("Error checking username:", error);
+      res.status(500).json({ message: "Erreur lors de la vérification du nom d'utilisateur" });
+    }
+  });
+
+  // ============================================
   // GET - Liste des employés avec données utilisateur
   // ============================================
   app.get("/api/employes", requireAuth, async (req, res) => {

@@ -82,6 +82,60 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     setShowPassword(false);
   };
 
+  const [usernameChecking, setUsernameChecking] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+
+  // Helper function to generate username from name (format: p.nom) - fallback local
+  const generateUsernameLocal = (fullName: string): string => {
+    // Remove accents and special characters
+    const normalized = fullName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const parts = normalized.trim().split(/\s+/).filter(Boolean);
+
+    if (parts.length < 2) {
+      // If only one word, use it as-is
+      return parts[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+    }
+
+    const prenom = parts[0];
+    const nom = parts[parts.length - 1];
+    return `${prenom.charAt(0).toLowerCase()}.${nom.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  };
+
+  // Generate unique username via backend API
+  const generateUniqueUsername = async (fullName: string): Promise<string> => {
+    try {
+      setUsernameChecking(true);
+      const response = await fetch(`/api/employes/check-username?fullName=${encodeURIComponent(fullName)}`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsernameAvailable(data.available);
+        return data.username;
+      }
+    } catch (error) {
+      console.error('Erreur vérification username:', error);
+    } finally {
+      setUsernameChecking(false);
+    }
+    // Fallback to local generation
+    return generateUsernameLocal(fullName);
+  };
+
+  // Auto-generate unique username when name changes (for new users only)
+  useEffect(() => {
+    if (!initialData && formData.name && formData.name.includes(' ')) {
+      // Debounce the API call
+      const timer = setTimeout(async () => {
+        const suggested = await generateUniqueUsername(formData.name);
+        if (suggested && suggested !== formData.username) {
+          setFormData((prev: any) => ({ ...prev, username: suggested }));
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [formData.name, initialData]);
+
   const generatePassword = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
     let password = '';
@@ -206,14 +260,29 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                    required
                    className="bg-surface-base"
                  />
-                 <FormField
-                   label="Identifiant"
-                   name="username"
-                   value={formData.username}
-                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                   className="bg-surface-base font-mono"
-                   required
-                 />
+                 <div className="relative">
+                   <FormField
+                     label="Identifiant"
+                     name="username"
+                     value={formData.username}
+                     onChange={(e) => {
+                       setFormData({ ...formData, username: e.target.value });
+                       setUsernameAvailable(null); // Reset on manual edit
+                     }}
+                     className="bg-surface-base font-mono"
+                     required
+                   />
+                   {usernameChecking && (
+                     <div className="absolute right-2 top-8 text-xs text-slate-400">
+                       Vérification...
+                     </div>
+                   )}
+                   {!usernameChecking && usernameAvailable === true && formData.username && (
+                     <div className="absolute right-2 top-8 text-xs text-green-400">
+                       ✓ Disponible
+                     </div>
+                   )}
+                 </div>
                </div>
                
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

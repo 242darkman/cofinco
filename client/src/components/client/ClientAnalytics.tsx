@@ -128,30 +128,55 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
             <DollarSign size={16} className="text-cyan-400" />
             Répartition Financière
         </h4>
-        
-        <div className="space-y-4">
-            {/* Credit Progress */}
-            <div>
-                 <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-slate-400">Crédits en cours</span>
-                    <span className="text-white font-mono font-medium">{stats.creditTotal.toLocaleString()} FC</span>
-                 </div>
-                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: '70%' }}></div>
-                 </div>
-            </div>
 
-            {/* Savings Progress */}
-            <div>
-                 <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-slate-400">Épargne totale</span>
-                    <span className="text-white font-mono font-medium">{stats.epargneTotal.toLocaleString()} FC</span>
-                 </div>
-                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '45%' }}></div>
-                 </div>
-            </div>
-        </div>
+        {stats.creditTotal === 0 && stats.epargneTotal === 0 ? (
+          <div className="text-center py-6 text-slate-500">
+            <p className="text-sm">Aucune donnée financière</p>
+            <p className="text-xs mt-1">Le client n'a ni crédit ni épargne active</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+              {/* Credit Progress - Only show if credit > 0 */}
+              <div>
+                   <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-slate-400">Crédits en cours</span>
+                      <span className={`font-mono font-medium text-right ${stats.creditTotal > 0 ? 'text-blue-400' : 'text-slate-500'}`}>
+                        {stats.creditTotal.toLocaleString()} FCFA
+                      </span>
+                   </div>
+                   {stats.creditTotal > 0 && (
+                     <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min((stats.creditTotal / (stats.creditTotal + stats.epargneTotal || 1)) * 100, 100)}%`
+                          }}
+                        ></div>
+                     </div>
+                   )}
+              </div>
+
+              {/* Savings Progress - Only show if epargne > 0 */}
+              <div>
+                   <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-slate-400">Épargne totale</span>
+                      <span className={`font-mono font-medium text-right ${stats.epargneTotal > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        {stats.epargneTotal.toLocaleString()} FCFA
+                      </span>
+                   </div>
+                   {stats.epargneTotal > 0 && (
+                     <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min((stats.epargneTotal / (stats.creditTotal + stats.epargneTotal || 1)) * 100, 100)}%`
+                          }}
+                        ></div>
+                     </div>
+                   )}
+              </div>
+          </div>
+        )}
       </Card>
       
       {/* 4. Activity Stats */}

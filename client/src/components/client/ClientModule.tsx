@@ -211,9 +211,9 @@ export default function ClientModule() {
               columns={[
                 {
                   key: 'nom',
-                  label: 'Nom',
+                  label: 'Nom Complet',
                   primary: true,
-                  format: (_, item) => `${item.nom} ${item.prenom}`
+                  format: (_, item) => `${item.nom || ''} ${item.prenom || ''}`.trim() || 'Sans nom'
                 },
                 {
                   key: 'telephone',
@@ -221,9 +221,10 @@ export default function ClientModule() {
                   hideOnMobile: false
                 },
                 {
-                  key: 'email',
-                  label: 'Email',
-                  format: (value) => value || '-'
+                  key: 'agence_nom',
+                  label: 'Agence',
+                  format: (value, item) => value || item.agence || '-',
+                  hideOnMobile: true
                 },
                 {
                   key: 'status',

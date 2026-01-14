@@ -227,6 +227,19 @@ const randomDateBetween = (start: Date, end: Date): Date => {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 };
 
+// Générer un username au format p.nom (ex: Jean Dupont -> j.dupont)
+// Conforme au format utilisé dans UserFormModal pour les nouveaux utilisateurs
+const generateUsername = (prenom: string, nom: string): string => {
+  // Remove accents and special characters
+  const normalizedNom = nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalizedPrenom = prenom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  
+  if (normalizedPrenom) {
+    return `${normalizedPrenom.charAt(0)}.${normalizedNom}`;
+  }
+  return normalizedNom;
+};
+
 // ----------------------------------------------------------------------
 // DATA DEFINITIONS
 // ----------------------------------------------------------------------
@@ -1878,6 +1891,7 @@ async function seedDemo() {
       demandesData.push({
         numeroDemande: `DEM-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
         clientId: client.id,
+        agenceId: client.agenceId || insertedAgences['Siège'],
         montantDemande: String(montantDemande),
         tauxInteret: String(randomBetween(15, 25)),
         // V2 duration fields
@@ -3477,6 +3491,7 @@ async function seedDemo() {
       tauxInteret: '10',
       dureeValeur: 6,
       dureeUnite: 'Mois',
+      frequenceRemboursement: 'Mensuel',
       objetCredit: 'Rejected Test 1 - Submitted Refund',
       statut: 'Rejetée',
       fraisEngagementPayes: true,
@@ -3509,6 +3524,7 @@ async function seedDemo() {
       tauxInteret: '10',
       dureeValeur: 12,
       dureeUnite: 'Mois',
+      frequenceRemboursement: 'Mensuel',
       objetCredit: 'Rejected Test 2 - Approved Refund',
       statut: 'Rejetée',
       fraisEngagementPayes: true,
@@ -3530,9 +3546,9 @@ async function seedDemo() {
       motifRejetCredit: 'Historique mauvais',
       motifRemboursement: 'Remboursement frais suite rejet',
       makerId: adminUser.id,
-      makerAt: daysAgo(2).toISOString(),
+      makerAt: daysAgo(2),
       checkerId: insertedUsers['chef_siege']?.id,
-      checkerAt: daysAgo(1).toISOString(),
+      checkerAt: daysAgo(1),
       checkerDecision: 'APPROVED',
       checkerComment: 'Validé pour remboursement',
     } as any);

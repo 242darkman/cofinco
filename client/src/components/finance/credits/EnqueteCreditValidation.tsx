@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, CheckCircle, XCircle, AlertTriangle, DollarSign, TrendingDown, FileText, User, Phone, MapPin, Briefcase } from 'lucide-react';
+import { X, Save, CheckCircle, XCircle, AlertTriangle, DollarSign, TrendingDown, FileText, User, Phone, MapPin, Briefcase, Loader2 } from 'lucide-react';
 
 import { EnqueteCredit } from '../../../hooks/credits/useEnquetes';
 
@@ -35,19 +35,39 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
   const [commentaire, setCommentaire] = useState('');
   const [raisonRefus, setRaisonRefus] = useState('');
   const [raisonReduction, setRaisonReduction] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const chargesMensuelles = enquete.charges_mensuelles || 0;
   const revenuMensuel = enquete.revenu_mensuel_declare || enquete.revenus_mensuels || 0;
-  const capaciteRemboursement = (revenuMensuel - chargesMensuelles) * 0.4;
-  const montantMaxRecommande = capaciteRemboursement * 24; // Augmenté pour refléter le nouveau taux/durée moyen
+  const joursTravailes = enquete.jours_travail_mois || 26;
 
-  const handleSubmit = () => {
+  // Formule microfinance stricte: Capacité = 35% du revenu journalier
+  // Si revenu journalier fourni, l'utiliser directement
+  // Sinon, calculer depuis le revenu mensuel
+  const revenuJournalier = enquete.revenu_journalier || (revenuMensuel / joursTravailes);
+
+  // Capacité de remboursement journalière = strictement 35% du revenu journalier
+  const capaciteRemboursementJournaliere = revenuJournalier * 0.35;
+
+  // Capacité mensuelle = capacité journalière × nombre de jours travaillés
+  const capaciteRemboursement = capaciteRemboursementJournaliere * joursTravailes;
+
+  // Montant max recommandé = capacité mensuelle
+  const montantMaxRecommande = capaciteRemboursement;
+
+  const handleSubmit = async () => {
     if (!decision) return;
+    if (submitting) return; // Prevent double submission
+    
+    setSubmitting(true);
+    try {
+      const montant = decision === 'approuve' ? montantApprouve : decision === 'reduit' ? montantApprouve : undefined;
+      const raison = decision === 'rejete' ? raisonRefus : decision === 'reduit' ? raisonReduction : undefined;
 
-    const montant = decision === 'approuve' ? montantApprouve : decision === 'reduit' ? montantApprouve : undefined;
-    const raison = decision === 'rejete' ? raisonRefus : decision === 'reduit' ? raisonReduction : undefined;
-
-    onValidate(decision, montant, commentaire, raison);
+      await onValidate(decision, montant, commentaire, raison);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getRisqueColor = (risque?: string) => {
@@ -158,13 +178,22 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
                   <span className="text-slate-400">Charges mensuelles:</span>
                   <span className="text-blue-400 font-medium">{(enquete.charges_mensuelles || 0).toLocaleString()} FCFA</span>
                 </div>
+                <div className="flex justify-between items-center p-2 bg-amber-500/10 rounded border border-amber-500/30">
+                  <span className="text-amber-300 font-semibold">Capacité journalière (35%):</span>
+                  <div className="text-right">
+                    <span className="text-amber-400 font-bold">{Math.round(capaciteRemboursementJournaliere).toLocaleString()} FCFA/jour</span>
+                    <p className="text-[10px] text-amber-300/60 italic">
+                      = {Math.round(revenuJournalier).toLocaleString()} × 35%
+                    </p>
+                  </div>
+                </div>
                 <div className="flex justify-between items-center p-2 bg-blue-500/10 rounded border border-blue-500/30">
-                  <span className="text-blue-300 font-semibold">Capacité remboursement:</span>
-                  <span className="text-blue-400 font-bold">{capaciteRemboursement.toLocaleString()} FCFA/mois</span>
+                  <span className="text-blue-300 font-semibold">Capacité mensuelle:</span>
+                  <span className="text-blue-400 font-bold">{Math.round(capaciteRemboursement).toLocaleString()} FCFA/mois</span>
                 </div>
                 <div className="flex justify-between items-center p-2 bg-cyan-500/10 rounded border border-cyan-500/30">
                   <span className="text-cyan-300 font-semibold">Montant max recommandé:</span>
-                  <span className="text-cyan-400 font-bold">{montantMaxRecommande.toLocaleString()} FCFA</span>
+                  <span className="text-cyan-400 font-bold">{Math.round(montantMaxRecommande).toLocaleString()} FCFA</span>
                 </div>
               </div>
             </div>
@@ -397,15 +426,18 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!decision}
+              disabled={!decision || submitting}
               className={`flex-1 px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition ${
-                decision
+                decision && !submitting
                   ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
                   : 'bg-slate-700 text-slate-400 cursor-not-allowed'
               }`}
             >
-              <Save size={20} />
-              Valider la Décision
+              {submitting ? (
+                <><Loader2 size={20} className="animate-spin" /> Validation en cours...</>
+              ) : (
+                <><Save size={20} /> Valider la Décision</>
+              )}
             </button>
           </div>
         </div>

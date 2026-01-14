@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, X } from 'lucide-react';
-import { SearchInput, Button, SelectField, IconButton } from '../ui';
+import { X } from 'lucide-react';
+import { SearchInput, Button, SelectField } from '../ui';
 
 export interface ClientFiltersState {
   searchTerm: string;
@@ -23,7 +23,6 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
   });
 
   const [debouncedSearch, setDebouncedSearch] = useState(filters.searchTerm);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Debounce search term
   useEffect(() => {
@@ -43,6 +42,11 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFilters(prev => ({ ...prev, searchTerm: e.target.value }));
+  };
+
+  // Handler for clear button in SearchInput
+  const handleSearchClear = () => {
+    setFilters(prev => ({ ...prev, searchTerm: '' }));
   };
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -72,7 +76,8 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
           <SearchInput
             value={filters.searchTerm}
             onChange={handleSearchChange}
-            placeholder="Nom, email, téléphone..."
+            onClear={handleSearchClear}
+            placeholder="Nom complet, email, téléphone..."
             className="w-full"
           />
         </div>

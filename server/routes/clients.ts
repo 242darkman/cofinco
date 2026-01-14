@@ -98,13 +98,34 @@ export function registerClientRoutes(app: Express) {
         const filter = agenceFilter || {};
 
         const clients = await storage.getAllClients(filter);
+        if (clients.length > 0) {
+            console.log("[Debug] First client keys:", Object.keys(clients[0]));
+            console.log("[Debug] First client sample:", JSON.stringify(clients[0], null, 2));
+        }
 
         const lowerQ = query.toLowerCase();
-        const filtered = clients.filter(c =>
-            (c.nom && c.nom.toLowerCase().includes(lowerQ)) ||
-            (c.prenom && c.prenom.toLowerCase().includes(lowerQ)) ||
-            (c.telephone && c.telephone.includes(query))
-        );
+        console.log(`[Search] Query: "${query}" (lower: "${lowerQ}")`);
+
+        const filtered = clients.filter(c => {
+            const fullName = `${c.nom || ''} ${c.prenom || ''}`.toLowerCase();
+            const fullNameReverse = `${c.prenom || ''} ${c.nom || ''}`.toLowerCase();
+            
+            // Debug specific match for Nzaba
+            if (c.nom === 'Nzaba') {
+                console.log(`[Search Debug] Found Nzaba: `, { nom: c.nom, prenom: c.prenom, fullName });
+            }
+
+            return (
+                (c.nom && c.nom.toLowerCase().includes(lowerQ)) ||
+                (c.prenom && c.prenom.toLowerCase().includes(lowerQ)) ||
+                fullName.includes(lowerQ) ||
+                fullNameReverse.includes(lowerQ) ||
+                (c.email && c.email.toLowerCase().includes(lowerQ)) ||
+                (c.telephone && c.telephone.includes(query))
+            );
+        });
+        
+        console.log(`[Search] Found ${filtered.length} results`);
         res.json(addSnakeCaseAliasesDeep(filtered));
     } catch (e) {
         res.status(500).json({ message: "Search failed" });

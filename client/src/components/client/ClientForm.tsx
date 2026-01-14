@@ -1,6 +1,6 @@
 import type { Client, InsertClient } from '@shared/schema';
 import React, { useState, useEffect } from 'react';
-import { Save, User, Mail, Phone, MapPin, Award, Upload, FileText, Trash2, Store, Video, Camera } from 'lucide-react';
+import { Save, User, Mail, Phone, MapPin, Award, Upload, FileText, Trash2, Store, Video, Camera, Lock, KeyRound } from 'lucide-react';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import CameraCapture from '../shared/CameraCapture';
 import Modal from '../ui/Modal';
@@ -54,6 +54,23 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pieceIdentite, setPieceIdentite] = useState<string[]>([]);
   const [typesMarches, setTypesMarches] = useState<{id: string; nom: string}[]>([]);
+  
+  // Future client portal access (locked for now)
+  const [portalAccessEnabled, setPortalAccessEnabled] = useState(false);
+  const [generatedUsername, setGeneratedUsername] = useState('');
+
+  // Helper function to generate username from name (format: p.nom)
+  const generateClientUsername = (nom: string, prenom: string): string => {
+    if (!nom) return '';
+    // Remove accents and special characters
+    const normalizedNom = nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedPrenom = (prenom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    
+    if (normalizedPrenom) {
+      return `${normalizedPrenom.charAt(0)}.${normalizedNom}`;
+    }
+    return normalizedNom;
+  };
 
   // Load Client Data
   useEffect(() => {
@@ -334,6 +351,40 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                  { value: 'VIP', label: 'VIP' }
              ]}
           />
+        </div>
+
+        {/* Accès Portail Client - Section verrouillée */}
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="relative">
+            <div className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-200 dark:bg-slate-700 rounded-lg">
+                  <KeyRound size={20} className="text-slate-500" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Créer un accès Portail Client</span>
+                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-500 text-[10px] font-bold rounded-full border border-amber-500/30 flex items-center gap-1">
+                      <Lock size={10} /> Bientôt disponible
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Permet au client de se connecter à son espace dédié
+                  </p>
+                  {formData.nom && formData.prenom && (
+                    <p className="text-xs text-cyan-500 mt-1 font-mono">
+                      Username prévu: {generateClientUsername(formData.nom, formData.prenom)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="relative">
+                <div className="w-12 h-6 bg-slate-300 dark:bg-slate-600 rounded-full">
+                  <div className="absolute left-1 top-1 w-4 h-4 bg-slate-400 dark:bg-slate-500 rounded-full"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Documents */}
