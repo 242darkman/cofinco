@@ -55,11 +55,11 @@ export class ClientService {
       // Removed client-side search filtering as it is now handled by the backend
       // kept other filters (status, segment) as client-side filtering for now
       
-      if (filters?.status) {
+      if (filters?.status && filters.status !== 'all') {
         filteredClients = filteredClients.filter(client => client.status === filters.status);
       }
       
-      if (filters?.segment) {
+      if (filters?.segment && filters.segment !== 'all') {
         filteredClients = filteredClients.filter(client => client.segment === filters.segment);
       }
       
