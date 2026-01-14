@@ -403,10 +403,6 @@ export default function ClientModule({ onModuleChange }: ClientModuleProps) {
                   icon={Users}
                   title="Aucun client"
                   description="Commencez par ajouter votre premier client"
-                  action={{
-                    label: "Ajouter un client",
-                    onClick: () => setShowForm(true)
-                  }}
                 />
               </div>
             ) : (
