@@ -34,6 +34,8 @@ import {
     CaisseAssignation, InsertCaisseAssignation,
     DureeSuggeree, InsertDureeSuggeree
 } from "@shared/schema";
+import type { PgTransaction } from "drizzle-orm/pg-core";
+
 
 export interface IStorage {
     // Users
@@ -77,7 +79,7 @@ export interface IStorage {
     getDemandesByClient(clientId: string): Promise<DemandeCredit[]>;
     getAllDemandes(filter?: { agence?: string }): Promise<DemandeCredit[]>;
     createDemandeCredit(demande: InsertDemandeCredit): Promise<DemandeCredit>;
-    updateDemandeCredit(id: string, demande: Partial<InsertDemandeCredit>): Promise<DemandeCredit | undefined>;
+    updateDemandeCredit(id: string, demande: Partial<InsertDemandeCredit>, tx?: PgTransaction<any, any, any>): Promise<DemandeCredit | undefined>;
     deleteDemandeCredit(id: string): Promise<boolean>;
     cancelDemandeCredit(id: string, motif?: string): Promise<DemandeCredit | undefined>;
     payerFraisEngagement(data: {
@@ -129,7 +131,7 @@ export interface IStorage {
 
     getTransactionCompte(id: string): Promise<TransactionCompte | undefined>;
     getTransactionsByCompte(compteId: string): Promise<TransactionCompte[]>;
-    createTransactionCompte(transaction: InsertTransactionCompte): Promise<TransactionCompte>;
+    createTransactionCompte(transaction: InsertTransactionCompte, tx?: PgTransaction<any, any, any>): Promise<TransactionCompte>;
     createTransactionCompteWithLedger(data: {
       compteId: string;
       typeTransaction: "Dépôt" | "Retrait" | "Intérêt" | "Frais" | "Ajustement";

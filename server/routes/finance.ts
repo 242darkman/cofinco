@@ -18,6 +18,7 @@ import { requireAuth, requireRole } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
+import { db } from "../db";
 import { z } from "zod";
 import {
   validerCoherenceFrequenceDuree,
@@ -26,7 +27,6 @@ import {
   type DureeUnite
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
-import { db } from "../db";
 import { eq } from "drizzle-orm";
 import * as sessionService from "../services/caisse/session-service";
 
@@ -427,67 +427,69 @@ export function registerFinanceRoutes(app: Express) {
       const existing = await storage.getDemandeCredit(id);
       if (!existing) return res.status(404).json({ message: "Demande non trouvée" });
 
+      let updated;
+
       // Logic for Refund on Rejection
       if (updateData.statut === 'Rejetée' && updateData.montantRemboursement && Number(updateData.montantRemboursement) > 0) {
           const refundAmount = Number(updateData.montantRemboursement);
           
-          // 1. Validation
-          if (!existing.fraisEngagementPayes) {
-             return res.status(400).json({ message: "Aucun frais n'a été payé pour cette demande." });
-          }
-          const maxRefund = Number(existing.montantFraisEngagement || 0);
-          if (refundAmount > maxRefund) {
-             return res.status(400).json({ message: `Le montant du remboursement (${refundAmount}) ne peut pas excéder les frais payés (${maxRefund}).` });
-          }
+          updated = await db.transaction(async (tx) => {
+            // 1. Validation
+            if (!existing.fraisEngagementPayes) {
+               throw new Error("Aucun frais n'a été payé pour cette demande.");
+            }
+            const maxRefund = Number(existing.montantFraisEngagement || 0);
+            if (refundAmount > maxRefund) {
+               throw new Error(`Le montant du remboursement (${refundAmount}) ne peut pas excéder les frais payés (${maxRefund}).`);
+            }
+  
+            // 2. Find Client's Current Account
+            const clientAccounts = await storage.getComptesByClient(existing.clientId);
+            const courantAccount = clientAccounts.find(c => c.typeCompte === 'Courant' && c.statut === 'Actif');
+  
+            if (!courantAccount) {
+                throw new Error("Le client n'a pas de compte courant actif pour recevoir le remboursement.");
+            }
+  
+            // 3. Execute Transaction (System -> Client)
+            await storage.createTransactionCompte({
+                compteId: courantAccount.id,
+                typePaiement: 'Dépôt Courant',
+                montant: refundAmount.toString(),
+                observations: `Remboursement partiel frais dossier (Demande #${existing.numeroDemande})`,
+                methodePaiement: 'Virement',
+            }, tx);
+  
+            // 4. Trace Mouvement Financier (Explicit Ledger Entry)
+            const { createMouvementFinancier } = await import('../services/ledger');
+            const userId = req.session.user?.id;
+            
+            await createMouvementFinancier(tx, {
+                montant: refundAmount.toString(),
+                sens: 'Crédit',
+                sourceModule: 'SYSTEME',
+                typePaiement: 'Virement',
+                clientId: existing.clientId,
+                compteId: courantAccount.id,
+                creditId: existing.id, 
+                metadata: {
+                    type: 'REMBOURSEMENT_FRAIS',
+                    motif: updateData.motifRejet || 'Rejet demande'
+                }
+            }, userId);
+  
+            // Motif Rejet Update
+            if (updateData.motifRejet) {
+                 updateData.motifRejet += ` (Dont remboursement de ${refundAmount} FCFA)`;
+            }
 
-          // 2. Find Client's Current Account
-          const clientAccounts = await storage.getComptesByClient(existing.clientId);
-          const courantAccount = clientAccounts.find(c => c.typeCompte === 'Courant' && c.statut === 'Actif');
-
-          if (!courantAccount) {
-              return res.status(400).json({ message: "Le client n'a pas de compte courant actif pour recevoir le remboursement." });
-          }
-
-          // 3. Execute Transaction (System -> Client)
-          // We use createTransaction to credit the client account
-          // Source is implicit (SYSTEME via creating a movement without source account, or conceptual source)
-          // For simplicity in this ledger, we treat it as a deposit/adjustment
-          
-          await storage.createTransaction({
-              compteId: courantAccount.id,
-              typeTransaction: 'Dépôt', // Or a specific type if Enum supports 'Remboursement' or 'Ajustement'
-              montant: refundAmount.toString(),
-              description: `Remboursement partiel frais dossier (Demande #${existing.numeroDemande})`,
-              // No source account ID implies external/system source
+            // 5. Update Status
+            return await storage.updateDemandeCredit(id, updateData, tx);
           });
-
-          // 4. Trace Mouvement Financier (Explicit Ledger Entry)
-          const { createMouvementFinancier } = await import('../services/ledger');
-          const userId = req.session.user?.id;
-          
-          await createMouvementFinancier({
-              type: 'DEPENSE', // It's an expense for the company (refunding revenue)
-              montant: refundAmount.toString(),
-              description: `Remboursement frais dossier ${existing.numeroDemande}`,
-              sourceModule: 'SYSTEME',
-              destinationModule: 'EPARGNE', // Goes to Account (Technically 'COMPTE' but module map uses EPARGNE/CREDIT/etc)
-              reference: `REFUND-${existing.numeroDemande}`,
-              clientId: existing.clientId,
-              compteId: courantAccount.id,
-              statut: 'Validé',
-              dateValidation: new Date(),
-              validePar: userId
-          });
-          
-          // Add info to updateData to persists if schema supports it (or just log/comment)
-          // For now, we trust the transaction log. We could append to 'motifRejet'
-          if (updateData.motifRejet) {
-             updateData.motifRejet += ` (Note: ${refundAmount.toLocaleString()} FCFA remboursés)`;
-          }
+      } else {
+          // Normal update
+          updated = await storage.updateDemandeCredit(id, updateData);
       }
-
-      // Update
-      const updated = await storage.updateDemandeCredit(id, updateData);
       
       // Notify
       const wsInstance = getWsInstance();

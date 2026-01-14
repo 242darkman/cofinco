@@ -21,6 +21,7 @@ import {
   } from "@shared/schema";
   import { db } from "../db";
 import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, aliasedTable } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 
 
   
@@ -260,8 +261,8 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
     return demande;
   }
   
-  export async function updateDemandeCredit(id: string, updateData: Partial<InsertDemandeCredit>): Promise<DemandeCredit | undefined> {
-    const [demande] = await db.update(demandesCredit).set(updateData).where(eq(demandesCredit.id, id)).returning();
+  export async function updateDemandeCredit(id: string, updateData: Partial<InsertDemandeCredit>, tx?: PgTransaction<any, any, any>): Promise<DemandeCredit | undefined> {
+    const [demande] = await (tx || db).update(demandesCredit).set(updateData).where(eq(demandesCredit.id, id)).returning();
     return demande || undefined;
   }
 
@@ -539,8 +540,8 @@ import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, 
     return db.select().from(transactionsCompte).where(eq(transactionsCompte.compteId, compteId)).orderBy(desc(transactionsCompte.createdAt));
   }
   
-  export async function createTransactionCompte(insertTransaction: InsertTransactionCompte): Promise<TransactionCompte> {
-    const [transaction] = await db.insert(transactionsCompte).values(insertTransaction).returning();
+  export async function createTransactionCompte(insertTransaction: InsertTransactionCompte, tx?: PgTransaction<any, any, any>): Promise<TransactionCompte> {
+    const [transaction] = await (tx || db).insert(transactionsCompte).values(insertTransaction).returning();
     return transaction;
   }
   
