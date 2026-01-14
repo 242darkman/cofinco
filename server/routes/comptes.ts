@@ -193,6 +193,48 @@ export function registerComptesRoutes(app: Express) {
   );
 
   /**
+   * GET /api/comptes-bloques - Liste des comptes de type "Bloqué"
+   * Retourne les comptes avec type_compte = "Bloqué" pour la section Comptes Bloqués
+   */
+  app.get(
+    "/api/comptes-bloques",
+    requireAuth,
+    requireAgenceAccess(),
+    async (req, res) => {
+      try {
+        const agenceFilter = req.agenceFilter as { agence?: string } | null;
+        const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+
+        // Get all blocked accounts
+        const result = await storage.getAllComptesWithClients(filter, {
+          typeCompte: "Bloqué",
+          page: 1,
+          limit: 100, // Get all blocked accounts
+        });
+
+        // Transform to match expected frontend interface
+        const comptesTransformed = result.data.map((compte: any) => ({
+          id: compte.id,
+          numero_compte: compte.numeroCompte || compte.numero_compte,
+          montant_initial: parseFloat(compte.soldeCourant || compte.solde_courant || '0'),
+          montant_actuel: parseFloat(compte.soldeCourant || compte.solde_courant || '0'),
+          taux_interet: 0, // Not applicable for blocked accounts in this schema
+          date_ouverture: compte.createdAt || compte.created_at,
+          date_echeance: compte.blocageFin || compte.blocage_fin || null,
+          duree_mois: 0,
+          statut: compte.statut,
+          clients: compte.clients,
+        }));
+
+        res.json(addSnakeCaseAliasesDeep(comptesTransformed));
+      } catch (error: any) {
+        console.error("Error listing comptes bloqués:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  /**
    * GET /api/comptes/:id - Détails d'un compte avec permissions
    */
   app.get("/api/comptes/:id", requireAuth, async (req, res) => {
