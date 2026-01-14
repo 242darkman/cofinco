@@ -21,6 +21,7 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import { toast, handleApiError } from '../../lib/toast';
 import { Pagination } from '../ui/Pagination';
+import { formatClientName } from '../../lib/format';
 
 interface ClientModuleProps {
   onModuleChange?: (module: string, subModule?: string, data?: any) => void;
@@ -191,7 +192,7 @@ export default function ClientModule({ onModuleChange }: ClientModuleProps) {
             
             <div>
               <h1 className="text-xl sm:text-3xl font-bold text-white mb-1">
-                {viewingClient.nom} {viewingClient.prenom}
+                {formatClientName(viewingClient.nom, viewingClient.prenom)}
               </h1>
               <div className="flex items-center gap-2 text-sm text-slate-400">
                 <Badge value={viewingClient.segment} size="sm" />
@@ -421,7 +422,7 @@ export default function ClientModule({ onModuleChange }: ClientModuleProps) {
                       key: 'nom',
                       label: 'Nom',
                       primary: true,
-                      format: (_, item) => `${item.nom || ''} ${item.prenom || ''}`.trim() || 'Sans nom'
+                      format: (_, item) => formatClientName(item.nom, item.prenom) || 'Sans nom'
                     },
                     {
                       key: 'telephone',

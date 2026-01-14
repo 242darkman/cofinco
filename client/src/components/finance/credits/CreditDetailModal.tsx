@@ -29,6 +29,7 @@ interface Credit {
   garanties?: string;
   nombre_echeances_total?: number;
   nombre_echeances_payees?: number;
+  fraisDossierPaye?: boolean;
 }
 
 interface Client {
@@ -171,7 +172,16 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
         {/* Header */}
         <div className="p-6 border-b border-slate-700 flex justify-between items-center shrink-0">
           <div>
-            <h2 className="text-2xl font-bold text-white uppercase tracking-tight">Dossier Crédit</h2>
+            <h2 className="text-2xl font-bold text-white uppercase tracking-tight flex items-center gap-3">
+              Dossier Crédit
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold border uppercase tracking-wide ${
+                  credit.fraisDossierPaye 
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                  : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+              }`}>
+                  {credit.fraisDossierPaye ? 'Frais Payés' : 'Frais Non Payés'}
+              </span>
+            </h2>
             <p className="text-slate-400 font-medium">#{credit.numeroCredit} - {client ? `${client.nom} ${client.prenom || ''}` : 'Sans client'}</p>
           </div>
           <div className="flex items-center gap-3">

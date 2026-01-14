@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { Client } from '@shared/schema';
 import { useLocation } from 'wouter';
-import { DollarSign, Award, MapPin, Phone, Mail, User, Building2, ChevronRight, TrendingUp, Wallet } from 'lucide-react';
+import { DollarSign, Award, MapPin, Phone, Mail, User, Building2, ChevronRight, TrendingUp, Wallet, AlertTriangle } from 'lucide-react';
 import { Card, Modal, Button, Skeleton } from '../ui';
 import ClientTags from './ClientTags';
 import { useQuery } from '@tanstack/react-query';
@@ -59,6 +59,20 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
 
   return (
     <>
+    {/* ====== FROZEN CLIENT BANNER ====== */}
+    {['Inactif', 'Suspendu', 'Blacklisté'].includes(client.status || '') && (
+        <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-3 animate-in slide-in-from-top duration-300">
+            <div className="shrink-0 w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <AlertTriangle className="text-red-400" size={20} />
+            </div>
+            <div>
+                <h4 className="text-red-400 font-bold text-sm">Client {client.status}</h4>
+                <p className="text-red-300/80 text-xs">Les comptes de ce client sont gelés. Les opérations de débit sont bloquées.</p>
+            </div>
+        </div>
+    )}
+    {/* ====== END FROZEN CLIENT BANNER ====== */}
+
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-in fade-in duration-500">
       
       {/* 1. Segment & Fidélité Card */}

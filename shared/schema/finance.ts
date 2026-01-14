@@ -67,6 +67,7 @@ export const credits = pgTable("credits", {
   id: uuid("id").primaryKey().defaultRandom(),
   numeroCredit: text("numero_credit").notNull().unique(),
   clientId: uuid("client_id").notNull().references(() => clients.id),
+  demandeId: uuid("demande_id").references(() => demandesCredit.id), // Added for linking back to application (fees, etc)
   enqueteId: uuid("enquete_id"),
   montant: numeric("montant").notNull(),
   taux: numeric("taux").notNull(),

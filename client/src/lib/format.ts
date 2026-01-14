@@ -236,6 +236,41 @@ export function formatName(name: string | null | undefined): string {
     .join(' ');
 }
 
+/**
+ * Format client name according to business rules:
+ * - Nom (last name): UPPERCASE
+ * - Prénom (first name): Title Case, handling compound names (Jean-Pierre, Marie Claire)
+ */
+export function formatClientName(nom: string | null | undefined, prenom?: string | null): string {
+  // Format last name: UPPERCASE
+  const formattedNom = (nom || '').trim().toUpperCase();
+  
+  if (!prenom) {
+    return formattedNom;
+  }
+  
+  // Format first name: Title Case with support for:
+  // - Simple names: "jean" -> "Jean"
+  // - Compound names with hyphen: "jean-pierre" -> "Jean-Pierre"
+  // - Multiple first names: "marie claire" -> "Marie Claire"
+  const formatPrenom = (p: string): string => {
+    return p
+      .trim()
+      .split(/(\s+|-)/) // Split on spaces and hyphens, keeping delimiters
+      .map(part => {
+        if (part === ' ' || part === '-') return part;
+        if (!part) return '';
+        // Handle each word: lowercase then capitalize first letter
+        return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+      })
+      .join('');
+  };
+  
+  const formattedPrenom = formatPrenom(prenom);
+  
+  return formattedPrenom ? `${formattedNom} ${formattedPrenom}` : formattedNom;
+}
+
 // File size formatting
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';

@@ -27,9 +27,21 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 
   
   // Credits
-  export async function getCredit(id: string): Promise<Credit | undefined> {
-    const [credit] = await db.select().from(credits).where(eq(credits.id, id));
-    return credit || undefined;
+  export async function getCredit(id: string): Promise<Credit & { fraisDossierPaye?: boolean } | undefined> {
+    const [result] = await db.select({
+      credit: credits,
+      demande: demandesCredit
+    })
+    .from(credits)
+    .leftJoin(demandesCredit, eq(credits.demandeId, demandesCredit.id))
+    .where(eq(credits.id, id));
+
+    if (!result) return undefined;
+
+    return {
+      ...result.credit,
+      fraisDossierPaye: result.demande?.fraisEngagementPayes || false
+    };
   }
   
   export async function getCreditsByClient(clientId: string): Promise<Credit[]> {

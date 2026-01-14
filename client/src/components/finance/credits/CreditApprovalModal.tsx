@@ -3,7 +3,7 @@ import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, Trend
 import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatClientName } from '../../../lib/format';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -181,10 +181,10 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     };
   }, [demande]);
 
-  // Safe escaped values
+  // Safe escaped values - Use formatClientName for consistent formatting
   const safeClientName = useMemo(() => {
-    const full = `${demande.clients.nom} ${demande.clients.prenom || ''}`.trim();
-    return escapeHtml(full);
+    const formatted = formatClientName(demande.clients.nom, demande.clients.prenom);
+    return escapeHtml(formatted);
   }, [demande.clients.nom, demande.clients.prenom]);
 
   const addGuarantee = useCallback(() => {
@@ -349,6 +349,41 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
               <X size={24} />
             </button>
           </div>
+
+          {/* ====== FEES STATUS BANNER - Above the Fold ====== */}
+          <div className={`mx-6 mt-4 p-4 rounded-xl flex items-center gap-4 ${
+              demande.frais_engagement_payes 
+                ? 'bg-emerald-500/10 border border-emerald-500/30' 
+                : 'bg-amber-500/10 border border-amber-500/30'
+          }`}>
+              <div className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                  demande.frais_engagement_payes ? 'bg-emerald-500/20' : 'bg-amber-500/20'
+              }`}>
+                  {demande.frais_engagement_payes ? (
+                      <CheckCircle className="text-emerald-400" size={24} />
+                  ) : (
+                      <AlertCircle className="text-amber-400" size={24} />
+                  )}
+              </div>
+              <div className="flex-1">
+                  <h4 className={`font-bold text-sm ${
+                      demande.frais_engagement_payes ? 'text-emerald-400' : 'text-amber-400'
+                  }`}>
+                      {demande.frais_engagement_payes ? 'Frais de Dossier Payés ✅' : 'Frais de Dossier en Attente ⚠️'}
+                  </h4>
+                  <p className={`text-xs ${
+                      demande.frais_engagement_payes ? 'text-emerald-300/80' : 'text-amber-300/80'
+                  }`}>
+                      {demande.frais_engagement_payes 
+                          ? `Montant payé : ${formatMoney(demande.montant_frais_engagement || 0)}`
+                          : demande.montant_frais_engagement 
+                              ? `Montant dû : ${formatMoney(demande.montant_frais_engagement)}`
+                              : 'Le client doit régler les frais avant traitement.'
+                      }
+                  </p>
+              </div>
+          </div>
+          {/* ====== END FEES STATUS BANNER ====== */}
 
           <div className="p-6 space-y-6">
             {/* Client & Demande Info */}

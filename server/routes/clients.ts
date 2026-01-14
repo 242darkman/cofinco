@@ -12,7 +12,7 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from 
 import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 
 export function registerClientRoutes(app: Express) {
@@ -545,6 +545,28 @@ export function registerClientRoutes(app: Express) {
 
         const client = await storage.updateClient(req.params.id, parsed);
 
+        // ====== BUSINESS LOGIC: Account Freezing on Client Status Change ======
+        const INACTIVE_STATUSES = ['Inactif', 'Suspendu', 'Blacklisté'];
+        const wasActive = !INACTIVE_STATUSES.includes(existing.status || '');
+        const isNowInactive = INACTIVE_STATUSES.includes(client?.status || '');
+        
+        if (wasActive && isNowInactive && client) {
+            // Freeze all client accounts
+            const accounts = await getComptesByClient(client.id);
+            for (const account of accounts) {
+                if (account.statut === 'Actif' && !account.blocageActif) {
+                    await storage.updateCompte(account.id, {
+                        blocageActif: true,
+                        blocageMotif: 'Décision interne',
+                        blocageReference: `CLIENT_STATUS:${client.status}`,
+                        blocageDebut: new Date()
+                    });
+                }
+            }
+            console.log(`🔒 Frozen ${accounts.length} accounts for client ${client.id} (status: ${client.status})`);
+        }
+        // ====== END BUSINESS LOGIC ======
+
         await logAudit(
             req,
             "UPDATE_CLIENT",
@@ -606,6 +628,49 @@ export function registerClientRoutes(app: Express) {
       }
 
       res.status(200).json({ message: "Client deleted successfully" });
+  });
+
+
+  // Check Uniqueness
+  app.post("/api/clients/check-uniqueness", requireAuth, async (req, res) => {
+      try {
+          const { telephone, email, numeroPiece, excludeClientId } = req.body;
+          const { eq, or, and, ne } = require("drizzle-orm");
+          const { clients } = require("@shared/schema");
+
+          const checks = [];
+          if (telephone) checks.push(eq(clients.telephone, telephone));
+          if (email) checks.push(eq(clients.email, email));
+          if (numeroPiece) checks.push(eq(clients.numeroPiece, numeroPiece));
+
+          if (checks.length === 0) return res.json({ available: true });
+
+          let query = db.select().from(clients).where(or(...checks));
+          
+          const conflicts = await query;
+          
+          // Filter out the current client if we are editing
+          const realConflicts = conflicts.filter(c => c.id !== excludeClientId);
+
+          if (realConflicts.length > 0) {
+              const conflict = realConflicts[0];
+              let field = '';
+              if (telephone && conflict.telephone === telephone) field = 'telephone';
+              else if (email && conflict.email === email) field = 'email';
+              else if (numeroPiece && conflict.numeroPiece === numeroPiece) field = 'numeroPiece';
+              
+              return res.json({ 
+                  available: false, 
+                  field, 
+                  message: `Ce ${field === 'numeroPiece' ? 'numéro de pièce' : field} est déjà associé à ${conflict.nom} ${conflict.prenom || ''}` 
+              });
+          }
+
+          res.json({ available: true });
+      } catch (error) {
+          console.error("Uniqueness check error:", error);
+          res.status(500).json({ message: "Validation error" });
+      }
   });
 
   // Types de Marchés
@@ -919,4 +984,95 @@ export function registerClientRoutes(app: Express) {
       res.status(500).json({ message: "Erreur lors de la création du profil client" });
     }
   });
+
+  // ============================================
+  // GLOBAL HISTORY ENDPOINT
+  // ============================================
+  app.get("/api/clients/:id/global-history", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+        const clientId = req.params.id;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        
+        // Verify access to client
+        const client = await storage.getClient(clientId);
+        if (!client) return res.status(404).json({ message: "Client not found" });
+
+        const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+        if (agenceFilter) {
+          if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
+            return res.status(403).json({ message: "Accès refusé" });
+          }
+        }
+
+        // Fetch from mouvementsFinanciers (the source of truth)
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        
+        const { mouvementsFinanciers, remboursements, contributionsTontine, credits } = require("@shared/schema");
+        const { desc, and, gte, lte, isNull } = require("drizzle-orm");
+        
+        // Get all movements for this client
+        const movements = await db.select()
+            .from(mouvementsFinanciers)
+            .where(and(
+                eq(mouvementsFinanciers.clientId, clientId),
+                gte(mouvementsFinanciers.dateOperation, oneYearAgo)
+            ))
+            .orderBy(desc(mouvementsFinanciers.dateOperation))
+            .limit(limit)
+            .offset((page - 1) * limit);
+
+        // Transform to unified history format
+        const history = movements.map((m: any) => ({
+            id: m.id,
+            date: m.dateOperation,
+            type: m.typePaiement || m.sourceModule,
+            sens: m.sens, // 'Débit' or 'Crédit'
+            montant: Number(m.montant),
+            source_module: m.sourceModule,
+            reference: m.reference,
+            reference_externe: m.referenceExterne,
+            statut: m.statut,
+            // Icon mapping for frontend
+            icon: getTransactionIcon(m.sourceModule, m.typePaiement)
+        }));
+
+        // Count total for pagination
+        const [countResult] = await db.select({ count: sql`count(*)` })
+            .from(mouvementsFinanciers)
+            .where(and(
+                eq(mouvementsFinanciers.clientId, clientId),
+                gte(mouvementsFinanciers.dateOperation, oneYearAgo)
+            ));
+        
+        const total = Number(countResult?.count) || 0;
+
+        res.json({
+            data: history,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error("Global history error:", error);
+        res.status(500).json({ message: "Erreur lors de la récupération de l'historique" });
+    }
+  });
+}
+
+// Helper function for icon mapping
+function getTransactionIcon(sourceModule: string, typePaiement?: string): string {
+    const type = (typePaiement || sourceModule || '').toLowerCase();
+    if (type.includes('crédit') || type.includes('credit')) return 'credit-card';
+    if (type.includes('épargne') || type.includes('epargne')) return 'piggy-bank';
+    if (type.includes('tontine')) return 'users';
+    if (type.includes('retrait')) return 'arrow-up-right';
+    if (type.includes('dépôt') || type.includes('depot') || type.includes('versement')) return 'arrow-down-left';
+    if (type.includes('remboursement')) return 'refresh-cw';
+    if (type.includes('décaissement') || type.includes('decaissement')) return 'banknote';
+    return 'activity';
 }

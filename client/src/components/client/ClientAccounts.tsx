@@ -404,7 +404,9 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                 <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase">Type de compte</label>
                 {/* Type selection logic same as before but disabled if editing */}
                  <div className="grid grid-cols-3 gap-2">
-                  {['Courant', 'Épargne', 'Bloqué'].map((type) => (
+                  {['Courant', 'Épargne', 'Bloqué']
+                    .filter(type => !comptes.some(c => c.typeCompte === type && c.statut !== 'Clôturé' && c.statut !== 'Fermé'))
+                    .map((type) => (
                     <button
                         key={type}
                         type="button"

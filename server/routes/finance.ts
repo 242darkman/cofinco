@@ -208,6 +208,7 @@ export function registerFinanceRoutes(app: Express) {
         duree: data.duree || demande.nombreEcheances || demande.dureeValeur,
         typeCredit: demande.typeCredit || 'Personnel',
         objetCredit: demande.objetCredit,
+        demandeId: demande.id, // Link to the original application
         // Si programmé, le crédit est "En attente" (du décaissement), sinon "Actif"
         statut: estProgramme ? 'En attente' as const : 'Actif' as const,
         echeance: demande.frequenceRemboursement,
@@ -1495,6 +1496,31 @@ export function registerFinanceRoutes(app: Express) {
         // For now, we assume ALL operations via this endpoint should be robust.
         
         const hasAccountImpact = !!targetCompteId;
+
+        // ====== BUSINESS LOGIC: Block Debit Operations on Frozen Accounts ======
+        if (hasAccountImpact && targetCompteId) {
+            const opType = (parsed.typeOperation || '').toLowerCase();
+            const isDebitOperation = opType.includes('retrait');
+            
+            if (isDebitOperation) {
+                const targetAccount = await storage.getCompte(targetCompteId);
+                if (targetAccount?.blocageActif) {
+                    return res.status(403).json({ 
+                        message: `Ce compte est gelé (${targetAccount.blocageMotif || 'Blocage administratif'}). Les retraits ne sont pas autorisés.` 
+                    });
+                }
+                // Also check if client is frozen
+                if (parsed.clientId) {
+                    const client = await storage.getClient(parsed.clientId);
+                    if (client && ['Inactif', 'Suspendu', 'Blacklisté'].includes(client.status || '')) {
+                        return res.status(403).json({
+                            message: `Client ${client.status}. Les opérations de débit ne sont pas autorisées.`
+                        });
+                    }
+                }
+            }
+        }
+        // ====== END BUSINESS LOGIC ======
 
         if (hasAccountImpact) {
             const { operation, transaction, mouvement } = await storage.createCashTransactionWithLedger({

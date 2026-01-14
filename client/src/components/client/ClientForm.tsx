@@ -142,6 +142,10 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     }
   }, [isAdmin]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ... (inside component)
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!(formData.nom || '').trim()) newErrors.nom = 'Le nom est requis';
@@ -153,10 +157,56 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const checkUniqueness = async (): Promise<boolean> => {
+    try {
+        const res = await fetch('/api/clients/check-uniqueness', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                telephone: formData.telephone,
+                email: formData.email,
+                numeroPiece: formData.numeroPiece,
+                excludeClientId: client?.id
+            })
+        });
+        const data = await res.json();
+        if (!data.available) {
+            setErrors(prev => ({ ...prev, [data.field]: data.message }));
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error("Check uniqueness failed", err);
+        return true; // Optionally allow if check fails? Or block? Safe to allow usually if API down.
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (validateForm()) {
-      onSave(formData);
+       setIsSubmitting(true);
+       
+       // Debounce/Delay slightly to prevent double clicks if not caught by state immediately
+       const isUnique = await checkUniqueness();
+       if (!isUnique) {
+           setIsSubmitting(false);
+           return;
+       }
+
+       try {
+           await onSave(formData);
+           // onSave usually handles closing, but if we are here and component unmounts, fine.
+           // If we stay mounted, we should enable button? 
+           // Usually onSave is fire and forget or triggers parents.
+           // We'll reset submitting after a timeout just in case it fails silently 
+           // or if onSave is not async (though it likely triggers an API call in parent).
+           setTimeout(() => setIsSubmitting(false), 2000); 
+       } catch (error) {
+           console.error("Save failed", error);
+           setIsSubmitting(false);
+       }
     }
   };
 
@@ -522,9 +572,14 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         </div>
 
         <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700 mt-6">
-             <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
-             <Button type="submit" variant="primary" icon={Save}>
-                 {client ? 'Mettre à jour' : 'Enregistrer'}
+             <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Annuler</Button>
+             <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting}>
+                 {isSubmitting ? (
+                     <span className="flex items-center gap-2">
+                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                         Traitement...
+                     </span>
+                 ) : client ? 'Mettre à jour' : 'Enregistrer'}
              </Button>
         </div>
       </form>

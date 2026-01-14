@@ -7,7 +7,9 @@ import {
   sessionsCaisse,
   tontines,
   caisses,
-  users
+  users,
+  clients,
+  membresTontine
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -291,6 +293,43 @@ export async function createMouvementEvents(
       payload: { ...payload, agentId: additionalData.agentId },
     });
   }
+
+  // Recalculate Total Savings for Client
+  if (mouvement.clientId) {
+      await recalculateClientSavings(tx, mouvement.clientId);
+  }
+}
+
+/**
+ * Recalculate Total Savings (Epargne + Bloqué + Tontine Contributions)
+ */
+async function recalculateClientSavings(tx: PgTransaction<any, any, any>, clientId: string) {
+    try {
+        const { inArray, eq, and, sql } = await import("drizzle-orm");
+        
+        // Sum accounts (Epargne + Bloqué)
+        const [accountsSum] = await tx.select({ total: sql<string>`sum(${comptes.soldeCourant})` })
+            .from(comptes)
+            .where(and(
+                eq(comptes.clientId, clientId),
+                inArray(comptes.typeCompte, ['Épargne', 'Bloqué'])
+            ));
+
+        // Sum tontine contributions
+        const [tontineSum] = await tx.select({ total: sql<string>`sum(${membresTontine.totalCotisations})` })
+            .from(membresTontine)
+            .where(eq(membresTontine.clientId, clientId));
+
+        const total = (Number(accountsSum?.total) || 0) + (Number(tontineSum?.total) || 0);
+
+        // Update client
+        await tx.update(clients)
+            .set({ epargneTotal: total.toString() })
+            .where(eq(clients.id, clientId));
+    } catch (error) {
+        console.error(`Error calculating savings for client ${clientId}:`, error);
+        // Do not block the transaction for this
+    }
 }
 
 /**

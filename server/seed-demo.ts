@@ -1900,6 +1900,9 @@ async function seedDemo() {
         : null;
       
       const dateRejet = statut === 'Rejetée' ? daysAgo(randomBetween(1, 180)) : null;
+      
+      // Fee amounts vary by loan size: 1-2% of requested amount, min 5000, max 50000
+      const fraisCalculated = Math.max(5000, Math.min(50000, Math.round(montantDemande * 0.015 / 1000) * 1000));
 
       demandesData.push({
         numeroDemande: `DEM-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
@@ -1924,7 +1927,7 @@ async function seedDemo() {
         dateRejet,
         // Rule: If rejected (or approved/processed), fees must have been paid
         fraisEngagementPayes: statut === 'Rejetée' || isApproved, 
-        montantFraisEngagement: (statut === 'Rejetée' || isApproved) ? '5000' : (Math.random() > 0.5 ? '5000' : '0'),
+        montantFraisEngagement: String(fraisCalculated),
         createdBy: staffGroups.Credits[i % staffGroups.Credits.length]?.id || staffGroups.Agents[0]?.id,
         createdAt: daysAgo(randomBetween(1, 180)),
       });
@@ -2163,18 +2166,23 @@ async function seedDemo() {
 
     const insertedEnquetes = await db.insert(enquetesCredit).values(enquetesData).returning();
 
-    // Générer 35 crédits actifs avec différents statuts
+    // Générer des crédits à partir des demandes décaissées + quelques crédits additionnels
     const creditsData: any[] = [];
-    const CREDIT_STATUTS_WEIGHTED = ['Actif', 'Actif', 'Actif', 'En retard', 'Soldé', 'Soldé', 'Soldé', 'En attente', 'Annulé'];
+    const CREDIT_STATUTS_WEIGHTED = ['Actif', 'Actif', 'Actif', 'En retard', 'Soldé', 'Soldé', 'Soldé', 'Annulé'];
     const GARANTIES = ['Caution', 'Matériel', 'Stock', 'Hypothèque', 'Véhicule', 'Nantissement', 'Aucune'];
 
-    for (let i = 0; i < 35; i++) {
-      const client = insertedClients[i % insertedClients.length];
-      const statut = randomFromArray(CREDIT_STATUTS_WEIGHTED);
-      const montant = parseInt(generateRealisticAmount(100000, 1500000, 50000));
-      const duree = randomBetween(3, 24);
-      const taux = randomBetween(9, 18);
-      const enquete = insertedEnquetes[i % insertedEnquetes.length];
+    // D'abord, créer des crédits à partir des demandes décaissées (avec demandeId)
+    const demandesDecaissees = insertedDemandes.filter(d => d.statut === 'Décaissée');
+    console.log(`   📋 Creating ${demandesDecaissees.length} credits from disbursed applications...`);
+    
+    for (let i = 0; i < demandesDecaissees.length; i++) {
+      const demande = demandesDecaissees[i];
+      const client = insertedClients.find(c => c.id === demande.clientId) || insertedClients[0];
+      const statut = randomFromArray(['Actif', 'Actif', 'En retard', 'Soldé']);
+      const montant = parseInt(demande.montantApprouve || demande.montantDemande || '500000');
+      const duree = demande.dureeValeur || randomBetween(3, 24);
+      const taux = parseInt(demande.tauxInteret || '15');
+      const enquete = insertedEnquetes.find(e => e.demandeId === demande.id) || insertedEnquetes[i % insertedEnquetes.length];
 
       const dateDebutDays = statut === 'Soldé' ? randomBetween(120, 365) : randomBetween(30, 180);
       const soldeRestant = statut === 'Soldé' ? 0
@@ -2184,6 +2192,45 @@ async function seedDemo() {
       creditsData.push({
         numeroCredit: `CRED-${currentYear}${(i + 1).toString().padStart(4, '0')}`,
         clientId: client.id,
+        demandeId: demande.id, // 🔗 Link to demande for fee status
+        enqueteId: enquete?.id,
+        montant: String(montant),
+        taux: String(taux),
+        duree,
+        typeCredit: demande.typeCredit || randomFromArray(CREDIT_TYPES),
+        objetCredit: demande.objetCredit || randomFromArray(CREDIT_OBJECTS),
+        statut,
+        dateDebut: ['Actif', 'En retard', 'Soldé'].includes(statut) ? daysAgo(dateDebutDays) : null,
+        dateFin: ['Actif', 'En retard'].includes(statut) ? daysFromNow(duree * 30 - dateDebutDays) : statut === 'Soldé' ? daysAgo(randomBetween(1, 60)) : null,
+        dateSolde: statut === 'Soldé' ? daysAgo(randomBetween(1, 30)) : null,
+        soldeRestant: String(soldeRestant),
+        echeance: demande.frequenceRemboursement || randomFromArray(['Mensuel', 'Hebdomadaire', 'Bimensuel']),
+        garanties: randomFromArray(GARANTIES),
+        agenceId: client.agenceId,
+        createdBy: staffGroups.Credits[i % staffGroups.Credits.length]?.id,
+        createdAt: daysAgo(dateDebutDays + randomBetween(5, 30)),
+      });
+    }
+
+    // Ajouter des crédits supplémentaires sans demande (legacy data)
+    const additionalCreditsCount = Math.max(0, 35 - creditsData.length);
+    for (let i = 0; i < additionalCreditsCount; i++) {
+      const client = insertedClients[(demandesDecaissees.length + i) % insertedClients.length];
+      const statut = randomFromArray(CREDIT_STATUTS_WEIGHTED);
+      const montant = parseInt(generateRealisticAmount(100000, 1500000, 50000));
+      const duree = randomBetween(3, 24);
+      const taux = randomBetween(9, 18);
+      const enquete = insertedEnquetes[(demandesDecaissees.length + i) % insertedEnquetes.length];
+
+      const dateDebutDays = statut === 'Soldé' ? randomBetween(120, 365) : randomBetween(30, 180);
+      const soldeRestant = statut === 'Soldé' ? 0
+        : statut === 'Annulé' ? 0
+        : Math.round(montant * (0.3 + Math.random() * 0.6));
+
+      creditsData.push({
+        numeroCredit: `CRED-${currentYear}${(demandesDecaissees.length + i + 1).toString().padStart(4, '0')}`,
+        clientId: client.id,
+        demandeId: null, // Legacy credit without linked application
         enqueteId: enquete?.id,
         montant: String(montant),
         taux: String(taux),
