@@ -646,6 +646,75 @@ export function registerComptesRoutes(app: Express) {
   });
 
   // ============================================================================
+  // STATS & CLOTURE
+  // ============================================================================
+
+  /**
+   * POST /api/comptes/:id/cloturer - Clôturer un compte définitivement
+   */
+  app.post(
+    "/api/comptes/:id/cloturer",
+    requireAuth,
+    requireRole("admin", "chef"), // Action critique
+    async (req, res) => {
+      try {
+        const user = req.session.user;
+        const compte = await comptesService.cloturerCompte(
+          req.params.id,
+          user?.id
+        );
+
+        await logAudit(
+          req,
+          "CLOTURER_COMPTE",
+          "compte",
+          req.params.id,
+          undefined,
+          "success",
+          "critical"
+        );
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            ...compte,
+            message: "Compte clôturé avec succès",
+          })
+        );
+      } catch (error: any) {
+        if (error instanceof CompteError) {
+          // Specific error codes to help frontend (BALANCE_NOT_ZERO, PENDING_TRANSACTIONS...)
+          return res.status(400).json({
+            message: error.message,
+            code: error.code,
+          });
+        }
+        console.error("Error cloturer compte:", error);
+        res.status(500).json({ message: error.message || "Erreur serveur" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/:id/stats - Statistiques d'évolution du solde
+   * Query: period (1M, 3M, 6M, 1Y)
+   */
+  app.get("/api/comptes/:id/stats", requireAuth, async (req, res) => {
+    try {
+      const period = (req.query.period as '1M' | '3M' | '6M' | '1Y') || '1M';
+      // Basic validation of period
+      if (!['1M', '3M', '6M', '1Y'].includes(period)) {
+        return res.status(400).json({ message: "Période invalide" });
+      }
+
+      const stats = await comptesService.getCompteStats(req.params.id, period);
+      res.json(stats); // Already JSON structure
+    } catch (error: any) {
+      console.error("Error getting stats:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
   // VALIDATION ENDPOINT (pour le frontend)
   // ============================================================================
 

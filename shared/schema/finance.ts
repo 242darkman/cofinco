@@ -406,6 +406,10 @@ export const comptes = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     deletedAt: timestamp("deleted_at"),
+
+    // Clôture
+    closedAt: timestamp("closed_at"),
+    closedBy: uuid("closed_by").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => ({
     uqNumero: uniqueIndex("uq_comptes_numero_compte").on(t.numeroCompte),

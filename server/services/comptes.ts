@@ -20,8 +20,10 @@ import {
   evenementsOutbox,
   sessionsCaisse,
   clients,
+  credits,
 } from "@shared/schema";
-import { eq, and, isNull, desc, sql } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, gte, lte } from "drizzle-orm";
+import { subMonths, subYears, startOfDay, endOfDay, eachDayOfInterval, format, isSameDay } from "date-fns";
 import {
   executeWithLedger,
   updateCompteSolde,
@@ -863,6 +865,206 @@ export async function getCompteTransactions(compteId: string, limit = 50) {
   });
 }
 
+export async function cloturerCompte(
+  compteId: string,
+  userId?: string
+): Promise<typeof comptes.$inferSelect> {
+  return await db.transaction(async (tx) => {
+    // 1. Get compte
+    const [compte] = await tx.select().from(comptes).where(eq(comptes.id, compteId));
+    if (!compte) {
+      throw new CompteError("Compte non trouvé", "COMPTE_NOT_FOUND");
+    }
+
+    if (compte.statut === "Clôturé") {
+      throw new CompteError("Le compte est déjà clôturé", "ALREADY_CLOSED");
+    }
+
+    // 2. Validate Zero Balance
+    // Using loose comparison for string "0.00" or number 0
+    if (parseFloat(compte.soldeCourant) !== 0) {
+      throw new CompteError(
+        "Le solde doit être à zéro pour clôturer le compte. Veuillez effectuer un retrait ou un dépôt de régularisation.",
+        "BALANCE_NOT_ZERO"
+      );
+    }
+
+    // 3. Validate No Pending Transactions
+    const pendingTransactions = await tx
+      .select()
+      .from(transactionsCompte)
+      .where(
+        and(
+          eq(transactionsCompte.compteId, compteId),
+          eq(transactionsCompte.statut, "Pending")
+        )
+      )
+      .limit(1);
+
+    if (pendingTransactions.length > 0) {
+      throw new CompteError(
+        "Impossible de clôturer : des transactions sont en attente.",
+        "PENDING_TRANSACTIONS"
+      );
+    }
+
+    // 4. Validate No Active Debts (Credits)
+    // Check for credits linked to this client that are Active or Late
+    // Ideally we should check if *this specific account* is linked as guarantee, but for now checking client's global state or linked credits
+    // The prompt says "Dettes liées : Vérifier qu'aucun crédit actif ... n'est rattaché à ce compte"
+    // Usually credits are linked to client, but maybe re-payments come from this account.
+    // Let's check if client has active credits first.
+    const activeCredits = await tx
+      .select()
+      .from(credits)
+      .where(
+        and(
+          eq(credits.clientId, compte.clientId),
+          sql`${credits.statut} IN ('Actif', 'En retard')`
+        )
+      )
+      .limit(1);
+
+    if (activeCredits.length > 0) {
+      throw new CompteError(
+        "Impossible de clôturer : le client a des crédits en cours.",
+        "ACTIVE_CREDITS"
+      );
+    }
+
+    // 5. Close Account
+    const [closedCompte] = await tx
+      .update(comptes)
+      .set({
+        statut: "Clôturé",
+        closedAt: new Date(),
+        closedBy: userId,
+        updatedAt: new Date(),
+      })
+      .where(eq(comptes.id, compteId))
+      .returning();
+
+    // 6. Audit / Outbox
+    await tx.insert(evenementsOutbox).values({
+      type: "SOLDE_COMPTE_CHANGE", // Generic status change event
+      aggregateType: "compte",
+      aggregateId: compteId,
+      payload: {
+        compteId,
+        action: "CLOTURE",
+        closedAt: new Date().toISOString(),
+        closedBy: userId,
+      },
+    });
+
+    // Notify client
+    await tx.insert(evenementsOutbox).values({
+      type: "SOLDE_COMPTE_CHANGE",
+      aggregateType: "client",
+      aggregateId: compte.clientId,
+      payload: {
+        type: "COMPTE_CLOTURE",
+        compteId,
+        typeCompte: compte.typeCompte,
+      },
+    });
+
+    return closedCompte;
+  });
+}
+
+export async function getCompteStats(
+  compteId: string,
+  period: '1M' | '3M' | '6M' | '1Y' = '1M'
+) {
+  const endDate = new Date();
+  let startDate = new Date();
+
+  switch (period) {
+    case '1M': startDate = subMonths(endDate, 1); break;
+    case '3M': startDate = subMonths(endDate, 3); break;
+    case '6M': startDate = subMonths(endDate, 6); break;
+    case '1Y': startDate = subYears(endDate, 1); break;
+    default: startDate = subMonths(endDate, 1);
+  }
+
+  // 1. Get initial balance before start date
+  // Find last transaction before startDate
+  const [lastTxBefore] = await db
+    .select({ soldeApres: transactionsCompte.soldeApres })
+    .from(transactionsCompte)
+    .where(
+      and(
+        eq(transactionsCompte.compteId, compteId),
+        lte(transactionsCompte.createdAt, startDate)
+      )
+    )
+    .orderBy(desc(transactionsCompte.createdAt))
+    .limit(1);
+
+  let currentBalance = lastTxBefore ? parseFloat(lastTxBefore.soldeApres || '0') : 0;
+
+  // 2. Get all transactions in range
+  const transactions = await db
+    .select({
+      createdAt: transactionsCompte.createdAt,
+      soldeApres: transactionsCompte.soldeApres,
+    })
+    .from(transactionsCompte)
+    .where(
+      and(
+        eq(transactionsCompte.compteId, compteId),
+        gte(transactionsCompte.createdAt, startDate),
+        lte(transactionsCompte.createdAt, endDate)
+      )
+    )
+    .orderBy(transactionsCompte.createdAt); // Ascending for traversal
+
+  // 3. Build daily points
+  // If period is large (1Y), maybe aggregate by week? For now daily is fine for < 365 points.
+  // Although 365 points is a bit heavy, commonly accepted.
+  // Optimization: use 'eachDayOfInterval' and fill.
+  
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  const dataPoints = [];
+  let txIndex = 0;
+
+  for (const day of days) {
+    const dayEnd = endOfDay(day);
+    
+    // Process all transactions for this day
+    while (
+      txIndex < transactions.length && 
+      transactions[txIndex].createdAt <= dayEnd
+    ) {
+      currentBalance = parseFloat(transactions[txIndex].soldeApres || '0');
+      txIndex++;
+    }
+
+    dataPoints.push({
+      date: format(day, 'yyyy-MM-dd'),
+      balance: currentBalance
+    });
+  }
+
+  // Determine trend (start vs end)
+  const startBal = dataPoints[0]?.balance || 0;
+  const endBal = dataPoints[dataPoints.length - 1]?.balance || 0;
+  // Simple trend: verify if any point was negative (red zone) or just global direction?
+  // User says: "Vert si la tendance globale est positive, Rouge si le compte a été à découvert sur la période."
+  // BUT logic also says: "Rouge si le compte a été à découvert".
+  // Let's check for overdraft.
+  const hasOverdraft = dataPoints.some(p => p.balance < 0);
+  const trend = hasOverdraft ? 'negative' : (endBal >= startBal ? 'positive' : 'neutral');
+
+  return {
+    period,
+    currency: 'XAF',
+    trend,
+    data_points: dataPoints
+  };
+}
+
 export default {
   // Validation
   clientHasCompteOfType,
@@ -873,6 +1075,7 @@ export default {
   // Operations
   deposerSurCompte,
   retirerDuCompte,
+  cloturerCompte,
   // Blocking
   bloquerCompte,
   debloquerCompte,
@@ -882,8 +1085,7 @@ export default {
   getClientPortfolio,
   getCompteAgenceHistorique,
   getCompteTransactions,
-  mouvementsFinanciers,
-  sessionsCaisse,
+  getCompteStats,
   // Error class
   CompteError,
 };

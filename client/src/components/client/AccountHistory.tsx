@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText } from 'lucide-react';
-import { Badge } from '../ui';
+import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Trash2, AlertTriangle } from 'lucide-react';
+import { Badge, ConfirmDialog, Modal, Button } from '../ui';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import AccountStatsChart from './AccountStatsChart';
 
 interface Transaction {
   id: string;
@@ -13,13 +14,15 @@ interface Transaction {
   montant: string | number;
   sens: 'CREDIT' | 'DEBIT';
   type: string;
-  description?: string; // Sometimes inferred
-  observations?: string; // From schema
-  recu_numero?: string; // Usually mapped from reference_externe
+  description?: string;
+  observations?: string;
+  recu_numero?: string;
   referenceExterne?: string;
   solde_apres?: string | number;
   typePaiement?: string;
   methodePaiement?: string;
+  displayDescription?: string;
+  displayRef?: string;
 }
 
 interface AccountHistoryProps {
@@ -34,6 +37,11 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Closure state
+  const [showClosureConfirm, setShowClosureConfirm] = useState(false);
+  const [closureLoading, setClosureLoading] = useState(false);
+  const [closureError, setClosureError] = useState<{ title: string; message: string } | null>(null);
 
   useEffect(() => {
     if (isOpen && compteId) {
@@ -56,6 +64,37 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
     }
   };
 
+  const handleClosure = async () => {
+    setClosureLoading(true);
+    try {
+      const res = await fetch(`/api/comptes/${compteId}/cloturer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setShowClosureConfirm(false); // Close confirmation to show error
+        setClosureError({
+          title: 'Impossible de clôturer le compte',
+          message: json.message || 'Une erreur est survenue lors de la clôture.'
+        });
+      } else {
+        // Success
+        setShowClosureConfirm(false);
+        onClose(); // Close modal
+        // Ideally trigger refresh of accounts list here
+        window.location.reload(); // Simple brute force refresh for now to ensure state sync
+      }
+    } catch (err) {
+      console.error(err);
+      setShowClosureConfirm(false);
+      setClosureError({ title: 'Erreur technique', message: 'Impossible de contacter le serveur.' });
+    } finally {
+      setClosureLoading(false);
+    }
+  };
+
   const safeFormatDate = (dateStr: string) => {
     try {
       if (!dateStr) return '-';
@@ -67,18 +106,15 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
     }
   };
 
-  // Safe formatting for amounts to avoid "77/000" or weird non-breaking spaces issues in PDF
   const formatMoney = (amount: string | number | undefined) => {
     if (amount === undefined || amount === null) return '-';
     const num = Number(amount);
     if (isNaN(num)) return '-';
-    // Use space as separator explicitly, fix fixed decimals to 0 if integer-like currency (FCFA usually no decimals)
     return num.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace(/\s/g, ' '); 
   };
 
   const formattedTransactions = transactions.map(t => ({
     ...t,
-    // Unified description logic: observations > description > typePaiement > type
     displayDescription: t.observations || t.description || t.typePaiement || t.type || 'Opération',
     displayRef: t.recu_numero || t.referenceExterne || '-'
   }));
@@ -86,8 +122,9 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
   const filteredTransactions = formattedTransactions.filter(t => {
     const matchesFilter = filter === 'ALL' || t.sens === filter;
     
-    const desc = t.displayDescription.toLowerCase();
-    const ref = t.displayRef.toLowerCase();
+    // Safety check for undefined fields although mapped above
+    const desc = (t.displayDescription || '').toLowerCase();
+    const ref = (t.displayRef || '').toLowerCase();
     const term = searchTerm.toLowerCase();
 
     const matchesSearch = desc.includes(term) || ref.includes(term);
@@ -113,7 +150,6 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
-
     doc.setFontSize(18);
     doc.text('Historique de Compte', 14, 22);
     
@@ -139,10 +175,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
       styles: { fontSize: 9 },
       headStyles: { fillColor: [22, 163, 74] },
       alternateRowStyles: { fillColor: [240, 253, 244] },
-      columnStyles: {
-        4: { halign: 'right' },
-        5: { halign: 'right' }
-      }
+      columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' } }
     });
 
     doc.save(`historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.pdf`);
@@ -153,7 +186,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
         
         {/* Header */}
         <div className="bg-slate-800/50 border-b border-slate-700 p-4 flex items-center justify-between shrink-0">
@@ -164,12 +197,23 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
             </h2>
             <p className="text-sm text-slate-400 font-mono mt-1">N° {numeroCompte}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowClosureConfirm(true)}
+              className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-medium transition flex items-center gap-2 border border-red-500/20"
+              title="Clôturer le compte"
+            >
+              <Trash2 size={16} />
+              <span className="hidden sm:inline">Clôturer</span>
+            </button>
+            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Toolbar */}
@@ -221,60 +265,70 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
           </div>
         </div>
 
-        {/* List */}
-        <div className="flex-1 overflow-auto p-0">
-          {loading ? (
-             <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+        {/* Chart & List */}
+        <div className="flex-1 overflow-auto bg-slate-900/30">
+          <div className="p-4 space-y-4">
+             {/* Graphique */}
+             <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+                <AccountStatsChart compteId={compteId} />
              </div>
-          ) : filteredTransactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500 p-8">
-              <Filter size={32} className="mb-3 opacity-50" />
-              <p>Aucune transaction trouvée</p>
-            </div>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-800/30 sticky top-0 backdrop-blur-md z-10">
-                <tr>
-                  <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider w-32">Date</th>
-                  <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>
-                  <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Montant</th>
-                  <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right w-32">Solde</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {filteredTransactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-800/30 group transition-colors text-sm">
-                    <td className="p-4 whitespace-nowrap text-slate-400 font-mono text-xs">
-                      {safeFormatDate(t.createdAt)}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-start gap-3">
-                         <div className={`mt-0.5 p-1.5 rounded-full shrink-0 ${
-                             t.sens === 'CREDIT' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-                         }`}>
-                             {t.sens === 'CREDIT' ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
-                         </div>
-                         <div>
-                             <p className="text-white font-medium">{t.displayDescription}</p>
-                             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                                 {t.type} 
-                                 {t.displayRef !== '-' && <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400">Ref: {t.displayRef}</span>}
-                             </p>
-                         </div>
-                      </div>
-                    </td>
-                    <td className={`p-4 text-right font-medium whitespace-nowrap ${t.sens === 'CREDIT' ? 'text-emerald-400' : 'text-slate-300'}`}>
-                      {t.sens === 'CREDIT' ? '+' : '-'}{formatMoney(t.montant)} <span className="text-xs opacity-50">FCFA</span>
-                    </td>
-                    <td className="p-4 text-right font-mono text-slate-400 whitespace-nowrap">
-                        {t.solde_apres ? formatMoney(t.solde_apres) : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+
+             {/* Table */}
+             <div className="bg-slate-950/50 border border-slate-800 rounded-xl overflow-hidden min-h-[300px]">
+                {loading ? (
+                  <div className="flex items-center justify-center h-40">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+                  </div>
+                ) : filteredTransactions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <Filter size={32} className="mb-3 opacity-50" />
+                    <p>Aucune transaction trouvée</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-900 sticky top-0 z-10 shadow-sm">
+                      <tr>
+                        <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider w-32">Date</th>
+                        <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</th>
+                        <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Montant</th>
+                        <th className="p-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right w-32">Solde</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {filteredTransactions.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-800/50 group transition-colors text-sm">
+                          <td className="p-4 whitespace-nowrap text-slate-400 font-mono text-xs">
+                            {safeFormatDate(t.createdAt)}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-0.5 p-1.5 rounded-full shrink-0 ${
+                                  t.sens === 'CREDIT' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                              }`}>
+                                  {t.sens === 'CREDIT' ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                              </div>
+                              <div>
+                                  <p className="text-white font-medium">{t.displayDescription}</p>
+                                  <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                                      {t.type} 
+                                      {t.displayRef !== '-' && <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400">Ref: {t.displayRef}</span>}
+                                  </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={`p-4 text-right font-medium whitespace-nowrap ${t.sens === 'CREDIT' ? 'text-emerald-400' : 'text-slate-300'}`}>
+                            {t.sens === 'CREDIT' ? '+' : '-'}{formatMoney(t.montant)} <span className="text-xs opacity-50">FCFA</span>
+                          </td>
+                          <td className="p-4 text-right font-mono text-slate-400 whitespace-nowrap">
+                              {t.solde_apres ? formatMoney(t.solde_apres) : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+             </div>
+          </div>
         </div>
 
         {/* Footer info */}
@@ -282,6 +336,50 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
              Affichage des {filteredTransactions.length} dernières opérations
         </div>
       </div>
+
+      {/* Closure Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showClosureConfirm}
+        onClose={() => setShowClosureConfirm(false)}
+        onConfirm={handleClosure}
+        title="Clôturer le compte"
+        message={
+          <div className="space-y-2">
+            <p>Êtes-vous sûr de vouloir clôturer définitivement ce compte ?</p>
+            <ul className="list-disc pl-4 text-slate-400 text-xs space-y-1">
+              <li>Le solde doit être à zéro.</li>
+              <li>Aucune transaction ne doit être en attente.</li>
+              <li>Cette action est irréversible.</li>
+            </ul>
+          </div>
+        }
+        variant="danger"
+        confirmText="Clôturer définitivement"
+        cancelText="Annuler"
+        isLoading={closureLoading}
+      />
+
+      {/* Error Modal */}
+      {closureError && (
+        <Modal
+          isOpen={!!closureError}
+          onClose={() => setClosureError(null)}
+          title={closureError.title}
+          variant="danger"
+          size="sm"
+        >
+          <div className="flex flex-col gap-4">
+             <div className="flex items-start gap-3 bg-red-500/10 p-4 rounded-lg border border-red-500/20">
+                <AlertTriangle className="text-red-400 shrink-0" size={20} />
+                <p className="text-sm text-red-200">{closureError.message}</p>
+             </div>
+             <div className="flex justify-end">
+                <Button onClick={() => setClosureError(null)} variant="secondary">Fermer</Button>
+             </div>
+          </div>
+        </Modal>
+      )}
+
     </div>
   );
 }

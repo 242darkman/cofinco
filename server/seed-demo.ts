@@ -1552,6 +1552,9 @@ async function seedDemo() {
       { subType: 'Epargne Bloquée', typeCompte: 'Bloqué' },
     ];
 
+    // Generic admin for closure
+    const closureAdminId = insertedUsers['chef_siege']?.id || insertedUsers['admin']?.id;
+
     insertedClients.forEach((client, index) => {
       // 🏦 RÈGLE MICROFINANCE: Chaque client DOIT avoir un compte courant
       // Puis on ajoute optionnellement d'autres types de comptes
@@ -1571,6 +1574,8 @@ async function seedDemo() {
         blocageActif: false,
         blocageMotif: null,
         createdAt: daysAgo(randomBetween(30, 365)),
+        closedAt: null,
+        closedBy: null,
         _originalSubType: 'Compte Courant',
         _targetSave: null,
         _monthlyPay: null
@@ -1589,7 +1594,11 @@ async function seedDemo() {
           : Math.random() < 0.3;
           
         if (shouldCreate) {
-          const solde = generateRealisticAmount(5000, 5000000, 1000);
+          // 10% chance d'être déjà clôturé
+          const isClosed = Math.random() < 0.1;
+          
+          // Si clôturé, solde DOIT être 0 (validé par notre nouvelle logique backend)
+          const solde = isClosed ? '0' : generateRealisticAmount(5000, 5000000, 1000);
           const isEpargneProjet = accountType.typeCompte === 'Épargne' && Math.random() > 0.7;
 
           comptesData.push({
@@ -1597,11 +1606,13 @@ async function seedDemo() {
             agenceId: client.agenceId || insertedAgences['Siège'] || null,
             numeroCompte: `${accountType.prefix}-${clientRef}-${timestamp}${i + 1}`,
             typeCompte: accountType.typeCompte,
-            statut: 'Actif',
+            statut: isClosed ? 'Clôturé' : 'Actif',
             soldeCourant: String(solde),
             blocageActif: accountType.typeCompte === 'Bloqué',
             blocageMotif: accountType.typeCompte === 'Bloqué' ? 'Épargne forcée' : null,
             createdAt: daysAgo(randomBetween(30, 365)),
+            closedAt: isClosed ? daysAgo(randomBetween(1, 60)) : null,
+            closedBy: isClosed ? closureAdminId : null,
             _originalSubType: accountType.subType,
             _targetSave: isEpargneProjet ? generateRealisticAmount(500000, 2000000, 100000) : null,
             _monthlyPay: isEpargneProjet ? generateRealisticAmount(25000, 100000, 5000) : null
@@ -1626,7 +1637,9 @@ async function seedDemo() {
         soldeCourant: c.soldeCourant,
         blocageActif: c.blocageActif,
         blocageMotif: c.blocageMotif,
-        createdAt: c.createdAt
+        createdAt: c.createdAt,
+        closedAt: c.closedAt,
+        closedBy: c.closedBy
       }));
       
       const res = await db.insert(comptes).values(batch).returning();
