@@ -34,6 +34,8 @@ interface Demande {
   frequence_remboursement: string;
   date_demande: string;
   created_at?: string;
+  frais_engagement_payes?: boolean;
+  montant_frais_engagement?: number;
   clients: {
     nom: string;
     prenom?: string;
@@ -78,6 +80,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   const [guarantees, setGuarantees] = useState<Guarantee[]>([]);
   const [showConfirmApprove, setShowConfirmApprove] = useState(false);
   const [showConfirmReject, setShowConfirmReject] = useState(false);
+  const [reimbursementAmount, setReimbursementAmount] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isReevaluating, setIsReevaluating] = useState(false);
   const [showReevaluationModal, setShowReevaluationModal] = useState(false);
@@ -207,6 +210,16 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       newErrors.commentaire = 'Le motif du rejet est obligatoire';
     }
 
+    if (action === 'reject' && reimbursementAmount) {
+         const val = Number(reimbursementAmount);
+         const max = Number(demande.montant_frais_engagement || 0);
+         if (isNaN(val) || val < 0) {
+             newErrors.reimbursement = 'Montant invalide';
+         } else if (val > max) {
+             newErrors.reimbursement = `Ne peut excéder ${formatMoney(max)}`;
+         }
+    }
+
     // Validate guarantee values
     guarantees.forEach((g, index) => {
       if (g.valeur_estimee) {
@@ -220,7 +233,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [action, commentaire, guarantees]);
+  }, [action, commentaire, guarantees, reimbursementAmount, demande.montant_frais_engagement]);
 
   const handleApprove = useCallback(async () => {
     setLoading(true);
@@ -249,17 +262,31 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       setShowConfirmApprove(false);
     }
   }, [demande, montantBase, commentaire, onSuccess]);
-
+  
   const handleReject = useCallback(async () => {
     setLoading(true);
 
     try {
-      await demandeCreditApi.update(demande.id, {
+      const payload: any = {
         statut: 'Rejetée',
         motif_rejet: sanitizeInput(commentaire)
-      });
+      };
 
-      toast.success('Demande de crédit rejetée');
+      // Add reimbursement if entered
+      if (reimbursementAmount) {
+         const amount = parseFloat(reimbursementAmount);
+         // Client-side validation is good, but API should also handle it.
+         // We trust validateForm has prevented this call if invalid.
+         payload.montantRemboursement = amount;
+      }
+
+      await demandeCreditApi.update(demande.id, payload);
+
+      const successMessage = reimbursementAmount 
+        ? `Demande rejetée. Un remboursement de ${formatMoney(Number(reimbursementAmount))} a été crédité sur le compte courant du client.`
+        : 'Demande de crédit rejetée avec succès.';
+      
+      toast.success(successMessage, { duration: 5000 });
       onSuccess();
     } catch (error) {
       const errorMessage = handleApiError(error, 'Erreur lors du rejet');
@@ -268,7 +295,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       setLoading(false);
       setShowConfirmReject(false);
     }
-  }, [demande.id, commentaire, onSuccess]);
+  }, [demande.id, commentaire, reimbursementAmount, onSuccess]);
 
   const handleSubmitAction = useCallback(() => {
     if (!validateForm()) {
@@ -837,23 +864,61 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 <label htmlFor="commentaire-reject" className="block text-sm font-semibold text-slate-300 mb-2">
                   Motif du Rejet <span className="text-red-400">*</span>
                 </label>
-                <textarea
-                  id="commentaire-reject"
-                  value={commentaire}
-                  onChange={(e) => {
-                    setCommentaire(e.target.value);
-                    if (errors.commentaire) setErrors(prev => ({ ...prev, commentaire: '' }));
-                  }}
-                  className={`w-full bg-slate-700 border ${errors.commentaire ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500`}
-                  rows={3}
-                  placeholder="Expliquer les raisons du rejet..."
-                  maxLength={1000}
-                  disabled={loading}
-                  aria-invalid={!!errors.commentaire}
-                  aria-describedby={errors.commentaire ? 'reject-error' : undefined}
-                />
-                {errors.commentaire && (
-                  <p id="reject-error" className="text-red-400 text-sm mt-1" role="alert">{errors.commentaire}</p>
+                  <textarea
+                    id="commentaire-reject"
+                    value={commentaire}
+                    onChange={(e) => {
+                      setCommentaire(e.target.value);
+                      if (errors.commentaire) setErrors(prev => ({ ...prev, commentaire: '' }));
+                    }}
+                    className={`w-full bg-slate-700 border ${errors.commentaire ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500`}
+                    rows={3}
+                    placeholder="Expliquer les raisons du rejet..."
+                    maxLength={1000}
+                    disabled={loading}
+                    aria-invalid={!!errors.commentaire}
+                    aria-describedby={errors.commentaire ? 'reject-error' : undefined}
+                  />
+                  {errors.commentaire && (
+                    <p id="reject-error" className="text-red-400 text-sm mt-1" role="alert">{errors.commentaire}</p>
+                  )}
+
+                {/* Refund Input - Only if fees paid */}
+                {(demande.frais_engagement_payes || (demande.montant_frais_engagement && demande.montant_frais_engagement > 0)) && (
+                   <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-600">
+                      <div className="flex justify-between items-center mb-2">
+                        <label htmlFor="reimbursement-amount" className="text-sm font-semibold text-slate-300">
+                          Remboursement des Frais (Optionnel)
+                        </label>
+                        <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
+                          Payé: {formatMoney(demande.montant_frais_engagement || 0)}
+                        </span>
+                      </div>
+                      
+                      <div className="relative">
+                        <input
+                          id="reimbursement-amount"
+                          type="number"
+                          value={reimbursementAmount}
+                          onChange={(e) => setReimbursementAmount(e.target.value)}
+                          className={`w-full bg-slate-700 border ${errors.reimbursement ? 'border-red-500' : 'border-slate-600'} rounded-lg pl-3 pr-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500`}
+                          placeholder="Montant du remboursement"
+                          min="0"
+                          max={demande.montant_frais_engagement}
+                          disabled={loading}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">
+                          FCFA
+                        </div>
+                      </div>
+                      {errors.reimbursement ? (
+                        <p className="text-red-400 text-xs mt-1">{errors.reimbursement}</p>
+                      ) : (
+                        <p className="text-slate-400 text-xs mt-1">
+                          Laissez vide si aucun remboursement. Le montant sera crédité sur le compte courant du client.
+                        </p>
+                      )}
+                   </div>
                 )}
               </div>
             )}
