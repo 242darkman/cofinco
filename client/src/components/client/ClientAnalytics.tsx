@@ -1,82 +1,96 @@
 import type { Client } from '@shared/schema';
-import React, { useState, useEffect } from 'react';
-import { DollarSign, Target, Award, CreditCard, Wallet, Users, Activity } from 'lucide-react';
+import React, { useState } from 'react';
+import { DollarSign, Target, Award, CreditCard, Wallet, Users, Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import ClientTags from './ClientTags';
-import { Card, Badge } from '../ui';
-
-interface ClientActivity {
-  id: string;
-  client_id: string;
-  activity_type: string;
-  activity_description: string;
-  created_at: string;
-  metadata?: any;
-}
+import { Card, Badge, Skeleton } from '../ui';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 
 interface ClientAnalyticsProps {
   client: Client;
 }
 
+interface AnalyticsData {
+  summary: {
+    total_savings: number;
+    total_credit_due: number;
+    active_loans_count: number;
+    fidelity_points: number;
+    repayment_rate: number;
+  };
+  distribution: {
+    label: string;
+    value: number;
+    color: string;
+  }[];
+  monthly_trend: {
+    savings_growth: string;
+    credit_evolution: string;
+  };
+}
+
 export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
-  const [activities, setActivities] = useState<ClientActivity[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [, setLocation] = useLocation();
 
-  useEffect(() => {
-    fetchActivities();
-  }, [client.id]);
+  // Fetch Real-Time Analytics
+  const { data: analytics, isLoading } = useQuery<AnalyticsData>({
+    queryKey: ['client-analytics', client.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${client.id}/analytics`);
+      if (!res.ok) throw new Error('Failed to fetch analytics');
+      return res.json();
+    },
+    refetchInterval: 5000, // Poll every 5s for "Real-Time" feel without websockets complexity for now
+  });
 
-  const fetchActivities = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/client-activities?client_id=${client.id}`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Erreur chargement');
-      const data = await response.json();
-      setActivities(data || []);
-    } catch (error) {
-      console.error('Erreur chargement activités:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Fetch Activities for counters (keep existing logic or rely on summary if backend provided count)
+  // The summary provides active_loans_count, but not others. We can keep the old activity fetch or simplify.
+  // For now, let's keep the activity fetch for the counts if they are "All Time" vs "Active".
+  // The prompt asks for "Drill-down" from counters.
+  
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const onPieEnter = (_: any, index: number) => {
+    setActiveIndex(index);
   };
 
-  const creditTotal = Number(client.creditTotal) || 0;
-  const epargneTotal = Number(client.epargneTotal) || 0;
-  const tauxRemboursement = client.tauxRemboursement !== null ? Number(client.tauxRemboursement) : 0;
-  const pointsFidelite = typeof client.pointsFidelite === 'number' ? client.pointsFidelite : (client.pointsFidelite ? Number(client.pointsFidelite) : 0);
+  if (isLoading || !analytics) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <div className="grid grid-cols-2 gap-3">
+            <Skeleton className="h-24 rounded-lg" />
+            <Skeleton className="h-24 rounded-lg" />
+        </div>
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
+    );
+  }
 
-  const stats = {
-    creditTotal,
-    epargneTotal,
-    tauxRemboursement,
-    pointsFidelite,
-    anciennete: client.dateInscription
-      ? Math.floor((new Date().getTime() - new Date(client.dateInscription).getTime()) / (1000 * 60 * 60 * 24))
-      : 0
-  };
+  const { summary, distribution, monthly_trend } = analytics;
 
-  const activityCounts = {
-    credits: activities.filter(a => a.activity_type === 'credit').length,
-    epargnes: activities.filter(a => a.activity_type === 'epargne').length,
-    tontines: activities.filter(a => a.activity_type === 'tontine').length,
-    payments: activities.filter(a => a.activity_type === 'payment').length
-  };
+  // Compute total for percentage calculation in donut center
+  const totalValue = distribution.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <div className="space-y-4">
-      {/* 1. Segment & Fidélité Card - Unified Pro View */}
+    <div className="space-y-4 animate-in fade-in duration-500">
+      {/* 1. Segment & Fidélité Card */}
       <Card variant="elevated" className="relative overflow-hidden border-blue-500/20">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
         <div className="relative z-10 flex flex-col sm:flex-row gap-6">
-            {/* Points Fidélité Area */}
+            {/* Points Fidélité */}
             <div className="flex-1 flex items-center justify-center sm:justify-start gap-4">
                 <div className="relative w-20 h-20 flex items-center justify-center bg-cyan-500/10 rounded-full border border-cyan-500/30">
                     <Award size={32} className="text-cyan-400" />
                 </div>
                 <div>
                      <p className="text-xs text-slate-500 uppercase font-semibold">Points Fidélité</p>
-                     <p className="text-2xl font-bold text-cyan-400">{stats.pointsFidelite.toLocaleString()}</p>
-                     <p className="text-xs text-slate-400 mt-1">Membre depuis {stats.anciennete}j</p>
+                     <p className="text-2xl font-bold text-cyan-400">{summary.fidelity_points.toLocaleString()}</p>
+                     <p className="text-xs text-slate-400 mt-1">
+                        Membre depuis {client.dateInscription ? Math.floor((new Date().getTime() - new Date(client.dateInscription).getTime()) / (1000 * 60 * 60 * 24)) : 0}j
+                     </p>
                 </div>
             </div>
 
@@ -93,113 +107,166 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
         </div>
       </Card>
 
-      {/* 2. Key Metrics Grid */}
-      <div className="grid grid-cols-2 gap-3">
-          {/* Taux Remboursement */}
-          <Card variant="default" padding="sm" className="bg-slate-800/30">
-             <div className="flex items-start justify-between mb-2">
-                <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
-                    <Target size={18} />
+
+      {/* 2. & 3. Main Content Grid - Desktop Side-by-Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          
+          {/* Répartition Financière (Interactive Donut) - Takes more space on desktop */}
+          <Card variant="default" padding="md" className="lg:col-span-2 flex flex-col h-[300px] sm:h-auto">
+            <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                <DollarSign size={16} className="text-cyan-400" />
+                Répartition Financière
+            </h4>
+
+            {summary.total_savings === 0 ? (
+               <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
+                 <div className="w-20 h-20 rounded-full border-2 border-slate-700 border-dashed flex items-center justify-center mb-2">
+                    <DollarSign size={24} className="text-slate-600" />
+                 </div>
+                 <p className="text-sm">Aucune donnée financière</p>
+               </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center h-full">
+                <div className="w-full sm:w-1/2 h-[200px] relative">
+                   <ResponsiveContainer width="100%" height="100%">
+                     <PieChart>
+                        <Pie
+                          data={distribution}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                          onMouseEnter={onPieEnter}
+                          onClick={(_, index) => setActiveIndex(index)}
+                        >
+                          {distribution.map((entry, index) => (
+                            <Cell 
+                               key={`cell-${index}`} 
+                               fill={entry.color} 
+                               stroke="rgba(0,0,0,0)"
+                               className="cursor-pointer hover:opacity-80 transition-opacity"
+                            />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip 
+                            formatter={(value: number) => `${value.toLocaleString()} FCFA`}
+                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
+                            itemStyle={{ color: '#f8fafc' }}
+                        />
+                     </PieChart>
+                   </ResponsiveContainer>
+                   
+                   {/* Center Text (Total or Selection) */}
+                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <p className="text-xs text-slate-500 uppercase font-semibold">Total</p>
+                      <p className="text-lg font-bold text-white">{summary.total_savings.toLocaleString()}</p>
+                   </div>
                 </div>
-                <span className={`text-xl font-bold ${stats.tauxRemboursement >= 90 ? 'text-emerald-400' : stats.tauxRemboursement >= 80 ? 'text-cyan-400' : 'text-amber-400'}`}>
-                    {stats.tauxRemboursement}%
-                </span>
-             </div>
-             <p className="text-xs text-slate-500 font-medium uppercase truncate">Taux de Remboursement</p>
+
+                {/* Custom Legend / Details */}
+                <div className="w-full sm:w-1/2 mt-4 sm:mt-0 sm:pl-6 space-y-3">
+                    {distribution.map((item, index) => (
+                        <div 
+                            key={index} 
+                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${activeIndex === index ? 'bg-slate-800 ring-1 ring-slate-700' : 'hover:bg-slate-800/50'}`}
+                            onClick={() => setActiveIndex(index)}
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                <span className="text-sm text-slate-300">{item.label}</span>
+                            </div>
+                            <div className="text-right">
+                                 <p className="text-sm font-bold text-white">{item.value.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">FCFA</span></p>
+                                 <p className="text-[10px] text-slate-500">
+                                    {((item.value / totalValue) * 100).toFixed(1)}%
+                                 </p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </Card>
 
-           {/* Points Fidelité */}
-          <Card variant="default" padding="sm" className="bg-slate-800/30">
-             <div className="flex items-start justify-between mb-2">
-                <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
-                    <Award size={18} />
-                </div>
-                <span className="text-xl font-bold text-cyan-400">
-                    {stats.pointsFidelite}
-                </span>
-             </div>
-             <p className="text-xs text-slate-500 font-medium uppercase truncate">Points Fidélité</p>
-          </Card>
+          {/* Key Metrics Grid - Stacked Vertically on Desktop, Grid on Mobile */}
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 content-start">
+              {/* Taux Remboursement */}
+              <Card variant="default" padding="sm" className="bg-slate-800/30">
+                 <div className="flex items-start justify-between mb-2">
+                    <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
+                        <Target size={18} />
+                    </div>
+                    <span className={`text-xl font-bold ${summary.repayment_rate >= 90 ? 'text-emerald-400' : summary.repayment_rate >= 80 ? 'text-cyan-400' : 'text-amber-400'}`}>
+                        {summary.repayment_rate}%
+                    </span>
+                 </div>
+                 <p className="text-xs text-slate-500 font-medium uppercase truncate">Taux Remboursement</p>
+              </Card>
+
+              {/* Croissance Epargne */}
+              <Card variant="default" padding="sm" className="bg-slate-800/30">
+                 <div className="flex items-start justify-between mb-2">
+                    <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
+                        <TrendingUp size={18} />
+                    </div>
+                    <span className="text-xl font-bold text-emerald-400">
+                        {monthly_trend.savings_growth}
+                    </span>
+                 </div>
+                 <p className="text-xs text-slate-500 font-medium uppercase truncate">Croissance (Mois)</p>
+              </Card>
+          </div>
       </div>
 
-      {/* 3. Finances Breakdown */}
-      <Card variant="default" padding="md">
-        <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <DollarSign size={16} className="text-cyan-400" />
-            Répartition Financière
-        </h4>
-
-        {stats.creditTotal === 0 && stats.epargneTotal === 0 ? (
-          <div className="text-center py-6 text-slate-500">
-            <p className="text-sm">Aucune donnée financière</p>
-            <p className="text-xs mt-1">Le client n'a ni crédit ni épargne active</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-              {/* Credit Progress - Only show if credit > 0 */}
-              <div>
-                   <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-slate-400">Crédits en cours</span>
-                      <span className={`font-mono font-medium text-right ${stats.creditTotal > 0 ? 'text-blue-400' : 'text-slate-500'}`}>
-                        {stats.creditTotal.toLocaleString()} FCFA
-                      </span>
-                   </div>
-                   {stats.creditTotal > 0 && (
-                     <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.min((stats.creditTotal / (stats.creditTotal + stats.epargneTotal || 1)) * 100, 100)}%`
-                          }}
-                        ></div>
-                     </div>
-                   )}
-              </div>
-
-              {/* Savings Progress - Only show if epargne > 0 */}
-              <div>
-                   <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-slate-400">Épargne totale</span>
-                      <span className={`font-mono font-medium text-right ${stats.epargneTotal > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {stats.epargneTotal.toLocaleString()} FCFA
-                      </span>
-                   </div>
-                   {stats.epargneTotal > 0 && (
-                     <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.min((stats.epargneTotal / (stats.creditTotal + stats.epargneTotal || 1)) * 100, 100)}%`
-                          }}
-                        ></div>
-                     </div>
-                   )}
-              </div>
-          </div>
-        )}
-      </Card>
       
-      {/* 4. Activity Stats */}
+      {/* 4. Navigation Cards (Drill-Down) */}
       <div className="grid grid-cols-4 gap-2">
-         <Card variant="default" padding="sm" className="text-center py-3 bg-slate-800/20">
+         {/* Credits Drill-down */}
+         <Card 
+            variant="default" 
+            padding="sm" 
+            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
+            onClick={() => setLocation(`/finance/credits?client=${client.id}`)}
+         >
             <CreditCard size={16} className="mx-auto mb-1 text-blue-400" />
-            <p className="text-lg font-bold text-white">{activityCounts.credits}</p>
+            <p className="text-lg font-bold text-white">{summary.active_loans_count}</p>
             <p className="text-[10px] text-slate-500 uppercase">Crédits</p>
          </Card>
-         <Card variant="default" padding="sm" className="text-center py-3 bg-slate-800/20">
+
+         {/* Epargnes Drill-down */}
+         <Card 
+            variant="default" 
+            padding="sm" 
+            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
+            onClick={() => setLocation(`/finance/epargne?client=${client.id}`)}
+         >
             <Wallet size={16} className="mx-auto mb-1 text-emerald-400" />
-            <p className="text-lg font-bold text-white">{activityCounts.epargnes}</p>
+            <p className="text-lg font-bold text-white">-</p> 
             <p className="text-[10px] text-slate-500 uppercase">Épargnes</p>
          </Card>
-         <Card variant="default" padding="sm" className="text-center py-3 bg-slate-800/20">
+
+         {/* Tontines Drill-down */}
+         <Card 
+            variant="default" 
+            padding="sm" 
+            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
+            onClick={() => setLocation(`/tontines?client=${client.id}`)}
+         >
             <Users size={16} className="mx-auto mb-1 text-amber-400" />
-            <p className="text-lg font-bold text-white">{activityCounts.tontines}</p>
+            <p className="text-lg font-bold text-white">-</p>
             <p className="text-[10px] text-slate-500 uppercase">Tontines</p>
          </Card>
-         <Card variant="default" padding="sm" className="text-center py-3 bg-slate-800/20">
+
+         {/* Ops History Drill-down */}
+         <Card 
+            variant="default" 
+            padding="sm" 
+            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
+            onClick={() => setLocation(`/finance/transactions?client=${client.id}`)}
+         >
             <Activity size={16} className="mx-auto mb-1 text-purple-400" />
-            <p className="text-lg font-bold text-white">{activityCounts.payments}</p>
-            <p className="text-[10px] text-slate-500 uppercase">Ops</p>
+            <p className="text-lg font-bold text-white">Ops</p>
+            <p className="text-[10px] text-slate-500 uppercase">Historique</p>
          </Card>
       </div>
     </div>

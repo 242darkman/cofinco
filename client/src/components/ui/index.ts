@@ -62,6 +62,7 @@ export type { ProgressBarProps, ProgressBarColor, ProgressBarSize } from './Prog
 // Loading Components
 export { default as LoadingScreen } from './LoadingScreen';
 export { default as LoadingSpinner } from './LoadingSpinner';
+export { Skeleton } from './Skeleton';
 
 // Layout Components
 export { default as PageHeader } from './PageHeader';

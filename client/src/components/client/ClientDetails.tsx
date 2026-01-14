@@ -1,26 +1,67 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Client } from '@shared/schema';
-import { DollarSign, Award, MapPin, Phone, Mail, User, Building2 } from 'lucide-react';
-import Card from '../ui/Card';
+import { useLocation } from 'wouter';
+import { DollarSign, Award, MapPin, Phone, Mail, User, Building2, ChevronRight, TrendingUp, Wallet } from 'lucide-react';
+import { Card, Modal, Button, Skeleton } from '../ui';
 import ClientTags from './ClientTags';
+import { useQuery } from '@tanstack/react-query';
 
 interface ClientDetailsProps {
     client: Client;
 }
 
-export default function ClientDetails({ client }: ClientDetailsProps) {
-
-  const stats = {
-      creditTotal: parseFloat(client.creditTotal as any) || 0,
-      epargneTotal: parseFloat(client.epargneTotal as any) || 0,
-      tauxRemboursement: parseFloat(client.tauxRemboursement as any) || 0,
-      pointsFidelite: client.pointsFidelite || 0
+interface AnalyticsData {
+    summary: {
+      total_savings: number;
+      total_credit_due: number;
+      active_loans_count: number;
+      fidelity_points: number;
+      repayment_rate: number;
+    };
+    distribution: {
+      label: string;
+      value: number;
+      color: string;
+    }[];
+    monthly_trend: {
+      savings_growth: string;
+      credit_evolution: string;
+    };
   }
 
+export default function ClientDetails({ client }: ClientDetailsProps) {
+    const [, setLocation] = useLocation();
+    const [showSavingsModal, setShowSavingsModal] = useState(false);
+
+    // Fetch Real-Time Analytics (Cached from Analytics Tab)
+    const { data: analytics, isLoading } = useQuery<AnalyticsData>({
+        queryKey: ['client-analytics', client.id],
+        queryFn: async () => {
+        const res = await fetch(`/api/clients/${client.id}/analytics`);
+        if (!res.ok) throw new Error('Failed to fetch analytics');
+        return res.json();
+        },
+        // We can rely on cache mostly, but poll if needed
+        staleTime: 30000, 
+    });
+
+    if (isLoading || !analytics) {
+        return (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                 <Skeleton className="h-48 w-full rounded-xl" />
+                 <Skeleton className="h-48 w-full rounded-xl" />
+                 <Skeleton className="h-48 w-full rounded-xl" />
+            </div>
+        );
+    }
+
+    const { summary, distribution, monthly_trend } = analytics;
+
   return (
-    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+    <>
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-in fade-in duration-500">
       
-      {/* 1. Segment & Fidélité Card - Mobile First Compact */}
+      {/* 1. Segment & Fidélité Card */}
       <Card variant="default" padding="sm" className="relative overflow-hidden border-slate-700/50 bg-slate-900/50">
          {/* Background Accent */}
          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
@@ -43,35 +84,59 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex flex-col justify-between">
                  <div>
                      <p className="text-[10px] text-slate-500 uppercase tracking-tighter mb-1">Points Fidélité</p>
-                     <p className="text-2xl font-bold text-cyan-400">{stats.pointsFidelite.toLocaleString()}</p>
+                     <p className="text-2xl font-bold text-cyan-400">{summary.fidelity_points.toLocaleString()}</p>
                  </div>
                  <div className="mt-1 text-xs font-medium text-slate-400">
-                     {stats.tauxRemboursement}% remboursement
+                     {summary.repayment_rate}% remboursement
                  </div>
              </div>
          </div>
       </Card>
 
-      {/* 2. Finances Card - Compact */}
+      {/* 2. Finances Card - Interactive */}
       <Card variant="default" padding="sm" className="flex flex-col border-slate-700/50 bg-slate-900/50">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-200 mb-4">
             <DollarSign size={16} className="text-slate-400" /> Finances
         </h3>
 
         <div className="space-y-3 flex-1">
-            {/* Credits */}
-            <div className="bg-slate-800/30 rounded-lg p-3 flex items-center justify-between border border-slate-700/30">
+            {/* Credits - Clickable Drill-down */}
+            <div 
+                className="group bg-slate-800/30 hover:bg-slate-800/60 rounded-lg p-3 flex items-center justify-between border border-slate-700/30 transition-colors cursor-pointer"
+                onClick={() => setLocation(`/finance/credits?client=${client.id}`)}
+            >
                 <div>
-                    <p className="text-[10px] uppercase text-slate-500 mb-0.5">Crédits En Cours</p>
-                    <p className="text-base font-bold text-white">{stats.creditTotal.toLocaleString()} FCFA</p>
+                    <p className="text-[10px] uppercase text-slate-500 mb-0.5 flex items-center gap-2">
+                        Crédits En Cours
+                        {summary.total_credit_due > 0 && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>}
+                    </p>
+                    <p className="text-base font-bold text-white">{summary.total_credit_due.toLocaleString()} FCFA</p>
+                </div>
+                {/* Trend / Chevron */}
+                <div className="flex items-center gap-2">
+                   {/* Placeholder for trend if available, distinct from savings */}
+                   <ChevronRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
                 </div>
             </div>
 
-            {/* Epargnes */}
-            <div className="bg-slate-800/30 rounded-lg p-3 flex items-center justify-between border border-slate-700/30">
+            {/* Epargnes - Clickable Modal Trigger */}
+            <div 
+                className="group bg-slate-800/30 hover:bg-slate-800/60 rounded-lg p-3 flex items-center justify-between border border-slate-700/30 transition-colors cursor-pointer"
+                onClick={() => setShowSavingsModal(true)}
+            >
                 <div>
                      <p className="text-[10px] uppercase text-slate-500 mb-0.5">Épargne Total</p>
-                     <p className="text-base font-bold text-white">{stats.epargneTotal.toLocaleString()} FCFA</p>
+                     <p className="text-base font-bold text-white">{summary.total_savings.toLocaleString()} FCFA</p>
+                </div>
+                 {/* Trend / Chevron */}
+                 <div className="flex items-center gap-3">
+                   {monthly_trend.savings_growth.startsWith('+') && (
+                       <div className="flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">
+                           <TrendingUp size={10} className="mr-1" />
+                           {monthly_trend.savings_growth}
+                       </div>
+                   )}
+                   <ChevronRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
                 </div>
             </div>
         </div>
@@ -129,7 +194,41 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
                )}
           </div>
       </Card>
+      
+      {/* Quick View Modal for Savings */}
+      <Modal 
+         isOpen={showSavingsModal} 
+         onClose={() => setShowSavingsModal(false)}
+         title="Détail de l'épargne"
+         size="sm"
+      >
+          <div className="space-y-4 pt-2">
+             <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 text-center">
+                 <p className="text-sm text-slate-400 mb-1">Total Consolidé</p>
+                 <p className="text-3xl font-bold text-white">{summary.total_savings.toLocaleString()} <span className="text-base font-normal text-slate-500">FCFA</span></p>
+             </div>
+
+             <div className="space-y-2">
+                 {distribution.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                          <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-slate-800 text-slate-400">
+                                   <Wallet size={16} style={{ color: item.color }} />
+                              </div>
+                              <span className="font-medium text-slate-200">{item.label}</span>
+                          </div>
+                          <span className="font-bold text-white">{item.value.toLocaleString()} FCFA</span>
+                      </div>
+                 ))}
+             </div>
+             
+             <div className="pt-2">
+                 <Button variant="outline" className="w-full" onClick={() => setShowSavingsModal(false)}>Fermer</Button>
+             </div>
+          </div>
+      </Modal>
 
     </div>
+    </>
   );
 }

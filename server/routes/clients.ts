@@ -1,5 +1,6 @@
 import type { Express } from "express";
-import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences } from "@shared/schema";
+import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine } from "@shared/schema";
+
 import { storage } from "../storage";
 import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches } from "../storage/clients";
 
@@ -672,6 +673,79 @@ export function registerClientRoutes(app: Express) {
       } catch (error) {
           console.error("Score calculation error:", error);
           res.status(500).json({ message: "Score calculation failed" });
+      }
+  });
+
+  // Analytics Real-Time
+  app.get("/api/clients/:id/analytics", requireAuth, async (req, res) => {
+      try {
+        const clientId = req.params.id;
+        const client = await storage.getClient(clientId);
+        if (!client) return res.status(404).json({ message: "Client not found" });
+
+        // 1. Fetch all financial data in parallel
+        const [accounts, credits, membresTontineData, transactionsMonth] = await Promise.all([
+            getComptesByClient(clientId),
+            getCreditsByClient(clientId),
+            db.select().from(membresTontine).where(eq(membresTontine.clientId, clientId)),
+            storage.getMouvementsByClientAndDateRange(
+                clientId, 
+                new Date(new Date().getFullYear(), new Date().getMonth(), 1), 
+                new Date()
+            )
+        ]);
+
+        // 2. Aggregate Data
+        
+        // Savings (Courant + Epargne + Tontine Contributions)
+        const compteCourantTotal = accounts
+            .filter(a => a.typeCompte === 'Courant' && a.statut === 'Actif')
+            .reduce((sum, a) => sum + Number(a.soldeCourant), 0);
+            
+        const compteEpargneTotal = accounts
+            .filter(a => a.typeCompte === 'Épargne' && a.statut === 'Actif')
+            .reduce((sum, a) => sum + Number(a.soldeCourant), 0);
+
+        const tontineContributionTotal = membresTontineData
+            .filter(m => m.statut === 'Actif')
+            .reduce((sum, m) => sum + Number(m.totalCotisations), 0);
+
+        const totalSavings = compteCourantTotal + compteEpargneTotal + tontineContributionTotal;
+
+        // Credits (Active Due)
+        const activeCredits = credits.filter(c => ['Actif', 'En retard', 'En cours'].includes(c.statut));
+        const totalCreditDue = activeCredits.reduce((sum, c) => sum + Number(c.soldeRestant), 0);
+
+        // 3. Trends (Growth this month)
+        // Simple logic: Sum of "Dépôt" operations this month vs "Retrait"
+        const depositsMonth = transactionsMonth
+            .filter(t => t.sens === 'Crédit')
+            .reduce((sum, t) => sum + Number(t.montant), 0);
+            
+        // 4. Construct Response
+        const response = {
+            summary: {
+                total_savings: totalSavings,
+                total_credit_due: totalCreditDue,
+                active_loans_count: activeCredits.length,
+                fidelity_points: client.pointsFidelite || 0,
+                repayment_rate: Number(client.tauxRemboursement) || 0
+            },
+            distribution: [
+                { label: "Compte Courant", value: compteCourantTotal, color: "#10B981" }, // Emerald 500
+                { label: "Épargne", value: compteEpargneTotal, color: "#3B82F6" },      // Blue 500
+                { label: "Tontine", value: tontineContributionTotal, color: "#F59E0B" } // Amber 500
+            ].filter(d => d.value > 0), // Only show non-zero segments
+            monthly_trend: {
+                savings_growth: depositsMonth > 0 ? `+${(depositsMonth / (totalSavings || 1) * 100).toFixed(1)}%` : "0%",
+                credit_evolution: "0%" // Placeholder for now
+            }
+        };
+
+        res.json(response);
+      } catch (error) {
+          console.error("Analytics error:", error);
+          res.status(500).json({ message: "Failed to generate analytics" });
       }
   });
 
