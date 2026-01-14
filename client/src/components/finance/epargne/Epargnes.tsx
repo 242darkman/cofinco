@@ -13,6 +13,7 @@ import TabGroup from '../../ui/TabGroup';
 import ResponsiveTable, { TableColumn } from '../../ui/ResponsiveTable';
 import Badge from '../../ui/Badge';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
+import { formatClientName } from '../../../lib/format';
 
 
 interface Compte {
@@ -146,9 +147,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   // Helper to get client display name
   const getClientName = (c: Compte): string => {
     if (!c.clients) return 'Client inconnu';
-    const prenom = c.clients.prenom || '';
-    const nom = c.clients.nom || '';
-    return `${prenom} ${nom}`.trim() || 'Client inconnu';
+    return formatClientName(c.clients.nom, c.clients.prenom) || 'Client inconnu';
   };
 
   // Helper to get phone
