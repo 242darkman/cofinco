@@ -21,7 +21,7 @@ import {
   sessionsCaisse,
   clients,
 } from "@shared/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc, sql } from "drizzle-orm";
 import {
   executeWithLedger,
   updateCompteSolde,
@@ -825,12 +825,42 @@ export async function getCompteAgenceHistorique(compteId: string) {
  * Récupère les transactions d'un compte
  */
 export async function getCompteTransactions(compteId: string, limit = 50) {
-  return db
-    .select()
+  const rawResult = await db
+    .select({
+      id: transactionsCompte.id,
+      createdAt: transactionsCompte.createdAt,
+      montant: transactionsCompte.montant,
+      // Fetch raw enum value
+      sens: mouvementsFinanciers.sens,
+      typePaiement: transactionsCompte.typePaiement,
+      observations: transactionsCompte.observations,
+      recu_numero: transactionsCompte.referenceExterne,
+      referenceExterne: transactionsCompte.referenceExterne,
+      solde_apres: transactionsCompte.soldeApres,
+      mouvementId: transactionsCompte.mouvementId,
+    })
     .from(transactionsCompte)
+    .leftJoin(mouvementsFinanciers, eq(transactionsCompte.mouvementId, mouvementsFinanciers.id))
     .where(eq(transactionsCompte.compteId, compteId))
-    .orderBy(transactionsCompte.createdAt)
+    .orderBy(desc(transactionsCompte.createdAt))
     .limit(limit);
+
+  return rawResult.map(t => {
+    // Logic moved to JS for safety
+    let finalSens = 'DEBIT'; // Default
+    if (t.sens === 'Crédit') finalSens = 'CREDIT';
+    else if (t.sens === 'Débit') finalSens = 'DEBIT';
+
+    // Priority for description
+    const description = t.observations || t.typePaiement || 'Opération';
+
+    return {
+      ...t,
+      sens: finalSens,
+      type: t.typePaiement, // Maintain compatibility
+      description,
+    };
+  });
 }
 
 export default {
@@ -852,6 +882,8 @@ export default {
   getClientPortfolio,
   getCompteAgenceHistorique,
   getCompteTransactions,
+  mouvementsFinanciers,
+  sessionsCaisse,
   // Error class
   CompteError,
 };

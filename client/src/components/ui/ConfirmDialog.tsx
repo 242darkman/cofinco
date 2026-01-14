@@ -32,6 +32,7 @@ export interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   isLoading?: boolean;
+  disabled?: boolean;
   children?: React.ReactNode;
 }
 
@@ -45,6 +46,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmText = 'Confirmer',
   cancelText = 'Annuler',
   isLoading = false,
+  disabled = false,
   children,
 }) => {
   // Variant configuration
@@ -114,7 +116,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             variant={config.buttonVariant}
             size="md"
             onClick={handleConfirm}
-            disabled={isLoading}
+            disabled={isLoading || disabled}
             isLoading={isLoading}
             className="flex-1 min-h-[44px] text-sm leading-tight whitespace-normal"
           >

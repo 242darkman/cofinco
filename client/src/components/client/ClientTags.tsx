@@ -154,7 +154,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
   };
 
   const unassignedTags = allTags.filter(t => !clientTags.some(ct => ct.tagId === t.id));
-  const filteredTags = unassignedTags.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredTags = unassignedTags.filter(t => (t.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className={`space-y-4 ${compact ? '!space-y-2' : ''}`}>

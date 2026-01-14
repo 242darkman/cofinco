@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, CreditCard, Wallet, Lock, X, Edit2, Trash2, Check, AlertCircle, TrendingUp, AlertTriangle, Unlock } from 'lucide-react';
-import { Card, Badge, ConfirmDialog } from '../ui';
+import { Plus, Check, AlertCircle, AlertTriangle, X } from 'lucide-react';
+import { Card, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useCompteSubscription } from '../../hooks/useRealTimeSubscription';
 import { toast, handleApiError } from '../../lib/toast';
+import AccountCard from './AccountCard';
+import AccountHistory from './AccountHistory';
 
 interface CompteBancaire {
   id: string;
@@ -61,13 +63,22 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
   const { hasPermission } = usePermissions();
   const canCreateAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'create');
   const canEditAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'edit');
-  const canDeleteAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'delete');
-  const canBlockAccounts = hasPermission('comptes', 'edit') || hasPermission('admin', 'all');
-
+  
   const [comptes, setComptes] = useState<CompteBancaire[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  
+  // Action states
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showActionConfirm, setShowActionConfirm] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<CompteBancaire | null>(null);
+  const [pendingAction, setPendingAction] = useState<'suspend' | 'close' | 'reactivate' | null>(null);
+  const [actionReason, setActionReason] = useState('');
+
+  // History state
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyCompte, setHistoryCompte] = useState<CompteBancaire | null>(null);
+
   const [editingCompte, setEditingCompte] = useState<CompteBancaire | null>(null);
   const [formData, setFormData] = useState({
     typeCompte: 'Courant' as 'Courant' | 'Épargne' | 'Bloqué',
@@ -93,11 +104,9 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
   const fetchComptes = async () => {
     setLoading(true);
     try {
-      // Use the portfolio endpoint to get client's accounts
       const res = await fetch(`/api/clients/${clientId}/portfolio`, { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur chargement comptes');
       const data = await res.json();
-      // Portfolio returns { comptes: [...], credits: [...], ... }
       const comptesData = (data.comptes || []).map(normalizeCompte);
       setComptes(comptesData.sort((a: CompteBancaire, b: CompteBancaire) =>
         new Date(b.dateOuverture || b.createdAt).getTime() - new Date(a.dateOuverture || a.createdAt).getTime()
@@ -119,7 +128,6 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
     }
 
     try {
-      // First get current user's agenceId from session if not provided
       let targetAgenceId = agenceId;
       if (!targetAgenceId) {
         const userRes = await fetch('/api/auth/me', { credentials: 'include' });
@@ -137,7 +145,6 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
         tauxInteret: formData.tauxInteret,
       };
 
-      // Use the new /api/comptes endpoint
       const res = await fetch('/api/comptes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,7 +160,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       const newAccount = await res.json();
       setComptes(prev => [normalizeCompte(newAccount), ...prev]);
       resetForm();
-      toast.success(`Compte ${newAccount.typeCompte || 'bancaire'} créé avec succès ! N° ${newAccount.numeroCompte || newAccount.numero_compte}`);
+      toast.success(`Compte ${newAccount.typeCompte || 'bancaire'} créé avec succès !`);
     } catch (error) {
       console.error('Erreur souscription compte:', error);
       toast.error(handleApiError(error, 'Erreur lors de la création du compte'));
@@ -167,10 +174,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       isSubmittingRef.current = true;
 
       try {
-          // Note: PATCH endpoint for comptes not yet implemented
-          // For now, show a message that editing requires admin action
-          toast.warning("La modification des comptes nécessite une action administrative.");
-          toast.info("Veuillez contacter votre superviseur pour effectuer cette opération.");
+          toast.warning("La modification des comptes est restreinte.");
           resetForm();
           setShowConfirm(false);
       } catch (error) {
@@ -184,22 +188,66 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       }
   };
 
-  const handleDelete = async (compteId: string) => {
-     toast.warning('La suppression de compte n\'est pas disponible pour des raisons de sécurité.');
-     toast.info('Contactez l\'administrateur pour clôturer un compte.');
-     // Implement DELETE /api/accounts/:id if needed
+  const handleAccountAction = (action: 'suspend' | 'close' | 'details' | 'history', compte: CompteBancaire) => {
+      setSelectedAccount(compte);
+      
+      if (action === 'suspend') {
+          setPendingAction(compte.statut === 'Suspendu' ? 'reactivate' : 'suspend');
+          setShowActionConfirm(true);
+      } else if (action === 'close') {
+          setPendingAction('close');
+          setShowActionConfirm(true);
+      } else if (action === 'details') {
+          toast.info(`Détails du compte ${compte.numeroCompte}`);
+      } else if (action === 'history') {
+          setHistoryCompte(compte);
+          setShowHistory(true);
+      }
   };
 
-  const handleEdit = (compte: CompteBancaire) => {
-    setEditingCompte(compte);
-    setFormData({
-      typeCompte: compte.typeCompte as 'Courant' | 'Épargne' | 'Bloqué',
-      soldeInitial: Number(compte.soldeCourant) || 0,
-      tauxInteret: compte.tauxInteret || 0,
-      statut: compte.statut as 'Actif' | 'Fermé' | 'Suspendu',
-      methodePaiement: 'Espèces'
-    });
-    setShowForm(true);
+  const executeAccountAction = async () => {
+      if (!selectedAccount || !pendingAction) return;
+      
+      try {
+          if (pendingAction === 'close') {
+            toast.warning("La clôture de compte n'est pas encore automatisée.");
+            toast.info("Veuillez contacter l'administrateur système.");
+            setShowActionConfirm(false);
+            return;
+          }
+
+          const endpoint = pendingAction === 'suspend' 
+            ? `/api/comptes/${selectedAccount.id}/bloquer`
+            : `/api/comptes/${selectedAccount.id}/debloquer`;
+
+          // Map 'Autre' as default motif if not specified strictly in UI
+          const motif = actionReason || 'Autre';
+
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ motif })
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'Erreur lors de l\'opération');
+          }
+          
+          const actionLabel = pendingAction === 'suspend' ? 'suspendu' : 'réactivé';
+          toast.success(`Le compte a été ${actionLabel} avec succès.`);
+          
+          await fetchComptes(); // Refresh list to get updated status
+          
+          setShowActionConfirm(false);
+          setSelectedAccount(null);
+          setPendingAction(null);
+          setActionReason('');
+      } catch (error) {
+          console.error("Status change error:", error);
+          toast.error(handleApiError(error, "Erreur lors du changement de statut"));
+      }
   };
 
   const resetForm = () => {
@@ -214,18 +262,9 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
     });
   };
 
-  const getCompteIcon = (type: string) => {
-    if (type === 'Bloqué') return Lock;
-    return type === 'Courant' ? CreditCard : Wallet;
-  };
-
-  const getSolde = (compte: CompteBancaire): number => {
-    return Number(compte.soldeCourant) || 0;
-  };
-
   return (
     <div className="space-y-4">
-      {/* Mobile-First Header */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
             Comptes Bancaires
@@ -245,30 +284,59 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
 
       <ConfirmDialog
         isOpen={showConfirm}
-        onClose={() => {
-            setShowConfirm(false);
-            if (!isSubmittingRef.current && editingCompte) {
-                setShowForm(true);
-            }
-        }}
+        onClose={() => setShowConfirm(false)}
         onConfirm={handleConfirmUpdate}
         title="Modifier le compte"
-        message={
-            <div className="space-y-2">
-                <p>Êtes-vous sûr de vouloir modifier ce compte ?</p>
-                <div className="bg-slate-800/50 p-3 rounded-lg text-sm border border-slate-700/50">
-                    <p className="flex justify-between"><span>Type:</span> <span className="font-medium text-white">{formData.typeCompte}</span></p>
-                    <p className="flex justify-between"><span>Statut:</span> <span className={`font-medium ${formData.statut === 'Actif' ? 'text-emerald-400' : 'text-red-400'}`}>{formData.statut}</span></p>
-                    {formData.typeCompte === 'Épargne' && (
-                         <p className="flex justify-between"><span>Taux:</span> <span className="font-medium text-white">{formData.tauxInteret}%</span></p>
-                    )}
-                </div>
-            </div>
-        }
+        message="Êtes-vous sûr ?"
         confirmText="Sauvegarder"
         variant="warning"
         isLoading={loading}
       />
+
+        {/* Change Status Dialog */}
+       <ConfirmDialog
+        isOpen={showActionConfirm}
+        onClose={() => setShowActionConfirm(false)}
+        onConfirm={executeAccountAction}
+        title={pendingAction === 'suspend' ? "Suspendre le compte" : pendingAction === 'close' ? "Clôturer le compte" : "Réactiver le compte"}
+        message={
+            <div className="space-y-3">
+                <p>
+                    {pendingAction === 'suspend' 
+                        ? "Le compte sera bloqué pour toutes les opérations de débit. Les crédits resteront possibles."
+                        : pendingAction === 'close'
+                        ? "Attention : La clôture est définitive. Le solde doit être à zéro avant de procéder."
+                        : "Le compte sera de nouveau pleinement opérationnel."}
+                </p>
+                {(pendingAction === 'suspend' || pendingAction === 'close') && (
+                    <div>
+                        <label className="block text-xs text-slate-400 mb-1">Motif de l'action *</label>
+                        <input 
+                            type="text" 
+                            className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white"
+                            placeholder="Ex: Fraude suspicion, Demande client..."
+                            value={actionReason}
+                            onChange={(e) => setActionReason(e.target.value)}
+                        />
+                    </div>
+                )}
+            </div>
+        }
+        confirmText={pendingAction === 'suspend' ? "Suspendre" : pendingAction === 'close' ? "Clôturer" : "Réactiver"}
+        variant={pendingAction === 'close' ? "danger" : "warning"}
+        isLoading={loading}
+        disabled={(pendingAction === 'suspend' || pendingAction === 'close') && !actionReason.trim()}
+      />
+
+      {/* Account History Modal */}
+      {showHistory && historyCompte && (
+        <AccountHistory
+            compteId={historyCompte.id}
+            numeroCompte={historyCompte.numeroCompte}
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+        />
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -292,105 +360,15 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {comptes.map((compte) => {
-            const Icon = getCompteIcon(compte.typeCompte);
-            const isEpargne = compte.typeCompte === 'Épargne';
-            const isBloque = compte.typeCompte === 'Bloqué' || compte.blocageActif;
-            const solde = getSolde(compte);
-
-            return (
-              <Card
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+          {comptes.map((compte) => (
+             <AccountCard 
                 key={compte.id}
-                variant="default"
-                padding="sm"
-                className={`hover:border-cyan-500/30 transition-colors group relative overflow-hidden ${isBloque ? 'border-amber-500/30' : ''}`}
-              >
-                 {/* Decorative background gradient */}
-                 {isBloque ? (
-                     <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
-                 ) : isEpargne ? (
-                     <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
-                 ) : (
-                     <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
-                 )}
-
-                <div className="flex items-start justify-between mb-3 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${isBloque ? 'bg-amber-500/10 text-amber-400' : isEpargne ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
-                      <Icon size={20} />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-white text-sm flex items-center gap-1.5">
-                        {compte.typeCompte}
-                        {isBloque && <Lock size={12} className="text-amber-400" />}
-                      </h4>
-                      <p className="text-[10px] text-slate-500 font-mono tracking-wider">{compte.numeroCompte}</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge value={compte.statut} size="sm" />
-                    {isBloque && (
-                      <span className="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                        {compte.blocageMotif || 'Bloqué'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="relative z-10 mb-3">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-tight mb-0.5">
-                      {isBloque ? 'Solde (Bloqué)' : 'Solde Disponible'}
-                    </p>
-                    <div className="flex items-baseline gap-1">
-                        <span className={`text-xl font-bold tracking-tight ${isBloque ? 'text-amber-300' : 'text-white'}`}>
-                          {solde.toLocaleString()}
-                        </span>
-                        <span className="text-xs font-medium text-slate-500">FCFA</span>
-                    </div>
-
-                    {isEpargne && (compte.tauxInteret || 0) > 0 && (
-                        <div className="flex items-center gap-1 mt-1">
-                            <TrendingUp size={10} className="text-emerald-500" />
-                            <span className="text-[10px] text-emerald-500 font-medium">+{compte.tauxInteret}% d'intérêts</span>
-                        </div>
-                    )}
-
-                    {isBloque && compte.blocageFin && (
-                        <div className="flex items-center gap-1 mt-1">
-                            <Unlock size={10} className="text-amber-500" />
-                            <span className="text-[10px] text-amber-500 font-medium">
-                              Déblocage: {new Date(compte.blocageFin).toLocaleDateString('fr-FR')}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2 pt-3 border-t border-slate-700/50 relative z-10">
-                  {canEditAccounts ? (
-                    <button
-                      onClick={() => handleEdit(compte)}
-                      className="flex-1 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition flex items-center justify-center gap-1.5"
-                    >
-                      <Edit2 size={12} /> Modifier
-                    </button>
-                  ) : (
-                    <div className="flex-1 py-1.5 rounded bg-slate-800/50 text-slate-500 text-xs font-medium flex items-center justify-center gap-1.5">
-                      <AlertTriangle size={12} /> Lecture seule
-                    </div>
-                  )}
-                  {canDeleteAccounts && (
-                    <button
-                      onClick={() => handleDelete(compte.id)}
-                      className="p-1.5 rounded bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
+                compte={compte}
+                onAction={handleAccountAction}
+                onEdit={(c) => { setEditingCompte(c); setShowForm(true); }}
+             />
+          ))}
         </div>
       )}
 
@@ -400,7 +378,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
             <div className="bg-slate-800/50 border-b border-slate-700 p-4 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-white">
-                  {editingCompte ? 'Modifier le compte' : 'Nouveau compte'}
+                  {editingCompte ? 'Détails du compte' : 'Nouveau compte'}
                 </h2>
               </div>
               <button
@@ -412,63 +390,67 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
             </div>
 
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
+               {/* Read-only details for verify */}
+               {editingCompte && (
+                   <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg mb-4">
+                       <p className="text-sm text-blue-300 flex gap-2">
+                           <AlertCircle size={16} />
+                           Pour modifier le solde, veuillez effectuer une opération de caisse (Dépôt/Retrait).
+                       </p>
+                   </div>
+               )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase">Type de compte</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, typeCompte: 'Courant' }))}
-                    className={`p-3 rounded-lg border transition flex flex-col items-center gap-2 ${
-                      formData.typeCompte === 'Courant'
-                        ? 'border-cyan-500 bg-cyan-500/10'
-                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                    }`}
-                  >
-                    <CreditCard size={20} className={formData.typeCompte === 'Courant' ? 'text-cyan-400' : 'text-slate-500'} />
-                    <span className={`text-xs font-medium ${formData.typeCompte === 'Courant' ? 'text-cyan-400' : 'text-slate-400'}`}>Courant</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, typeCompte: 'Épargne' }))}
-                    className={`p-3 rounded-lg border transition flex flex-col items-center gap-2 ${
-                      formData.typeCompte === 'Épargne'
-                        ? 'border-emerald-500 bg-emerald-500/10'
-                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                    }`}
-                  >
-                    <Wallet size={20} className={formData.typeCompte === 'Épargne' ? 'text-emerald-400' : 'text-slate-500'} />
-                    <span className={`text-xs font-medium ${formData.typeCompte === 'Épargne' ? 'text-emerald-400' : 'text-slate-400'}`}>Épargne</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, typeCompte: 'Bloqué' }))}
-                    className={`p-3 rounded-lg border transition flex flex-col items-center gap-2 ${
-                      formData.typeCompte === 'Bloqué'
-                        ? 'border-amber-500 bg-amber-500/10'
-                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                    }`}
-                  >
-                    <Lock size={20} className={formData.typeCompte === 'Bloqué' ? 'text-amber-400' : 'text-slate-500'} />
-                    <span className={`text-xs font-medium ${formData.typeCompte === 'Bloqué' ? 'text-amber-400' : 'text-slate-400'}`}>Bloqué</span>
-                  </button>
-                </div>
+                {/* Type selection logic same as before but disabled if editing */}
+                 <div className="grid grid-cols-3 gap-2">
+                  {['Courant', 'Épargne', 'Bloqué'].map((type) => (
+                    <button
+                        key={type}
+                        type="button"
+                        disabled={!!editingCompte} 
+                        onClick={() => setFormData(prev => ({ ...prev, typeCompte: type as any }))}
+                        className={`p-3 rounded-lg border transition flex flex-col items-center gap-2 ${
+                        formData.typeCompte === type
+                            ? 'border-cyan-500 bg-cyan-500/10'
+                            : 'border-slate-700 bg-slate-800/50'
+                        } ${editingCompte ? 'opacity-50 cursor-not-allowed' : 'hover:border-slate-600'}`}
+                    >
+                        <span className={`text-xs font-medium ${formData.typeCompte === type ? 'text-cyan-400' : 'text-slate-400'}`}>{type}</span>
+                    </button>
+                  ))}
+                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Solde initial (FCFA)</label>
-                <div className="relative">
-                    <input
-                    type="number"
-                    min="0"
-                    value={formData.soldeInitial}
-                    onChange={(e) => setFormData(prev => ({ ...prev, soldeInitial: Number(e.target.value) }))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-12 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition"
-                    />
-                    <span className="absolute right-3 top-2.5 text-xs text-slate-500 font-medium">FCFA</span>
-                </div>
-              </div>
+              {/* Solde Initial - ONLY for NEW accounts */}
+              {!editingCompte ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Solde initial (FCFA)</label>
+                    <div className="relative">
+                        <input
+                        type="number"
+                        min="0"
+                        value={formData.soldeInitial}
+                        onChange={(e) => setFormData(prev => ({ ...prev, soldeInitial: Number(e.target.value) }))}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-12 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition"
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs text-slate-500 font-medium">FCFA</span>
+                    </div>
+                  </div>
+              ) : (
+                   <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Solde Actuel (FCFA)</label>
+                    <div className="relative">
+                        <input
+                        type="text"
+                        disabled
+                        value={Number(editingCompte.soldeCourant).toLocaleString()}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-3 pr-12 py-2.5 text-slate-400 text-sm cursor-not-allowed"
+                        />
+                        <span className="absolute right-3 top-2.5 text-xs text-slate-600 font-medium">FCFA</span>
+                    </div>
+                  </div>
+              )}
 
               {formData.soldeInitial > 0 && !editingCompte && (
                   <div className="animate-in slide-in-from-top-2 duration-200">
@@ -516,15 +498,17 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                   onClick={resetForm}
                   className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
                 >
-                  Annuler
+                  Fermer
                 </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-cyan-500/20"
-                >
-                  <Check size={16} />
-                  {editingCompte ? 'Sauvegarder' : 'Créer'}
-                </button>
+                {!editingCompte && (
+                    <button
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-cyan-500/20"
+                    >
+                    <Check size={16} />
+                    Créer
+                    </button>
+                )}
               </div>
             </form>
           </div>
