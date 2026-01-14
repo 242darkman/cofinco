@@ -92,6 +92,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   useEffect(() => {
     loadClients();
     loadCreditPlans();
+
+    // Listen for real-time client updates (Item 22 fix - Automatic)
+    const handleClientUpdate = () => {
+        console.log("🔄 Real-time update: Reloading clients...");
+        loadClients();
+    };
+
+    window.addEventListener('client-update', handleClientUpdate);
+    
+    return () => {
+        window.removeEventListener('client-update', handleClientUpdate);
+    };
   }, []);
 
   const loadCreditPlans = async () => {
@@ -465,17 +477,27 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
             />
           </div>
 
-          <div className="md:col-span-2">
-            <SearchableSelect
-              label="Client"
-              name="client_id"
-              value={formData.client_id}
-              onChange={(value) => setFormData({ ...formData, client_id: String(value) })}
-              options={clientOptions}
-              disabled={!!clientId}
-              required
-              error={errors.client_id}
-              placeholder="Rechercher un client..."
+          <div className="md:col-span-2 flex items-start gap-2">
+            <div className="flex-1">
+              <SearchableSelect
+                label="Client"
+                name="client_id"
+                value={formData.client_id}
+                onChange={(value) => setFormData({ ...formData, client_id: String(value) })}
+                options={clientOptions}
+                disabled={!!clientId}
+                required
+                error={errors.client_id}
+                placeholder="Rechercher un client..."
+              />
+            </div>
+            <Button 
+                type="button" 
+                variant="secondary" 
+                icon={RefreshCw} 
+                onClick={loadClients}
+                className="mt-7" // Align with input
+                title="Actualiser la liste des clients"
             />
           </div>
 

@@ -84,19 +84,26 @@ export default function ClientModule({ onModuleChange }: ClientModuleProps) {
   const handleSaveClient = async (clientData: any) => {
     try {
       if (selectedClient) {
-        await clientService.update(selectedClient.id, clientData);
-        toast.success('Client mis à jour avec succès !');
-        // Update viewingClient if we're editing the currently viewed client
-        if (viewingClient?.id === selectedClient.id) {
-          setViewingClient({ ...viewingClient, ...clientData });
+        const updated = await clientService.update(selectedClient.id, clientData);
+        if (updated) {
+            setClients(prev => prev.map(c => c.id === updated.id ? updated : c));
+            toast.success('Client mis à jour avec succès !');
+            // Update viewingClient if we're editing the currently viewed client
+            if (viewingClient?.id === selectedClient.id) {
+              setViewingClient({ ...viewingClient, ...updated });
+            }
         }
       } else {
-        await clientService.create(clientData);
-        toast.success('Client créé avec succès ! Un compte courant a été automatiquement ouvert.');
+        const newClient = await clientService.create(clientData);
+        if (newClient) {
+            setClients(prev => [newClient, ...prev]);
+            toast.success('Client créé avec succès ! Un compte courant a été automatiquement ouvert.');
+        }
       }
       setShowForm(false);
       setSelectedClient(null);
-      loadClients();
+      // No need to reload all clients, we have the fresh data with agency name from backend fix
+      // loadClients();
     } catch (error: any) {
       console.error('Error saving client:', error);
       toast.error(handleApiError(error, 'Erreur lors de la sauvegarde du client'));

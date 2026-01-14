@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients } from "@shared/schema";
+import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences } from "@shared/schema";
 import { storage } from "../storage";
 import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches } from "../storage/clients";
 
@@ -460,6 +460,13 @@ export function registerClientRoutes(app: Express) {
           // Ne pas bloquer la création du client si le compte échoue
         }
 
+        // Fetch agency details to return complete object (Item 21 fix)
+        let agenceNom = client.agence; // Fallback to legacy field
+        if (client.agenceId) {
+            const [agence] = await db.select().from(agences).where(eq(agences.id, client.agenceId));
+            if (agence) agenceNom = agence.nom;
+        }
+
         await logAudit(
             req,
             "CREATE_CLIENT",
@@ -495,7 +502,11 @@ export function registerClientRoutes(app: Express) {
             });
         }
 
-        res.status(201).json(addSnakeCaseAliasesDeep(client));
+        res.status(201).json(addSnakeCaseAliasesDeep({
+            ...client,
+            agence_nom: agenceNom,
+            type_marche_nom: 'Standard' // Default for now, or fetch if needed
+        }));
       } catch (e) {
         if (e instanceof z.ZodError) return res.status(400).json(e);
         console.error("Create client error:", e);
