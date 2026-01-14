@@ -311,15 +311,15 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
   };
 
   const handleExportCSV = () => {
-    const headers = [t('nom'), t('email'), t('telephone'), t('adresse'), t('status'), t('segment'), t('score')];
+    const headers = [t('nom'), t('prenom'), t('email'), t('telephone'), t('adresse'), t('status'), t('segment')];
     const csvData = filteredClients.map(client => [
       client.nom,
+      client.prenom || '',
       client.email,
       client.telephone,
       client.adresse || '',
       client.status,
-      client.segment,
-      client.score
+      client.segment
     ]);
 
     const csv = [
@@ -358,12 +358,6 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
       }
       if (searchFilters.segment) {
         matchesAdvancedFilters = matchesAdvancedFilters && client.segment === searchFilters.segment;
-      }
-      if (searchFilters.scoreMin !== undefined) {
-        matchesAdvancedFilters = matchesAdvancedFilters && (client.score || 0) >= searchFilters.scoreMin;
-      }
-      if (searchFilters.scoreMax !== undefined) {
-        matchesAdvancedFilters = matchesAdvancedFilters && (client.score || 0) <= searchFilters.scoreMax;
       }
       if (searchFilters.creditMin !== undefined) {
         matchesAdvancedFilters = matchesAdvancedFilters && Number(client.creditTotal || 0) >= searchFilters.creditMin;
@@ -444,10 +438,6 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
                 <h1 className="text-xl sm:text-3xl font-bold text-white mb-1">{selectedClient.nom} {selectedClient.prenom}</h1>
                 <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Badge value={selectedClient.segment} size="sm" />
-                    <span>•</span>
-                    <span className={(selectedClient.score || 0) >= 70 ? 'text-emerald-400 font-medium' : (selectedClient.score || 0) >= 40 ? 'text-amber-400 font-medium' : 'text-red-400 font-medium'}>
-                        Score: {selectedClient.score ?? 0}
-                    </span>
                     {selectedClient.agence && (
                       <>
                         <span>•</span>
@@ -659,7 +649,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
                   <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-200 bg-slate-50 dark:bg-slate-900/95">Nom</th>
-                      <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-200 hidden sm:table-cell bg-slate-50 dark:bg-slate-900/95">Score</th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-200 hidden sm:table-cell bg-slate-50 dark:bg-slate-900/95">Téléphone</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-200 hidden sm:table-cell bg-slate-50 dark:bg-slate-900/95">Segment</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-200 bg-slate-50 dark:bg-slate-900/95">Status</th>
                       <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-200 hidden md:table-cell bg-slate-50 dark:bg-slate-900/95">Actions</th>
@@ -688,14 +678,14 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
                           onClick={() => setSelectedClient(client)}
                         >
                           <td className="px-4 py-3">
-                            <div className="font-medium text-slate-900 dark:text-white">{client.nom}</div>
+                            <div className="font-medium text-slate-900 dark:text-white">{client.nom} {client.prenom}</div>
                             <div className="text-xs text-slate-500 sm:hidden mt-0.5">
-                              {client.segment} • Score: {client.score}
+                              {client.segment}
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
-                            <span className="font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 px-1.5 py-0.5 rounded text-xs">
-                              {client.score}
+                            <span className="text-slate-600 dark:text-slate-300 text-sm">
+                              {client.telephone || '-'}
                             </span>
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">

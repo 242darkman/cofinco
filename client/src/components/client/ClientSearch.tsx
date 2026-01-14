@@ -1,6 +1,6 @@
 import type { Client } from '@shared/schema';
 import React, { useState } from 'react';
-import { Search, Filter, X, Calendar, DollarSign, Award, MapPin } from 'lucide-react';
+import { Search, Filter, X, Calendar, DollarSign, MapPin } from 'lucide-react';
 
 interface ClientSearchProps {
   onSearch: (filters: SearchFilters) => void;
@@ -11,8 +11,6 @@ export interface SearchFilters {
   searchTerm?: string;
   status?: string;
   segment?: string;
-  scoreMin?: number;
-  scoreMax?: number;
   creditMin?: number;
   creditMax?: number;
   dateFrom?: string;
@@ -25,8 +23,6 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
     searchTerm: '',
     status: 'all',
     segment: 'all',
-    scoreMin: 0,
-    scoreMax: 100,
     creditMin: 0,
     creditMax: 1000000,
     dateFrom: '',
@@ -54,8 +50,6 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
       searchTerm: '',
       status: 'all',
       segment: 'all',
-      scoreMin: 0,
-      scoreMax: 100,
       creditMin: 0,
       creditMax: 1000000,
       dateFrom: '',
@@ -97,7 +91,7 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
               value={filters.searchTerm}
               onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
               className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              placeholder="Nom, email, téléphone..."
+              placeholder="Nom complet, prénom, email, téléphone..."
             />
           </div>
 

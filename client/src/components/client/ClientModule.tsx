@@ -41,6 +41,10 @@ export default function ClientModule() {
     setLoading(true);
     try {
       const data = await clientService.getAll(searchFilters);
+      // DEBUG: Check if prenom exists in data
+      if (data.length > 0) {
+        console.log('[DEBUG ClientModule] First client:', { nom: data[0].nom, prenom: data[0].prenom, keys: Object.keys(data[0]) });
+      }
       setClients(data);
     } catch (error) {
       console.error('Error loading clients:', error);

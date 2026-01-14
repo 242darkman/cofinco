@@ -103,25 +103,36 @@ export function registerClientRoutes(app: Express) {
             console.log("[Debug] First client sample:", JSON.stringify(clients[0], null, 2));
         }
 
-        const lowerQ = query.toLowerCase();
-        console.log(`[Search] Query: "${query}" (lower: "${lowerQ}")`);
+        const lowerQ = query.toLowerCase().trim();
+        // Split query into words for multi-term search (e.g., "nzaba joseph" -> ["nzaba", "joseph"])
+        const searchTerms = lowerQ.split(/\s+/).filter(Boolean);
 
         const filtered = clients.filter(c => {
-            const fullName = `${c.nom || ''} ${c.prenom || ''}`.toLowerCase();
-            const fullNameReverse = `${c.prenom || ''} ${c.nom || ''}`.toLowerCase();
-            
-            // Debug specific match for Nzaba
-            if (c.nom === 'Nzaba') {
-                console.log(`[Search Debug] Found Nzaba: `, { nom: c.nom, prenom: c.prenom, fullName });
+            const nom = (c.nom || '').toLowerCase();
+            const prenom = (c.prenom || '').toLowerCase();
+            const email = (c.email || '').toLowerCase();
+            const telephone = c.telephone || '';
+            const fullName = `${nom} ${prenom}`.trim();
+            const fullNameReverse = `${prenom} ${nom}`.trim();
+
+            // If multiple words, ALL words must match somewhere in client data
+            if (searchTerms.length > 1) {
+                return searchTerms.every(term =>
+                    nom.includes(term) ||
+                    prenom.includes(term) ||
+                    email.includes(term) ||
+                    telephone.includes(term)
+                );
             }
 
+            // Single word search - original logic
             return (
-                (c.nom && c.nom.toLowerCase().includes(lowerQ)) ||
-                (c.prenom && c.prenom.toLowerCase().includes(lowerQ)) ||
+                nom.includes(lowerQ) ||
+                prenom.includes(lowerQ) ||
                 fullName.includes(lowerQ) ||
                 fullNameReverse.includes(lowerQ) ||
-                (c.email && c.email.toLowerCase().includes(lowerQ)) ||
-                (c.telephone && c.telephone.includes(query))
+                email.includes(lowerQ) ||
+                telephone.includes(query)
             );
         });
         
