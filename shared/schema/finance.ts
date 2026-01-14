@@ -101,6 +101,7 @@ export const demandesCredit = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     numeroDemande: text("numero_demande").notNull().unique(),
     clientId: uuid("client_id").notNull().references(() => clients.id),
+    agenceId: uuid("agence_id").notNull().references(() => agences.id), // Added missing agenceId reference
 
     montantDemande: numeric("montant_demande").notNull(),
     tauxInteret: numeric("taux_interet").notNull(),
@@ -1082,3 +1083,64 @@ export type InsertReevaluationAuditLog = z.infer<typeof insertReevaluationAuditL
 export type ReevaluationAuditLog = typeof reevaluationAuditLogs.$inferSelect;
 
 // End of finance tables
+
+// =======================
+// REMBOURSEMENT FRAIS DE CRÉDIT (CR)
+// =======================
+
+export const creditRefundRequests = pgTable(
+  "credit_refund_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    
+    // Core Links
+    demandeId: uuid("demande_id").notNull().references(() => demandesCredit.id, { onDelete: 'restrict' }),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: 'restrict' }),
+    agenceId: uuid("agence_id").notNull().references(() => agences.id, { onDelete: 'restrict' }),
+
+    // Financial Data
+    montantEncaisse: numeric("montant_encaisse").notNull(),
+    montantRemboursable: numeric("montant_remboursable").notNull(),
+    montantNonRemboursable: numeric("montant_non_remboursable").notNull(),
+    
+    // Workflow State
+    statut: text("statut").notNull().default("DRAFT"), // DRAFT | SUBMITTED | APPROVED | REJECTED | PAID | CANCELLED
+    
+    // Context
+    motifRejetCredit: text("motif_rejet_credit"),
+    motifRemboursement: text("motif_remboursement"),
+    
+    // Decisions (Audit constraints)
+    makerId: uuid("maker_id").references(() => users.id),
+    makerAt: timestamp("maker_at"),
+    
+    checkerId: uuid("checker_id").references(() => users.id),
+    checkerAt: timestamp("checker_at"),
+    
+    checkerDecision: text("checker_decision"), // APPROVED | REJECTED
+    checkerComment: text("checker_comment"),
+
+    // Execution / Payment
+    paidAt: timestamp("paid_at"),
+    paidBy: uuid("paid_by").references(() => users.id),
+    paymentMethod: text("payment_method"), // CASH | ACCOUNT
+    paymentReference: text("payment_reference"), // Bon de sortie / Transfer ref
+    
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id),
+
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => ({
+    idxDemande: index("idx_refund_demande").on(t.demandeId),
+    idxStatus: index("idx_refund_status").on(t.statut),
+  })
+);
+
+export const insertCreditRefundRequestSchema = createInsertSchema(creditRefundRequests).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertCreditRefundRequest = z.infer<typeof insertCreditRefundRequestSchema>;
+export type CreditRefundRequest = typeof creditRefundRequests.$inferSelect;

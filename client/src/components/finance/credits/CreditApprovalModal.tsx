@@ -283,7 +283,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       await demandeCreditApi.update(demande.id, payload);
 
       const successMessage = reimbursementAmount 
-        ? `Demande rejetée. Un remboursement de ${formatMoney(Number(reimbursementAmount))} a été crédité sur le compte courant du client.`
+        ? `Demande rejetée. Une demande de remboursement de ${formatMoney(Number(reimbursementAmount))} a été créée pour validation.`
         : 'Demande de crédit rejetée avec succès.';
       
       toast.success(successMessage, { duration: 5000 });

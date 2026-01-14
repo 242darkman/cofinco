@@ -30,9 +30,9 @@ export * from "./coffres-forts";
 // I will create `relations.ts` in `shared/schema/` and export it in index.
 
 import { relations } from "drizzle-orm";
-import { users } from "./auth";
-import { clients, clientTags, clientActivities } from "./clients";
-import { credits, comptes, transactionsCompte } from "./finance"; 
+
+ 
+ 
 import { membresTontine, contributionsTontine, tontines } from "./tontines";
 import { factures, lignesFactures, modelesFactures } from "./operations";
 // Circular dependency risk if I import from "." inside relations.ts which is exported by "."?

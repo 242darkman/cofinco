@@ -17,7 +17,8 @@ import {
     caisseTransferts, type CaisseTransfert, type InsertCaisseTransfert,
     type Agence, type CaisseAssignation,
     type DureeSuggeree, type InsertDureeSuggeree,
-    creditPlans, type UserCreditPlan, type InsertCreditPlan, insertCreditPlanSchema
+    creditPlans, type UserCreditPlan, type InsertCreditPlan, insertCreditPlanSchema,
+    creditRefundRequests, type CreditRefundRequest, type InsertCreditRefundRequest
   } from "@shared/schema";
   import { db } from "../db";
 import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, aliasedTable } from "drizzle-orm";
@@ -2099,3 +2100,47 @@ export async function validateTransfertWithLedger(
   });
 }
 
+
+/**
+ * Create a new Credit Refund Request
+ */
+export async function createCreditRefundRequest(
+  data: InsertCreditRefundRequest, 
+  tx?: PgTransaction<any, any, any>
+): Promise<CreditRefundRequest> {
+  const [request] = await (tx || db)
+    .insert(creditRefundRequests)
+    .values(data)
+    .returning();
+  return request;
+}
+
+/**
+ * Get a Credit Refund Request by ID
+ */
+export async function getCreditRefundRequest(
+  id: string, 
+  tx?: PgTransaction<any, any, any>
+): Promise<CreditRefundRequest | undefined> {
+  const [request] = await (tx || db)
+    .select()
+    .from(creditRefundRequests)
+    .where(eq(creditRefundRequests.id, id));
+  return request;
+}
+
+/**
+ * Update a Credit Refund Request
+ */
+export async function updateCreditRefundRequest(
+  id: string, 
+  updateData: Partial<CreditRefundRequest>,
+  tx?: PgTransaction<any, any, any>
+): Promise<CreditRefundRequest> {
+  const [updated] = await (tx || db)
+    .update(creditRefundRequests)
+    .set({ ...updateData, updatedAt: new Date() })
+    .where(eq(creditRefundRequests.id, id))
+    .returning();
+  return updated;
+}

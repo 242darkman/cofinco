@@ -32,7 +32,8 @@ import {
 
     InsertAvantage, ObjectifMensuel, InsertObjectifMensuel,
     CaisseAssignation, InsertCaisseAssignation,
-    DureeSuggeree, InsertDureeSuggeree
+    DureeSuggeree, InsertDureeSuggeree,
+    CreditRefundRequest, InsertCreditRefundRequest
 } from "@shared/schema";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
@@ -111,6 +112,12 @@ export interface IStorage {
       observations?: string;
       idempotencyKey?: string;
     }, userId?: string): Promise<{ remboursement: Remboursement; mouvement: any }>;
+    
+    // Refund Requests
+    createCreditRefundRequest(data: InsertCreditRefundRequest, tx?: PgTransaction<any, any, any>): Promise<CreditRefundRequest>;
+    getCreditRefundRequest(id: string, tx?: PgTransaction<any, any, any>): Promise<CreditRefundRequest | undefined>;
+    updateCreditRefundRequest(id: string, data: Partial<CreditRefundRequest>, tx?: PgTransaction<any, any, any>): Promise<CreditRefundRequest>;
+
 
     // Epargne (Comptes Bancaires)
     getCompte(id: string): Promise<Compte | undefined>;

@@ -10,9 +10,15 @@ import {
   insertCaisseTransfertSchema,
   insertCreditPlanSchema,
   mouvementsFinanciers,
-  comptes
+  comptes,
+  creditRefundRequests,
+  sessionsCaisse,
+  operationsCaisse,
+  clients,
+  demandesCredit
 } from "@shared/schema";
 import { storage } from "../storage";
+import { createMouvementFinancier } from "../services/ledger";
 import { getComptesByClient } from "../storage/finance";
 import { requireAuth, requireRole } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
@@ -27,7 +33,7 @@ import {
   type DureeUnite
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
-import { eq } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import * as sessionService from "../services/caisse/session-service";
 
 export function registerFinanceRoutes(app: Express) {
@@ -442,48 +448,28 @@ export function registerFinanceRoutes(app: Express) {
             if (refundAmount > maxRefund) {
                throw new Error(`Le montant du remboursement (${refundAmount}) ne peut pas excéder les frais payés (${maxRefund}).`);
             }
-  
-            // 2. Find Client's Current Account
-            const clientAccounts = await storage.getComptesByClient(existing.clientId);
-            const courantAccount = clientAccounts.find(c => c.typeCompte === 'Courant' && c.statut === 'Actif');
-  
-            if (!courantAccount) {
-                throw new Error("Le client n'a pas de compte courant actif pour recevoir le remboursement.");
-            }
-  
-            // 3. Execute Transaction (System -> Client)
-            await storage.createTransactionCompte({
-                compteId: courantAccount.id,
-                typePaiement: 'Dépôt Courant',
-                montant: refundAmount.toString(),
-                observations: `Remboursement partiel frais dossier (Demande #${existing.numeroDemande})`,
-                methodePaiement: 'Virement',
+
+            // 2. Create Refund Request (Wait for approval/payment)
+            await storage.createCreditRefundRequest({
+              demandeId: existing.id,
+              clientId: existing.clientId,
+              agenceId: req.session.user?.agenceId!, // Validated by middleware
+              montantEncaisse: existing.montantFraisEngagement?.toString() || '0',
+              montantRemboursable: refundAmount.toString(),
+              montantNonRemboursable: (maxRefund - refundAmount).toString(),
+              statut: 'SUBMITTED', // Ready for approval/payment
+              motifRejetCredit: updateData.motifRejet,
+              motifRemboursement: "Remboursement suite rejet", // Default
+              makerId: req.session.user?.id,
+              makerAt: new Date(),
             }, tx);
   
-            // 4. Trace Mouvement Financier (Explicit Ledger Entry)
-            const { createMouvementFinancier } = await import('../services/ledger');
-            const userId = req.session.user?.id;
-            
-            await createMouvementFinancier(tx, {
-                montant: refundAmount.toString(),
-                sens: 'Crédit',
-                sourceModule: 'SYSTEME',
-                typePaiement: 'Virement',
-                clientId: existing.clientId,
-                compteId: courantAccount.id,
-                creditId: existing.id, 
-                metadata: {
-                    type: 'REMBOURSEMENT_FRAIS',
-                    motif: updateData.motifRejet || 'Rejet demande'
-                }
-            }, userId);
-  
+            // 3. Update Demande Status
             // Motif Rejet Update
             if (updateData.motifRejet) {
-                 updateData.motifRejet += ` (Dont remboursement de ${refundAmount} FCFA)`;
+                 updateData.motifRejet += ` (Remboursement de ${refundAmount} FCFA en attente)`;
             }
 
-            // 5. Update Status
             return await storage.updateDemandeCredit(id, updateData, tx);
           });
       } else {
@@ -1860,4 +1846,212 @@ export function registerFinanceRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ============================================================================
+  // CREDIT REFUND WORKFLOW API
+  // ============================================================================
+
+  /**
+   * GET /api/finance/credit-refunds - List refunds with filters
+   */
+  app.get("/api/finance/credit-refunds", requireAuth, requireRole('admin', 'chef', 'credit', 'caisse'), requireAgenceAccess(), async (req, res) => {
+    try {
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      let query = db.select({
+        refund: creditRefundRequests,
+        demande: demandesCredit,
+        client: clients
+      })
+      .from(creditRefundRequests)
+      .innerJoin(demandesCredit, eq(creditRefundRequests.demandeId, demandesCredit.id))
+      .innerJoin(clients, eq(creditRefundRequests.clientId, clients.id));
+
+      const conditions = [];
+      if (agenceFilter?.agenceId) {
+        conditions.push(eq(creditRefundRequests.agenceId, agenceFilter.agenceId));
+      }
+
+      if (req.query.statut) {
+        conditions.push(eq(creditRefundRequests.statut, req.query.statut as string));
+      }
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+
+      
+      const results = await query.orderBy(desc(creditRefundRequests.createdAt));
+      res.json(addSnakeCaseAliasesDeep(results));
+    } catch (error: any) {
+      console.error("Error fetching refunds:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * GET /api/finance/credit-refunds/:id - Get Single Refund Details
+   */
+  app.get("/api/finance/credit-refunds/:id", requireAuth, async (req, res) => {
+     try {
+        const refund = await storage.getCreditRefundRequest(req.params.id);
+        if (!refund) return res.status(404).json({ message: "Refund request not found" });
+        res.json(addSnakeCaseAliasesDeep(refund));
+     } catch (error: any) {
+        res.status(500).json({ message: error.message });
+     }
+  });
+
+  /**
+   * POST /api/finance/credit-refunds/:id/approve - Approve Refund Request
+   * Requires N+1 Validation (Checker must be different from Maker)
+   */
+  app.post("/api/finance/credit-refunds/:id/approve", requireAuth, requireRole('admin', 'chef', 'audit'), async (req, res) => {
+     try {
+       const user = req.session.user!;
+       const refund = await storage.getCreditRefundRequest(req.params.id);
+       
+       if (!refund) return res.status(404).json({ message: "Refund request not found" });
+       
+       if (refund.statut !== 'SUBMITTED') {
+         return res.status(400).json({ message: `Cannot approve refund in status '${refund.statut}'` });
+       }
+
+       if (refund.makerId === user.id && user.role !== 'admin') {
+         return res.status(403).json({ message: "Segregation of Duties: Maker cannot approve their own request." });
+       }
+
+       const updated = await storage.updateCreditRefundRequest(refund.id, {
+         statut: 'APPROVED',
+         checkerId: user.id,
+         checkerAt: new Date(),
+         checkerDecision: 'APPROVED'
+       });
+       
+       // Log Audit
+       await logAudit(req, "APPROVE_REFUND", "credit_refund", refund.id, {}, "success", "medium");
+       
+       res.json(addSnakeCaseAliasesDeep(updated));
+     } catch (error: any) {
+       res.status(500).json({ message: error.message });
+     }
+  });
+
+  /**
+   * POST /api/finance/credit-refunds/:id/pay - Execute Payment (Cash or Account)
+   */
+  app.post("/api/finance/credit-refunds/:id/pay", requireAuth, requireRole('admin', 'caisse', 'chef'), async (req, res) => {
+    const { method, sessionCaisseId } = req.body; // method: 'CASH' | 'ACCOUNT'
+    const user = req.session.user!;
+
+    try {
+       // Using simpler transaction wrapper because we need explicit logic
+       const refundId = req.params.id;
+       
+       await db.transaction(async (tx) => {
+          // 1. Lock and Get Refund
+          const [refundData] = await tx
+             .select()
+             .from(creditRefundRequests)
+             .where(eq(creditRefundRequests.id, refundId))
+             //.for('update') // drizzle support for lock? .for('update') might need raw sql or specific driver support
+             ;
+             
+          if (!refundData) throw new Error("Refund not found");
+          if (refundData.statut !== 'APPROVED') throw new Error("Refund must be APPROVED before payment");
+
+          const amount = Number(refundData.montantRemboursable);
+
+          // 2. Prepare Ledger Transaction
+          // Dynamic import removed
+          let mouvement;
+          let paymentRefString = '';
+
+          if (method === 'ACCOUNT') {
+             // Credit Client Account
+             const clientAccounts = await storage.getComptesByClient(refundData.clientId);
+             const courantAccount = clientAccounts.find(c => c.typeCompte === 'Courant' && c.statut === 'Actif');
+             if (!courantAccount) throw new Error("No active current account found for client");
+
+             // Create Transaction
+             await storage.createTransactionCompte({
+                compteId: courantAccount.id,
+                typePaiement: 'Dépôt Courant',
+                montant: amount.toString(),
+                observations: `Remboursement Frais Dossier (Ref: ${refundData.id})`,
+                methodePaiement: 'Virement', 
+             }, tx);
+
+             // Create Ledger Entry
+             mouvement = await createMouvementFinancier(tx, {
+               montant: amount.toString(),
+               sens: 'Crédit',
+               sourceModule: 'SYSTEME',
+               typePaiement: 'Virement',
+               clientId: refundData.clientId,
+               compteId: courantAccount.id,
+               creditId: refundData.demandeId,
+               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id }
+             }, user.id);
+             
+             paymentRefString = `VIREMENT-${mouvement.reference}`;
+
+          } else if (method === 'CASH') {
+             // Cash Payment (Requires Active Session)
+             if (!sessionCaisseId) throw new Error("Session Caisse ID required for cash payment");
+             
+             // Check Session Balance
+             const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionCaisseId));
+             if (!session || session.statut !== 'Ouverte') throw new Error("Session caisse invalid or closed");
+             
+             // Debit Caisse -> Insert Operation
+             const [op] = await tx.insert(operationsCaisse).values({
+               sessionId: sessionCaisseId,
+               typeOperation: 'Retrait Courant', 
+               montant: amount.toString(),
+               methodePaiement: 'Espèces',
+               reference: `REFUND-${refundData.id.substring(0,8)}`,
+               description: `Remboursement Frais (Ref: ${refundData.id})`,
+               clientId: refundData.clientId,
+               createdBy: user.id
+             }).returning();
+             
+             // Ledger Mouvement
+             mouvement = await createMouvementFinancier(tx, {
+               montant: amount.toString(),
+               sens: 'Débit',
+               sourceModule: 'SYSTEME',
+               sourceId: op.id,
+               typePaiement: 'Espèces',
+               sessionCaisseId: sessionCaisseId,
+               clientId: refundData.clientId,
+               creditId: refundData.demandeId,
+               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id, operationId: op.id }
+             }, user.id);
+             
+             paymentRefString = `CASH-${op.reference}`;
+          } else {
+             throw new Error("Invalid payment method");
+          }
+
+          // 3. Update Refund Note Status
+          await tx.update(creditRefundRequests).set({
+             statut: 'PAID',
+             paidAt: new Date(),
+             paidBy: user.id,
+             paymentMethod: method,
+             paymentReference: paymentRefString,
+             mouvementId: mouvement.id
+          }).where(eq(creditRefundRequests.id, refundData.id));
+          
+       });
+
+       const updated = await storage.getCreditRefundRequest(refundId);
+       res.json(addSnakeCaseAliasesDeep(updated));
+       
+    } catch (error: any) {
+       console.error("Payment Error", error);
+       res.status(500).json({ message: error.message });
+    }
+  });
+
 }

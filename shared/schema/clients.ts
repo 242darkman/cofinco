@@ -55,6 +55,7 @@ export const clients = pgTable("clients", {
   // Situation professionnelle
   profession: text("profession"),
   employeur: text("employeur"),
+  typeActivite: text("type_activite"), // Added missing column
   revenuMensuel: numeric("revenu_mensuel"),
 
   // Classification

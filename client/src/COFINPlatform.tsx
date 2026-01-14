@@ -56,6 +56,8 @@ import { Button, IconButton, Card, Badge, ConfirmDialog } from './components/ui'
 import ComptabiliteSageOHADA from './components/finance/accounting/ComptabiliteSageOHADA';
 import GlobalSearchModal from './components/shared/GlobalSearchModal';
 import { Pagination } from './components/ui/Pagination';
+import CreditRefundsPage from './pages/finance/CreditRefundsPage';
+
 
 interface COFINPlatformProps {
   currentUser?: any;
@@ -765,6 +767,8 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
         return <Tontines />;
       case 'credits':
         return <Credits userRole={currentUser?.role} activeView={currentSubModule} onModuleChange={handleModuleChange} />;
+      case 'remboursements':
+        return <CreditRefundsPage />;
       case 'epargnes':
         return <Epargnes activeView={currentSubModule} />;
       case 'agentTerrain':

@@ -119,6 +119,7 @@ import {
   transfertsInterCoffresAuditLogs,
   reconciliationsLiaison,
   tachesRegularisation,
+  creditRefundRequests,
   configTransfertInterCoffres,
 } from '@shared/schema';
 import { hashPassword, ROLES } from './auth';
@@ -344,6 +345,7 @@ async function seedDemo() {
     await db.delete(reevaluationAuditLogs);
     await db.delete(reevaluationsCredit);
     await db.delete(configReevaluation);
+    await db.delete(creditRefundRequests);
     await db.delete(demandesCredit);
     await db.delete(objectifsEpargne);
     await db.delete(transactionsCompte);
@@ -506,7 +508,7 @@ async function seedDemo() {
         ville: a.ville,
         region: a.region,
         typeAgence: a.isSiege ? 'Principale' : 'Secondaire',
-        statut: 'En cours',
+        statut: 'Actif',
         latitude: a.latitude,
         longitude: a.longitude,
         telephone: a.telephone,
@@ -1893,6 +1895,9 @@ async function seedDemo() {
         statut,
         motifRejet,
         dateRejet,
+        // Rule: If rejected (or approved/processed), fees must have been paid
+        fraisEngagementPayes: statut === 'Rejetée' || isApproved, 
+        montantFraisEngagement: (statut === 'Rejetée' || isApproved) ? '5000' : (Math.random() > 0.5 ? '5000' : '0'),
         createdBy: staffGroups.Credits[i % staffGroups.Credits.length]?.id || staffGroups.Agents[0]?.id,
         createdAt: daysAgo(randomBetween(1, 180)),
       });
@@ -3413,6 +3418,126 @@ async function seedDemo() {
     await db.insert(caisseTransferts).values(transfertsData);
 
     console.log(`   ✅ Caisse: ${insertedCaisses.length} caisses, ${insertedShifts.length} shifts, ${insertedSessions.length} sessions, ${insertedOperations.length} opérations, ${insertedFactures.length} factures`);
+
+    // ----------------------------------------------------------------------
+    // TEST DATA FOR CREDIT REFUND ON REJECTION
+    // ----------------------------------------------------------------------
+    console.log('   🧪 Seeding Test Data for Credit Refund...');
+    
+    // 1. Create dedicated Client
+    const [refundClient] = await db.insert(clients).values({
+      nom: 'REFUND_TEST',
+      prenom: 'Jean',
+      dateNaissance: '1985-05-15',
+      telephone: '+242069998877',
+      adresse: 'Zone de Test, Brazzaville',
+      ville: 'Brazzaville',
+      agenceId: insertedAgences['Siège'],
+      typeActivite: 'Salarié',
+      statut: 'Actif',
+      kycLevel: 2,
+    } as any).returning();
+
+    // 2. Create Current Account (Mandatory for refund)
+    await db.insert(comptes).values({
+      clientId: refundClient.id,
+      agenceId: insertedAgences['Siège'],
+      numeroCompte: 'CPT-REJECT-TEST',
+      typeCompte: 'Courant',
+      statut: 'Actif',
+      soldeCourant: '10000',
+    });
+
+    // 3. Create Credit Demand with FEES PAID
+    await db.insert(demandesCredit).values({
+      numeroDemande: 'DEM-REFUND-001',
+      clientId: refundClient.id,
+      agenceId: insertedAgences['Siège'],
+      montantDemande: '5000000',
+      tauxInteret: '10',
+      frequenceRemboursement: 'Mensuel',
+      dureeValeur: 12,
+      dureeUnite: 'Mois',
+      objetCredit: 'Achat Test',
+      statut: 'En attente', // Ready to be rejected
+      fraisEngagementPayes: true,
+      montantFraisEngagement: '5000', // 5000 FCFA to be refunded
+      revenusMensuels: '500000',
+      dateRejet: null
+    });
+
+    console.log('   ✅ Refund Test Data created: Client "Jean REFUND_TEST" with Demand "DEM-REFUND-001"');
+
+    // 4. Create REJECTED demand with Refund Request (SUBMITTED)
+    const [rejectedDemand1] = await db.insert(demandesCredit).values({
+      numeroDemande: 'DEM-REJECT-SUBMIT',
+      clientId: refundClient.id,
+      agenceId: insertedAgences['Siège'],
+      montantDemande: '2000000',
+      tauxInteret: '10',
+      dureeValeur: 6,
+      dureeUnite: 'Mois',
+      objetCredit: 'Rejected Test 1 - Submitted Refund',
+      statut: 'Rejetée',
+      fraisEngagementPayes: true,
+      montantFraisEngagement: '2000',
+      dateRejet: daysAgo(1),
+      rejectedBy: adminUser.id,
+      motifRejet: 'Garanties insuffisantes',
+      revenusMensuels: '300000',
+    } as any).returning();
+
+    await db.insert(creditRefundRequests).values({
+      demandeId: rejectedDemand1.id,
+      clientId: refundClient.id,
+      agenceId: insertedAgences['Siège'],
+      montantEncaisse: '2000',
+      montantRemboursable: '2000',
+      montantNonRemboursable: '0',
+      statut: 'SUBMITTED',
+      motifRejetCredit: 'Garanties insuffisantes',
+      motifRemboursement: 'Remboursement frais suite rejet',
+      makerId: adminUser.id,
+    });
+
+    // 5. Create APPROVED refund request (Ready to Pay)
+     const [rejectedDemand2] = await db.insert(demandesCredit).values({
+      numeroDemande: 'DEM-REJECT-APPROVE',
+      clientId: refundClient.id,
+      agenceId: insertedAgences['Siège'],
+      montantDemande: '3000000',
+      tauxInteret: '10',
+      dureeValeur: 12,
+      dureeUnite: 'Mois',
+      objetCredit: 'Rejected Test 2 - Approved Refund',
+      statut: 'Rejetée',
+      fraisEngagementPayes: true,
+      montantFraisEngagement: '3000',
+      dateRejet: daysAgo(2),
+      rejectedBy: adminUser.id,
+      motifRejet: 'Historique mauvais',
+      revenusMensuels: '400000',
+    } as any).returning();
+
+    await db.insert(creditRefundRequests).values({
+      demandeId: rejectedDemand2.id,
+      clientId: refundClient.id,
+      agenceId: insertedAgences['Siège'],
+      montantEncaisse: '3000',
+      montantRemboursable: '3000',
+      montantNonRemboursable: '0',
+      statut: 'APPROVED',
+      motifRejetCredit: 'Historique mauvais',
+      motifRemboursement: 'Remboursement frais suite rejet',
+      makerId: adminUser.id,
+      makerAt: daysAgo(2).toISOString(),
+      checkerId: insertedUsers['chef_siege']?.id,
+      checkerAt: daysAgo(1).toISOString(),
+      checkerDecision: 'APPROVED',
+      checkerComment: 'Validé pour remboursement',
+    } as any);
+
+    console.log('   ✅ Refund Requests (SUBMITTED/APPROVED) seeded');
 
     // 14. SEED TRANSFERS & KYC
     console.log('\n💸 Seeding Transfers...');

@@ -20,6 +20,8 @@ const ParametresModule = lazy(() => import('@/components/admin/settings/Parametr
 const MessagesModule = lazy(() => import('@/components/shared/MessagesModule'));
 const UserProfile = lazy(() => import('@/components/shared/UserProfile'));
 const ExcelModule = lazy(() => import('@/components/shared/ExcelModule'));
+const CreditRefundsPage = lazy(() => import('@/pages/finance/CreditRefundsPage'));
+
 
 export interface RouteConfig {
   key: string;
@@ -68,6 +70,15 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Crédits',
     label: 'Crédits',
     labelKey: 'menuCredits',
+    group: 'Services Clients',
+  },
+  {
+    key: 'remboursements',
+    path: '/remboursements',
+    component: CreditRefundsPage,
+    requiredModule: 'Remboursements',
+    label: 'Remboursements',
+    labelKey: 'menuRemboursements',
     group: 'Services Clients',
   },
   {

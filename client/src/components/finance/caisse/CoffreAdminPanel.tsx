@@ -273,10 +273,10 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
                 type="number"
                 value={config.seuilDoubleValidation}
                 onChange={(e) => setConfig(p => ({ ...p, seuilDoubleValidation: Number(e.target.value) }))}
-                helperText={<div className="flex items-center gap-2 mt-1">
+                helperText={<span className="flex items-center gap-2 mt-1">
                   <ScopeBadge type="guichet" />
                   <span>Validation requise au-delà de ce montant</span>
-                </div>}
+                </span>}
             />
             <FormField 
                 label="Tentatives Max / Jour"
@@ -284,10 +284,10 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
                 type="number"
                 value={config.tentativesMaxParJour}
                 onChange={(e) => setConfig(p => ({ ...p, tentativasMaxParJour: Number(e.target.value) }))}
-                helperText={<div className="flex items-center gap-2 mt-1">
+                helperText={<span className="flex items-center gap-2 mt-1">
                    <ScopeBadge type="global" />
                    <span>Blocage automatique après X échecs</span>
-                </div>}
+                </span>}
             />
         </div>
 

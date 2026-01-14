@@ -44,6 +44,7 @@ export interface MouvementData {
   agenceId?: string;
   agentId?: string;
   referenceExterne?: string;
+  sourceId?: string;
   idempotencyKey?: string;
   metadata?: Record<string, any>;
 }
