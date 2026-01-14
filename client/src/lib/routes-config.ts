@@ -1,5 +1,5 @@
 import { lazy, ComponentType } from 'react';
-import { MODULE_ACCESS } from './rbac-config';
+import { canAccessModule, MODULE_ACCESS } from '@shared/config/rbac';
 import { authService } from './auth';
 
 // Lazy load components

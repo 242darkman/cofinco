@@ -5,7 +5,7 @@ import { creditPlanApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { hasPermission } from '@/lib/rbac-config';
+import { hasPermission } from '@shared/config/rbac';
 
 interface CreditPlan {
   id: string;

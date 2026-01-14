@@ -257,9 +257,9 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 permissions={permissions}
                 selectedRole={selectedRole}
                 onRoleChange={handleRoleChange}
-                roleHasPermission={(_role, code) => roleHasPermission(code)}
+                roleHasPermission={(_role, code) => selectedRole === 'Administrateur' ? true : roleHasPermission(code)}
                 toggleRolePermission={handleToggleRolePermission}
-                activePermissionsCount={activeRolePermissionsCount}
+                activePermissionsCount={selectedRole === 'Administrateur' ? (permissions?.length || 0) : activeRolePermissionsCount}
                 confirmMessage={confirmMessage}
               />
             )}

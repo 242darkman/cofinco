@@ -1,5 +1,5 @@
 import { authApi, AuthUser, setOnUnauthorized } from './api-client';
-import { ROLE_PERMISSIONS, hasPermission as rbacHasPermission, canAccessModule as rbacCanAccessModule } from './rbac-config';
+import { canAccessModule as rbacCanAccessModule, getAccessibleModules, MODULE_ACCESS, hasPermission as rbacHasPermission, ROLE_PERMISSIONS } from '@shared/config/rbac';
 
 export interface User {
   id: string;
