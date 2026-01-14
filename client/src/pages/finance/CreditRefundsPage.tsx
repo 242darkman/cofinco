@@ -9,9 +9,21 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast, handleApiError } from '../../lib/toast';
 import { usePermissions } from '../../components/auth/ProtectedFeature';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, formatClientName } from '../../lib/format';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { authService } from '../../lib/auth';
+
+// Safe date format helper to prevent crashes on invalid dates
+const safeDateFormat = (dateValue: string | Date | null | undefined, formatStr: string): string => {
+  if (!dateValue) return '-';
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return '-';
+    return format(date, formatStr, { locale: fr });
+  } catch {
+    return '-';
+  }
+};
 
 interface CreditRefundRequest {
   id: string;
@@ -67,7 +79,13 @@ export default function CreditRefundsPage() {
       }
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch refunds');
-      return res.json();
+      const data = await res.json();
+      // Transform nested response: {refund, demande, client} -> flat structure
+      return data.map((item: any) => ({
+        ...item.refund,
+        demande: item.demande,
+        clients: item.client,
+      }));
     }
   });
 
@@ -167,8 +185,8 @@ export default function CreditRefundsPage() {
     if (searchTerm) {
        const searchLower = searchTerm.toLowerCase();
        return (
-           r.clients.nom.toLowerCase().includes(searchLower) ||
-           r.demande.numeroDemande.toLowerCase().includes(searchLower)
+           (r.clients?.nom || '').toLowerCase().includes(searchLower) ||
+           (r.demande?.numeroDemande || '').toLowerCase().includes(searchLower)
        );
     }
     return true;
@@ -253,17 +271,17 @@ export default function CreditRefundsPage() {
                     <td colSpan={6} className="p-8 text-center text-slate-500 italic">Aucun remboursement trouvé</td>
                  </tr>
               ) : (
-                 filteredRefunds.map((refund) => (
-                    <tr key={refund.id} className="hover:bg-slate-700/30 transition-colors">
+                 filteredRefunds.map((refund, index) => (
+                    <tr key={refund.id || `refund-${index}`} className="hover:bg-slate-700/30 transition-colors">
                       <td className="p-4 text-slate-300">
-                        {format(new Date(refund.createdAt), 'dd/MM/yyyy', { locale: fr })}
-                        <div className="text-xs text-slate-500">{format(new Date(refund.createdAt), 'HH:mm', { locale: fr })}</div>
+                        {safeDateFormat(refund.createdAt, 'dd/MM/yyyy')}
+                        <div className="text-xs text-slate-500">{safeDateFormat(refund.createdAt, 'HH:mm')}</div>
                       </td>
                       <td className="p-4">
-                        <span className="font-mono text-cyan-400 font-medium">{refund.demande.numeroDemande}</span>
+                        <span className="font-mono text-cyan-400 font-medium">{refund.demande?.numeroDemande || '-'}</span>
                       </td>
                       <td className="p-4 text-white font-medium">
-                        {refund.clients.nom} {refund.clients.prenom}
+                        {refund.clients ? formatClientName(refund.clients.nom, refund.clients.prenom) : '-'}
                       </td>
                       <td className="p-4 text-right">
                         <div className="font-bold text-white">{formatMoney(Number(refund.montantRemboursable))}</div>
@@ -309,7 +327,7 @@ export default function CreditRefundsPage() {
         title="Valider le Remboursement"
         message={
            <div>
-              <p>Êtes-vous sûr de vouloir valider le remboursement de <span className="text-white font-bold">{selectedRefund ? formatMoney(Number(selectedRefund.montantRemboursable)) : ''}</span> pour <span className="text-white font-bold">{selectedRefund?.clients.nom}</span> ?</p>
+              <p>Êtes-vous sûr de vouloir valider le remboursement de <span className="text-white font-bold">{selectedRefund ? formatMoney(Number(selectedRefund.montantRemboursable)) : ''}</span> pour <span className="text-white font-bold">{selectedRefund?.clients ? formatClientName(selectedRefund.clients.nom, selectedRefund.clients.prenom) : '-'}</span> ?</p>
               <div className="mt-2 text-sm text-slate-400 bg-slate-900/50 p-2 rounded border border-slate-700">
                 Action irréversible. Le dossier passera à l'étape de paiement.
               </div>
