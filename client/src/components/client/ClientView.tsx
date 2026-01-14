@@ -5,6 +5,7 @@ import ClientDetails from './ClientDetails';
 import ClientAccounts from './ClientAccounts';
 import ClientHistory from './ClientHistory';
 import { Client } from '@shared/schema';
+import { formatClientName } from '../../lib/format';
 
 interface ClientViewProps {
   client: Client;
@@ -28,7 +29,7 @@ export default function ClientView({ client, onClose }: ClientViewProps) {
         <div className="flex items-center gap-2">
             <span className="font-bold text-lg text-white">Dossier Client</span>
             <span className="px-2 py-0.5 rounded-full bg-slate-700 text-xs text-slate-300 font-mono">
-                {client.nom} {client.prenom}
+                {formatClientName(client.nom, client.prenom)}
             </span>
         </div>
       }

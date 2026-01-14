@@ -18,6 +18,7 @@ import type { CaisseAgentSummary, OperationTerrainWithRelations } from '@shared/
 import CollectCashModal from './CollectCashModal';
 import SettlementCashModal from './SettlementCashModal';
 import OperationDetailModal from './OperationDetailModal';
+import { formatClientName } from '../../../lib/format';
 
 interface CaisseAgentDashboardProps {
   agentId: string;
@@ -327,7 +328,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                   <div>
                     <p className="text-sm font-medium text-white group-hover:text-cyan-400 transition-colors line-clamp-1">
                       {getTypeLabel(op.type)}
-                      {op.client && ` - ${op.client.nom} ${op.client.prenom}`}
+                      {op.client && ` - ${formatClientName(op.client.nom, op.client.prenom)}`}
                     </p>
                     <div className="flex items-center gap-2 text-[10px] text-slate-500">
                       <span>{formatDate(op.submittedAt as unknown as string)}</span>
@@ -387,7 +388,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                     </p>
                     {op.client && (
                       <p className="text-xs text-slate-400">
-                        Client: {op.client.nom} {op.client.prenom}
+                        Client: {formatClientName(op.client.nom, op.client.prenom)}
                       </p>
                     )}
                     <p className="text-xs text-slate-500">
@@ -478,7 +479,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                   <div>
                     <p className="text-sm font-medium text-white">
                       {getTypeLabel(op.type)}
-                      {op.client && ` - ${op.client.nom}`}
+                      {op.client && ` - ${formatClientName(op.client.nom, op.client.prenom)}`}
                     </p>
                     <p className="text-xs text-slate-500">
                       {formatDate(op.submittedAt as unknown as string)}

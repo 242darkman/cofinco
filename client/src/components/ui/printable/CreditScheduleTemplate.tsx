@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Installment } from '../../../lib/credit-logic';
 import { MapPin, Phone, Mail, QrCode } from 'lucide-react';
+import { formatClientName } from '../../../lib/format';
 
 interface CreditSchedulePDFProps {
   credit: any;
@@ -74,7 +75,7 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Client</h3>
-              <p className="font-bold text-lg">{client.nom} {client.prenom || ''}</p>
+              <p className="font-bold text-lg">{formatClientName(client.nom, client.prenom)}</p>
               <p className="text-sm">Tél: {client.telephone}</p>
               <p className="text-sm">Compte: {client.numeroCompte || 'N/A'}</p>
             </div>

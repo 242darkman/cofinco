@@ -9,6 +9,7 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { usePagination } from '../../../hooks/usePagination';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
+import { formatClientName } from '../../../lib/format';
 
 interface Client {
   id: string;
@@ -476,7 +477,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                             selectedClientId === client.id ? 'text-emerald-400' : 'text-slate-200'
                           }`}
                         >
-                          {escapeHtml(client.nom)}
+                          {formatClientName(client.nom, client.prenom)}
                         </div>
                         <div className="text-xs text-slate-500 mt-0.5">
                           {escapeHtml(client.telephone || client.phone || client.email || '')}

@@ -4,7 +4,7 @@ import { useReactToPrint } from 'react-to-print';
 import { creditApi, clientApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { Button, StatCard, TabGroup } from '../../ui';
-import { formatMoney, parseMoney } from '../../../lib/format';
+import { formatMoney, parseMoney, formatClientName } from '../../../lib/format';
 import { escapeHtml } from '../../../lib/sanitize';
 import { generateLoanSchedule } from '../../../lib/credit-logic';
 import { CreditSchedulePDF } from '../../ui/printable/CreditScheduleTemplate';
@@ -182,7 +182,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                   {credit.fraisDossierPaye ? 'Frais Payés' : 'Frais Non Payés'}
               </span>
             </h2>
-            <p className="text-slate-400 font-medium">#{credit.numeroCredit} - {client ? `${client.nom} ${client.prenom || ''}` : 'Sans client'}</p>
+            <p className="text-slate-400 font-medium">#{credit.numeroCredit} - {client ? formatClientName(client.nom, client.prenom) : 'Sans client'}</p>
           </div>
           <div className="flex items-center gap-3">
             <Button 
@@ -256,7 +256,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-slate-500 text-sm">Nom</span>
-                        <span className="text-white font-medium text-sm">{client.nom} {client.prenom}</span>
+                        <span className="text-white font-medium text-sm">{formatClientName(client.nom, client.prenom)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-500 text-sm">Téléphone</span>

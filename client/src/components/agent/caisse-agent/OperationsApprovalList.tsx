@@ -15,6 +15,7 @@ import { caisseAgentApi, agentTerrainApi } from '../../../lib/api-client';
 import type { OperationTerrainWithRelations } from '@shared/schema';
 import OperationDetailModal from './OperationDetailModal';
 import RejectOperationModal from './RejectOperationModal';
+import { formatClientName } from '../../../lib/format';
 
 interface OperationsApprovalListProps {
   onModuleChange?: (module: string) => void;
@@ -160,7 +161,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
   const filteredOperations = operations.filter((op) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
-    const clientName = op.client ? `${op.client.nom} ${op.client.prenom}`.toLowerCase() : '';
+    const clientName = op.client ? formatClientName(op.client.nom, op.client.prenom).toLowerCase() : '';
     const agentName = op.agent ? `${op.agent.nom} ${op.agent.prenom}`.toLowerCase() : '';
     const ref = op.reference?.toLowerCase() || '';
     return clientName.includes(query) || agentName.includes(query) || ref.includes(query);
@@ -172,7 +173,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
     { value: '', label: 'Tous les agents' },
     ...agents.map((a) => ({
       value: a.id,
-      label: `${a.nom || ''} ${a.prenom || ''}`
+      label: formatClientName(a.nom, a.prenom)
     }))
   ];
 
@@ -365,13 +366,13 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                       {op.client && (
                         <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
                           <User size={12} />
-                          Client: {op.client.nom} {op.client.prenom}
+                          Client: {formatClientName(op.client.nom, op.client.prenom)}
                         </p>
                       )}
                       {op.agent && (
                         <p className="text-xs text-slate-400 flex items-center gap-1">
                           <User size={12} />
-                          Agent: {op.agent.nom} {op.agent.prenom}
+                          Agent: {formatClientName(op.agent.nom, op.agent.prenom)}
                         </p>
                       )}
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">

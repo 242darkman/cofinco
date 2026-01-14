@@ -9,6 +9,7 @@ import { ReceiptData, ReceiptTemplate } from '../../../ui/printable/ReceiptTempl
 import { InvoiceTemplate } from '../../../ui/printable/InvoiceTemplate';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
+import { formatClientName } from '@/lib/format';
 
 interface UniversalPaymentSuccessModalProps {
   isOpen: boolean;
@@ -279,7 +280,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                         <span className="text-sm text-slate-500">Client</span>
                       </div>
                       <span className="text-sm font-medium text-white">
-                        {data.client.prenom} {data.client.nom}
+                        {formatClientName(data.client.nom, data.client.prenom)}
                       </span>
                     </div>
                   )}

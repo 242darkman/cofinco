@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Users, MapPin, CreditCard, PiggyBank, ChevronLeft } from 'lucide-react';
+import { formatClientName } from '../../lib/format';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -207,7 +208,7 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
               <Popup>
                 <div className="min-w-[200px]">
                   <div className="font-bold text-lg text-slate-800 mb-2">
-                    {client.nom} {client.prenom}
+                    {formatClientName(client.nom, client.prenom)}
                   </div>
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2 text-slate-600">

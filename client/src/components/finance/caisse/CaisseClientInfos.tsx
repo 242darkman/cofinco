@@ -9,6 +9,7 @@ import { Card, Button, Badge } from '@/components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
+import { formatClientName } from '@/lib/format';
 
 interface SecurityLimits {
   daily: { limit: number, used: number, remaining: number };
@@ -230,7 +231,7 @@ export default function CaisseClientInfos() {
                         <User size={40} className="text-slate-500" />
                     )}
                 </div>
-                <h2 className="text-xl font-bold text-white mb-1">{client.nom} {client.prenom}</h2>
+                <h2 className="text-xl font-bold text-white mb-1">{formatClientName(client.nom, client.prenom)}</h2>
                 <p className="text-cyan-400 font-mono text-sm mb-3 text-ellipsis overflow-hidden w-full">{client.id.substring(0,8)}... (ID)</p>
                 {getKycBadge(client.kycStatus || client.kyc_status)}
                 

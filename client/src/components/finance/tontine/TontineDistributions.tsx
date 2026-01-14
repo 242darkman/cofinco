@@ -4,6 +4,7 @@ import { Card, Button, Badge, IconButton } from '../../ui';
 import { tontineDistributionApi, tontineMembreApi, tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml } from '../../../lib/sanitize';
+import { formatClientName } from '../../../lib/format';
 
 interface Distribution {
   id: string;
@@ -231,7 +232,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
   // Helper pour obtenir le nom du bénéficiaire d'une distribution
   const getBeneficiaireName = (dist: Distribution) => {
     if (dist.membre?.client) {
-      return `${dist.membre.client.nom} ${dist.membre.client.prenom || ''}`.trim();
+      return formatClientName(dist.membre.client.nom, dist.membre.client.prenom);
     }
     if (dist.tontine_membres?.clients) {
       return `${dist.tontine_membres.clients.nom} ${dist.tontine_membres.clients.prenom || ''}`.trim();
@@ -319,7 +320,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${soldeInsuffisant ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
                   <User size={16} />
                 </div>
-                {nextBeneficiary.client.nom} {nextBeneficiary.client.prenom}
+                {formatClientName(nextBeneficiary.client.nom, nextBeneficiary.client.prenom)}
               </div>
               {nextBeneficiary.estAJour === false && (
                 <div className="flex items-center gap-1 mt-1 text-xs text-amber-400">
@@ -434,7 +435,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                   <option value="">Sélectionner un membre éligible...</option>
                   {membresEligibles.map(m => (
                     <option key={m.id} value={m.id}>
-                      Position #{m.position} - {m.client.nom} {m.client.prenom}
+                      Position #{m.position} - {formatClientName(m.client.nom, m.client.prenom)}
                       {m.estAJour === false ? ' (en retard)' : ''}
                     </option>
                   ))}

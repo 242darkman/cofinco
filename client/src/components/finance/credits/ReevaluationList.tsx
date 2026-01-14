@@ -9,7 +9,7 @@ import {
   Users, Filter, Search, ChevronRight, Loader2, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatClientName } from '../../../lib/format';
 import { Pagination } from '../../ui';
 
 interface Reevaluation {
@@ -267,7 +267,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                     {/* Client */}
                     {reeval.client && (
                       <p className="text-slate-400 text-sm mb-2">
-                        {reeval.client.nom} {reeval.client.prenom}
+                        {formatClientName(reeval.client.nom, reeval.client.prenom)}
                       </p>
                     )}
                     

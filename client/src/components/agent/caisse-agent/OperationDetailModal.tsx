@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Badge } from '../../ui';
 import type { OperationTerrainWithRelations } from '@shared/schema';
+import { formatClientName } from '../../../lib/format';
 
 interface OperationDetailModalProps {
   operation: OperationTerrainWithRelations;
@@ -132,7 +133,7 @@ export default function OperationDetailModal({
                 <p className="text-xs text-slate-400">Client</p>
               </div>
               <p className="text-sm font-medium text-white">
-                {operation.client.nom} {operation.client.prenom}
+                {formatClientName(operation.client.nom, operation.client.prenom)}
               </p>
             </div>
           )}

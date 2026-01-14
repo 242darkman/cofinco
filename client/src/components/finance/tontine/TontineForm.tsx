@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Check, Calendar, DollarSign, Users, FileText, UserPlus, Search, Info, TrendingUp } from 'lucide-react';
 import { tontineApi, clientApi, tontinePlanApi } from '../../../lib/api-client';
 import { Modal, FormField, SelectField, Button, Card, Badge, IconButton, TextareaField, LoadingSpinner } from '../../ui';
+import { formatClientName } from '../../../lib/format';
 
 interface Tontine {
   id: string;
@@ -455,7 +456,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                                             {selectedMembers.includes(client.id) && <Check size={12} className="text-white" />}
                                         </div>
                                         <div>
-                                            <div className="text-sm font-medium text-white">{client.nom} {client.prenom}</div>
+                                            <div className="text-sm font-medium text-white">{formatClientName(client.nom, client.prenom)}</div>
                                             <div className="text-xs text-slate-400">{client.telephone} • {client.quartier}</div>
                                         </div>
                                     </div>
