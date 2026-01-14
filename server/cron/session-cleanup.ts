@@ -8,6 +8,7 @@
  */
 
 import * as sessionService from "../services/caisse/session-service";
+import { cleanupOrphanSessions } from "../session-tracker";
 import { getWsInstance } from "../ws-server";
 
 // Configuration
@@ -25,6 +26,10 @@ async function runSessionCleanup(): Promise<void> {
   console.log(`[CRON] Vérification des sessions expirées (timeout: ${SESSION_TIMEOUT_HOURS}h)...`);
 
   try {
+    // 1. Nettoyage des sessions orphelines (Technique)
+    await cleanupOrphanSessions();
+
+    // 2. Nettoyage des sessions de caisse expirées (Business)
     const closedSessions = await sessionService.closeExpiredSessions(SESSION_TIMEOUT_HOURS);
 
     if (closedSessions.length > 0) {

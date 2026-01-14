@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { activeSessions, users } from '@shared/schema';
-import { eq, and, lt, desc } from 'drizzle-orm';
+import { eq, and, lt, desc, sql } from 'drizzle-orm';
 
 // Simple user agent parser without external dependencies
 function parseUserAgent(userAgent: string | undefined): {
@@ -171,6 +171,29 @@ export async function cleanupExpiredSessions(): Promise<number> {
   }
 }
 
+// Cleanup orphan sessions (users that no longer exist)
+export async function cleanupOrphanSessions(): Promise<number> {
+  try {
+    // Delete sessions where userId is not found in users table
+    // Using NOT EXISTS via SQL injection as Drizzle abstract construction for this widely varies
+    const result = await db.execute(
+      sql`DELETE FROM ${activeSessions} 
+          WHERE ${activeSessions.userId} NOT IN (SELECT ${users.id} FROM ${users})
+          RETURNING *`
+    );
+
+    const count = result.rows ? result.rows.length : 0;
+    
+    if (count > 0) {
+      console.log(`[SESSION TRACKER] Cleaned up ${count} orphan sessions`);
+    }
+    return count;
+  } catch (error) {
+    console.error('[SESSION TRACKER] Error cleaning up orphan sessions:', error);
+    return 0;
+  }
+}
+
 // Middleware to track session activity (throttled to every 60 seconds)
 const activityThrottleMap = new Map<string, number>();
 const ACTIVITY_THROTTLE_MS = 60 * 1000; // 1 minute
@@ -205,11 +228,13 @@ export function scheduleSessionCleanup(): void {
   // Run cleanup every 5 minutes
   setInterval(async () => {
     await cleanupExpiredSessions();
+    await cleanupOrphanSessions();
   }, 5 * 60 * 1000);
 
   // Run initial cleanup after 30 seconds
   setTimeout(async () => {
     await cleanupExpiredSessions();
+    await cleanupOrphanSessions();
   }, 30 * 1000);
 
   console.log('[SESSION TRACKER] Cleanup scheduled every 5 minutes');

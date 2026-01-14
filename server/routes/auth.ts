@@ -589,10 +589,10 @@ export function registerAuthRoutes(app: Express) {
         const wsInstance = getWsInstance();
         if (wsInstance) {
           wsInstance.sendToUser(userId, {
-            type: "NOTIFICATION",
+            type: "FORCE_LOGOUT",
             payload: {
-              type: "FORCE_LOGOUT",
-              message: "Votre session a été terminée par un administrateur",
+              userId,
+              reason: "Votre session a été terminée par un administrateur",
               forceLogout: true
             }
           });

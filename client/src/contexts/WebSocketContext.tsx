@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 
-type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE" | "REALTIME_EVENT" | "SUBSCRIBED" | "UNSUBSCRIBED" | "COMPTE_UPDATE" | "MAINTENANCE_UPDATE";
+type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE" | "REALTIME_EVENT" | "SUBSCRIBED" | "UNSUBSCRIBED" | "COMPTE_UPDATE" | "MAINTENANCE_UPDATE" | "SESSION_TIMEOUT" | "SESSION_RISK_ALERT" | "FORCE_LOGOUT";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -315,6 +315,47 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
       case "MAINTENANCE_UPDATE":
          window.dispatchEvent(new CustomEvent('maintenance-update', { detail: message.payload }));
+         break;
+
+      case "SESSION_TIMEOUT":
+         // Check if this timeout applies to current user
+         if (message.payload.caissierId === user?.id || message.payload.userId === user?.id || message.payload.sessionId === (user as any)?.sessionId) {
+            toast.error("Votre session a expiré suite à une période d'inactivité.", {
+              duration: Infinity, // Require manual dismissal or it stays until redirect
+              action: {
+                label: "Se reconnecter",
+                onClick: () => window.location.reload()
+              }
+            });
+            // Delay slightly to let user see toast, then logout
+            setTimeout(() => {
+                authService.logout();
+                window.location.reload();
+            }, 2000);
+         }
+         break;
+
+      case "SESSION_RISK_ALERT":
+         // Check if applies to current user
+         if (message.payload.caissierId === user?.id) {
+            toast.warning(`Attention : Votre session caisse est inactive depuis ${message.payload.hoursInactive}h.`, {
+               description: "Elle sera fermée automatiquement après 12h d'inactivité.",
+               duration: 8000,
+            });
+         }
+         break;
+
+      case "FORCE_LOGOUT":
+         if (message.payload.userId === user?.id) {
+             toast.error("DÉCONNEXION FORCÉE", {
+                 description: message.payload.reason || "Un administrateur a terminé votre session.",
+                 duration: 5000
+             });
+             setTimeout(() => {
+                 authService.logout();
+                 window.location.reload();
+             }, 1500);
+         }
          break;
     }
   };

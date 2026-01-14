@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion'; 
 import { authService, type User as UserType } from '../../lib/auth';
 import LoginBackground from './LoginBackground';
 import Button from '../ui/Button';
@@ -34,6 +35,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [shake, setShake] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [successUser, setSuccessUser] = useState<UserType | null>(null);
@@ -58,10 +60,15 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
     if (loginSuccess && successUser) {
       const timer = setTimeout(() => {
         onLoginSuccess(successUser);
-      }, 3000);
+      }, 2000); // Reduced to 2s for better flow
       return () => clearTimeout(timer);
     }
   }, [loginSuccess, successUser, onLoginSuccess]);
+
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 500);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,12 +76,24 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
 
     if (!username || !password) {
       setError(t('remplirTousChamps') || 'Veuillez remplir tous les champs');
+      triggerShake();
       return;
     }
 
     setLoading(true);
+    
+    // Add artificial delay if response is too fast for better UX
+    const startTime = Date.now();
+    
     try {
       const user = await authService.login(username, password);
+      
+      const elapsed = Date.now() - startTime;
+      const minDelay = 600; // Minimum 600ms loading
+      
+      if (elapsed < minDelay) {
+        await new Promise(resolve => setTimeout(resolve, minDelay - elapsed));
+      }
 
       if (user) {
         setLoading(false);
@@ -82,12 +101,14 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
         setSuccessUser(user);
       } else {
         setError(t('identifiantsInvalides') || 'Identifiants invalides');
+        triggerShake();
         setLoading(false);
       }
     } catch (err: any) {
       console.error('Login error:', err);
       const message = err?.error || t('erreurConnexion') || 'Erreur de connexion. Veuillez réessayer.';
       setError(message);
+      triggerShake();
       setLoading(false);
     }
   };
@@ -98,38 +119,46 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
       <LoginBackground />
 
       {/* Session Expired Banner */}
-      {showSessionExpiredBanner && sessionExpiredMessage && (
-        <div className="fixed top-0 left-0 right-0 z-50 animate-in slide-in-from-top duration-300">
-          <div className="bg-amber-500/95 backdrop-blur-sm border-b border-amber-600/50 px-4 py-3 shadow-lg">
-            <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-amber-900 flex-shrink-0" />
-                <p className="text-sm font-medium text-amber-900">
-                  {sessionExpiredMessage}
-                </p>
+      <AnimatePresence>
+        {showSessionExpiredBanner && sessionExpiredMessage && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-0 left-0 right-0 z-50"
+          >
+            <div className="bg-amber-500/95 backdrop-blur-sm border-b border-amber-600/50 px-4 py-3 shadow-lg">
+              <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-900 flex-shrink-0" />
+                  <p className="text-sm font-medium text-amber-900">
+                    {sessionExpiredMessage}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowSessionExpiredBanner(false)}
+                  className="text-amber-900/70 hover:text-amber-900 transition-colors p-1"
+                  aria-label="Fermer"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button
-                onClick={() => setShowSessionExpiredBanner(false)}
-                className="text-amber-900/70 hover:text-amber-900 transition-colors p-1"
-                aria-label="Fermer"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Layout wrapper (mobile-first) */}
       <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-7xl flex-col lg:flex-row">
         {/* Mobile Header (compact branding to reduce scrolling) */}
         <div className="lg:hidden px-4 pt-5 sm:px-6 sm:pt-7">
-          <div
-            className={`mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-blue-500/15 bg-slate-900/30 p-3 backdrop-blur-md transition-all duration-700 ${
-              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-            }`}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7 }}
+            className="mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-blue-500/15 bg-slate-900/30 p-3 backdrop-blur-md"
           >
             <div
               className="flex h-12 w-12 items-center justify-center rounded-xl bg-white shadow-2xl"
@@ -157,16 +186,17 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               <Shield size={14} className="text-blue-400" />
               <span className="hidden xs:inline">SSL/TLS</span>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Left Panel - Branding (desktop/tablet only) */}
         <div className="hidden lg:flex lg:w-1/2 xl:w-3/5">
           <div className="relative flex w-full flex-col justify-center items-center px-10 py-10 xl:px-12">
-            <div
-              className={`text-center max-w-md transition-all duration-1000 ${
-                mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-              }`}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="text-center max-w-md"
             >
               {/* Logo with 3D effect */}
               <div className="relative mb-9">
@@ -203,7 +233,12 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               </p>
 
               {/* Feature cards */}
-              <div className="space-y-4">
+              <motion.div 
+                className="space-y-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5, duration: 1 }}
+              >
                 <div
                   className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-5 border border-blue-500/20 shadow-lg shadow-blue-500/10 transform hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-300"
                   style={{ boxShadow: '0 10px 40px -10px rgba(59, 130, 246, 0.3)' }}
@@ -237,8 +272,8 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
             <div className="absolute bottom-6 text-center">
               <p className="text-slate-400 text-sm">&copy; {new Date().getFullYear()} {agenceName}. {t('tousDroitsReserves') || 'Tous droits réservés.'}</p>
@@ -249,10 +284,11 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
 
         {/* Right Panel - Form (mobile-first, optimized height) */}
         <div className="flex w-full flex-1 items-center justify-center px-4 pb-6 pt-5 sm:px-6 sm:pb-10 sm:pt-8 lg:w-1/2 lg:px-10 lg:py-10 xl:w-2/5">
-          <div
-            className={`w-full max-w-md transition-all duration-700 delay-200 ${
-              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
-            }`}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="w-full max-w-md"
           >
             {/* Card */}
             <Card
@@ -273,98 +309,137 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                 </p>
               </div>
 
-              {error && (
-                <div
-                  className="group relative overflow-hidden bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-5 flex items-start gap-4 animate-in slide-in-from-top-2 duration-300"
-                  data-testid="status-error"
-                >
-                  {/* Decorative background pulse */}
-                  <div className="absolute inset-0 bg-red-500/5 animate-pulse" />
-                  
-                  <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/10">
-                    <AlertCircle className="text-red-400 drop-shadow-md" size={20} />
-                  </div>
-                  
-                  <div className="relative flex-1 py-0.5">
-                     <h4 className="text-red-400 font-bold text-sm mb-0.5">Erreur de connexion</h4>
-                     <p className="text-red-300/90 text-sm leading-relaxed" data-testid="text-error-message">
-                      {error}
-                     </p>
-                  </div>
-                </div>
-              )}
-
-              {loginSuccess ? (
-                <div className="text-center py-6 sm:py-8">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-5 sm:mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-pulse">
-                    <CheckCircle className="text-white" size={36} />
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-white mb-1.5">
-                    Connexion Réussie !
-                  </h3>
-                  <p className="text-emerald-400 mb-3 sm:mb-4">
-                    Ravi de vous revoir, {successUser?.prenom || successUser?.username}
-                  </p>
-                  <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
-                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                    <span>Redirection vers le tableau de bord...</span>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
-                  <FormField
-                    label={t('identifiant') || 'Identifiant'}
-                    name="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Saisissez votre identifiant"
-                    icon={User}
-                    autoFocus
-                    autoComplete="username"
-                    data-testid="input-username"
-                  />
-
-                  <FormField
-                    label={t('motDePasse') || 'Mot de passe'}
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Saisissez votre mot de passe"
-                    icon={Lock}
-                    rightIcon={showPassword ? EyeOff : Eye}
-                    onRightIconClick={() => setShowPassword(!showPassword)}
-                    autoComplete="current-password"
-                    data-testid="input-password"
-                  />
-
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    fullWidth
-                    isLoading={loading}
-                    icon={!loading ? LogIn : undefined}
-                    iconPosition="left"
-                    data-testid="button-submit"
+              <AnimatePresence mode="wait">
+                {loginSuccess ? (
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="text-center py-6 sm:py-8"
                   >
-                    {loading ? (t('connexionEnCours') || 'Connexion en cours...') : (t('seConnecter') || 'Se connecter')}
-                  </Button>
-                </form>
-              )}
+                    <motion.div 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 200, damping: 10 }}
+                      className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-5 sm:mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-lg shadow-emerald-500/40"
+                    >
+                      <CheckCircle className="text-white" size={36} />
+                    </motion.div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-white mb-1.5">
+                      Connexion Réussie !
+                    </h3>
+                    <p className="text-emerald-400 mb-3 sm:mb-4">
+                      Ravi de vous revoir, {successUser?.prenom || successUser?.username}
+                    </p>
+                    <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                      <span>Redirection vers le tableau de bord...</span>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="form"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, x: -20 }}
+                  >
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ 
+                            opacity: 1, 
+                            height: 'auto',
+                            x: shake ? [0, -10, 10, -10, 10, 0] : 0 
+                          }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ 
+                            x: { type: 'tween', duration: 0.4 },
+                            default: { duration: 0.3 }
+                          }}
+                          className="group relative overflow-hidden bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-5 flex items-start gap-4"
+                          data-testid="status-error"
+                        >
+                          <div className="absolute inset-0 bg-red-500/5 animate-pulse" />
+                          <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/10">
+                            <AlertCircle className="text-red-400 drop-shadow-md" size={20} />
+                          </div>
+                          <div className="relative flex-1 py-0.5">
+                             <h4 className="text-red-400 font-bold text-sm mb-0.5">Erreur de connexion</h4>
+                             <p className="text-red-300/90 text-sm leading-relaxed" data-testid="text-error-message">
+                              {error}
+                             </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
+                      <FormField
+                        label={t('identifiant') || 'Identifiant'}
+                        name="username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Saisissez votre identifiant"
+                        icon={User}
+                        autoFocus
+                        autoComplete="username"
+                        data-testid="input-username"
+                      />
+
+                      <FormField
+                        label={t('motDePasse') || 'Mot de passe'}
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Saisissez votre mot de passe"
+                        icon={Lock}
+                        rightIcon={showPassword ? EyeOff : Eye}
+                        onRightIconClick={() => setShowPassword(!showPassword)}
+                        autoComplete="current-password"
+                        data-testid="input-password"
+                      />
+
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        size="lg"
+                        fullWidth
+                        isLoading={loading}
+                        icon={!loading ? LogIn : undefined}
+                        iconPosition="left"
+                        data-testid="button-submit"
+                        className="transition-all duration-300 active:scale-[0.98]"
+                      >
+                        {loading ? (t('connexionEnCours') || 'Connexion en cours...') : (t('seConnecter') || 'Se connecter')}
+                      </Button>
+                    </form>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Footer area inside card (compact on mobile) */}
-              {!loginSuccess && (
-                <div className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-slate-700">
-                  <div className="flex items-center justify-center sm:justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <Shield size={14} className="text-blue-400" />
-                      <span className="hidden sm:inline">Connexion sécurisée SSL/TLS</span>
-                      <span className="sm:hidden">SSL/TLS</span>
+              <AnimatePresence>
+                {!loginSuccess && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="mt-5 sm:mt-6 pt-5 sm:pt-6 border-t border-slate-700"
+                  >
+                    <div className="flex items-center justify-center sm:justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <Shield size={14} className="text-blue-400" />
+                        <span className="hidden sm:inline">Connexion sécurisée SSL/TLS</span>
+                        <span className="sm:hidden">SSL/TLS</span>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
 
             {/* Mobile page footer (outside the card, avoids pushing content too much) */}
@@ -374,7 +449,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               </p>
               <p className="text-slate-500 text-[11px] mt-1">Développé par WESLEY Global Développement & BV Corp</p>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
