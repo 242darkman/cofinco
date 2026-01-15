@@ -109,7 +109,7 @@ export async function executeAutomaticTransfer(
     }
     
     // 8. Execute transfer in a transaction with proper ledger tracking
-    await db.transaction(async (tx) => {
+    const mouvementId = await db.transaction(async (tx) => {
       // Create mouvement financier for the transfer
       const [mouvement] = await tx.insert(mouvementsFinanciers).values({
         montant: compteDest.versementAutoMontant!,
@@ -173,6 +173,8 @@ export async function executeAutomaticTransfer(
         mouvementId: mouvement.id,
         tentatives: 1,
       });
+
+      return mouvement.id;
     });
     
     // 10. Mettre à jour les dates du compte
@@ -190,7 +192,7 @@ export async function executeAutomaticTransfer(
       })
       .where(eq(comptes.id, compteId));
     
-    return { success: true, mouvementId: mouvement.id };
+    return { success: true, mouvementId };
     
   } catch (error) {
     console.error('[Automatic Transfer] Erreur:', error);

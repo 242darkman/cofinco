@@ -193,7 +193,7 @@ export default function CaisseDashboard({
   const loadComptesEnAttente = async () => {
     try {
       const response = await compteEpargneApi.getAll({ 
-        statut: 'En attente',
+        statut: 'EN_ATTENTE_PAIEMENT',
         limit: 1 
       });
       setComptesEnAttenteCount(response.total);

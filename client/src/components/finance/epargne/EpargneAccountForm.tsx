@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Percent, DollarSign, Calendar, CreditCard, Building, Smartphone, ArrowRight, AlertCircle, CheckCircle, Clock, Banknote, FileCheck, RefreshCw, Phone, Hash, Wallet, AlertTriangle, Loader2, Search } from 'lucide-react';
 import { clientApi, compteEpargneApi, transactionEpargneApi } from '../../../lib/api-client';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
@@ -31,6 +32,7 @@ interface CompteExistant {
   typeCompte?: string;
   type_compte: string;
   solde: number;
+  solde_courant?: string | number;
 }
 
 interface EpargneAccountFormProps {
@@ -40,7 +42,7 @@ interface EpargneAccountFormProps {
 }
 
 type TypeCompte = 'Courant' | 'Épargne' | 'Bloqué';
-type ModeOuverture = 'Espèces' | 'Virement';
+type ModeOuverture = 'Espèces' | 'Virement' | 'Mobile Money';
 type FrequenceVersement = 'Hebdomadaire' | 'Bimensuel' | 'Mensuel' | 'Trimestriel';
 
 export default function EpargneAccountForm({ onClose, onSuccess, clientId }: EpargneAccountFormProps) {
@@ -52,10 +54,19 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState(clientId ? 2 : 1);
   const [searchQuery, setSearchQuery] = useState('');
-  const [validationRequise, setValidationRequise] = useState(true);
-
-  // Removed mobile/caisse states as payment is handled via backend status or simplified
-  const [validationRequise, setValidationRequise] = useState(true);
+  const [selectedOperator, setSelectedOperator] = useState<string>('');
+  const [validationRequise, setValidationRequise] = useState(false);
+  const [showMobileMoneyModal, setShowMobileMoneyModal] = useState(false);
+  const [showCaisseModal, setShowCaisseModal] = useState(false);
+  const [mobileMoneyData, setMobileMoneyData] = useState({
+    numero_telephone: '',
+    numero_transaction: '',
+    code_otp: ''
+  });
+  const [caisseData, setCaisseData] = useState({
+    billets: {} as Record<number, number>,
+    reference_recu: ''
+  });
 
   const [formData, setFormData] = useState({
     client_id: clientId || '',
@@ -104,6 +115,19 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       const activeComptes = Array.isArray(data) ? data.filter((c: any) => c.statut === 'Actif') : [];
       setComptesExistants(activeComptes);
       
+      // Check eligibility for internal transfer
+      const isVirementEligible = activeComptes.some((c: any) => {
+        const type = (c.type_compte || c.typeCompte || '').toLowerCase();
+        const soldeValue = c.solde !== undefined ? c.solde : c.solde_courant;
+        const solde = typeof soldeValue === 'number' ? soldeValue : parseFloat(String(soldeValue || 0));
+        return type === 'courant' && solde > 0;
+      });
+
+      // Reset mode_ouverture to 'Espèces' if virement is no longer eligible
+      if (!isVirementEligible && formData.mode_ouverture === 'Virement') {
+        setFormData(prev => ({ ...prev, mode_ouverture: 'Espèces' }));
+      }
+
       // Auto-sélectionner un type disponible si celui par défaut est déjà possédé
       const ownedTypes = activeComptes.map((c: any) => c.typeCompte || c.type_compte);
       if (ownedTypes.includes(formData.type_compte)) {
@@ -226,11 +250,6 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       }
     }
 
-    // Mobile money operator validation
-    if (formData.mode_ouverture === 'Mobile Money' && !selectedOperator) {
-      newErrors.operateur = 'Veuillez sélectionner un opérateur';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }, [formData, comptesExistants, selectedOperator]);
@@ -246,7 +265,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       return;
     }
 
-    // Direct creation - Cash payment handled via pending status
+    // Intercept Cash payments for validation
+    if (formData.mode_ouverture === 'Espèces' && parseFloat(formData.solde_initial) > 0) {
+      setShowCaisseModal(true);
+      return;
+    }
+
     await createAccount();
   }, [formData, validate]);
 
@@ -323,6 +347,31 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
   // Safe escaped values
   const safeClientName = selectedClient ? escapeHtml(`${selectedClient.nom} ${selectedClient.prenom || ''}`) : '';
+
+  // Mobile Money Validation Stub
+  const handleMobileMoneyValidation = async () => {
+    // TODO: Implement Mobile Money validation
+    console.log('Validating Mobile Money payment:', mobileMoneyData);
+    setShowMobileMoneyModal(false);
+  };
+
+  // Caisse Validation Implementation
+  const handleCaisseValidation = async () => {
+    const totalBillets = Object.entries(caisseData.billets).reduce((sum, [billet, count]) => {
+        return sum + (parseInt(billet) * count);
+    }, 0);
+
+    const initialAmount = parseFloat(formData.solde_initial) || 0;
+
+    if (totalBillets !== initialAmount) {
+        toast.error(`Le montant compté (${formatMoney(totalBillets)}) ne correspond pas au montant attendu (${formatMoney(initialAmount)})`);
+        return;
+    }
+    
+    // Proceed with creation
+    await createAccount();
+    setShowCaisseModal(false);
+  };
 
   return (
     <div
@@ -593,7 +642,13 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       <span className="text-xs opacity-75 mt-1">Paiement en caisse</span>
                     </button>
                     
-                    {comptesExistants.some(c => c.type_compte === 'Courant' && c.solde > 0) ? (
+                    {comptesExistants.some(c => {
+                        const type = (c.type_compte || c.typeCompte || '').toLowerCase();
+                        // Handle potential property names and types
+                        const soldeValue = c.solde !== undefined ? c.solde : c.solde_courant;
+                        const solde = typeof soldeValue === 'number' ? soldeValue : parseFloat(String(soldeValue || 0));
+                        return type === 'courant' && solde > 0;
+                    }) ? (
                         <button
                           type="button"
                           role="radio"
@@ -617,6 +672,28 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                              <span className="text-xs text-center mt-1">Aucun compte courant éligible</span>
                         </div>
                     )}
+
+                    <button
+                      type="button"
+                      role="radio"
+                      disabled={true}
+                      className="flex flex-col items-center justify-center p-4 rounded-lg border bg-slate-800/50 border-slate-700 text-slate-500 opacity-50 cursor-not-allowed"
+                    >
+                      <Smartphone size={24} className="mb-2" aria-hidden="true" />
+                      <span className="text-sm font-medium">Mobile Money</span>
+                      <span className="text-xs opacity-75 mt-1">Bientôt disponible</span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      role="radio"
+                      disabled={true}
+                      className="flex flex-col items-center justify-center p-4 rounded-lg border bg-slate-800/50 border-slate-700 text-slate-500 opacity-50 cursor-not-allowed"
+                    >
+                      <Smartphone size={24} className="mb-2" aria-hidden="true" />
+                      <span className="text-sm font-medium">Mobile Money</span>
+                      <span className="text-xs opacity-75 mt-1">Bientôt disponible</span>
+                    </button>
                   </div>
 
                   {formData.mode_ouverture === 'Espèces' && (
@@ -633,47 +710,11 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                   )}
                 </fieldset>
 
-                {/* Mobile Money Operator Selection */}
-                {formData.mode_ouverture === 'Mobile Money' && (
-                  <fieldset className="md:col-span-2">
-                    <legend className="block text-sm font-semibold text-slate-300 mb-2">
-                      <Smartphone size={16} className="inline mr-2" aria-hidden="true" />
-                      Sélectionner l'opérateur <span className="text-red-400">*</span>
-                    </legend>
-                    <div className="grid grid-cols-2 gap-3" role="radiogroup">
-                      {MOBILE_OPERATORS.map(op => (
-                        <button
-                          key={op.id}
-                          type="button"
-                          role="radio"
-                          aria-checked={selectedOperator === op.id}
-                          onClick={() => setSelectedOperator(op.id)}
-                          disabled={loading}
-                          className={`flex items-center gap-3 p-4 rounded-lg border-2 transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                            selectedOperator === op.id
-                              ? `${op.color} border-white text-white`
-                              : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
-                          } disabled:opacity-50`}
-                        >
-                          <div className={`w-10 h-10 rounded-full ${selectedOperator === op.id ? 'bg-white/20' : op.color} flex items-center justify-center`}>
-                            <Smartphone size={20} className="text-white" aria-hidden="true" />
-                          </div>
-                          <div className="text-left">
-                            <p className="font-semibold">{op.name}</p>
-                            <p className="text-xs opacity-75">{op.prefix}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    {errors.operateur && (
-                      <p className="text-red-400 text-sm mt-1" role="alert">{errors.operateur}</p>
-                    )}
-                  </fieldset>
-                )}
+
 
                 {/* Source Account for Internal Transfer */}
-                {formData.mode_ouverture === 'Virement' && comptesExistants.length > 0 && (
-                  <div>
+                {formData.mode_ouverture === 'Virement' ? (
+                  <div className="md:col-span-2">
                     <label htmlFor="compte-source" className="block text-sm font-semibold text-slate-300 mb-2">
                       Compte Source <span className="text-red-400">*</span>
                     </label>
@@ -696,7 +737,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       <p className="text-red-400 text-sm mt-1" role="alert">{errors.compte_source_id}</p>
                     )}
                   </div>
-                )}
+                ) : null}
 
                 {/* Initial Amount */}
                 <div className="md:col-span-2">
@@ -729,7 +770,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 </div>
 
                 {/* Payment Reference */}
-                {formData.mode_ouverture !== 'Transfert interne' && (
+                {formData.mode_ouverture !== 'Virement' && (
                   <div className="md:col-span-2">
                     <label htmlFor="reference-paiement" className="block text-sm font-semibold text-slate-300 mb-2">
                       Référence de Paiement
@@ -940,7 +981,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     <p className="font-semibold text-white mb-1">Processus d'ouverture</p>
                     <ul className="space-y-1 text-slate-400">
                       <li>✓ Le compte sera créé {validationRequise ? 'en attente de validation' : 'immédiatement'}</li>
-                      {formData.mode_ouverture !== 'Transfert interne' && (
+                      {formData.mode_ouverture !== 'Virement' && (
                         <li>✓ Le client doit se présenter à la caisse pour effectuer le paiement</li>
                       )}
                       {validationRequise && (
@@ -1101,152 +1142,222 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         </div>
       )}
 
-      {/* Cash Validation Modal */}
-      {showCaisseModal && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="caisse-title"
-        >
-          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="border-b border-slate-700 p-4 flex justify-between items-center bg-green-500/20">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
-                  <Wallet className="text-white" size={20} aria-hidden="true" />
+      {/* Cash Validation Modal - Enhanced UX */}
+      <AnimatePresence>
+        {showCaisseModal && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="caisse-title"
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCaisseModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-2xl relative z-10"
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
+                    <Wallet className="text-green-500" size={24} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <h3 id="caisse-title" className="text-xl font-bold text-white tracking-tight">Validation Caisse</h3>
+                    <p className="text-sm text-slate-400">Comptage des espèces</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 id="caisse-title" className="text-lg font-bold text-white">Validation Caisse</h3>
-                  <p className="text-sm text-slate-400">Comptage des billets</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCaisseModal(false)}
-                className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700"
-                aria-label="Fermer"
-                disabled={loading}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4">
-              <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-                <p className="text-sm text-slate-400">Montant attendu</p>
-                <p className="text-2xl font-bold text-green-400">
-                  {formatMoney(parseFloat(formData.solde_initial || '0'))}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  <Banknote size={16} className="inline mr-2" aria-hidden="true" />
-                  Comptage des billets
-                </label>
-                <div className="space-y-2">
-                  {BILLETS_FCFA.map(billet => (
-                    <div key={billet} className="flex items-center gap-3 bg-slate-700/50 rounded-lg p-2">
-                      <div className="w-20 text-right">
-                        <span className="text-white font-semibold">{billet.toLocaleString('fr-FR')}</span>
-                        <span className="text-slate-400 text-sm ml-1">FC</span>
-                      </div>
-                      <span className="text-slate-400">×</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min="0"
-                        value={caisseData.billets[billet] || ''}
-                        onChange={(e) => setCaisseData({
-                          ...caisseData,
-                          billets: { ...caisseData.billets, [billet]: parseInt(e.target.value) || 0 }
-                        })}
-                        className="w-20 bg-slate-600 border border-slate-500 rounded px-3 py-2 text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="0"
-                        disabled={loading}
-                        aria-label={`Nombre de billets de ${billet} FCFA`}
-                      />
-                      <span className="text-slate-400">=</span>
-                      <span className="text-green-400 font-semibold flex-1 text-right">
-                        {formatMoney((caisseData.billets[billet] || 0) * billet)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div
-                className={`rounded-lg p-3 border-2 ${
-                  calculateTotalBillets === parseFloat(formData.solde_initial || '0')
-                    ? 'bg-green-500/20 border-green-500'
-                    : calculateTotalBillets > 0
-                      ? 'bg-orange-500/20 border-orange-500'
-                      : 'bg-slate-700/50 border-slate-600'
-                }`}
-                role="status"
-                aria-live="polite"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-300 font-semibold">Total compté</span>
-                  <span className={`text-2xl font-bold ${
-                    calculateTotalBillets === parseFloat(formData.solde_initial || '0')
-                      ? 'text-green-400'
-                      : 'text-orange-400'
-                  }`}>
-                    {formatMoney(calculateTotalBillets)}
-                  </span>
-                </div>
-                {calculateTotalBillets > 0 && calculateTotalBillets !== parseFloat(formData.solde_initial || '0') && (
-                  <p className="text-orange-400 text-sm mt-1">
-                    Différence: {formatMoney(calculateTotalBillets - parseFloat(formData.solde_initial || '0'))}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="reference-recu" className="block text-sm font-semibold text-slate-300 mb-2">
-                  Numéro de reçu (optionnel)
-                </label>
-                <input
-                  id="reference-recu"
-                  type="text"
-                  value={caisseData.reference_recu}
-                  onChange={(e) => setCaisseData({ ...caisseData, reference_recu: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: REC-2024-001"
-                  disabled={loading}
-                  maxLength={50}
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
                 <button
+                  onClick={() => setShowCaisseModal(false)}
+                  className="text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors"
+                  aria-label="Fermer"
+                  disabled={loading}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                {/* Amount Summary */}
+                <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700/50">
+                  <p className="text-sm text-slate-400 font-medium uppercase tracking-wider mb-1">Montant à Encaisser</p>
+                  <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
+                    {formatMoney(parseFloat(formData.solde_initial || '0'))}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                       <Banknote size={16} className="text-slate-400" />
+                       Billetage
+                    </label>
+                    <button 
+                      type="button" 
+                      onClick={() => setCaisseData(prev => ({ ...prev, billets: {} }))}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      Réinitialiser
+                    </button>
+                  </div>
+                  
+                  <div className="grid gap-3">
+                    {BILLETS_FCFA.map((billet, index) => {
+                      const count = caisseData.billets[billet] || 0;
+                      const subtotal = count * billet;
+                      
+                      return (
+                        <motion.div 
+                          key={billet}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className={`
+                            flex items-center gap-3 bg-slate-800/40 rounded-xl p-3 border transition-all duration-200
+                            ${count > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-slate-700/50 hover:border-slate-600'}
+                          `}
+                        >
+                          <div className="w-24 text-right shrink-0">
+                            <span className="text-white font-bold text-lg">{billet.toLocaleString('fr-FR')}</span>
+                            <span className="text-slate-500 text-xs ml-1 font-medium">FCFA</span>
+                          </div>
+                          
+                          <span className="text-slate-600">×</span>
+                          
+                          <div className="flex-1 relative">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min="0"
+                              value={caisseData.billets[billet] || ''}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setCaisseData({
+                                  ...caisseData,
+                                  billets: { ...caisseData.billets, [billet]: val }
+                                });
+                              }}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white text-center font-mono text-lg focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-shadow"
+                              placeholder="0"
+                              disabled={loading}
+                            />
+                          </div>
+
+                          <div className="w-28 text-right font-mono font-medium shrink-0">
+                             <span className={subtotal > 0 ? 'text-green-400' : 'text-slate-600'}>
+                               {formatMoney(subtotal)}
+                             </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Total & Status */}
+                {(() => {
+                   const totalT = Object.entries(caisseData.billets).reduce((sum, [b, c]) => sum + (parseInt(b) * c), 0);
+                   const target = parseFloat(formData.solde_initial || '0');
+                   const diff = totalT - target;
+                   const isMatch = totalT === target;
+                   
+                   return (
+                     <div
+                        className={`rounded-xl p-4 border-2 transition-all duration-300 ${
+                          isMatch
+                            ? 'bg-green-500/10 border-green-500/50'
+                            : totalT > 0
+                              ? 'bg-orange-500/10 border-orange-500/50'
+                              : 'bg-slate-800 border-slate-700'
+                        }`}
+                      >
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <span className="text-xs uppercase tracking-wider font-semibold text-slate-400 block mb-1">Total Compté</span>
+                            <span className={`text-3xl font-bold ${
+                              isMatch ? 'text-green-400' : totalT > 0 ? 'text-orange-400' : 'text-slate-500'
+                            }`}>
+                              {formatMoney(totalT)}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                             {diff !== 0 && totalT > 0 && (
+                               <div className={`text-sm font-medium px-2 py-1 rounded-lg inline-block ${
+                                 diff > 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-red-500/20 text-red-400'
+                               }`}>
+                                 {diff > 0 ? '+' : ''}{formatMoney(diff)}
+                               </div>
+                             )}
+                          </div>
+                        </div>
+                      </div>
+                   );
+                })()}
+
+                <div>
+                  <label htmlFor="reference-recu" className="block text-sm font-semibold text-slate-300 mb-2">
+                    Numéro de reçu (optionnel)
+                  </label>
+                  <div className="relative">
+                    <FileCheck className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <input
+                      id="reference-recu"
+                      type="text"
+                      value={caisseData.reference_recu}
+                      onChange={(e) => setCaisseData({ ...caisseData, reference_recu: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                      placeholder="Ex: REC-2024-001"
+                      disabled={loading}
+                      maxLength={50}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="p-5 border-t border-slate-800 bg-slate-900/50 flex gap-3">
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => setShowCaisseModal(false)}
                   disabled={loading}
-                  className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition disabled:opacity-50"
+                  className="flex-1"
                 >
                   Annuler
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={handleCaisseValidation}
-                  disabled={loading || calculateTotalBillets !== parseFloat(formData.solde_initial || '0')}
-                  className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  isLoading={loading}
+                  disabled={loading || (() => {
+                     const total = Object.entries(caisseData.billets).reduce((s, [b, c]) => s + (parseInt(b) * c), 0);
+                     return total !== parseFloat(formData.solde_initial || '0');
+                  })()}
+                  className={`flex-1 ${
+                    Object.entries(caisseData.billets).reduce((s, [b, c]) => s + (parseInt(b) * c), 0) === parseFloat(formData.solde_initial || '0')
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-900/20'
+                    : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                  }`}
+                  icon={CheckCircle}
                 >
-                  {loading ? (
-                    <Loader2 className="animate-spin" size={20} />
-                  ) : (
-                    <>
-                      <CheckCircle size={20} aria-hidden="true" />
-                      Valider le paiement
-                    </>
-                  )}
-                </button>
+                  Valider le Paiement
+                </Button>
               </div>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }

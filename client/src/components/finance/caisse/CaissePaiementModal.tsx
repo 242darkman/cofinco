@@ -10,6 +10,7 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { v4 as uuidv4 } from 'uuid';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <div className={`flex items-center justify-center font-bold text-red-500 bg-red-100 rounded-lg p-2 ${className}`}>
@@ -95,6 +96,13 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
     reference: '',
     description: ''
   });
+
+  // Idempotency Key
+  const [idempotencyKey, setIdempotencyKey] = useState<string>('');
+
+  useEffect(() => {
+    setIdempotencyKey(uuidv4());
+  }, []);
 
   // Vérifier si c'est une opération d'entrée
   const isOperationEntree = useCallback((typeOp: string) => {
@@ -436,18 +444,21 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
           methodePaiement: formData.mode_paiement,
           reference: operationData.reference
         });
+
       } else if (isAccountOperation && selectedAccount && selectedAccount.statut === 'EN_ATTENTE_PAIEMENT' && formData.type_operation.includes('Dépôt')) {
           // ACTIVATION DE COMPTE : APPEL SPECIFIQUE
           response = await compteEpargneApi.depotInitial(selectedAccount.id, {
              montant: operationData.montant,
              sessionCaisseId: sessionId,
-             modePaiement: formData.mode_paiement // 'Espèces' normalement
+             modePaiement: formData.mode_paiement, // 'Espèces' normalement
+             idempotencyKey // Add key to call
           });
       } else {
         // **Autres opérations** : créer l'opération de caisse
         response = await operationCaisseApi.create({
           ...operationData,
-          statut: 'Posté' 
+          statut: 'Posté',
+          idempotencyKey
         });
       }
       

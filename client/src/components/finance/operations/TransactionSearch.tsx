@@ -412,7 +412,59 @@ export default function TransactionSearch({
           {filteredTransactions.length} {t('transactionsTrouvees')}
         </div>
 
-        <div className="overflow-x-auto">
+
+
+        {/* Mobile / Tablet Card View */}
+        <div className="md:hidden space-y-4">
+          {filteredTransactions.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+               {t('aucuneTransaction')}
+            </div>
+          ) : (
+            filteredTransactions.map((transaction) => (
+              <div 
+                key={transaction.id}
+                className="bg-slate-700/30 border border-slate-600 rounded-lg p-4 space-y-3"
+              >
+                {/* Header: Date + Status */}
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs text-slate-400 block">{formatDate(transaction.date)}</span>
+                    <span className="text-white font-medium">{transaction.description}</span>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${getStatusColor(transaction.status)} bg-slate-800`}>
+                       {transaction.status === 'completed' ? 'Succès' : transaction.status}
+                  </span>
+                </div>
+
+                {/* Amount + Reference */}
+                <div className="flex justify-between items-center border-t border-slate-600/50 pt-2">
+                   <div className="flex flex-col">
+                      <span className="text-[10px] text-slate-500 uppercase">Référence</span>
+                      <span className="text-xs text-cyan-400 font-mono">{transaction.reference}</span>
+                   </div>
+                   <div className={`text-lg font-bold ${
+                      transaction.type === 'credit' ? 'text-emerald-400' : 
+                      transaction.type === 'debit' ? 'text-red-400' : 'text-white'
+                    }`}>
+                      {transaction.type === 'credit' ? '+' : transaction.type === 'debit' ? '-' : ''}
+                      {formatMoney(transaction.amount)}
+                   </div>
+                </div>
+                
+                {/* Footer: Type Badge */}
+                <div className="flex justify-start">
+                    <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${getTypeColor(transaction.type)}`}>
+                        {transaction.type}
+                    </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-700">

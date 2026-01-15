@@ -349,6 +349,13 @@ export async function updateCompteSolde(
   compteId: string,
   delta: number
 ): Promise<string> {
+  // Pessimistic Lock (SELECT ... FOR UPDATE) to prevent race conditions
+  await tx
+    .select({ id: comptes.id })
+    .from(comptes)
+    .where(eq(comptes.id, compteId))
+    .for("update");
+
   // Atomic update to handle concurrency
   const [updated] = await tx.update(comptes)
     .set({ 
@@ -370,6 +377,13 @@ export async function updateCreditSolde(
   creditId: string,
   delta: number
 ): Promise<string> {
+  // Pessimistic Lock
+  await tx
+    .select({ id: credits.id })
+    .from(credits)
+    .where(eq(credits.id, creditId))
+    .for("update");
+
   // Atomic update
   // Note: GREATEST(0, ...) check might differ between DBs, but works in Postgres
   const [updated] = await tx.update(credits)
@@ -392,6 +406,13 @@ export async function updateSessionSolde(
   sessionId: string,
   delta: number
 ): Promise<string> {
+  // Pessimistic Lock
+  await tx
+    .select({ id: sessionsCaisse.id })
+    .from(sessionsCaisse)
+    .where(eq(sessionsCaisse.id, sessionId))
+    .for("update");
+
   const [updated] = await tx.update(sessionsCaisse)
     .set({ 
       soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${delta}`,
@@ -412,6 +433,13 @@ export async function updateTontineSolde(
   tontineId: string,
   delta: number
 ): Promise<string> {
+  // Pessimistic Lock
+  await tx
+    .select({ id: tontines.id })
+    .from(tontines)
+    .where(eq(tontines.id, tontineId))
+    .for("update");
+
   const [updated] = await tx.update(tontines)
     .set({ 
       solde: sql`${tontines.solde} + ${delta}`,
@@ -432,6 +460,13 @@ export async function updateCaisseSolde(
   caisseId: string,
   delta: number
 ): Promise<string> {
+  // Pessimistic Lock
+  await tx
+    .select({ id: caisses.id })
+    .from(caisses)
+    .where(eq(caisses.id, caisseId))
+    .for("update");
+
   const [updated] = await tx.update(caisses)
     .set({ 
       solde: sql`${caisses.solde} + ${delta}`,

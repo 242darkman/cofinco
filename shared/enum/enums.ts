@@ -226,6 +226,13 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
 
   // Coffre
   "Approvisionnement coffre",
+  "Versement coffre",
+
+  // Transferts Auto & Virement
+  "Transfert Entrant",
+  "Transfert Sortant",
+  "Dépôt Initial",
+  "Virement Interne",
 ]);
 
 export const typeCompteEnum = pgEnum("type_compte_enum", [

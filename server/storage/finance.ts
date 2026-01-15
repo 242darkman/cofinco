@@ -26,6 +26,105 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 
 
   
+
+  /**
+   * Enrich credit data with calculated fields (installments, delays, etc.)
+   */
+  export function enrichCreditData(credit: Credit, client?: any): any {
+    let jours_retard = 0;
+    let nombre_echeances_payees = 0;
+
+    // Calcul basé sur le soldeRestant stocké (cohérent avec le frontend)
+    const principal = Number(credit.montant) || 0;
+    const taux = Number(credit.taux) || 0;
+    const totalEcheances = credit.duree || 1;
+    const totalWithInterest = principal * (1 + taux / 100);
+    const installmentAmount = totalWithInterest / totalEcheances;
+
+    // Utiliser soldeRestant comme source de vérité (comme le frontend)
+    const soldeRestant = Number(credit.soldeRestant) || totalWithInterest;
+    const totalPaid = Math.max(0, totalWithInterest - soldeRestant);
+
+    // Nombre d'échéances complètement payées = montant total payé / montant échéance
+    if (installmentAmount > 0) {
+      nombre_echeances_payees = Math.floor(totalPaid / installmentAmount);
+    }
+
+    // Calcul du retard uniquement pour les crédits actifs non soldés
+    if (credit.dateDebut && ['Actif', 'En retard', 'En cours', 'Contentieux'].includes(credit.statut)) {
+        // Normaliser les dates à minuit pour éviter les problèmes de timezone
+        const start = new Date(credit.dateDebut);
+        start.setHours(0, 0, 0, 0);
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        // Convertir la fréquence en jours
+        let frequencyDays = 30; // Par défaut Mensuel
+        switch (credit.echeance) {
+          case 'Journalier': frequencyDays = 1; break;
+          case 'Hebdomadaire': frequencyDays = 7; break;
+          case 'Bimensuel': frequencyDays = 15; break;
+          case 'Trimestriel': frequencyDays = 90; break;
+        }
+
+        // Si crédit totalement remboursé, pas de retard
+        if (totalPaid >= totalWithInterest - 0.01 || nombre_echeances_payees >= totalEcheances) {
+          jours_retard = 0;
+        } else {
+          // La prochaine échéance due est celle après les échéances déjà payées
+          const nextInstallmentNumber = nombre_echeances_payees + 1;
+
+          // Calcul de la date de la prochaine échéance
+          const nextDueDate = new Date(start);
+          nextDueDate.setDate(nextDueDate.getDate() + (nextInstallmentNumber * frequencyDays));
+
+          // Retard = nombre de jours depuis que l'échéance est passée
+          if (now > nextDueDate) {
+            const diffTime = now.getTime() - nextDueDate.getTime();
+            jours_retard = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          }
+        }
+    }
+
+    // Calcul de la prochaine échéance si manquante
+    let prochaine_echeance_calc = credit.prochaineEcheance;
+    if (!prochaine_echeance_calc && credit.dateDebut && ['Actif', 'En retard', 'En cours'].includes(credit.statut)) {
+        const start = new Date(credit.dateDebut);
+        start.setHours(0, 0, 0, 0);
+
+        let frequencyDays = 30;
+        switch (credit.echeance) {
+          case 'Journalier': frequencyDays = 1; break;
+          case 'Hebdomadaire': frequencyDays = 7; break;
+          case 'Bimensuel': frequencyDays = 15; break;
+          case 'Trimestriel': frequencyDays = 90; break;
+        }
+
+        const nextInstallmentNumber = nombre_echeances_payees + 1;
+        const nextDueDate = new Date(start);
+        nextDueDate.setDate(nextDueDate.getDate() + (nextInstallmentNumber * frequencyDays));
+        prochaine_echeance_calc = nextDueDate;
+    }
+
+    return {
+      ...credit,
+      numero_credit: credit.numeroCredit,
+      montant_principal: principal,
+      nombre_echeances_total: totalEcheances,
+      nombre_echeances_payees,
+      jours_retard,
+      prochaineEcheance: prochaine_echeance_calc,
+      montantEcheance: credit.montantEcheance || installmentAmount.toString(),
+      clients: client ? {
+        nom: client.nom,
+        prenom: client.prenom,
+        phone: client.telephone,
+        photo_url: client.photoProfile
+      } : undefined
+    };
+  }
+
   // Credits
   export async function getCredit(id: string): Promise<Credit & { fraisDossierPaye?: boolean } | undefined> {
     const [result] = await db.select({
@@ -39,20 +138,25 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     if (!result) return undefined;
 
     return {
-      ...result.credit,
+      ...enrichCreditData(result.credit),
       fraisDossierPaye: result.demande?.fraisEngagementPayes || false
     };
   }
   
   export async function getCreditsByClient(clientId: string): Promise<Credit[]> {
-    return db.select().from(credits).where(eq(credits.clientId, clientId)).orderBy(desc(credits.createdAt));
+    const results = await db.select().from(credits).where(eq(credits.clientId, clientId)).orderBy(desc(credits.createdAt));
+    return results.map(credit => enrichCreditData(credit));
   }
   
-  export async function getAllCredits(filter: { agence?: string } = {}): Promise<Credit[]> {
+  export async function getAllCredits(filter: { agence?: string, clientId?: string } = {}): Promise<Credit[]> {
     const conditions = [];
 
     if (filter.agence && filter.agence !== "all") {
       conditions.push(eq(clients.agence, filter.agence));
+    }
+
+    if (filter.clientId) {
+      conditions.push(eq(credits.clientId, filter.clientId));
     }
     
     let baseQuery = db.select({
@@ -65,82 +169,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     }
     
     const results = await baseQuery.orderBy(desc(credits.createdAt));
-
-    return results.map(({ credit, client }) => {
-      let jours_retard = 0;
-      let nombre_echeances_payees = 0;
-
-      // Calcul basé sur le soldeRestant stocké (cohérent avec le frontend)
-      const principal = Number(credit.montant) || 0;
-      const taux = Number(credit.taux) || 0;
-      const totalEcheances = credit.duree || 1;
-      const totalWithInterest = principal * (1 + taux / 100);
-      const installmentAmount = totalWithInterest / totalEcheances;
-
-      // Utiliser soldeRestant comme source de vérité (comme le frontend)
-      const soldeRestant = Number(credit.soldeRestant) || totalWithInterest;
-      const totalPaid = Math.max(0, totalWithInterest - soldeRestant);
-
-      // Nombre d'échéances complètement payées = montant total payé / montant échéance
-      if (installmentAmount > 0) {
-        nombre_echeances_payees = Math.floor(totalPaid / installmentAmount);
-      }
-
-      // Calcul du retard uniquement pour les crédits actifs non soldés
-      if (credit.dateDebut && ['Actif', 'En retard', 'En cours'].includes(credit.statut)) {
-          // Normaliser les dates à minuit pour éviter les problèmes de timezone
-          const start = new Date(credit.dateDebut);
-          start.setHours(0, 0, 0, 0);
-
-          const now = new Date();
-          now.setHours(0, 0, 0, 0);
-
-          // Convertir la fréquence en jours
-          let frequencyDays = 30; // Par défaut Mensuel
-          switch (credit.echeance) {
-            case 'Journalier': frequencyDays = 1; break;
-            case 'Hebdomadaire': frequencyDays = 7; break;
-            case 'Bimensuel': frequencyDays = 15; break;
-            case 'Trimestriel': frequencyDays = 90; break;
-          }
-
-          // Si crédit totalement remboursé, pas de retard
-          if (totalPaid >= totalWithInterest - 0.01 || nombre_echeances_payees >= totalEcheances) {
-            jours_retard = 0;
-          } else {
-            // Calcul PAR (Portfolio at Risk) standard microfinance:
-            // Échéance #N tombe à: dateDebut + (N × frequencyDays) jours
-            // La prochaine échéance due est celle après les échéances déjà payées
-            const nextInstallmentNumber = nombre_echeances_payees + 1;
-
-            // Calcul de la date de la prochaine échéance
-            const nextDueDate = new Date(start);
-            nextDueDate.setDate(nextDueDate.getDate() + (nextInstallmentNumber * frequencyDays));
-
-            // Retard = nombre de jours depuis que l'échéance est passée
-            // Si nextDueDate est dans le futur ou aujourd'hui, pas de retard
-            if (now > nextDueDate) {
-              const diffTime = now.getTime() - nextDueDate.getTime();
-              jours_retard = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            }
-          }
-      }
-
-      return {
-        ...credit,
-        numero_credit: credit.numeroCredit,
-        montant_principal: principal,
-        nombre_echeances_total: totalEcheances,
-        nombre_echeances_payees,
-        jours_retard,
-        clients: client ? {
-          nom: client.nom,
-          prenom: client.prenom,
-          phone: client.telephone,
-          photo_url: client.photoProfile
-        } : undefined
-      };
-    });
+    return results.map(({ credit, client }) => enrichCreditData(credit, client));
   }
   
   export async function createCredit(insertCredit: InsertCredit): Promise<Credit> {
@@ -359,14 +388,36 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
   }
 
   
+
+  /**
+   * Enrich account data with aliases for frontend compatibility
+   */
+  export function enrichCompteData(compte: Compte): any {
+    return {
+      ...compte,
+      // Snake case and generic aliases for frontend compatibility
+      numero_compte: compte.numeroCompte,
+      type_compte: compte.typeCompte,
+      solde_courant: compte.soldeCourant,
+      solde: Number(compte.soldeCourant) || 0, // Alias for frontend logic
+      client_id: compte.clientId,
+      agence_id: compte.agenceId,
+      blocage_actif: compte.blocageActif,
+      blocage_motif: compte.blocageMotif,
+      created_at: compte.createdAt,
+      date_ouverture: compte.createdAt, // Alias for frontend
+    };
+  }
+
   // Comptes
   export async function getCompte(id: string): Promise<Compte | undefined> {
     const [compte] = await db.select().from(comptes).where(eq(comptes.id, id));
-    return compte || undefined;
+    return compte ? enrichCompteData(compte) : undefined;
   }
   
   export async function getComptesByClient(clientId: string): Promise<Compte[]> {
-    return db.select().from(comptes).where(eq(comptes.clientId, clientId));
+    const results = await db.select().from(comptes).where(eq(comptes.clientId, clientId));
+    return results.map(c => enrichCompteData(c));
   }
   
   export async function getAllComptes(filter: { agence?: string } = {}): Promise<Compte[]> {
@@ -461,18 +512,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 
     // Transform data with client info embedded
     const data = results.map(({ compte, client, user }) => ({
-      ...compte,
-      // Snake case aliases for frontend compatibility
-      numero_compte: compte.numeroCompte,
-      type_compte: compte.typeCompte,
-      solde_courant: compte.soldeCourant,
-      solde: compte.soldeCourant, // Alias for frontend
-      client_id: compte.clientId,
-      agence_id: compte.agenceId,
-      blocage_actif: compte.blocageActif,
-      blocage_motif: compte.blocageMotif,
-      created_at: compte.createdAt,
-      date_ouverture: compte.createdAt, // Alias for frontend
+      ...enrichCompteData(compte),
       // Embedded client info
       clients: client ? {
         id: client.id,

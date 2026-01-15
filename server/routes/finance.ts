@@ -84,7 +84,12 @@ export function registerFinanceRoutes(app: Express) {
     const agenceFilter = req.agenceFilter as { agence?: string } | null;
     
     // On passe le filtre directement au storage qui l'applique en SQL (jointure client)
-    const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+    const filter: { agence?: string; clientId?: string } = agenceFilter ? { agence: agenceFilter.agence } : {};
+    
+    if (req.query.clientId) {
+      filter.clientId = req.query.clientId as string;
+    }
+    
     const credits = await storage.getAllCredits(filter);
     
     res.json(addSnakeCaseAliasesDeep(credits));

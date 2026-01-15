@@ -46,7 +46,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Types
 export type TypeCompte = "Épargne" | "Courant" | "Bloqué";
-export type StatutCompte = "Actif" | "Suspendu" | "Clôturé";
+export type StatutCompte = "Actif" | "Suspendu" | "Clôturé" | "EN_ATTENTE_PAIEMENT";
 export type MotifBlocage =
   | "Garantie crédit"
   | "Garantie tontine"
@@ -427,7 +427,7 @@ export async function deposerSurCompte(
           observations: data.observations,
           idempotencyKey: data.idempotencyKey,
           createdBy: userId,
-        })
+        } as any)
         .returning();
 
       return {
@@ -1215,7 +1215,7 @@ export async function createCompteWithInitialDeposit(
         methodePaiement: 'Virement',
         observations: `Virement vers nouveau compte ${compte.numeroCompte}`,
         createdBy: userId,
-      });
+      } as any);
 
       // Update Source Balance
       await tx.update(comptes)
@@ -1317,7 +1317,7 @@ export async function payerDepotInitialCompte(
         methodePaiement: 'Espèces',
         observations: 'Dépôt initial - Activation de compte',
         createdBy: data.userId,
-      }).returning();
+      } as any).returning();
       
       // 3. Activate Account & Update Balance
       const [updatedCompte] = await tx.update(comptes)

@@ -1,4 +1,4 @@
-import { apiClient } from './api-client';
+import { api as apiClient } from '../api-client';
 
 export interface Facture {
   id: string;
@@ -11,7 +11,7 @@ export interface Facture {
   montantTva: string;
   montantTotal: string;
   montantPaye: string;
-  statut: 'brouillon' | 'envoyee' | 'payee' | 'annulee';
+  statut: 'brouillon' | 'envoyee' | 'payee' | 'annulee' | 'en_attente';
   modePaiement?: string;
   operationCaisseId?: string;
   notes?: string;
@@ -36,8 +36,16 @@ export const factureApi = {
   /**
    * Get all factures for a client
    */
-  getByClient: (clientId: string, filters?: FactureFilters) =>
-    apiClient.get<Facture[]>(`/clients/${clientId}/factures`, { params: filters }),
+  getByClient: (clientId: string, filters?: FactureFilters) => {
+    const queryParams = new URLSearchParams();
+    if (filters?.type) queryParams.append('type', filters.type);
+    if (filters?.dateDebut) queryParams.append('date_debut', filters.dateDebut);
+    if (filters?.dateFin) queryParams.append('date_fin', filters.dateFin);
+    if (filters?.statut) queryParams.append('statut', filters.statut);
+    
+    const query = queryParams.toString();
+    return apiClient.get<Facture[]>(`/clients/${clientId}/factures${query ? `?${query}` : ''}`);
+  },
 
   /**
    * Download facture as PDF
