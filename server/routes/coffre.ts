@@ -231,17 +231,24 @@ coffreRouter.get("/supervision", requireRole("admin", "Administrateur", "admin_g
         solde: Number(c.solde)
     })).sort((a, b) => b.solde - a.solde);
 
-    // 4. History (Last 30 Days) - Reconstructed from current balance backwards
+    // 4. History (Last 30 Days)
+    // Supports "historyFor" query param to fetch history for specific agencies (comma separated IDs)
+    const historyFor = (req.query.historyFor as string)?.split(',').filter(Boolean);
+    
     // Fetch all movements involving any coffre in the last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const coffreIds = allCoffres.map(c => c.id);
+    // If specific agencies requested, filter coffreIds. Otherwise use all.
+    let targetCoffreIds = allCoffres.map(c => c.id);
+    if (historyFor && historyFor.length > 0) {
+       targetCoffreIds = allCoffres.filter(c => historyFor.includes(c.agenceId!)).map(c => c.id);
+    }
     
     // Safety check: if no coffres, return empty history
     let history: any[] = [];
     
-    if (coffreIds.length > 0) {
+    if (targetCoffreIds.length > 0) {
         const movements = await db.select({
             date: schema.mouvementsFinanciers.dateOperation,
             montant: schema.mouvementsFinanciers.montant,
@@ -253,74 +260,80 @@ coffreRouter.get("/supervision", requireRole("admin", "Administrateur", "admin_g
         .where(
             and(
                 sql`${schema.mouvementsFinanciers.dateOperation} >= ${thirtyDaysAgo}`,
-                 // Check if sourceId OR metadata->destinationId matches any coffre
-                sql`(${schema.mouvementsFinanciers.sourceId} IN ${coffreIds} OR ${schema.mouvementsFinanciers.metadata}->>'destinationId' IN ${coffreIds})`
+                // Check if sourceId OR metadata->destinationId matches any TARGET coffre
+                sql`(${schema.mouvementsFinanciers.sourceId} IN ${targetCoffreIds} OR ${schema.mouvementsFinanciers.metadata}->>'destinationId' IN ${targetCoffreIds})`
             )
         )
         .orderBy(desc(schema.mouvementsFinanciers.dateOperation));
 
-        // Group by day (YYYY-MM-DD)
-        const dailyNetChange: Record<string, number> = {};
+        // Map coffreId to agenceId for grouping
+        const coffreToAgence = allCoffres.reduce((acc, c) => {
+            acc[c.id] = c.agenceId!;
+            return acc;
+        }, {} as Record<string, string>);
+
+        // Net change by date AND agence
+        const dailyAgencyChange: Record<string, Record<string, number>> = {};
         
         movements.forEach(m => {
             const dateKey = new Date(m.date!).toISOString().split('T')[0];
             const amount = Number(m.montant);
             
-            if (!dailyNetChange[dateKey]) dailyNetChange[dateKey] = 0;
+            if (!dailyAgencyChange[dateKey]) dailyAgencyChange[dateKey] = {};
 
-            // Logic:
-            // If movement is TODAY, it contributed to Current Balance.
-            // If we go BACKWARDS, we need to REVERSE the operation to get Yesterday's Closing Balance.
-            // Closing(Yesterday) = Closing(Today) - NetChange(Today)
-            
-            // NetChange definition for a Coffer:
-            // IN (Credit) = +Amount
-            // OUT (Debit) = -Amount
-            
-            // Checking movement direction relative to Coffres:
-            let change = 0;
-            // Robust check using metadata or sourceId
             const destId = (m.metadata as any)?.destinationId;
             const srcId = m.sourceId;
 
-            if (coffreIds.includes(destId)) {
-                 // Money CAME IN (Credit)
-                 change = amount;
-            } else if (coffreIds.includes(srcId as string)) {
-                 // Money WENT OUT (Debit)
-                 change = -amount;
+            if (targetCoffreIds.includes(destId)) {
+                const agId = coffreToAgence[destId];
+                dailyAgencyChange[dateKey][agId] = (dailyAgencyChange[dateKey][agId] || 0) + amount;
+            } 
+            if (targetCoffreIds.includes(srcId as string)) {
+                const agId = coffreToAgence[srcId as string];
+                dailyAgencyChange[dateKey][agId] = (dailyAgencyChange[dateKey][agId] || 0) - amount;
             }
-            
-            dailyNetChange[dateKey] += change;
         });
+
+        // Current totals for the TARGETED agencies
+        const currentBalances = allCoffres
+            .filter(c => targetCoffreIds.includes(c.id))
+            .reduce((acc, c) => {
+                acc[c.agenceId!] = (acc[c.agenceId!] || 0) + Number(c.solde);
+                return acc;
+            }, {} as Record<string, number>);
 
         // Reconstruct
         const today = new Date();
-        let runningBalance = totalSolde;
+        const runningBalances = { ...currentBalances };
+        const relevantAgIds = Object.keys(currentBalances);
         
         for (let i = 0; i < 30; i++) {
             const day = new Date();
             day.setDate(today.getDate() - i);
             const dateKey = day.toISOString().split('T')[0];
             
+            const totalBalance = Object.values(runningBalances).reduce((a, b) => a + b, 0);
+            
             history.push({
                 date: dateKey,
-                balance: runningBalance
+                balance: totalBalance, // backward兼容 : le total pour la sélection
+                ...runningBalances     // Ajoute les balances individuelles (ex: [agId]: 12345)
             });
             
-            // Prepare for previous day: subtract today's net change
-            // Closing(Yesterday) = Closing(Today) - Change(Today)
-            const changeToday = dailyNetChange[dateKey] || 0;
-            runningBalance -= changeToday;
+            // Go back in time: subtract today's net change
+            const dayChanges = dailyAgencyChange[dateKey] || {};
+            relevantAgIds.forEach(id => {
+                runningBalances[id] -= (dayChanges[id] || 0);
+            });
         }
         
-        history.reverse(); // Show oldest to newest
+        history.reverse();
     }
 
     res.json({
-        globalBalance: totalSolde,
-        breakdown,
-        history
+        globalBalance: totalSolde, // Always return global current balance
+        breakdown, // Always return full breakdown
+        history // Returns history for the requested agencies (or all if none specified)
     });
 
   } catch (e: any) {

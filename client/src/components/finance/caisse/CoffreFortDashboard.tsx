@@ -441,78 +441,57 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
-             <h2 className="text-2xl font-bold tracking-tight">Coffre-Fort</h2>
-             {canConfigure && (
-                <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                    onClick={() => setShowProvisionModal(true)}
-                >
-                    <ArrowDownRight size={14} className="mr-2" />
-                    Approvisionner
-                </Button>
-             )}
-        </div>
-        
-        {/* Simple Tab Switcher if TabGroup not suitable or for quick toggle */}
-        <div className="flex space-x-1 sm:space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg overflow-x-auto">
-           <button
-             onClick={() => setActiveTab('operations')}
-             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'operations' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-           >
-             <div className="flex items-center gap-2">
-               <ArrowRightLeft size={16} />
-               <span className="hidden sm:inline">Transferts</span>
-               <span className="sm:hidden">Caisse</span>
-             </div>
-           </button>
-           <button
-             onClick={() => setActiveTab('intercoffres')}
-             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'intercoffres' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-           >
-             <div className="flex items-center gap-2">
-               <Vault size={16} />
-               <span className="hidden sm:inline">Inter-Coffres</span>
-               <span className="sm:hidden">Coffres</span>
-             </div>
-           </button>
-           <button
-             onClick={() => setActiveTab('historique')}
-             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'historique' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-           >
-             <div className="flex items-center gap-2">
-               <Clock size={16} />
-               Historique
-             </div>
-           </button>
-           {canSupervise && (
-           <button
-             onClick={() => setActiveTab('supervision')}
-             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'supervision' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-           >
-             <div className="flex items-center gap-2">
-               <Shield size={16} />
-               <span className="hidden sm:inline">Supervision</span>
-               <span className="sm:hidden">Sup.</span>
-             </div>
-           </button>
-           )}
-           {canConfigure && (
-           <button
-             onClick={() => setActiveTab('admin')}
-             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'admin' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
-           >
-             <div className="flex items-center gap-2">
-               <Settings size={16} />
-               <span className="hidden sm:inline">Administration</span>
-               <span className="sm:hidden">Admin</span>
-             </div>
-           </button>
-           )}
+    <div className="space-y-6 pt-2">
+      <div className="sticky top-[3.5rem] lg:top-0 z-40 -mx-4 px-4 py-3 bg-slate-950/80 backdrop-blur-md border-b border-white/5 transition-all duration-200">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
+              <div className="bg-blue-600/20 p-2 rounded-xl">
+                 <Vault className="w-6 h-6 text-blue-500" />
+              </div>
+               <div>
+                  <h2 className="text-xl font-bold tracking-tight text-white">Coffre-Fort</h2>
+                  <p className="text-xs text-slate-400 hidden sm:block">Gestion centralisée des fonds</p>
+               </div>
+               
+               {canConfigure && (
+                  <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="ml-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hidden lg:flex"
+                      onClick={() => setShowProvisionModal(true)}
+                  >
+                      <ArrowDownRight size={14} className="mr-2" />
+                      Approvisionner
+                  </Button>
+               )}
+          </div>
+          
+          <div className="w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+             <div className="flex space-x-1 bg-slate-900/50 p-1 rounded-xl border border-white/5">
+                {[
+                  { id: 'operations', label: 'Transferts', icon: ArrowRightLeft, short: 'Ops' },
+                  { id: 'intercoffres', label: 'Inter-Coffres', icon: Vault, short: 'Inter' },
+                  { id: 'historique', label: 'Historique', icon: Clock, short: 'Hist' },
+                  ...(canSupervise ? [{ id: 'supervision', label: 'Supervision', icon: Shield, short: 'Sup.' }] : []),
+                  ...(canConfigure ? [{ id: 'admin', label: 'Admin', icon: Settings, short: 'Admin' }] : [])
+                ].map(tab => (
+                 <button
+                   key={tab.id}
+                   onClick={() => setActiveTab(tab.id)}
+                   className={`
+                      relative flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap
+                      ${activeTab === tab.id 
+                        ? 'text-white bg-blue-600/90 shadow-lg shadow-blue-900/20' 
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'}
+                   `}
+                 >
+                   <tab.icon size={16} className={activeTab === tab.id ? 'animate-in zoom-in-50 duration-200' : ''} />
+                   <span className="hidden sm:inline">{tab.label}</span>
+                   <span className="sm:hidden">{tab.short}</span>
+                 </button>
+                ))}
+            </div>
+          </div>
         </div>
       </div>
 
