@@ -30,6 +30,8 @@ import { CoffreAdminPanel } from './CoffreAdminPanel';
 import { ProvisionCoffreModal } from './ProvisionCoffreModal';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import TransfertInterCoffresModule from '../transfert-coffres/TransfertInterCoffresModule';
+import { TreasurySupervision } from '../../admin/TreasurySupervision';
+
 
 interface CoffreFortDashboardProps {
   agenceId: string;
@@ -63,6 +65,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const canValidate = hasPermission('coffre', 'transfert.validate');
   const canExecute = hasPermission('coffre', 'transfert.execute');
   const canConfigure = hasPermission('coffre', 'config.view') || hasPermission('coffre', 'config.edit');
+  const canSupervise = hasPermission('coffre', 'supervision.view') || hasPermission('admin', 'access');
+
 
   const [activeTab, setActiveTab] = useState('operations');
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
@@ -485,6 +489,18 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                Historique
              </div>
            </button>
+           {canSupervise && (
+           <button
+             onClick={() => setActiveTab('supervision')}
+             className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${activeTab === 'supervision' ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+           >
+             <div className="flex items-center gap-2">
+               <Shield size={16} />
+               <span className="hidden sm:inline">Supervision</span>
+               <span className="sm:hidden">Sup.</span>
+             </div>
+           </button>
+           )}
            {canConfigure && (
            <button
              onClick={() => setActiveTab('admin')}
@@ -502,6 +518,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
       {activeTab === 'admin' ? (
         <CoffreAdminPanel agenceId={agenceId} />
+      ) : activeTab === 'supervision' ? (
+        <TreasurySupervision />
       ) : activeTab === 'intercoffres' ? (
         <TransfertInterCoffresModule
           onBack={() => setActiveTab('operations')}

@@ -324,7 +324,10 @@ async function recalculateClientSavings(tx: PgTransaction<any, any, any>, client
 
         // Update client
         await tx.update(clients)
-            .set({ epargneTotal: total.toString() })
+            .set({ 
+                epargneTotal: total.toString(),
+                updatedAt: new Date()
+            })
             .where(eq(clients.id, clientId));
     } catch (error) {
         console.error(`Error calculating savings for client ${clientId}:`, error);
@@ -388,7 +391,8 @@ export async function updateSessionSolde(
 ): Promise<string> {
   const [updated] = await tx.update(sessionsCaisse)
     .set({ 
-      soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${delta}` 
+      soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${delta}`,
+      updatedAt: new Date()
     })
     .where(eq(sessionsCaisse.id, sessionId))
     .returning({ solde: sessionsCaisse.soldeTheorique });

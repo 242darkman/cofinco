@@ -225,6 +225,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
             agenceId={currentUser?.agenceId || selectedAgence || 'centrale'} 
           />
         );
+
       case 'transfert':
         return <TransfertArgent />;
       case 'bourse':

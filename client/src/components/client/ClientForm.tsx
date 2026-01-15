@@ -132,7 +132,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     if (isAdmin) {
       const loadAgences = async () => {
         try {
-          const data = await agenceApi.getAll();
+          const data = await agenceApi.getAll({ statut: 'Actif' });
           setAgences(data);
         } catch (error) {
           console.error('Erreur chargement agences:', error);

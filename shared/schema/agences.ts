@@ -27,6 +27,7 @@ export const agences = pgTable("agences", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
 export const insertAgenceSchema = createInsertSchema(agences).omit({ id: true, createdAt: true, updatedAt: true });

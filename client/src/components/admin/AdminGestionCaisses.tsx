@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Card, Button, FormField, SelectField, Badge, Modal, ConfirmDialog, Pagination } from '../ui';
 import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
-import { api } from '../../lib/api';
+import { api, caisseApi } from '../../lib/api-client';
 
 // Types
 interface Caisse {
@@ -34,7 +34,7 @@ export default function AdminGestionCaisses() {
     queryKey: ['agences'],
     queryFn: async () => {
        const res = await api.get('/agences');
-       return (res.data as any[]) || [];
+       return (res as any[]) || [];
     },
     enabled: isAdmin
   });
@@ -67,7 +67,7 @@ export default function AdminGestionCaisses() {
         // Assuming we have a way to get users by agency. 
         // Failing that, we fetch all and filter.
         const res = await api.get<any[]>('/users'); 
-        return (res.data || []).filter((u: any) => u.agence === user?.agence && u.role !== 'admin' && u.role !== 'Administrateur');
+        return (res || []).filter((u: any) => u.agence === user?.agence && u.role !== 'admin' && u.role !== 'Administrateur');
     },
     enabled: isAssignModalOpen
   });
@@ -76,8 +76,9 @@ export default function AdminGestionCaisses() {
   const assignMutation = useMutation({
       mutationFn: async ({ caisseId, userIds }: { caisseId: string, userIds: string[] }) => {
           const res = await api.post(`/caisses/${caisseId}/assign`, { userIds });
-          if (res.error) throw new Error(res.error);
-          return res.data;
+          // Note: api.post returns parsed JSON, so we check for error property if backend returns { error: ... } on 200/201?
+          // Actually api-client throws on error status. So here res is success data.
+          return res;
       },
       onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ['caisses'] });
@@ -114,7 +115,7 @@ export default function AdminGestionCaisses() {
     queryFn: async () => {
        const endpoint = isAdmin ? '/caisses' : `/agences/${user?.agenceId}/caisses`;
        const res = await api.get<Caisse[]>(endpoint);
-       return res.data || [];
+       return res || [];
     },
     enabled: !!user?.agenceId || isAdmin
   });
@@ -123,8 +124,7 @@ export default function AdminGestionCaisses() {
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await api.post('/caisses', data);
-      if (res.error) throw new Error(res.error);
-      return res.data;
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['caisses'] });
@@ -139,9 +139,7 @@ export default function AdminGestionCaisses() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-        const res = await api.delete(`/caisses/${id}`);
-        if (res.error) throw new Error(res.error);
-        return res.data;
+        await caisseApi.delete(id);
     },
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['caisses'] });
@@ -152,14 +150,45 @@ export default function AdminGestionCaisses() {
     }
   });
 
-  const handleDelete = (id: string, nom: string) => {
-      openConfirm({
-          title: "Supprimer la caisse",
-          message: `Êtes-vous sûr de vouloir supprimer la caisse "${nom}" ? Cette action est irréversible et impossible si la caisse a de l'historique.`,
-          variant: 'danger',
-          confirmText: "Supprimer",
-          onConfirm: () => deleteMutation.mutate(id)
-      });
+  const liquidateMutation = useMutation({
+    mutationFn: async (id: string) => {
+        await caisseApi.liquidate(id);
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['caisses'] });
+        toast.success('Caisse liquidée et supprimée');
+    },
+    onError: (err: any) => {
+        toast.error(err.message || "Erreur lors de la liquidation");
+    }
+  });
+
+  const handleDelete = (caisse: Caisse) => {
+      // Check status
+      if (caisse.statut === 'Ouverte') {
+          toast.error("Impossible de supprimer une caisse ouverte. Veuillez d'abord fermer la session.");
+          return;
+      }
+
+      const balance = Number(caisse.solde);
+      
+      if (balance > 0) {
+          openConfirm({
+              title: "Liquider et Supprimer ?",
+              message: `Cette caisse contient ${balance.toLocaleString()} FCFA. Voulez-vous transférer ces fonds au coffre de l'agence et supprimer définitivement la caisse ?`,
+              variant: 'danger',
+              confirmText: "Liquider et Supprimer",
+              onConfirm: () => liquidateMutation.mutate(caisse.id)
+          });
+      } else {
+          openConfirm({
+              title: "Supprimer la caisse",
+              message: `Êtes-vous sûr de vouloir supprimer la caisse "${caisse.nom}" ? Cette action est irréversible.`,
+              variant: 'danger',
+              confirmText: "Supprimer",
+              onConfirm: () => deleteMutation.mutate(caisse.id)
+          });
+      }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -217,9 +246,9 @@ export default function AdminGestionCaisses() {
              <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => handleDelete(caisse.id, caisse.nom)}
+                onClick={() => handleDelete(caisse)}
                 className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-8"
-                title="Supprimer définitivement"
+                title="Supprimer ou Liquider"
              >
                 <Trash2 size={15} className="mr-1.5" />
                 <span className="text-xs font-medium">Supprimer</span>
@@ -341,7 +370,7 @@ export default function AdminGestionCaisses() {
                   label="Agence"
                   name="agenceId"
                   required
-                  options={agences.map(a => ({ value: a.id, label: a.nom }))}
+                  options={agences.filter((a: any) => a.statut === 'Actif').map((a: any) => ({ value: a.id, label: a.nom }))}
                   value={formData.agenceId}
                   onChange={e => setFormData({...formData, agenceId: e.target.value})}
                 />

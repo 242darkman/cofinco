@@ -8,7 +8,7 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { storage } from "../storage";
 
-import { requireAuth } from "../auth";
+import { requireAuth, requireRole } from "../auth";
 
 export const coffreRouter = Router();
 const service = new TransfertCoffreService();
@@ -204,6 +204,130 @@ coffreRouter.post(
     }
   }
 );
+
+// 5. SUPERVISION TREASURY (Super-Admin)
+coffreRouter.get("/supervision", requireRole("admin", "Administrateur", "admin_generale"), async (req, res) => {
+  try {
+    // 1. Get all safes with Agency Info
+    const allCoffres = await db.select({
+        id: schema.coffresForts.id,
+        nom: schema.coffresForts.nom,
+        solde: schema.coffresForts.solde,
+        agenceId: schema.coffresForts.ownerId,
+        agenceNom: schema.agences.nom,
+        ville: schema.agences.ville
+    })
+    .from(schema.coffresForts)
+    .leftJoin(schema.agences, eq(schema.coffresForts.ownerId, schema.agences.id));
+
+    // 2. Calculate Global Stats
+    const totalSolde = allCoffres.reduce((acc, c) => acc + Number(c.solde), 0);
+    
+    // 3. Breakdown by Agency
+    const breakdown = allCoffres.map(c => ({
+        agenceId: c.agenceId,
+        agenceNom: c.agenceNom,
+        ville: c.ville,
+        solde: Number(c.solde)
+    })).sort((a, b) => b.solde - a.solde);
+
+    // 4. History (Last 30 Days) - Reconstructed from current balance backwards
+    // Fetch all movements involving any coffre in the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const coffreIds = allCoffres.map(c => c.id);
+    
+    // Safety check: if no coffres, return empty history
+    let history: any[] = [];
+    
+    if (coffreIds.length > 0) {
+        const movements = await db.select({
+            date: schema.mouvementsFinanciers.dateOperation,
+            montant: schema.mouvementsFinanciers.montant,
+            sens: schema.mouvementsFinanciers.sens,
+            sourceId: schema.mouvementsFinanciers.sourceId,
+            metadata: schema.mouvementsFinanciers.metadata
+        })
+        .from(schema.mouvementsFinanciers)
+        .where(
+            and(
+                sql`${schema.mouvementsFinanciers.dateOperation} >= ${thirtyDaysAgo}`,
+                 // Check if sourceId OR metadata->destinationId matches any coffre
+                sql`(${schema.mouvementsFinanciers.sourceId} IN ${coffreIds} OR ${schema.mouvementsFinanciers.metadata}->>'destinationId' IN ${coffreIds})`
+            )
+        )
+        .orderBy(desc(schema.mouvementsFinanciers.dateOperation));
+
+        // Group by day (YYYY-MM-DD)
+        const dailyNetChange: Record<string, number> = {};
+        
+        movements.forEach(m => {
+            const dateKey = new Date(m.date!).toISOString().split('T')[0];
+            const amount = Number(m.montant);
+            
+            if (!dailyNetChange[dateKey]) dailyNetChange[dateKey] = 0;
+
+            // Logic:
+            // If movement is TODAY, it contributed to Current Balance.
+            // If we go BACKWARDS, we need to REVERSE the operation to get Yesterday's Closing Balance.
+            // Closing(Yesterday) = Closing(Today) - NetChange(Today)
+            
+            // NetChange definition for a Coffer:
+            // IN (Credit) = +Amount
+            // OUT (Debit) = -Amount
+            
+            // Checking movement direction relative to Coffres:
+            let change = 0;
+            // Robust check using metadata or sourceId
+            const destId = (m.metadata as any)?.destinationId;
+            const srcId = m.sourceId;
+
+            if (coffreIds.includes(destId)) {
+                 // Money CAME IN (Credit)
+                 change = amount;
+            } else if (coffreIds.includes(srcId as string)) {
+                 // Money WENT OUT (Debit)
+                 change = -amount;
+            }
+            
+            dailyNetChange[dateKey] += change;
+        });
+
+        // Reconstruct
+        const today = new Date();
+        let runningBalance = totalSolde;
+        
+        for (let i = 0; i < 30; i++) {
+            const day = new Date();
+            day.setDate(today.getDate() - i);
+            const dateKey = day.toISOString().split('T')[0];
+            
+            history.push({
+                date: dateKey,
+                balance: runningBalance
+            });
+            
+            // Prepare for previous day: subtract today's net change
+            // Closing(Yesterday) = Closing(Today) - Change(Today)
+            const changeToday = dailyNetChange[dateKey] || 0;
+            runningBalance -= changeToday;
+        }
+        
+        history.reverse(); // Show oldest to newest
+    }
+
+    res.json({
+        globalBalance: totalSolde,
+        breakdown,
+        history
+    });
+
+  } catch (e: any) {
+    console.error("Supervision Error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // 5. Lister les transferts (Filtres)
 coffreRouter.get("/transferts", async (req, res) => {

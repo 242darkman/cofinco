@@ -6,6 +6,7 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { agenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { AgencyMigrationWizard } from '../agences/AgencyMigrationWizard';
 
 interface Agence {
   id: string;
@@ -44,6 +45,8 @@ export default function AdminGestionAgences() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingAgence, setEditingAgence] = useState<Agence | null>(null);
+  const [showMigration, setShowMigration] = useState(false);
+  const [migrationAgence, setMigrationAgence] = useState<Agence | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatut, setFilterStatut] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
@@ -114,7 +117,14 @@ export default function AdminGestionAgences() {
     }
   }, [editingAgence, formData, loadAgences]);
 
-  const handleDelete = useCallback((id: string) => {
+  const handleDelete = useCallback((agence: Agence) => {
+    // Check if agency has data that requires migration
+    if (agence.nombreClients > 0 || agence.nombreEmployes > 0) {
+      setMigrationAgence(agence);
+      setShowMigration(true);
+      return;
+    }
+
     openConfirm({
       title: 'Supprimer cette agence ?',
       message: 'Cette action est irréversible. Êtes-vous sûr de vouloir supprimer cette agence ?',
@@ -123,7 +133,7 @@ export default function AdminGestionAgences() {
       onConfirm: async () => {
         setLoading(true);
         try {
-          await agenceApi.delete(id);
+          await agenceApi.delete(agence.id);
           toast.success('Agence supprimée avec succès');
           loadAgences();
         } catch (error) {
@@ -325,7 +335,7 @@ export default function AdminGestionAgences() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(agence.id)}
+                      onClick={() => handleDelete(agence)}
                       className="p-2 text-red-400 hover:text-red-300"
                     >
                       <Trash2 size={16} />
@@ -604,6 +614,22 @@ export default function AdminGestionAgences() {
         variant={confirmState.variant}
         confirmText={confirmState.confirmText}
       />
+
+      {migrationAgence && (
+        <AgencyMigrationWizard
+          isOpen={showMigration}
+          onClose={() => {
+            setShowMigration(false);
+            setMigrationAgence(null);
+          }}
+          sourceAgence={migrationAgence}
+          onSuccess={() => {
+            loadAgences();
+            setShowMigration(false);
+            setMigrationAgence(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -164,6 +164,32 @@ export const authApi = {
     }),
 };
 
+// Generic API
+export const api = {
+  get: <T>(endpoint: string) => request<T>(endpoint),
+  post: <T>(endpoint: string, data?: any) => request<T>(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  patch: <T>(endpoint: string, data?: any) => request<T>(endpoint, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  delete: <T>(endpoint: string) => request<T>(endpoint, {
+    method: 'DELETE',
+  }),
+};
+
+// Caisse API (Admin Management)
+export const caisseApi = {
+  liquidate: (id: string) => request<any>(`/caisses/${id}/liquidate`, {
+    method: 'POST',
+  }),
+  delete: (id: string) => request<void>(`/caisses/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
 // Client API
 export const clientApi = {
   getAll: () => request<any[]>('/clients'),
@@ -660,7 +686,12 @@ export const echeanceCreditApi = {
 
 // Agences API
 export const agenceApi = {
-  getAll: () => request<any[]>('/agences'),
+  getAll: (params?: { statut?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.statut) queryParams.append('statut', params.statut);
+    const query = queryParams.toString();
+    return request<any[]>(`/agences${query ? `?${query}` : ''}`);
+  },
   getById: (id: string) => request<any>(`/agences/${id}`),
   create: (data: any) => request<any>('/agences', {
     method: 'POST',

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import * as schema from "@shared/schema";
 import {
   insertCreditSchema,
   insertDemandeCreditSchema,
@@ -33,7 +34,7 @@ import {
   type DureeUnite
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import * as sessionService from "../services/caisse/session-service";
 
 export function registerFinanceRoutes(app: Express) {
@@ -2087,6 +2088,112 @@ export function registerFinanceRoutes(app: Express) {
     } catch (error: any) {
        console.error("Payment Error", error);
        res.status(500).json({ message: error.message });
+    }
+  });
+
+
+  // ==========================================
+  // CAISSE LIQUIDATION & DELETION
+  // ==========================================
+
+  // LIQUIDATION CAISSE
+  app.post("/api/caisses/:id/liquidate", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).session?.userId;
+
+      // 1. Get Caisse
+      const [caisse] = await db.select().from(schema.caisses).where(eq(schema.caisses.id, id));
+      if (!caisse) return res.status(404).json({ error: "Caisse not found" });
+
+      if (caisse.statut === 'Fermée') {
+         // If already closed, check balance. If 0, just delete.
+         if (Number(caisse.solde) === 0) {
+            await db.delete(schema.caisses).where(eq(schema.caisses.id, id));
+            return res.json({ message: "Caisse fermée et vide supprimée." });
+         }
+      }
+
+      // 2. Get Agency Safe (Coffre-Fort)
+      const [coffre] = await db.select()
+        .from(schema.coffresForts)
+        .where(eq(schema.coffresForts.ownerId, caisse.agenceId));
+      
+      if (!coffre) return res.status(400).json({ error: "Aucun coffre-fort trouvé pour cette agence." });
+
+      // 3. Transfer Balance Logique
+      const amount = Number(caisse.solde);
+      
+      await db.transaction(async (tx) => {
+        if (amount > 0) {
+            // Debit Caisse
+            await tx.update(schema.caisses)
+                .set({ solde: "0" })
+                .where(eq(schema.caisses.id, id));
+
+            // Credit Coffre
+            await tx.update(schema.coffresForts)
+                .set({ solde: sql`${schema.coffresForts.solde} + ${amount}` })
+                .where(eq(schema.coffresForts.id, coffre.id));
+
+            // Mouvement
+            await tx.insert(schema.mouvementsFinanciers).values({
+                typeMouvement: "LIQUIDATION_CAISSE",
+                montant: amount.toString(),
+                sourceId: caisse.id,
+                destinationId: coffre.id,
+                status: "COMPLETED",
+                description: `Liquidation Caisse ${caisse.nom} -> Coffre`,
+                createdBy: userId,
+                sens: "SORTIE",
+                sourceModule: "CAISSE",
+                agenceId: caisse.agenceId
+            } as any);
+        }
+
+        // 4. Delete Caisse
+        await tx.delete(schema.caisses).where(eq(schema.caisses.id, id));
+      });
+
+      await logAudit(req, "LIQUIDATE", "caisses", id, { amount });
+
+      res.json({ message: "Caisse liquidée et supprimée avec succès." });
+
+    } catch (e: any) {
+      console.error("Erreur liquidation:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE CAISSE - Validated
+  app.delete("/api/caisses/:id", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [caisse] = await db.select().from(schema.caisses).where(eq(schema.caisses.id, id));
+        
+        if (!caisse) return res.status(404).json({ error: "Caisse not found" });
+
+        // Check conditions
+        if (caisse.statut === 'Ouverte') {
+            return res.status(400).json({ 
+                error: "Impossible de supprimer une caisse ouverte.", 
+                code: "CAISSE_OPEN" 
+            });
+        }
+
+        if (Number(caisse.solde) > 0) {
+             return res.status(400).json({ 
+                error: "Cette caisse contient encore des fonds. Utilisez l'option 'Liquider' pour transférer les fonds au coffre avant suppression.", 
+                code: "CAISSE_HAS_FUNDS" 
+            });
+        }
+
+        await db.delete(schema.caisses).where(eq(schema.caisses.id, id));
+        await logAudit(req, "DELETE", "caisses", id, {});
+
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
     }
   });
 

@@ -132,6 +132,7 @@ export const demandesCredit = pgTable(
 
     createdBy: uuid("created_by"),
     createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"),
     
     // Reevaluation tracking
@@ -148,7 +149,7 @@ export const demandesCredit = pgTable(
   }),
 );
 
-export const insertDemandeCreditSchema = createInsertSchema(demandesCredit).omit({ id: true, createdAt: true, deletedAt: true });
+export const insertDemandeCreditSchema = createInsertSchema(demandesCredit).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertDemandeCredit = z.infer<typeof insertDemandeCreditSchema>;
 export type DemandeCredit = typeof demandesCredit.$inferSelect;
 
@@ -238,6 +239,9 @@ export const remboursements = pgTable(
 
     annulledAt: timestamp("annulled_at"),
     reversedAt: timestamp("reversed_at"),
+
+    updatedAt: timestamp("updated_at").defaultNow(),
+    deletedAt: timestamp("deleted_at"), // Soft delete
   },
   (t) => ({
     idxCredit: index("idx_remboursements_credit_id").on(t.creditId),
@@ -249,7 +253,7 @@ export const remboursements = pgTable(
   }),
 );
 
-export const insertRemboursementSchema = createInsertSchema(remboursements).omit({ id: true, createdAt: true });
+export const insertRemboursementSchema = createInsertSchema(remboursements).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertRemboursement = z.infer<typeof insertRemboursementSchema>;
 export type Remboursement = typeof remboursements.$inferSelect;
 
@@ -630,6 +634,7 @@ export const caisses = pgTable("caisses", {
   // Optional: link to a specific device or location?
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
 export const insertCaisseSchema = createInsertSchema(caisses).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertCaisse = z.infer<typeof insertCaisseSchema>;
@@ -656,9 +661,11 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   timeoutAt: timestamp("timeout_at"), // Date d'expiration prévue
   closedReason: text("closed_reason").default("manual"), // manual, timeout, admin
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertSessionCaisseSchema = createInsertSchema(sessionsCaisse).omit({ id: true, createdAt: true });
+export const insertSessionCaisseSchema = createInsertSchema(sessionsCaisse).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertSessionCaisse = z.infer<typeof insertSessionCaisseSchema>;
 export type SessionCaisse = typeof sessionsCaisse.$inferSelect;
 
@@ -692,6 +699,9 @@ export const operationsCaisse = pgTable(
 
     annulledAt: timestamp("annulled_at"),
     reversedAt: timestamp("reversed_at"),
+
+    updatedAt: timestamp("updated_at").defaultNow(),
+    deletedAt: timestamp("deleted_at"), // Soft delete
   },
   (t) => ({
     idxSessionDate: index("idx_operations_caisse_session_date").on(t.sessionId, t.createdAt),
@@ -703,7 +713,7 @@ export const operationsCaisse = pgTable(
   }),
 );
 
-export const insertOperationCaisseSchema = createInsertSchema(operationsCaisse).omit({ id: true, createdAt: true });
+export const insertOperationCaisseSchema = createInsertSchema(operationsCaisse).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertOperationCaisse = z.infer<typeof insertOperationCaisseSchema>;
 export type OperationCaisse = typeof operationsCaisse.$inferSelect;
 

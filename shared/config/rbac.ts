@@ -134,7 +134,7 @@ export type PermissionConfig = {
 
 export const ROLE_PERMISSIONS: PermissionConfig = {
   'Administrateur': {
-    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide', 'caisseagent.approve', 'caisseagent.reject']
+    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide', 'caisseagent.approve', 'caisseagent.reject', 'supervision.view']
   },
   "Chef d'Agence": {
     'clients': ['view', 'create', 'edit', 'delete'],
@@ -410,6 +410,7 @@ export const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string
     { name: 'Exécuter transfert', code: 'coffre.transfert.execute', description: 'Exécuter un transfert validé' },
     { name: 'Voir configuration', code: 'coffre.config.view', description: 'Voir la configuration du coffre' },
     { name: 'Modifier configuration', code: 'coffre.config.edit', description: 'Modifier la configuration du coffre' },
+    { name: 'Supervision Trésorerie', code: 'coffre.supervision.view', description: 'Vue globale trésorerie' },
   ],
 };
 

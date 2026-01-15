@@ -347,6 +347,7 @@ const translations: Translations = {
   menuRH: { fr: 'RH', en: 'HR' },
   menuComptabilite: { fr: 'Comptabilité', en: 'Accounting' },
   menuRapports: { fr: 'Rapports', en: 'Reports' },
+  menuTresorerieSupervision: { fr: 'Supervision Trésorerie', en: 'Treasury Supervision' },
   menuParametres: { fr: 'Paramètres', en: 'Settings' },
   menuAdministrateur: { fr: 'Administrateur', en: 'Administrator' },
   menuAdmin: { fr: 'Administration', en: 'Administration' },

@@ -141,9 +141,11 @@ export const prospections = pgTable("prospections", {
   observations: text("observations"),
   dateProspection: timestamp("date_prospection").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertProspectionSchema = createInsertSchema(prospections).omit({ id: true, createdAt: true });
+export const insertProspectionSchema = createInsertSchema(prospections).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertProspection = z.infer<typeof insertProspectionSchema>;
 export type Prospection = typeof prospections.$inferSelect;
 
@@ -164,9 +166,11 @@ export const visitesTerrain = pgTable("visites_terrain", {
   longitude: numeric("longitude"),
   statut: text("statut").notNull().default("Planifiée"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertVisiteTerrainSchema = createInsertSchema(visitesTerrain).omit({ id: true, createdAt: true });
+export const insertVisiteTerrainSchema = createInsertSchema(visitesTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertVisiteTerrain = z.infer<typeof insertVisiteTerrainSchema>;
 export type VisiteTerrain = typeof visitesTerrain.$inferSelect;
 
@@ -215,6 +219,8 @@ export const paiementsTerrain = pgTable(
 
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    deletedAt: timestamp("deleted_at"), // Soft delete
   },
   (t) => ({
     idxAgentDate: index("idx_paiements_terrain_agent_date").on(t.agentId, t.createdAt),
@@ -239,7 +245,7 @@ export const paiementsTerrain = pgTable(
 );
 
 
-export const insertPaiementTerrainSchema = createInsertSchema(paiementsTerrain).omit({ id: true, createdAt: true });
+export const insertPaiementTerrainSchema = createInsertSchema(paiementsTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertPaiementTerrain = z.infer<typeof insertPaiementTerrainSchema>;
 export type PaiementTerrain = typeof paiementsTerrain.$inferSelect;
 

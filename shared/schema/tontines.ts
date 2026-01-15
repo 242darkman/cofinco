@@ -81,10 +81,11 @@ export const membresTontine = pgTable("membres_tontine", {
   aRecuBenefice: boolean("a_recu_benefice").default(false),
   dateBenefice: timestamp("date_benefice"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertMembreTontineSchema = createInsertSchema(membresTontine).omit({ id: true, createdAt: true, deletedAt: true });
+export const insertMembreTontineSchema = createInsertSchema(membresTontine).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertMembreTontine = z.infer<typeof insertMembreTontineSchema>;
 export type MembreTontine = typeof membresTontine.$inferSelect;
 
@@ -114,6 +115,8 @@ export const contributionsTontine = pgTable(
     observations: text("observations"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    deletedAt: timestamp("deleted_at"), // Soft delete
   },
   (t) => ({
     idxTontineDate: index("idx_contributions_tontine_tontine_date").on(t.tontineId, t.createdAt),
@@ -124,7 +127,9 @@ export const contributionsTontine = pgTable(
   }),
 );
 
-export const insertContributionTontineSchema = createInsertSchema(contributionsTontine).omit({ id: true, createdAt: true });
+export const insertContributionTontineSchema = createInsertSchema(contributionsTontine, {
+  montant: z.coerce.string(),
+}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertContributionTontine = z.infer<typeof insertContributionTontineSchema>;
 export type ContributionTontine = typeof contributionsTontine.$inferSelect;
 
@@ -138,7 +143,9 @@ export const tontineRegles = pgTable("tontine_regles", {
   actif: boolean("actif").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
-export const insertTontineRegleSchema = createInsertSchema(tontineRegles).omit({ id: true, createdAt: true });
+export const insertTontineRegleSchema = createInsertSchema(tontineRegles, {
+  montantPenalite: z.coerce.string(),
+}).omit({ id: true, createdAt: true });
 export type InsertTontineRegle = z.infer<typeof insertTontineRegleSchema>;
 export type TontineRegle = typeof tontineRegles.$inferSelect;
 
@@ -154,8 +161,12 @@ export const tontinePenalites = pgTable("tontine_penalites", {
   datePaiement: timestamp("date_paiement"),
   motif: text("motif"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
-export const insertTontinePenaliteSchema = createInsertSchema(tontinePenalites).omit({ id: true, createdAt: true });
+export const insertTontinePenaliteSchema = createInsertSchema(tontinePenalites, {
+  montant: z.coerce.string(),
+}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertTontinePenalite = z.infer<typeof insertTontinePenaliteSchema>;
 export type TontinePenalite = typeof tontinePenalites.$inferSelect;
 
@@ -171,8 +182,12 @@ export const tontineDistributions = pgTable("tontine_distributions", {
   referencePaiement: text("reference_paiement"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // Soft delete
 });
-export const insertTontineDistributionSchema = createInsertSchema(tontineDistributions).omit({ id: true, createdAt: true });
+export const insertTontineDistributionSchema = createInsertSchema(tontineDistributions, {
+  montantTotal: z.coerce.string(),
+}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertTontineDistribution = z.infer<typeof insertTontineDistributionSchema>;
 export type TontineDistribution = typeof tontineDistributions.$inferSelect;
 
