@@ -154,6 +154,11 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
   const handleQuickAction = (action: string) => {
     switch (action) {
 
+      case 'new-client':
+        setCurrentModule('clients');
+        setCurrentSubModule('new');
+        break;
+
       case 'new-credit':
         setShowCreditRequestForm(true);
         break;
@@ -197,7 +202,8 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
       case 'dashboard':
         return renderDashboard();
       case 'clients':
-        return <ClientModule onModuleChange={handleModuleChange} />;
+
+        return <ClientModule onModuleChange={handleModuleChange} activeSubModule={currentSubModule} />;
       case 'tontines':
         return <Tontines />;
       case 'credits':

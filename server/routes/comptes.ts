@@ -23,7 +23,7 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { z } from "zod";
 import comptesService, { CompteError } from "../services/comptes";
 import { storage } from "../storage";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { comptes } from "@shared/schema";
 
@@ -82,6 +82,55 @@ export function registerComptesRoutes(app: Express) {
   // ============================================================================
   // CREATE COMPTE
   // ============================================================================
+
+  // ============================================================================
+  // STATS
+  // ============================================================================
+
+  /**
+   * GET /api/comptes/stats - Statistiques globales des comptes
+   */
+  app.get(
+    "/api/comptes/stats",
+    requireAuth,
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        const agenceId = req.selectedAgenceId;
+        
+        const conditions = [eq(comptes.statut, "Actif")];
+        
+        if (agenceId) {
+           conditions.push(eq(comptes.agenceId, agenceId));
+        }
+        
+        const whereClause = and(...conditions);
+
+        const allStats = await db.select({
+            typeCompte: comptes.typeCompte,
+            count: sql<number>`count(*)`.mapWith(Number),
+            totalSolde: sql<number>`sum(${comptes.soldeCourant})`.mapWith(Number)
+        })
+        .from(comptes)
+        .where(whereClause)
+        .groupBy(comptes.typeCompte);
+
+        // Format for frontend
+        const result = {
+          total: allStats.reduce((sum, s) => sum + s.count, 0),
+          epargne: allStats.find(s => s.typeCompte === "Épargne")?.count || 0,
+          courant: allStats.find(s => s.typeCompte === "Courant")?.count || 0,
+          bloque: allStats.find(s => s.typeCompte === "Bloqué")?.count || 0,
+          totalSolde: allStats.reduce((sum, s) => sum + (s.totalSolde || 0), 0)
+        };
+
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching account stats:", error);
+        res.status(500).json({ message: "Erreur lors du chargement des statistiques" });
+      }
+    }
+  );
 
   /**
    * POST /api/comptes - Créer un nouveau compte

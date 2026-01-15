@@ -166,14 +166,53 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     }
   };
 
-  const stats = useMemo(() => ({
-    totalComptes: totalComptes,
-    comptesActifs: comptesFiltered.filter(c => c.statut === 'Actif').length,
-    soldeTotal: comptesFiltered.reduce((sum, c) => sum + getSolde(c), 0),
-    comptesEpargne: totalComptes, // Server already filters by type
-    comptesCourant: totalComptes,
-    tauxMoyen: 0 // Taux not applicable for comptes courants
-  }), [comptesFiltered, totalComptes]);
+  const [accountStats, setAccountStats] = useState({ total: 0, epargne: 0, courant: 0, bloque: 0, totalSolde: 0 });
+  
+  // Load stats separately
+  const loadStats = useCallback(async () => {
+    try {
+      const stats = await compteEpargneApi.getStats();
+      setAccountStats(stats);
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  // Refresh stats when accounts change (e.g. after create/update)
+  useEffect(() => {
+    if (!loading) loadStats();
+  }, [loading, loadStats]);
+
+  const stats = useMemo(() => {
+    let activeTotal = accountStats.total;
+    let activeLabel = 'actifs';
+
+    // Context-aware total based on active tab
+    if (activeTab === 'courant') {
+      activeTotal = accountStats.courant;
+      activeLabel = 'courants';
+    } else if (activeTab === 'epargne') {
+      activeTotal = accountStats.epargne;
+      activeLabel = 'épargnes';
+    } else if (activeTab === 'bloques') {
+      activeTotal = accountStats.bloque;
+      activeLabel = 'bloqués';
+    }
+    
+    return {
+      totalComptes: activeTotal,
+      activeLabel: activeLabel,
+      comptesActifs: 0, 
+      soldeTotal: accountStats.totalSolde,
+      comptesEpargne: accountStats.epargne,
+      comptesCourant: accountStats.courant,
+      tauxMoyen: 0
+    };
+  }, [accountStats, activeTab]);
 
   const handleTransaction = (compte: Compte, type: 'Dépôt' | 'Retrait') => {
     // Ensure the compte has valid client data before proceeding
@@ -333,7 +372,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
                   value={stats.totalComptes} 
                   icon={Users} 
                   color="primary"
-                  subtitle={`${stats.comptesActifs} actifs`}
+                  subtitle={`${stats.totalComptes} ${stats.activeLabel}`}
                 />
               </div>
               <div className="w-[220px] md:w-auto">

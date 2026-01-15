@@ -327,6 +327,7 @@ export const compteEpargneApi = {
       `/comptes${query ? `?${query}` : ''}`
     );
   },
+  getStats: () => request<{ total: number; epargne: number; courant: number; bloque: number; totalSolde: number }>('/comptes/stats'),
   getByClient: (clientId: string) => request<any[]>(`/clients/${clientId}/comptes`),
   getById: (id: string) => request<any>(`/comptes/${id}`),
   create: (data: any) => request<any>('/comptes', {

@@ -25,9 +25,10 @@ import { formatClientName } from '../../lib/format';
 
 interface ClientModuleProps {
   onModuleChange?: (module: string, subModule?: string, data?: any) => void;
+  activeSubModule?: string;
 }
 
-export default function ClientModule({ onModuleChange }: ClientModuleProps) {
+export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreateClients = hasPermission('clients', 'create') || hasPermission('clients', 'manage');
@@ -39,6 +40,13 @@ export default function ClientModule({ onModuleChange }: ClientModuleProps) {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+
+  // Handle initial view
+  useEffect(() => {
+    if (activeSubModule === 'new') {
+      setShowForm(true);
+    }
+  }, [activeSubModule]);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
