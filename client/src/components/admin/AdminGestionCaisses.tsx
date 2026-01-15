@@ -7,6 +7,7 @@ import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
 import { ForceCloseModal } from './ForceCloseModal';
+import { useCaisseWebSocket } from '../../hooks/useCaisseWebSocket';
 
 interface Caisse {
   id: string;
@@ -96,7 +97,21 @@ export default function AdminGestionCaisses() {
        const res = await api.get<Caisse[]>(endpoint);
        return res || [];
     },
-    enabled: !!user?.agenceId || isAdmin
+    enabled: !!user?.agenceId || isAdmin,
+    refetchOnWindowFocus: true,
+  });
+
+  // WebSocket for real-time updates
+  useCaisseWebSocket({
+    onCaisseStatusChanged: (event) => {
+      console.log('Caisse status changed:', event);
+      queryClient.invalidateQueries({ queryKey: ['caisses'] });
+    },
+    onSessionForceClosed: (event) => {
+      console.log('Session force closed:', event);
+      queryClient.invalidateQueries({ queryKey: ['caisses'] });
+    },
+    enabled: true,
   });
 
   const createMutation = useMutation({
@@ -297,7 +312,10 @@ export default function AdminGestionCaisses() {
                               <button
                                 onClick={() => {
                                   setSelectedCaisseForClose(caisse);
-                                  setActiveSessionId((caisse as any).sessionId || '');
+                                  // Get sessionId from caisse object - it might be in different formats
+                                  const sid = (caisse as any).sessionId || (caisse as any).currentSessionId || '';
+                                  console.log('Session ID for force close:', sid, 'Caisse:', caisse);
+                                  setActiveSessionId(sid);
                                   setIsForceCloseModalOpen(true);
                                   setOpenMenuId(null);
                                 }}

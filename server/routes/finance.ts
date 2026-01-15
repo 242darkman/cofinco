@@ -993,6 +993,7 @@ export function registerFinanceRoutes(app: Express) {
              solde: currentSolde,
              isOccupied: !!activeSession,
              occupiedBy: activeSession ? activeSession.caissierId : null,
+             sessionId: activeSession ? activeSession.id : null,
              assignments: assignments.map(a => a.userId)
          };
       }));
@@ -1037,6 +1038,7 @@ export function registerFinanceRoutes(app: Express) {
              solde: currentSolde,
              isOccupied: !!activeSession,
              occupiedBy: activeSession ? activeSession.caissierId : null,
+             sessionId: activeSession ? activeSession.id : null,
              assignments: assignments.map(a => a.userId)
          };
       }));
