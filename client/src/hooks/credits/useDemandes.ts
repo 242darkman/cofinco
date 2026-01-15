@@ -23,6 +23,8 @@ export interface DemandeCredit {
     prenom?: string;
     phone: string;
     photo_url?: string;
+    agence?: string;
+    agenceId?: string;
   };
 }
 

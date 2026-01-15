@@ -205,10 +205,13 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     
     let baseQuery = db.select({
       demande: demandesCredit,
-      client: clients
+      client: clients,
+      agence: agences
     })
     .from(demandesCredit)
-    .leftJoin(clients, eq(demandesCredit.clientId, clients.id)).$dynamic();
+    .leftJoin(clients, eq(demandesCredit.clientId, clients.id))
+    .leftJoin(agences, eq(clients.agenceId, agences.id))
+    .$dynamic();
 
     if (conditions.length > 0) {
       baseQuery = baseQuery.where(and(...conditions));
@@ -216,7 +219,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     
     const results = await baseQuery.orderBy(desc(demandesCredit.createdAt));
 
-    return results.map(({ demande, client }) => ({
+    return results.map(({ demande, client, agence }) => ({
       ...demande,
       numero_demande: demande.numeroDemande,
       montant_demande: Number(demande.montantDemande),
@@ -225,7 +228,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
         prenom: client.prenom,
         phone: client.telephone,
         photo_url: client.photoProfile,
-        agence: client.agence,
+        agence: client.agence || agence?.nom,
         agenceId: client.agenceId
       } : undefined
     }));

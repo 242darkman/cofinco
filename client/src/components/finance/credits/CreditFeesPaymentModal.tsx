@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, AlertCircle, CheckCircle, X, Wallet, ArrowRight, Shield, Building, User } from 'lucide-react';
-import { Modal, Button, FormField, SelectField } from '../../ui';
+import { Modal, Button, FormField, SelectField, Badge } from '../../ui';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { formatMoney } from '../../../lib/format';
 import { toast } from 'sonner';
@@ -17,14 +17,27 @@ interface CreditFeesPaymentModalProps {
 
 export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, onNavigate }: CreditFeesPaymentModalProps) {
   const { payerFrais } = useDemandes();
-  const [amount, setAmount] = useState(''); // Obligatoire, pas de montant par défaut
+  
+  // 10% Fees Calculation (Auto-filled)
+  const calculatedFee = (demande.montant_demande || 0) * 0.10;
+
+  const [amount, setAmount] = useState(calculatedFee.toString()); 
   const [method, setMethod] = useState('Espèces');
   const [loading, setLoading] = useState(false);
   
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [paidFacture, setPaidFacture] = useState<any>(null);
-  
+
+  // Sync amount when demande is available
+  useEffect(() => {
+    if (demande?.montant_demande) {
+      const calculatedFee = (demande.montant_demande || 0) * 0.10;
+      setAmount(calculatedFee.toString());
+    }
+  }, [demande?.montant_demande]);
+
   // Session State
   const [checkingSession, setCheckingSession] = useState(true);
   const [userSession, setUserSession] = useState<any>(null); // The user's own session
@@ -188,7 +201,10 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
                          <div className="font-bold text-emerald-400">{formatMoney(demande.montant_demande)}</div>
                     </div>
                 </div>
-                 <div className="text-sm text-slate-400">Client: <span className="text-white font-medium">{demande.clients?.nom} {demande.clients?.prenom}</span> ({demande.clients?.agence})</div>
+                 <div className="text-sm text-slate-400 flex items-center gap-2 mt-2">
+                    Client: <span className="text-white font-medium">{demande.clients?.nom} {demande.clients?.prenom}</span> 
+                    <Badge value={demande.clients?.agence || 'N/A'} variant="neutral" className="text-xs py-0 px-2" />
+                 </div>
             </div>
 
             {checkingSession ? (
@@ -277,29 +293,24 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
                         </div>
                     )}
 
-                    {!showCaisseList && (
+                    {!showCaisseList && !showConfirm && (
                         <>
-                             <FormField label="Montant Frais (FCFA)" name="amount">
-                                <div className="relative">
-                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                    <input 
-                                        name="amount"
-                                        type="number" 
-                                        value={amount} 
-                                        onChange={e => setAmount(e.target.value)}
-                                        placeholder="0"
-                                        required
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-emerald-500"
-                                    />
-                                </div>
-                             </FormField>
+                             <FormField 
+                                label="Montant Frais (10% - Fixe)" 
+                                name="amount"
+                                value={amount ? `${Number(amount).toLocaleString()} FCFA` : ''} 
+                                readOnly
+                                disabled
+                                icon={DollarSign}
+                                className="bg-slate-800/30 border-slate-700/50 text-slate-500 font-bold text-lg opacity-80 cursor-not-allowed"
+                             />
     
                              <div className="space-y-1">
                                 <label className="text-sm font-medium text-slate-300">Méthode de Paiement</label>
                                 <select
                                     value={method}
                                     onChange={(e) => setMethod(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-emerald-500"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2.5 px-3 text-white focus:outline-none focus:border-emerald-500 shadow-sm"
                                 >
                                     <option value="Espèces">Espèces</option>
                                     <option value="Mobile Money">Mobile Money</option>
@@ -311,14 +322,62 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
                                 <Button variant="ghost" onClick={onClose} disabled={loading}>Annuler</Button>
                                 <Button 
                                     variant="primary" 
-                                    onClick={handlePayment} 
+                                    onClick={() => setShowConfirm(true)} 
                                     disabled={loading || !amount || (!activeSession && !isAdmin)}
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[160px]"
                                 >
-                                    {loading ? 'Traitement...' : 'Confirmer Paiement'}
+                                    Suivant
                                 </Button>
                             </div>
                         </>
+                    )}
+
+                    {showConfirm && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 text-center">
+                                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <AlertCircle className="text-emerald-500" size={32} />
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">Confirmation du paiement</h3>
+                                <p className="text-slate-400 text-sm leading-relaxed">
+                                    Vous êtes sur le point de procéder au paiement automatique des frais d'engagement.
+                                </p>
+                            </div>
+
+                            <div className="bg-slate-900/50 rounded-xl border border-slate-700 p-4 space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500">Montant à payer</span>
+                                    <span className="text-white font-bold text-lg">{formatMoney(parseFloat(amount))}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500">Mode de paiement</span>
+                                    <Badge value={method} variant="neutral" />
+                                </div>
+                                <div className="h-px bg-slate-700/50 my-1" />
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-slate-500">Caisse utilisée</span>
+                                    <span className="text-emerald-400 font-medium">{activeSession?.caisse_nom || 'Ma Caisse'}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 justify-end">
+                                <Button 
+                                    variant="ghost" 
+                                    onClick={() => setShowConfirm(false)}
+                                    disabled={loading}
+                                >
+                                    Retour
+                                </Button>
+                                <Button 
+                                    variant="primary" 
+                                    onClick={handlePayment}
+                                    isLoading={loading}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[140px]"
+                                >
+                                    Payer {formatMoney(parseFloat(amount))}
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </div>
             )}
