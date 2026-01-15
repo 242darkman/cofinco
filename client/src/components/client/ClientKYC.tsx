@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, Filter, SortAsc, Image } from 'lucide-react';
 import { Card, Badge } from '../ui';
+import { FileUploadZone } from '../ui/FileUploadZone';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 // Helper to detect image URLs
@@ -290,14 +291,35 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
             </div>
 
             <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">URL du document</label>
-                <input
-                type="text"
-                value={newDoc.url}
-                onChange={(e) => setNewDoc(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none"
-                placeholder="https://..."
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Document</label>
+                <FileUploadZone
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  maxSize={5}
+                  maxFiles={1}
+                  label="Glissez votre document ici"
+                  hint="ou cliquez pour parcourir (PDF, JPG, PNG - max 5MB)"
+                  onFilesSelected={async (files: File[]) => {
+                    if (files.length > 0) {
+                      const file = files[0];
+                      // Convert to base64 for storage
+                      const reader = new FileReader();
+                      reader.onload = (e) => {
+                        const base64 = e.target?.result as string;
+                        setNewDoc(prev => ({ 
+                          ...prev, 
+                          url: base64,
+                          name: prev.name || file.name 
+                        }));
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
                 />
+                {newDoc.url && (
+                  <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
+                    <CheckCircle size={12} /> Document chargé
+                  </p>
+                )}
             </div>
             </div>
 

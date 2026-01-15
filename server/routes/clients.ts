@@ -12,7 +12,7 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from 
 import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, or } from "drizzle-orm";
 import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 
 export function registerClientRoutes(app: Express) {
@@ -635,8 +635,6 @@ export function registerClientRoutes(app: Express) {
   app.post("/api/clients/check-uniqueness", requireAuth, async (req, res) => {
       try {
           const { telephone, email, numeroPiece, excludeClientId } = req.body;
-          const { eq, or, and, ne } = require("drizzle-orm");
-          const { clients } = require("@shared/schema");
 
           const checks = [];
           if (telephone) checks.push(eq(clients.telephone, telephone));
