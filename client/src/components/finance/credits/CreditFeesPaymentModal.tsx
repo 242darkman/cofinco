@@ -29,6 +29,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [paidFacture, setPaidFacture] = useState<any>(null);
+  const [factureId, setFactureId] = useState<string | undefined>(undefined);
 
   // Sync amount when demande is available
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
         if (result.facture) {
           // Show success modal with facture
           setPaidFacture(result.facture);
+          setFactureId(result.facture.id); // Store factureId
           setShowSuccessModal(true);
         }
         onSuccess();
@@ -408,6 +410,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
           devise: 'FCFA',
           notes: `Demande de crédit: ${formatMoney(demande.montant_demande)}`,
         } as ReceiptData}
+        factureId={factureId}
       />
     )}
     </>

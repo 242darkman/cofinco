@@ -75,6 +75,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   // Universal Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
+  const [factureId, setFactureId] = useState<string | undefined>(undefined);
 
   // Billetage State
   const [showBilletage, setShowBilletage] = useState(false);
@@ -996,6 +997,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         }}
         term="Terminer"
         data={receiptData}
+        factureId={factureId}
       />
     </div>
   );

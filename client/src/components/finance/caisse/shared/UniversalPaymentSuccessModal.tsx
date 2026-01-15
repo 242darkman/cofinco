@@ -9,6 +9,7 @@ import { ReceiptData, ReceiptTemplate } from '../../../ui/printable/ReceiptTempl
 import { InvoiceTemplate } from '../../../ui/printable/InvoiceTemplate';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
+import { useReceiptPDF } from '@/hooks/finance/useReceiptPDF';
 import { formatClientName } from '@/lib/format';
 
 interface UniversalPaymentSuccessModalProps {
@@ -16,6 +17,7 @@ interface UniversalPaymentSuccessModalProps {
   onClose: () => void;
   term?: string;
   data?: ReceiptData;
+  factureId?: string; // ID de la facture générée par le backend
 }
 
 // Format money helper
@@ -36,7 +38,8 @@ const copyToClipboard = async (text: string, label: string) => {
 export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModalProps> = ({
   isOpen,
   onClose,
-  data
+  data,
+  factureId
 }) => {
   const [activeTab, setActiveTab] = useState<'ticket' | 'facture'>('ticket');
   const [showDetails, setShowDetails] = useState(false);
@@ -46,6 +49,12 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   // Refs for printing
   const ticketRef = useRef<HTMLDivElement>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
+  
+  // PDF generation hook
+  const { downloadPDF } = useReceiptPDF({
+    filename: data ? `Recu-${data.reference}` : 'recu',
+    format: activeTab === 'ticket' ? 'ticket' : 'a4'
+  });
 
   // Animation sequence
   useEffect(() => {
@@ -380,7 +389,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                   <span>Partager</span>
                 </button>
                 <button
-                  onClick={() => toast.info('Export PDF en cours de développement')}
+                  onClick={() => downloadPDF(activeTab === 'ticket' ? ticketRef : invoiceRef)}
                   className="flex items-center justify-center gap-2 py-3.5 px-4 bg-slate-800/60 hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all border border-slate-700/50 active:scale-[0.98]"
                 >
                   <Download size={16} />

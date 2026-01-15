@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { tontines, membresTontine, contributionsTontine, tontineDistributions, comptes } from "@shared/schema";
+import { tontines, membresTontine, contributionsTontine, tontineDistributions, comptes, transactionsCompte } from "@shared/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { createContributionTontineWithLedger } from "../storage/tontines";
 import { updateTontineSolde, executeWithLedger, updateCompteSolde, generateReference } from "./ledger";
@@ -161,7 +161,7 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
         },
         async (tx, mouvement) => {
             // 1. Debit Account
-            await updateCompteSolde(tx, compte.id, -amount);
+            const nouveauSoldeCompte = await updateCompteSolde(tx, compte.id, -amount);
             
             // 2. Credit Tontine
             await updateTontineSolde(tx, tontine.id, amount);
@@ -177,6 +177,17 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
                 reference: mouvement.reference,
                 statutTransaction: "Posté",
                 mouvementId: mouvement.id
+            });
+            
+            // 4. Create Transaction Record (for account history)
+            await tx.insert(transactionsCompte).values({
+                compteId: compte.id,
+                mouvementId: mouvement.id,
+                typePaiement: "Versement Tontine",
+                montant: amount.toString(),
+                soldeApres: nouveauSoldeCompte,
+                methodePaiement: "Virement",
+                observations: `Contribution automatique Tontine Tour ${tourNumero}`,
             });
             
             // 4. Update Member Stats

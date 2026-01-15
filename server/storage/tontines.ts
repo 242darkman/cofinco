@@ -8,6 +8,7 @@ import { db } from "../db";
 import { eq, desc, and, sql, getTableColumns } from "drizzle-orm";
 
 import { executeWithLedger, updateTontineSolde, updateSessionSolde, validateUserId } from "../services/ledger";
+import { createFactureForContributionTontine } from "./finance";
 
 
 // Tontine Plans
@@ -401,7 +402,25 @@ export async function createContributionTontineWithLedger(
       };
     },
     userId
-  ).then(({ result }) => result);
+  ).then(async ({ result: contribution }) => { // Renamed result to contribution for clarity
+    // Generate receipt for the contribution
+    const [tontine] = await db.select().from(tontines).where(eq(tontines.id, data.tontineId));
+    
+    let facture;
+    if (contribution.clientId) {
+      facture = await createFactureForContributionTontine({
+        tontineId: contribution.tontineId,
+        nomTontine: tontine?.nom || 'Tontine',
+        clientId: contribution.clientId,
+        montant: contribution.montant.toString(),
+        tourNumero: contribution.tourNumero || 1,
+        agentId: userId,
+        sessionCaisseId: sessionCaisseId,
+      });
+    }
+    
+    return { contribution, facture };
+  }).then(({ contribution }) => contribution); // Keep original return type for compatibility
 }
 
 // Règles

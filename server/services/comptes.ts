@@ -29,9 +29,14 @@ import {
   updateCompteSolde,
   updateSessionSolde,
   createOutboxEvent,
+  generateReference,
   type SensMouvement,
   type MouvementFinancier,
 } from "./ledger";
+import {
+  createFactureForDepot,
+  createFactureForRetrait,
+} from "../storage/finance";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Types
@@ -429,7 +434,21 @@ export async function deposerSurCompte(
       };
     },
     userId
-  ).then(({ result, mouvement }) => ({ transaction: result, mouvement }));
+  ).then(async ({ result, mouvement }) => {
+    // Generate receipt for the deposit
+    const facture = await createFactureForDepot({
+      compteId: data.compteId,
+      numeroCompte: compte.numeroCompte,
+      clientId: compte.clientId,
+      montant: data.montant.toString(),
+      typeCompte: compte.typeCompte,
+      agentId: userId,
+      sessionCaisseId: data.sessionCaisseId,
+      transactionId: result.id, // ← NOUVEAU: Lier la facture à la transaction
+    });
+    
+    return { transaction: result, mouvement, facture };
+  });
 }
 
 /**
@@ -529,7 +548,20 @@ export async function retirerDuCompte(
       };
     },
     userId
-  ).then(({ result, mouvement }) => ({ transaction: result, mouvement }));
+  ).then(async ({ result, mouvement }) => {
+    // Generate receipt for the withdrawal
+    const facture = await createFactureForRetrait({
+      compteId: data.compteId,
+      numeroCompte: compte.numeroCompte,
+      clientId: compte.clientId,
+      montant: data.montant.toString(),
+      typeCompte: compte.typeCompte,
+      agentId: userId,
+      sessionCaisseId: data.sessionCaisseId,
+    });
+    
+    return { transaction: result, mouvement, facture };
+  });
 }
 
 // ============================================================================
@@ -840,6 +872,7 @@ export async function getCompteTransactions(compteId: string, limit = 50) {
       referenceExterne: transactionsCompte.referenceExterne,
       solde_apres: transactionsCompte.soldeApres,
       mouvementId: transactionsCompte.mouvementId,
+      factureId: transactionsCompte.factureId, // ← NOUVEAU: Pour les actions de reçu dans l'UI
     })
     .from(transactionsCompte)
     .leftJoin(mouvementsFinanciers, eq(transactionsCompte.mouvementId, mouvementsFinanciers.id))
@@ -861,6 +894,7 @@ export async function getCompteTransactions(compteId: string, limit = 50) {
       sens: finalSens,
       type: t.typePaiement, // Maintain compatibility
       description,
+      factureId: t.factureId, // ← NOUVEAU: Exposé dans l'API
     };
   });
 }

@@ -111,6 +111,7 @@ export default function CaisseDashboard({
   // History Receipt State
   const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
   const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
+  const [historyFactureId, setHistoryFactureId] = useState<string | undefined>(undefined);
 
   // Actual session being used (own or supervised)
   const currentSession = supervisedSession || sessionActive;
@@ -631,9 +632,13 @@ export default function CaisseDashboard({
     <div className="min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
         <UniversalPaymentSuccessModal 
             isOpen={showHistoryReceipt}
-            onClose={() => setShowHistoryReceipt(false)}
+            onClose={() => {
+              setShowHistoryReceipt(false);
+              setHistoryFactureId(undefined);
+            }}
             term="Fermer"
             data={historyReceiptData}
+            factureId={historyFactureId}
         />
         
       <div className="w-full min-h-screen flex flex-col p-4 md:p-6">

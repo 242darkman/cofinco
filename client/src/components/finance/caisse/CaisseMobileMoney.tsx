@@ -46,6 +46,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
   // Success Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
+  const [factureId, setFactureId] = useState<string | undefined>(undefined);
   
   // Security configuration
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
@@ -312,6 +313,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
         onClose={handleCloseSuccess}
         term="Terminer"
         data={receiptData}
+        factureId={factureId}
       />
       <div className="w-full max-w-sm mx-auto">
         <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 shadow-2xl shadow-emerald-900/10 rounded-2xl overflow-hidden ring-1 ring-white/5">

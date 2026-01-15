@@ -300,7 +300,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         client_id: formData.client_id,
         type_compte: formData.type_compte,
         numero_compte: numeroCompte,
-        solde: (paymentValidated || formData.mode_ouverture === 'Transfert interne' ? soldeInitial : 0).toString(),
+        solde_initial: (paymentValidated || formData.mode_ouverture === 'Transfert interne' ? soldeInitial : 0),
         taux_interet: formData.taux_interet,
         mode_ouverture: formData.mode_ouverture,
         montant_ouverture: soldeInitial,

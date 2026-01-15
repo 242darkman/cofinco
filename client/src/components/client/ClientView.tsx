@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { User, CreditCard, Clock, X, Printer } from 'lucide-react';
+import { User, CreditCard, Clock, X, Printer, FileText } from 'lucide-react';
 import { Modal } from '../ui';
 import ClientDetails from './ClientDetails';
 import ClientAccounts from './ClientAccounts';
 import ClientHistory from './ClientHistory';
+import { ClientDocumentsTab } from '../finance/shared/ClientDocumentsTab';
 import { Client } from '@shared/schema';
 import { formatClientName } from '../../lib/format';
 
@@ -13,12 +14,13 @@ interface ClientViewProps {
 }
 
 export default function ClientView({ client, onClose }: ClientViewProps) {
-  const [activeTab, setActiveTab] = useState<'details' | 'accounts' | 'history'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'accounts' | 'history' | 'documents'>('details');
 
   const tabs = [
     { id: 'details', label: "Vue d'ensemble", icon: User },
     { id: 'accounts', label: 'Comptes Bancaires', icon: CreditCard },
     { id: 'history', label: 'Historique & Activité', icon: Clock },
+    { id: 'documents', label: 'Documents', icon: FileText }, // ← NOUVEAU
   ] as const;
 
   return (
@@ -71,6 +73,12 @@ export default function ClientView({ client, onClose }: ClientViewProps) {
           {activeTab === 'history' && (
              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <ClientHistory clientId={client.id} />
+             </div>
+          )}
+          
+          {activeTab === 'documents' && (
+             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                <ClientDocumentsTab clientId={client.id} />
              </div>
           )}
         </div>

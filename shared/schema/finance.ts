@@ -7,6 +7,7 @@ import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
 import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum } from "@shared/enum/enums";
+import { factures } from "./operations";
 
 // Interest Rates
 export const interestRates = pgTable(
@@ -238,6 +239,9 @@ export const remboursements = pgTable(
 
     // Pivot ledger
     mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+    
+    // Reference to generated invoice/receipt
+    factureId: uuid("facture_id").references(() => factures.id, { onDelete: "set null" }),
 
     montant: numeric("montant").notNull(),
     dateRemboursement: timestamp("date_remboursement").notNull(),
@@ -596,6 +600,11 @@ export const transactionsCompte = pgTable(
 
     // Pivot ledger (source de vérité)
     mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, {
+      onDelete: "set null",
+    }),
+    
+    // Reference to generated invoice/receipt
+    factureId: uuid("facture_id").references(() => factures.id, {
       onDelete: "set null",
     }),
 

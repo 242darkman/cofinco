@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, TrendingUp, TrendingDown, Calendar, DollarSign, Percent } from 'lucide-react';
 import { compteEpargneApi, transactionEpargneApi, clientApi } from '../../../lib/api-client';
+import { TransactionRowActions } from '../shared/TransactionRowActions';
+import { ReceiptViewer } from '../shared/ReceiptViewer';
+import { useReceiptActions } from '../../../hooks/finance/useReceiptActions';
 
 interface EpargneDetailModalProps {
   compteId: string;
@@ -17,6 +20,16 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
     nombreTransactions: 0
   });
   const [loading, setLoading] = useState(true);
+  
+  // Receipt actions hook
+  const {
+    viewingFactureId,
+    isViewerOpen,
+    handleView,
+    handleDownload,
+    handleShare,
+    handleCloseViewer
+  } = useReceiptActions();
 
   useEffect(() => {
     console.log('EpargneDetailModal compteId changed:', compteId);
@@ -32,9 +45,10 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
       ]);
 
       // Handle paginated response format: { data, total, page, limit, totalPages }
-      const comptesData = Array.isArray(comptesResponse) ? comptesResponse : comptesResponse.data || [];
+      const comptesResponseAny = comptesResponse as any;
+      const comptesData = Array.isArray(comptesResponse) ? comptesResponse : (comptesResponseAny.data || []);
       const clientsAny = clientsResponse as any;
-      const clientsData = Array.isArray(clientsAny) ? clientsAny : clientsAny.data || [];
+      const clientsData = Array.isArray(clientsAny) ? clientsAny : (clientsAny.data || []);
 
       const compteData = comptesData.find((c: any) => c.id === compteId);
       if (compteData) {
@@ -59,13 +73,25 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
 
       if (transactionsData) {
         // Normalize transaction fields from backend (typePaiement -> type_transaction, createdAt -> date_transaction)
-        const normalizedTransactions = transactionsData.map((t: any) => ({
-          ...t,
-          type_transaction: (t.typePaiement || t.type_paiement || '').replace(' Épargne', '') || 'Autre',
-          date_transaction: t.createdAt || t.created_at || new Date().toISOString(),
-          description: t.observations || t.typePaiement || t.type_paiement,
-          reference: t.billingReference || t.billing_reference || t.id?.substring(0, 8)
-        }));
+        const normalizedTransactions = transactionsData.map((t: any) => {
+          // Extract base transaction type by removing account type suffixes
+          let typeTransaction = (t.typePaiement || t.type_paiement || '')
+            .replace(' Épargne', '')
+            .replace(' Courant', '')
+            .replace(' Bloqué', '')
+            .trim();
+          
+          // Fallback to 'Autre' if empty
+          if (!typeTransaction) typeTransaction = 'Autre';
+          
+          return {
+            ...t,
+            type_transaction: typeTransaction,
+            date_transaction: t.createdAt || t.created_at || new Date().toISOString(),
+            description: t.observations || t.typePaiement || t.type_paiement,
+            reference: t.billingReference || t.billing_reference || t.id?.substring(0, 8)
+          };
+        });
         setTransactions(normalizedTransactions);
 
         const statsCalc = normalizedTransactions.reduce((acc: any, t: any) => {
@@ -273,15 +299,26 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className={`text-xl font-bold ${
-                          transaction.montant > 0 ? 'text-green-400' : 'text-blue-400'
-                        }`}>
-                          {transaction.montant > 0 ? '+' : ''}{transaction.montant.toLocaleString()} FCFA
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className={`text-xl font-bold ${
+                            transaction.montant > 0 ? 'text-green-400' : 'text-blue-400'
+                          }`}>
+                            {transaction.montant > 0 ? '+' : ''}{transaction.montant.toLocaleString()} FCFA
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            Solde: {transaction.solde_apres.toLocaleString()} FCFA
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-400">
-                          Solde: {transaction.solde_apres.toLocaleString()} FCFA
-                        </div>
+                        
+                        {/* Receipt actions */}
+                        <TransactionRowActions
+                          factureId={transaction.factureId}
+                          transactionId={transaction.id}
+                          onView={handleView}
+                          onDownload={handleDownload}
+                          onShare={handleShare}
+                        />
                       </div>
                     </div>
                   </div>
@@ -300,6 +337,14 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
           </button>
         </div>
       </div>
+      
+      {/* Receipt Viewer Modal */}
+      <ReceiptViewer
+        isOpen={isViewerOpen}
+        onClose={handleCloseViewer}
+        factureId={viewingFactureId || ''}
+        format="a4"
+      />
     </div>
   );
 }

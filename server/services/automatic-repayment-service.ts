@@ -1,7 +1,8 @@
 import { db } from "../db";
-import { credits, clients, comptes, mouvementsFinanciers } from "@shared/schema";
-import { eq, and, lte, isNotNull, sql, gt } from "drizzle-orm";
-import { executeWithLedger, updateCompteSolde, updateCreditSolde, generateReference } from "./ledger";
+import { comptes, credits, transactionsCompte } from "@shared/schema";
+import { eq, and, lte, sql, isNotNull, gt } from "drizzle-orm";
+import { executeWithLedger } from "./ledger";
+import { updateCompteSolde, updateCreditSolde, generateReference } from "./ledger";
 
 export async function processAutomaticCreditRepayments() {
   const now = new Date();
@@ -103,7 +104,18 @@ async function executeAutomaticRepayment(credit: any) {
       // 2. Credit Loan (Decrease remaining balance)
       const nouveauSoldeCredit = await updateCreditSolde(tx, credit.id, -amountToPay);
 
-      // 3. Update Next Due Date (Advance by frequency)
+      // 3. Create Transaction Record (for account history)
+      await tx.insert(transactionsCompte).values({
+        compteId: sourceAccountId,
+        mouvementId: mouvement.id,
+        typePaiement: "Remboursement Crédit",
+        montant: amountToPay.toString(),
+        soldeApres: nouveauSoldeCompte,
+        methodePaiement: "Virement",
+        observations: `Remboursement automatique crédit ${credit.numeroCredit}`,
+      });
+
+      // 4. Update Next Due Date (Advance by frequency)
       let nextDate = new Date(credit.prochaineEcheance);
       // Fallback if null (shouldn't be based on query)
       

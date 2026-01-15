@@ -75,6 +75,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   const [loadingTontines, setLoadingTontines] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
+  const [factureId, setFactureId] = useState<string | undefined>(undefined);
 
   // Client Summary State
   const [clientCredits, setClientCredits] = useState<any[]>([]);
@@ -396,8 +397,9 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
       setLoading(true);
 
       // **Cotisations Tontine** : utiliser l'endpoint tontine qui gère déjà le ledger
+      let response;
       if (formData.type_operation === 'Cotisation Tontine' && selectedTontine) {
-        await tontineApi.addContribution(selectedTontine.tontineId, {
+        response = await tontineApi.addContribution(selectedTontine.tontineId, {
           clientId: formData.client_id,
           montant: operationData.montant,
           methodePaiement: formData.mode_paiement,
@@ -405,11 +407,14 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
         });
       } else {
         // **Autres opérations** : créer l'opération de caisse
-        await operationCaisseApi.create({
+        response = await operationCaisseApi.create({
           ...operationData,
           statut: 'Posté' 
         });
       }
+      
+      // Extraire le factureId si disponible
+      const factureIdFromResponse = response?.facture?.id;
 
       const clientName = `${clients.find(c => c.id === formData.client_id)?.nom || ''} ${clients.find(c => c.id === formData.client_id)?.prenom || ''}`.trim() || 'Client';
       
@@ -447,6 +452,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
 
       // Afficher le reçu visuellement
       setReceiptData(rData);
+      setFactureId(factureIdFromResponse);
       setShowReceipt(true);
     } catch (error) {
       toast.dismiss(loadingId);
@@ -952,11 +958,13 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
         isOpen={showReceipt}
         onClose={() => {
             setShowReceipt(false);
+            setFactureId(undefined);
             onSuccess();
             onClose();
         }}
         term="Terminer"
         data={receiptData}
+        factureId={factureId}
       />
     </div>
   );

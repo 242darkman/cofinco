@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { comptes, versementsAutomatiques, mouvementsFinanciers } from "@shared/schema";
+import { comptes, versementsAutomatiques, mouvementsFinanciers, transactionsCompte } from "@shared/schema";
 import { eq, and, lte, sql } from "drizzle-orm";
 
 /**
@@ -108,51 +108,71 @@ export async function executeAutomaticTransfer(
       };
     }
     
-    // 8. Créer le mouvement financier et mettre à jour les soldes
-    // 8. Créer le mouvement financier et mettre à jour les soldes
-    const [mouvement] = await db.insert(mouvementsFinanciers).values({
-      montant: compteDest.versementAutoMontant!,
-      sens: "Débit",
-      sourceModule: "VERSEMENT_AUTO",
-      compteId: compteSource.id,
-      reference: `VA-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      metadata: {
-        description: `Versement automatique ${compteDest.versementAutoFrequence} - ${compteSource.numeroCompte} → ${compteDest.numeroCompte}`,
-        typeOperation: "Transfert interne",
-        compteDestId: compteDest.id
-      },
-      createdBy: userId,
-      agenceId: compteDest.agenceId || undefined,
-    }).returning();
-    
-    // 9. Mettre à jour les soldes des comptes
-    // Débiter le compte source
-    await db
-      .update(comptes)
-      .set({
-        soldeCourant: (soldeSource - montantVersement).toString(),
-      })
-      .where(eq(comptes.id, compteSource.id));
-    
-    // Créditer le compte destination
-    const soldeDest = Number(compteDest.soldeCourant || 0);
-    await db
-      .update(comptes)
-      .set({
-        soldeCourant: (soldeDest + montantVersement).toString(),
-      })
-      .where(eq(comptes.id, compteDest.id));
-    
-    // 10. Enregistrer dans l'historique
-    await db.insert(versementsAutomatiques).values({
-      compteSourceId: compteSource.id,
-      compteDestId: compteDest.id,
-      montant: compteDest.versementAutoMontant!,
-      statut: 'success',
-      dateExecution: new Date(),
-      datePlanifiee: compteDest.prochainVersementAuto || new Date(),
-      mouvementId: mouvement.id,
-      tentatives: 1,
+    // 8. Execute transfer in a transaction with proper ledger tracking
+    await db.transaction(async (tx) => {
+      // Create mouvement financier for the transfer
+      const [mouvement] = await tx.insert(mouvementsFinanciers).values({
+        montant: compteDest.versementAutoMontant!,
+        sens: "Débit",
+        sourceModule: "VERSEMENT_AUTO",
+        compteId: compteSource.id,
+        reference: `VA-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        metadata: {
+          description: `Versement automatique ${compteDest.versementAutoFrequence} - ${compteSource.numeroCompte} → ${compteDest.numeroCompte}`,
+          typeOperation: "Transfert interne",
+          compteDestId: compteDest.id
+        },
+        createdBy: userId,
+        agenceId: compteDest.agenceId || undefined,
+      }).returning();
+      
+      // Update account balances atomically
+      const nouveauSoldeSource = (soldeSource - montantVersement).toString();
+      const soldeDest = Number(compteDest.soldeCourant || 0);
+      const nouveauSoldeDest = (soldeDest + montantVersement).toString();
+      
+      await tx
+        .update(comptes)
+        .set({ soldeCourant: nouveauSoldeSource })
+        .where(eq(comptes.id, compteSource.id));
+      
+      await tx
+        .update(comptes)
+        .set({ soldeCourant: nouveauSoldeDest })
+        .where(eq(comptes.id, compteDest.id));
+      
+      // Create transaction records for both accounts
+      await tx.insert(transactionsCompte).values({
+        compteId: compteSource.id,
+        mouvementId: mouvement.id,
+        typePaiement: "Transfert Sortant",
+        montant: compteDest.versementAutoMontant!,
+        soldeApres: nouveauSoldeSource,
+        methodePaiement: "Virement",
+        observations: `Versement automatique vers ${compteDest.numeroCompte}`,
+      });
+      
+      await tx.insert(transactionsCompte).values({
+        compteId: compteDest.id,
+        mouvementId: mouvement.id,
+        typePaiement: "Transfert Entrant",
+        montant: compteDest.versementAutoMontant!,
+        soldeApres: nouveauSoldeDest,
+        methodePaiement: "Virement",
+        observations: `Versement automatique depuis ${compteSource.numeroCompte}`,
+      });
+      
+      // Record in versements_automatiques history
+      await tx.insert(versementsAutomatiques).values({
+        compteSourceId: compteSource.id,
+        compteDestId: compteDest.id,
+        montant: compteDest.versementAutoMontant!,
+        statut: 'success',
+        dateExecution: new Date(),
+        datePlanifiee: compteDest.prochainVersementAuto || new Date(),
+        mouvementId: mouvement.id,
+        tentatives: 1,
+      });
     });
     
     // 10. Mettre à jour les dates du compte
