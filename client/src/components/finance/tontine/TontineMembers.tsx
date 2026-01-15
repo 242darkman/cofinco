@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Pagination } from '../../ui/Pagination';
 import { SkeletonMemberCard } from '../../ui/Skeleton';
-import { tontineMembreApi, tontineApi, clientApi } from '../../../lib/api-client';
+import { tontineMembreApi, tontineApi, clientApi, compteEpargneApi } from '../../../lib/api-client';
+import { formatMoney } from '../../../lib/format';
 import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { usePagination } from '../../../hooks/usePagination';
@@ -47,6 +48,8 @@ interface TontineMembre {
   nombreContributions?: number;
   tourActuel?: number;
   montantCotisation?: number;
+  cotisationAutomatique?: boolean;
+  cotisationCompteId?: string;
 }
 
 interface TontineMembersProps {
@@ -65,6 +68,10 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [configMember, setConfigMember] = useState<TontineMembre | null>(null);
+  const [memberAccounts, setMemberAccounts] = useState<any[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [updatingConfig, setUpdatingConfig] = useState(false);
 
   // Confirmation dialog hook
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
@@ -215,6 +222,42 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
     setSearchQuery('');
   }, []);
 
+  const handleOpenConfig = async (membre: TontineMembre) => {
+     setConfigMember(membre);
+     setLoadingAccounts(true);
+     try {
+         const accounts = await compteEpargneApi.getByClient(membre.client_id);
+         setMemberAccounts(accounts || []);
+     } catch(e) {
+         console.error("Error loading accounts", e);
+         toast.error("Impossible de charger les comptes du membre");
+     } finally {
+         setLoadingAccounts(false);
+     }
+  };
+
+  const handleUpdateConfig = async (enabled: boolean, accountId?: string) => {
+      if (!configMember) return;
+      setUpdatingConfig(true);
+      try {
+          await tontineMembreApi.update(tontineId, configMember.id, {
+              cotisationAutomatique: enabled,
+              cotisationCompteId: enabled ? accountId : null
+          });
+          
+          toast.success("Configuration mise à jour");
+          
+          // Local update
+          setMembres(prev => prev.map(m => m.id === configMember.id ? { ...m, cotisationAutomatique: enabled, cotisationCompteId: enabled ? accountId : undefined } : m));
+          setConfigMember(prev => prev ? { ...prev, cotisationAutomatique: enabled, cotisationCompteId: enabled ? accountId : undefined } : null);
+          
+      } catch (e) {
+          toast.error(handleApiError(e, "Erreur mise à jour"));
+      } finally {
+          setUpdatingConfig(false);
+      }
+  };
+
   const isFull = membres.length >= maxMembres;
 
   return (
@@ -336,7 +379,22 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                         type="button"
                       >
                         <Trash2 size={14} aria-hidden="true" />
+                        <Trash2 size={14} aria-hidden="true" />
                       </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2">
+                        <button 
+                            onClick={() => handleOpenConfig(membre)}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider border transition-colors ${
+                                membre.cotisationAutomatique 
+                                ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500/20' 
+                                : 'bg-slate-700/30 text-slate-500 border-slate-700 hover:bg-slate-700/50 hover:text-slate-300'
+                            }`}
+                        >
+                            <Settings size={10} />
+                            {membre.cotisationAutomatique ? 'Auto ON' : 'Auto OFF'}
+                        </button>
                     </div>
 
                     {/* Stats de cotisations */}
@@ -521,6 +579,76 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
         variant={confirmState.variant}
         confirmText={confirmState.confirmText}
       />
+
+      {/* Configuration Modal */}
+      {configMember && (
+         <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => e.target === e.currentTarget && setConfigMember(null)}
+        >
+          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm shadow-2xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-200">
+             <div className="flex justify-between items-start">
+                 <div>
+                    <h3 className="font-bold text-white text-lg">Configuration Membre</h3>
+                    <p className="text-slate-400 text-xs">{formatClientName(configMember.client?.nom, configMember.client?.prenom)}</p>
+                 </div>
+                 <IconButton icon={X} onClick={() => setConfigMember(null)} size="sm" aria-label="Fermer" />
+             </div>
+
+             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 space-y-4">
+                 <div className="flex items-center justify-between">
+                     <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                         <Settings size={14} className="text-purple-400" />
+                         Cotisation Auto
+                     </span>
+                     <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={!!configMember.cotisationAutomatique} 
+                            onChange={(e) => handleUpdateConfig(e.target.checked, configMember.cotisationCompteId || memberAccounts.find(a => a.typeCompte === 'Courant')?.id)}
+                            className="sr-only peer"
+                            disabled={updatingConfig}
+                        />
+                        <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                     </label>
+                 </div>
+
+                 {configMember.cotisationAutomatique && (
+                     <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                         <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Compte Source</span>
+                         {loadingAccounts ? (
+                             <div className="h-9 bg-slate-700/50 rounded animate-pulse" />
+                         ) : (
+                             <select 
+                                value={configMember.cotisationCompteId || ''}
+                                onChange={(e) => handleUpdateConfig(true, e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                                disabled={updatingConfig}
+                             >
+                                <option value="" disabled>Choisir un compte</option>
+                                {memberAccounts.map(acc => (
+                                    <option key={acc.id} value={acc.id}>
+                                       {acc.typeCompte} - {formatMoney(acc.soldeCourant || 0)}
+                                    </option>
+                                ))}
+                             </select>
+                         )}
+                         <div className="flex gap-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-md mt-2">
+                             <Wallet size={12} className="text-blue-400 mt-0.5" />
+                             <p className="text-[10px] text-blue-300 leading-tight">
+                                La cotisation sera prélevée automatiquement à chaque début de tour si le solde est suffisant.
+                             </p>
+                         </div>
+                     </div>
+                 )}
+             </div>
+
+             <Button fullWidth onClick={() => setConfigMember(null)}>
+                 Fermer
+             </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -574,6 +574,10 @@ export const tontineMembreApi = {
   remove: (tontineId: string, membreId: string) => request<void>(`/tontines/${tontineId}/membres/${membreId}`, {
     method: 'DELETE',
   }),
+  update: (tontineId: string, membreId: string, data: any) => request<any>(`/tontines/${tontineId}/membres/${membreId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
 };
 
 // Contributions Tontine API

@@ -79,6 +79,7 @@ import {
   factures,
   lignesFactures,
   mouvementsFinanciers,
+  evenementsOutbox,
   coffresForts,
   comptesLiaison,
   transfertsInterCoffres,
@@ -254,6 +255,7 @@ async function seedDemoSimple() {
     console.log('\n🧹 Cleaning tables (robust 10-level hierarchy)...');
 
     // -- Level 10: Highest Dependency Leafs (Audit, Logs, Leafs)
+    await db.delete(evenementsOutbox);
     await db.delete(transfertWebhooks);
     await db.delete(transfertAuditLogs);
     await db.delete(reevaluationAuditLogs);

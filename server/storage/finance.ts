@@ -354,6 +354,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     const [remboursement] = await db.insert(remboursements).values(insertRemboursement).returning();
     return remboursement;
   }
+
   
   // Comptes
   export async function getCompte(id: string): Promise<Compte | undefined> {

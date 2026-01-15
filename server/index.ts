@@ -15,6 +15,7 @@ import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
 import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
 import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
 import { startScheduledDisbursementsCron } from "./cron/scheduled-disbursements";
+import { startAutomaticRepaymentsCron } from "./cron/automatic-repayments";
 
 const app = express();
 // const httpServer = createServer(app); // Removed to avoid duplicate server creation
@@ -211,7 +212,9 @@ async function seedAdminUser() {
 
   // Start the scheduled disbursements cron job (daily at 9 AM)
   startScheduledDisbursementsCron();
+  startAutomaticRepaymentsCron(); // Start Auto Repayments
   log('[Cron] Scheduled disbursements job started');
+  log('[Cron] Automatic repayments job started');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

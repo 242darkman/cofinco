@@ -82,6 +82,11 @@ export const credits = pgTable("credits", {
   soldeAvant2Mois: boolean("solde_avant_2_mois").default(false),
   soldeRestant: numeric("solde_restant"),
   echeance: text("echeance").default("Journalier"),
+  
+  // Suivi des échéances
+  montantEcheance: numeric("montant_echeance"), // Montant à payer par période
+  prochaineEcheance: timestamp("prochaine_echeance"), // Date prochaine échéance
+  
   garanties: text("garanties"),
   observations: text("observations"),
   agenceId: uuid("agence_id").references(() => agences.id), // Agence du crédit
@@ -92,6 +97,11 @@ export const credits = pgTable("credits", {
   dateDecaissementEffectif: timestamp("date_decaissement_effectif"),
   decaissementTentatives: integer("decaissement_tentatives").notNull().default(0),
   decaissementErreur: text("decaissement_erreur"),
+  
+  // Remboursement Automatique
+  remboursementAutomatique: boolean("remboursement_automatique").notNull().default(false),
+  remboursementCompteId: uuid("remboursement_compte_id").references(() => comptes.id), // Optionnel: Compte épargne ou autre, sinon compte courant
+  lastAutoRepaymentCheck: timestamp("last_auto_repayment_check"),
   
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at").defaultNow(),

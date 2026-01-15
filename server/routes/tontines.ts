@@ -139,6 +139,17 @@ export function registerTontineRoutes(app: Express) {
       res.json({ success: !!success });
   });
 
+  // Update membre tontine (cotisation auto etc)
+  app.patch("/api/tontines/:id/membres/:membreId", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+      const data = normalizeKeysDeep(req.body);
+      // Ensure tontine exists
+      const tontine = await storage.getTontine(req.params.id);
+      if (!tontine) return res.status(404).json({ message: "Tontine not found" });
+
+      const updated = await storage.updateMembreTontine(req.params.membreId, data as any);
+      res.json(addSnakeCaseAliasesDeep(updated));
+  });
+
   app.get("/api/tontines/:id/contributions", requireAuth, async (req, res) => {
       const contribs = await storage.getContributionsByTontine(req.params.id);
       res.json(addSnakeCaseAliasesDeep(contribs));

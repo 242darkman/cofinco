@@ -4,7 +4,7 @@ import { z } from "zod";
 import { users } from "./auth";
 import { clients } from "./clients";
 import { agences } from "./agences";
-import { mouvementsFinanciers } from "./finance";
+import { mouvementsFinanciers, comptes } from "./finance";
 import { methodePaiementEnum, statutTransactionEnum } from "@shared/enum/enums";
 import { sql } from "drizzle-orm";
 
@@ -80,6 +80,11 @@ export const membresTontine = pgTable("membres_tontine", {
   position: integer("position"),
   aRecuBenefice: boolean("a_recu_benefice").default(false),
   dateBenefice: timestamp("date_benefice"),
+  
+  // Cotisation Automatique
+  cotisationAutomatique: boolean("cotisation_automatique").notNull().default(false),
+  cotisationCompteId: uuid("cotisation_compte_id").references(() => comptes.id), // Optionnel
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete

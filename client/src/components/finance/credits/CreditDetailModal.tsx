@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, User, FileText, TrendingUp, Download, PieChart, Clock } from 'lucide-react';
+import { X, User, FileText, TrendingUp, Download, PieChart, Clock, CalendarClock, Settings } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
-import { creditApi, clientApi } from '../../../lib/api-client';
+import { creditApi, clientApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { Button, StatCard, TabGroup } from '../../ui';
 import { formatMoney, parseMoney, formatClientName } from '../../../lib/format';
@@ -30,6 +30,10 @@ interface Credit {
   nombre_echeances_total?: number;
   nombre_echeances_payees?: number;
   fraisDossierPaye?: boolean;
+  remboursementAutomatique?: boolean;
+  remboursementCompteId?: string;
+  prochaineEcheance?: string;
+  montantEcheance?: number;
 }
 
 interface Client {
@@ -51,8 +55,11 @@ interface CreditDetailModalProps {
 export default function CreditDetailModal({ creditId, onClose }: CreditDetailModalProps) {
   const [credit, setCredit] = useState<Credit | null>(null);
   const [client, setClient] = useState<Client | null>(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'schedule'>('overview');
+  // Auto-repayment states
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updatingAutoRepay, setUpdatingAutoRepay] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +80,10 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
         try {
           const clientData = await clientApi.getById(creditData.clientId);
           setClient(clientData);
+          
+          // Load accounts for auto-repayment
+          const accountsData = await compteEpargneApi.getByClient(creditData.clientId);
+          setAccounts(accountsData || []);
         } catch (clientError) {
           console.warn('Client non trouvé:', clientError);
         }
@@ -83,6 +94,30 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
       toast.error(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateAutoRepayment = async (enabled: boolean, accountId?: string) => {
+    if (!credit) return;
+    setUpdatingAutoRepay(true);
+    try {
+        await creditApi.update(credit.id, {
+            remboursementAutomatique: enabled,
+            remboursementCompteId: enabled ? accountId : null
+        });
+        
+        // Optimistic update
+        setCredit(prev => prev ? ({ 
+            ...prev, 
+            remboursementAutomatique: enabled,
+            remboursementCompteId: enabled ? accountId : undefined
+        }) : null);
+        
+        toast.success("Configuration mise à jour");
+    } catch (error) {
+        toast.error(handleApiError(error, "Erreur mise à jour"));
+    } finally {
+        setUpdatingAutoRepay(false);
     }
   };
 
@@ -265,6 +300,56 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                     </div>
                   </div>
                 )}
+                
+                {/* Auto Repayment Config */}
+                <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
+                   <div className="flex items-center gap-2 mb-4">
+                      <Settings size={16} className="text-purple-400" />
+                      <span className="text-slate-300 text-sm font-medium">Automatisation</span>
+                   </div>
+                   
+                   <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                         <span className="text-slate-500 text-sm">Remboursement Auto</span>
+                         <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                               type="checkbox" 
+                               checked={!!credit.remboursementAutomatique} 
+                               onChange={(e) => handleUpdateAutoRepayment(e.target.checked, credit.remboursementCompteId || accounts.find(a => a.typeCompte === 'Courant')?.id)}
+                               className="sr-only peer"
+                               disabled={updatingAutoRepay}
+                            />
+                            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                         </label>
+                      </div>
+
+                      {credit.remboursementAutomatique && (
+                         <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                             <span className="text-xs text-slate-500 uppercase tracking-wider font-bold">Compte Source</span>
+                             <select 
+                                value={credit.remboursementCompteId || ''}
+                                onChange={(e) => handleUpdateAutoRepayment(true, e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                                disabled={updatingAutoRepay}
+                             >
+                                <option value="" disabled>Sélectionner un compte</option>
+                                {accounts.map(acc => (
+                                    <option key={acc.id} value={acc.id}>
+                                        {acc.numeroCompte} ({acc.typeCompte}) - {formatMoney(acc.soldeCourant || 0)}
+                                    </option>
+                                ))}
+                             </select>
+                             
+                             {credit.prochaineEcheance && (
+                                 <div className="flex items-center gap-2 text-xs text-purple-300 bg-purple-500/10 p-2 rounded mt-2">
+                                     <CalendarClock size={12} />
+                                     Prochain prélèvement: {new Date(credit.prochaineEcheance).toLocaleDateString()}
+                                 </div>
+                             )}
+                         </div>
+                      )}
+                   </div>
+                </div>
 
                 <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
                   <div className="flex items-center gap-2 mb-4">

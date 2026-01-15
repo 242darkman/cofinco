@@ -1606,7 +1606,6 @@ export function registerFinanceRoutes(app: Express) {
         }
         
         // Notify updates
-        try {
              if (updated.clientId) {
                 const wsInstance = getWsInstance();
                 if (wsInstance) {
@@ -1614,15 +1613,30 @@ export function registerFinanceRoutes(app: Express) {
                     wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
                 }
              }
-        } catch (wsError) {
-             console.error("WS Broadcast error:", wsError);
-        }
-
-        res.json(addSnakeCaseAliasesDeep(updated));
+             res.json(addSnakeCaseAliasesDeep(updated));
       } catch (error: any) {
          console.error('Error updating operation:', error);
          res.status(400).json({ message: error.message || "Erreur lors de la mise à jour" });
       }
+  });
+
+  // Update credit (roles: admin, chef, credit)
+  app.patch("/api/credits/:id", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+    try {
+      const data = normalizeKeysDeep(req.body);
+      const credit = await storage.getCredit(req.params.id);
+      
+      if (!credit) return res.status(404).json({ message: "Crédit non trouvé" });
+
+      // Clean up fields that shouldn't be updated directly usually, but flexible for now
+      // Especially crucial for automated repayment toggle
+      
+      const updated = await storage.updateCredit(req.params.id, data as any);
+      res.json(addSnakeCaseAliasesDeep(updated));
+    } catch (e: any) {
+      console.error("Erreur mise à jour crédit:", e);
+      res.status(400).json({ message: e.message || "Erreur lors de la mise à jour du crédit" });
+    }
   });
 
   // Factures - Basic logic
