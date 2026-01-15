@@ -316,12 +316,13 @@ export const remboursementApi = {
 
 // Compte Epargne API (uses unified /api/comptes endpoint)
 export const compteEpargneApi = {
-  getAll: (params?: { search?: string; page?: number; limit?: number; typeCompte?: string }) => {
+  getAll: (params?: { search?: string; page?: number; limit?: number; typeCompte?: string; statut?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
     if (params?.page) queryParams.append('page', String(params.page));
     if (params?.limit) queryParams.append('limit', String(params.limit));
     if (params?.typeCompte) queryParams.append('typeCompte', params.typeCompte);
+    if (params?.statut) queryParams.append('statut', params.statut);
     const query = queryParams.toString();
     return request<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>(
       `/comptes${query ? `?${query}` : ''}`
@@ -339,6 +340,10 @@ export const compteEpargneApi = {
     body: JSON.stringify(data),
   }),
   depot: (id: string, data: any) => request<any>(`/comptes/${id}/depot`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  depotInitial: (id: string, data: any) => request<any>(`/comptes/${id}/depot-initial`, {
     method: 'POST',
     body: JSON.stringify(data),
   }),

@@ -277,8 +277,12 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       label: 'Statut',
       key: 'statut',
       format: (value: any) => {
-         const color = value === 'Actif' ? 'success' : value === 'Suspendu' ? 'warning' : 'neutral';
-         return <Badge variant={color} value={value} />;
+         const color = value === 'Actif' ? 'success' : 
+                       value === 'Suspendu' ? 'warning' : 
+                       value === 'EN_ATTENTE_PAIEMENT' ? 'warning' : 
+                       'neutral';
+         const label = value === 'EN_ATTENTE_PAIEMENT' ? 'En attente paiement' : value;
+         return <Badge variant={color} value={label} />;
       }
     }
   ];

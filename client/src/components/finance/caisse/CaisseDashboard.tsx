@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { Button, Card, StatCard, TabGroup } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi } from '../../../lib/api-client';
+import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compteEpargneApi } from '../../../lib/api-client';
 import { CaisseQuickActions } from './CaisseQuickActions';
 import CaisseOuverture from './CaisseOuverture';
 import CaisseOperations from './CaisseOperations';
@@ -108,6 +108,9 @@ export default function CaisseDashboard({
   // End of day reminder state
   const [showEndOfDayReminder, setShowEndOfDayReminder] = useState(false);
 
+  // Pending activations
+  const [comptesEnAttenteCount, setComptesEnAttenteCount] = useState(0);
+
   // History Receipt State
   const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
   const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
@@ -137,6 +140,7 @@ export default function CaisseDashboard({
     loadSessionActive();
     loadTransactionsJour();
     loadCaissesSeparees();
+    loadComptesEnAttente();
   }, []);
 
   useEffect(() => {
@@ -183,6 +187,18 @@ export default function CaisseDashboard({
       setCaissesSeparees(data || []);
     } catch (error) {
       console.error('Erreur:', error);
+    }
+  };
+
+  const loadComptesEnAttente = async () => {
+    try {
+      const response = await compteEpargneApi.getAll({ 
+        statut: 'En attente',
+        limit: 1 
+      });
+      setComptesEnAttenteCount(response.total);
+    } catch (error) {
+      console.error('Erreur chargement comptes en attente:', error);
     }
   };
 
@@ -531,6 +547,32 @@ export default function CaisseDashboard({
                  </div>
              </Card>
           </div>
+
+          {/* Pending Activations Alert */}
+          {comptesEnAttenteCount > 0 && (
+             <div className="mt-4 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-between animate-in slide-in-from-left duration-500">
+                <div className="flex items-center gap-3">
+                   <div className="p-2 rounded-lg bg-orange-500/20 text-orange-400">
+                      <Users size={20} />
+                   </div>
+                   <div>
+                      <p className="text-sm font-bold text-white">{comptesEnAttenteCount} Compte{comptesEnAttenteCount > 1 ? 's' : ''} en attente d'activation</p>
+                      <p className="text-xs text-orange-400/80">Versement initial requis</p>
+                   </div>
+                </div>
+                <Button 
+                   size="sm" 
+                   className="bg-orange-500 hover:bg-orange-600 text-white border-none shadow-lg shadow-orange-500/20"
+                   onClick={() => {
+                       setInitialPaymentType('Dépôt');
+                       setShowPaiement(true);
+                       toast.info("Recherchez le compte par numéro ou nom client pour activer.");
+                   }}
+                >
+                   Encaisser
+                </Button>
+             </div>
+          )}
       </div>
 
       {/* Recent Transactions */}

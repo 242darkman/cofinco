@@ -17,10 +17,13 @@ import {
   transactionsCompte,
   compteAgencesHistorique,
   mouvementsFinanciers,
+  operationsCaisse, // Added
   evenementsOutbox,
   sessionsCaisse,
   clients,
   credits,
+  type Compte,
+  type TransactionCompte,
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, gte, lte } from "drizzle-orm";
 import { subMonths, subYears, startOfDay, endOfDay, eachDayOfInterval, format, isSameDay } from "date-fns";
@@ -36,7 +39,9 @@ import {
 import {
   createFactureForDepot,
   createFactureForRetrait,
+  createFactureForDepotInitial,
 } from "../storage/finance";
+import type { Facture } from "@shared/schema";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Types
@@ -1111,6 +1116,263 @@ export async function getCompteStats(
   };
 }
 
+
+/**
+ * Create a new account with conditional status based on payment method.
+ * - Cash: Created as EN_ATTENTE_PAIEMENT
+ * - Transfer: Created as Actif, with atomic debit from source account
+ */
+export async function createCompteWithInitialDeposit(
+  data: {
+    clientId: string;
+    typeCompte: TypeCompte;
+    agenceId: string;
+    produitId?: string;
+    montantInitial: number;
+    modePaiement: 'Espèces' | 'Virement';
+    compteSourceId?: string; // Required for Transfer
+    blocageActif?: boolean;
+    blocageMotif?: MotifBlocage;
+  },
+  userId: string
+): Promise<{ compte: Compte; transaction?: TransactionCompte; facture?: Facture }> {
+  
+  return await db.transaction(async (tx) => {
+    // 1. Determine Status
+    const statut = data.modePaiement === 'Espèces' && data.montantInitial > 0
+      ? 'EN_ATTENTE_PAIEMENT' 
+      : 'Actif';
+    
+    // 2. Generate Account Number
+    const numeroCompte = await generateNumeroCompte(data.typeCompte);
+
+    // 3. Create Account
+    const [compte] = await tx.insert(comptes).values({
+      clientId: data.clientId,
+      agenceId: data.agenceId,
+      typeCompte: data.typeCompte,
+      produitId: data.produitId,
+      numeroCompte,
+      statut: statut,
+      // If Transfer, balance will be set immediately via transaction flow
+      soldeCourant: '0', 
+      blocageActif: data.blocageActif || false,
+      blocageMotif: data.blocageMotif,
+      blocageDebut: data.blocageActif ? new Date() : null,
+      createdBy: userId,
+    }).returning();
+
+    // 4. Agency History
+    await tx.insert(compteAgencesHistorique).values({
+      compteId: compte.id,
+      agenceId: data.agenceId,
+      dateDebut: new Date(),
+      motif: "Création du compte",
+      transferePar: userId,
+    });
+    
+    // 5. Handle Transfer Payment (Immediate Activation)
+    if (data.modePaiement === 'Virement' && data.montantInitial > 0) {
+      if (!data.compteSourceId) throw new Error('Compte source requis pour virement');
+
+      // A. Verify Source Account
+      const [compteSource] = await tx.select()
+        .from(comptes)
+        .where(eq(comptes.id, data.compteSourceId));
+      
+      if (!compteSource) throw new Error('Compte source introuvable');
+      
+      const soldeSource = parseFloat(compteSource.soldeCourant);
+      if (soldeSource < data.montantInitial) {
+        throw new Error(`Solde insuffisant. Disponible: ${soldeSource}, Requis: ${data.montantInitial}`);
+      }
+      
+      // B. Create Financial Movement (Internal Transfer)
+      const reference = `VIR-OUVERTURE-${Date.now()}`;
+      const [mouvement] = await tx.insert(mouvementsFinanciers).values({
+        dateOperation: new Date(),
+        montant: data.montantInitial.toString(),
+        sens: 'Crédit',
+        statut: 'Posté',
+        methodePaiement: 'Virement',
+        reference,
+        sourceModule: 'COMPTE',
+        compteId: compte.id, // Linked to the new account
+        clientId: data.clientId,
+        agenceId: data.agenceId,
+        typePaiement: "Dépôt Initial" as any, 
+        createdBy: userId,
+        metadata: { description: `Virement ouverture depuis ${compteSource.numeroCompte}` }
+      }).returning();
+      
+      // C. Transaction 1: DEBIT Source Account
+      await tx.insert(transactionsCompte).values({
+        compteId: data.compteSourceId,
+        mouvementId: mouvement.id,
+        typePaiement: 'Virement Interne' as any,
+        montant: data.montantInitial.toString(),
+        soldeApres: (soldeSource - data.montantInitial).toString(),
+        methodePaiement: 'Virement',
+        observations: `Virement vers nouveau compte ${compte.numeroCompte}`,
+        createdBy: userId,
+      });
+
+      // Update Source Balance
+      await tx.update(comptes)
+        .set({ 
+          soldeCourant: (soldeSource - data.montantInitial).toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(comptes.id, data.compteSourceId));
+      
+      // D. Transaction 2: CREDIT New Account (Initial Deposit)
+      const [transaction] = await tx.insert(transactionsCompte).values({
+        compteId: compte.id,
+        mouvementId: mouvement.id,
+        typePaiement: 'Dépôt Initial' as any,
+        montant: data.montantInitial.toString(),
+        soldeApres: data.montantInitial.toString(),
+        methodePaiement: 'Virement',
+        observations: 'Dépôt initial - Ouverture de compte',
+        createdBy: userId,
+      }).returning();
+
+      // Update New Account Balance
+      await tx.update(comptes)
+        .set({ 
+          soldeCourant: data.montantInitial.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(comptes.id, compte.id));
+      
+      // E. Generate Receipt (Facture)
+      const facture = await createFactureForDepotInitial({
+        compteId: compte.id,
+        numeroCompte: compte.numeroCompte,
+        clientId: data.clientId,
+        montant: data.montantInitial.toString(),
+        typeCompte: data.typeCompte,
+        modePaiement: 'Virement',
+        transactionId: transaction.id,
+        agentId: userId,
+      });
+      
+      // Re-fetch updated account
+      const [updatedCompte] = await tx.select().from(comptes).where(eq(comptes.id, compte.id));
+      
+      return { compte: updatedCompte!, transaction, facture };
+    }
+    
+    // 6. Handle Cash (Pending Payment)
+    // No transaction created yet. Status is EN_ATTENTE_PAIEMENT.
+    return { compte };
+  });
+}
+
+/**
+ * Validates and processes the initial deposit for a pending account via Cashier.
+ */
+export async function payerDepotInitialCompte(
+  compteId: string,
+  data: {
+    montant: number;
+    sessionCaisseId: string;
+    userId: string;
+  }
+): Promise<{ compte: Compte; transaction: TransactionCompte; facture: Facture }> {
+  
+  return await executeWithLedger(
+    "COMPTE",
+    {
+      montant: data.montant.toString(),
+      sens: "Crédit",
+      compteId,
+      sessionCaisseId: data.sessionCaisseId,
+      typePaiement: "Dépôt Initial" as any,
+      methodePaiement: "Espèces",
+      metadata: { description: "Paiement dépôt initial - Activation compte" },
+      agenceId: undefined, // Will be inferred or can be passed if needed
+    },
+    async (tx, mouvement) => {
+      // 1. Verify Account
+    const [compte] = await tx.select()
+        .from(comptes)
+        .where(eq(comptes.id, compteId));
+      
+      if (!compte) {
+        throw new Error("Compte introuvable");
+      }
+
+      if (compte.statut !== 'EN_ATTENTE_PAIEMENT') {
+          throw new Error("Ce compte n'est pas en attente de paiement initial");
+      }
+      
+      // 2. Create Transaction
+      const [transaction] = await tx.insert(transactionsCompte).values({
+        compteId,
+        mouvementId: mouvement.id,
+        typePaiement: 'Dépôt Initial' as any,
+        montant: data.montant.toString(),
+        soldeApres: data.montant.toString(), // Assuming 0 start
+        methodePaiement: 'Espèces',
+        observations: 'Dépôt initial - Activation de compte',
+        createdBy: data.userId,
+      }).returning();
+      
+      // 3. Activate Account & Update Balance
+      const [updatedCompte] = await tx.update(comptes)
+        .set({ 
+          statut: 'Actif',
+          soldeCourant: data.montant.toString(),
+          updatedAt: new Date()
+        })
+        .where(eq(comptes.id, compteId))
+        .returning();
+      
+      // 4. Update Session Balance
+      const nouveauSoldeSession = await updateSessionSolde(
+        tx, 
+        data.sessionCaisseId, 
+        data.montant
+      );
+      
+      // 5. Create Operation Caisse
+      // const validatedUserId = await validateUserId(tx, data.userId);
+      const [operation] = await tx.insert(operationsCaisse).values({
+        sessionId: data.sessionCaisseId,
+        mouvementId: mouvement.id,
+        typeOperation: "Dépôt" as any, 
+        montant: data.montant.toString(),
+        methodePaiement: "Espèces",
+        reference: `DEP-INIT-${compte.numeroCompte}`,
+        description: `Dépôt initial - Ouverture ${compte.numeroCompte}`,
+        clientId: compte.clientId,
+        createdBy: data.userId
+      }).returning();
+
+      return {
+        result: { compte: updatedCompte, transaction, operation },
+        additionalEventData: { nouveauSoldeSession },
+      };
+    },
+    data.userId
+  ).then(async ({ result }) => {
+    // 6. Generate Receipt
+    const facture = await createFactureForDepotInitial({
+      compteId: result.compte.id,
+      numeroCompte: result.compte.numeroCompte,
+      clientId: result.compte.clientId,
+      montant: data.montant.toString(),
+      typeCompte: result.compte.typeCompte,
+      modePaiement: 'Espèces',
+      transactionId: result.transaction.id,
+      agentId: data.userId,
+    });
+    
+    return { ...result, facture };
+  });
+}
+
 export default {
   // Validation
   clientHasCompteOfType,
@@ -1118,6 +1380,8 @@ export default {
   canDeposit,
   // Creation
   createCompte,
+  createCompteWithInitialDeposit,
+  payerDepotInitialCompte,
   // Operations
   deposerSurCompte,
   retirerDuCompte,

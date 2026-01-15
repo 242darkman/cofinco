@@ -33,7 +33,9 @@ const createCompteSchema = z.object({
   typeCompte: z.enum(["Épargne", "Courant", "Bloqué"]),
   agenceId: z.string().uuid(),
   produitId: z.string().uuid().optional(),
-  soldeInitial: z.number().min(0).optional(),
+  soldeInitial: z.number().min(0).optional().default(0),
+  modePaiement: z.enum(["Espèces", "Virement"]).default("Espèces"),
+  compteSourceId: z.string().uuid().optional(), // requis si Virement
   blocageActif: z.boolean().optional(),
   blocageMotif: z
     .enum([
@@ -136,6 +138,10 @@ export function registerComptesRoutes(app: Express) {
    * POST /api/comptes - Créer un nouveau compte
    * Validation: Un client ne peut avoir qu'un seul compte par type
    */
+  /**
+   * POST /api/comptes - Créer un nouveau compte
+   * Validation: Un client ne peut avoir qu'un seul compte par type
+   */
   app.post(
     "/api/comptes",
     requireAuth,
@@ -152,29 +158,29 @@ export function registerComptesRoutes(app: Express) {
           if (!client) {
             return res.status(404).json({ message: "Client non trouvé" });
           }
-          // On utilise l'agence du client par défaut si non précisé, 
-          // ou on l'écrase pour respecter la règle métier demandée.
           data.agenceId = client.agenceId;
         }
 
         const parsed = createCompteSchema.parse(data);
 
-        const compte = await comptesService.createCompte(
+        // Appel au nouveau service qui gère la création conditionnelle
+        const result = await comptesService.createCompteWithInitialDeposit(
           {
             clientId: parsed.clientId,
             typeCompte: parsed.typeCompte,
             agenceId: parsed.agenceId,
             produitId: parsed.produitId,
-            soldeInitial: parsed.soldeInitial,
+            montantInitial: parsed.soldeInitial,
+            modePaiement: parsed.modePaiement,
+            compteSourceId: parsed.compteSourceId,
             blocageActif: parsed.blocageActif,
             blocageMotif: parsed.blocageMotif,
-            blocageReference: parsed.blocageReference,
           },
-          user?.id
+          user?.id!
         );
 
-        // Traiter la configuration de versement automatique si activée
-        if (data.versementAutoActif) {
+        // Traiter la configuration de versement automatique si activée (sur le compte créé)
+        if (data.versementAutoActif && result.compte) {
           const { calculateNextTransferDate } = await import("../services/automatic-transfers-service");
           
           const prochainVersement = calculateNextTransferDate(
@@ -191,15 +197,19 @@ export function registerComptesRoutes(app: Express) {
               compteSourceId: data.compteSourceId,
               prochainVersementAuto: prochainVersement,
             })
-            .where(eq(comptes.id, compte.id));
+            .where(eq(comptes.id, result.compte.id));
         }
 
         await logAudit(
           req,
           "CREATE_COMPTE",
           "compte",
-          compte.id,
-          undefined,
+          result.compte.id,
+          { 
+            statut: result.compte.statut, 
+            montantInitial: parsed.soldeInitial,
+            modePaiement: parsed.modePaiement 
+          },
           "success",
           "medium"
         );
@@ -211,9 +221,13 @@ export function registerComptesRoutes(app: Express) {
             type: "DASHBOARD_UPDATE",
             payload: {},
           });
+          
+          if (result.facture) {
+             // Notifier la facture disponible
+          }
         }
 
-        res.status(201).json(addSnakeCaseAliasesDeep(compte));
+        res.status(201).json(addSnakeCaseAliasesDeep(result));
       } catch (error: any) {
         if (error instanceof CompteError) {
           return res.status(400).json({
@@ -228,7 +242,7 @@ export function registerComptesRoutes(app: Express) {
           });
         }
         console.error("Error creating compte:", error);
-        res.status(500).json({ message: "Erreur serveur" });
+        res.status(500).json({ message: error.message || "Erreur serveur" });
       }
     }
   );
@@ -256,6 +270,7 @@ export function registerComptesRoutes(app: Express) {
           page: req.query.page ? parseInt(req.query.page as string) : 1,
           limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
           typeCompte: req.query.typeCompte as string | undefined,
+          statut: req.query.statut as string | undefined,
         };
 
         const result = await storage.getAllComptesWithClients(filter, options);
@@ -430,6 +445,74 @@ export function registerComptesRoutes(app: Express) {
         console.error("Error depot:", error);
         res.status(500).json({ message: error.message || "Erreur serveur" });
       }
+    }
+  );
+
+  /**
+   * POST /api/comptes/:id/depot-initial - Payer le dépôt initial (Activation)
+   * Réservé aux caissiers avec session active
+   */
+  app.post(
+    "/api/comptes/:id/depot-initial",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    requireAgenceAccess(),
+    async (req, res) => {
+        try {
+            const data = normalizeKeysDeep(req.body) as any;
+            
+            // Validation stricte du montant et session
+            if (!data.montant || Number(data.montant) <= 0) {
+                return res.status(400).json({ message: "Montant invalide" });
+            }
+            if (!data.sessionCaisseId) {
+                 return res.status(400).json({ message: "Session de caisse requise" });
+            }
+
+            const result = await comptesService.payerDepotInitialCompte(
+                req.params.id,
+                {
+                    montant: Number(data.montant),
+                    sessionCaisseId: data.sessionCaisseId,
+                    userId: req.session.user!.id
+                }
+            );
+            
+            // Logs & Broadcast...
+            await logAudit(req, "DEPOT_INITIAL", "compte", req.params.id, { montant: data.montant }, "success", "high");
+             
+             // Broadcast temps réel
+            const wsInstance = require("../ws-server").getWsInstance();
+            if (wsInstance && req.session.user?.agence) {
+              wsInstance.broadcastToAgency(req.session.user.agence, {
+                type: "LIVE_ACTIVITY",
+                payload: {
+                  action: `Activation Compte: ${result.compte.numeroCompte}`,
+                  user: req.session.user.nom || "Système",
+                  type: "account_activation",
+                  timestamp: new Date().toISOString(),
+                },
+              });
+               wsInstance.broadcastToAgency(req.session.user.agence, {
+                type: "DASHBOARD_UPDATE",
+                payload: {},
+              });
+            }
+
+            res.json(addSnakeCaseAliasesDeep(result));
+        } catch (error: any) {
+             console.error("Error depot initial:", error);
+             const message = error.message || "Erreur serveur";
+             
+             if (message.includes("Compte introuvable")) {
+                 return res.status(404).json({ message });
+             }
+             if (message.includes("n'est pas en attente") || message.includes("Montant invalide")) {
+                 return res.status(400).json({ message });
+             }
+             
+             res.status(500).json({ message });
+        }
     }
   );
 

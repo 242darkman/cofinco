@@ -3,7 +3,7 @@ import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Us
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { clientApi, clientSearchApi, operationCaisseApi, tontineApi } from '../../../lib/api-client';
+import { clientApi, clientSearchApi, operationCaisseApi, tontineApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
@@ -76,6 +76,9 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [factureId, setFactureId] = useState<string | undefined>(undefined);
+  const [clientAccounts, setClientAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedAccount, setSelectedAccount] = useState<any>(null); // Full object for status check
 
   // Client Summary State
   const [clientCredits, setClientCredits] = useState<any[]>([]);
@@ -102,6 +105,15 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   // Vérifier si c'est une opération tontine
   const isTontineOperation = useMemo(() => {
     return formData.type_operation === 'Cotisation Tontine' || formData.type_operation === 'Retrait Tontine';
+  }, [formData.type_operation]);
+
+  // Vérifier si c'est une opération sur compte
+  const isAccountOperation = useMemo(() => {
+    return [
+      'Dépôt épargne', 'Retrait Épargne', 
+      'Versement Courant', 'Retrait Courant',
+      'Versement Bloqué', 'Retrait Bloqué'
+    ].includes(formData.type_operation);
   }, [formData.type_operation]);
 
   // Charger les clients via api-client
@@ -173,6 +185,18 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                  if (isTontineOperation && tontines && tontines.length === 1) {
                       selectTontine(tontines[0]);
                  }
+
+                 // Load Accounts for account ops (or just pre-load)
+                 const comptes = await compteEpargneApi.getByClient(formData.client_id);
+                 setClientAccounts(comptes || []);
+                 
+                 // Auto-select if only 1 and match type? Or prioritize pending payment
+                 // For now, if there is a pending account, maybe auto-select it if operation matches?
+                 // Let's just create a helper logic later.
+                 if (comptes?.length === 1) {
+                     setSelectedAccountId(comptes[0].id);
+                     setSelectedAccount(comptes[0]);
+                 }
              } catch (err) {
                  console.error("Error loading client details", err);
              }
@@ -182,6 +206,9 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
       setClientTontines([]);
       setClientCredits([]);
       setSelectedTontine(null);
+      setClientAccounts([]);
+      setSelectedAccountId('');
+      setSelectedAccount(null);
       setActiveTontinesCount(0);
       setActiveCreditsAmount(0);
     }
@@ -225,6 +252,9 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
     if (isTontineOperation && !selectedTontine) {
       newErrors.tontine = 'Veuillez sélectionner une tontine';
     }
+    if (isAccountOperation && !selectedAccountId) {
+      newErrors.account = 'Veuillez sélectionner un compte';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -259,7 +289,8 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
         numero_telephone: isMobileMoney ? sanitizeInput(formData.numero_telephone) : null,
         numero_transaction: isMobileMoney ? sanitizeInput(formData.numero_transaction) : null,
         tontineId: selectedTontine?.tontineId || null,
-        membreId: selectedTontine?.id || null
+        membreId: selectedTontine?.id || null,
+        compteId: selectedAccountId || null
       };
 
       toast.dismiss(loadingId);
@@ -405,6 +436,13 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
           methodePaiement: formData.mode_paiement,
           reference: operationData.reference
         });
+      } else if (isAccountOperation && selectedAccount && selectedAccount.statut === 'EN_ATTENTE_PAIEMENT' && formData.type_operation.includes('Dépôt')) {
+          // ACTIVATION DE COMPTE : APPEL SPECIFIQUE
+          response = await compteEpargneApi.depotInitial(selectedAccount.id, {
+             montant: operationData.montant,
+             sessionCaisseId: sessionId,
+             modePaiement: formData.mode_paiement // 'Espèces' normalement
+          });
       } else {
         // **Autres opérations** : créer l'opération de caisse
         response = await operationCaisseApi.create({
@@ -600,6 +638,51 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
               </select>
             </div>
           </div>
+
+          {/* Account Selection for Account Operations */}
+          {isAccountOperation && formData.client_id && (
+             <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600">
+                <label className="block text-sm font-semibold text-slate-300 mb-2">Compte Cible *</label>
+                {clientAccounts.length === 0 ? (
+                   <p className="text-amber-400 text-sm flex items-center gap-2"><AlertCircle size={14} /> Aucun compte trouvé pour ce client.</p>
+                ) : (
+                   <div className="grid gap-2">
+                       {clientAccounts.map(acc => (
+                           <div 
+                              key={acc.id}
+                              onClick={() => {
+                                 setSelectedAccountId(acc.id);
+                                 setSelectedAccount(acc);
+                              }}
+                              className={`p-3 rounded border cursor-pointer flex items-center justify-between transition ${
+                                selectedAccountId === acc.id 
+                                ? 'bg-cyan-500/20 border-cyan-500' 
+                                : 'bg-slate-800 border-slate-700 hover:border-slate-500'
+                              }`}
+                           >
+                               <div>
+                                   <div className="flex items-center gap-2">
+                                       <span className="font-mono font-bold text-white">{acc.numero_compte || acc.numeroCompte}</span>
+                                       <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${
+                                           acc.statut === 'Actif' ? 'bg-emerald-500/20 text-emerald-400' :
+                                           acc.statut === 'EN_ATTENTE_PAIEMENT' ? 'bg-orange-500/20 text-orange-400' :
+                                           'bg-slate-500/20 text-slate-400'
+                                       }`}>
+                                           {acc.statut === 'EN_ATTENTE_PAIEMENT' ? 'Activation Requise' : acc.statut}
+                                       </span>
+                                   </div>
+                                   <div className="text-xs text-slate-400">{acc.type_compte || acc.typeCompte}</div>
+                               </div>
+                               {selectedAccountId === acc.id && <CheckCircle2 className="text-cyan-400" size={20} />}
+                           </div>
+                       ))}
+                   </div>
+                )}
+                 {errors.account && (
+                    <p className="text-red-500 text-sm mt-2" role="alert">{errors.account}</p>
+                 )}
+             </div>
+          )}
 
           {/* Section Tontines */}
           {isTontineOperation && formData.client_id && (

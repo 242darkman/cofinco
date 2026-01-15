@@ -40,7 +40,7 @@ interface EpargneAccountFormProps {
 }
 
 type TypeCompte = 'Courant' | 'Épargne' | 'Bloqué';
-type ModeOuverture = 'Espèces' | 'Chèque' | 'Virement' | 'Mobile Money' | 'Transfert interne';
+type ModeOuverture = 'Espèces' | 'Virement';
 type FrequenceVersement = 'Hebdomadaire' | 'Bimensuel' | 'Mensuel' | 'Trimestriel';
 
 export default function EpargneAccountForm({ onClose, onSuccess, clientId }: EpargneAccountFormProps) {
@@ -54,20 +54,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const [searchQuery, setSearchQuery] = useState('');
   const [validationRequise, setValidationRequise] = useState(true);
 
-  const [selectedOperator, setSelectedOperator] = useState<string>('');
-  const [showMobileMoneyModal, setShowMobileMoneyModal] = useState(false);
-  const [showCaisseModal, setShowCaisseModal] = useState(false);
-  const [pendingAccountData, setPendingAccountData] = useState<any>(null);
-  const [mobileMoneyData, setMobileMoneyData] = useState({
-    numero_telephone: '',
-    numero_transaction: '',
-    code_otp: ''
-  });
-  const [caisseData, setCaisseData] = useState({
-    reference_recu: '',
-    billets: {} as Record<string, number>
-  });
-  const [paymentValidated, setPaymentValidated] = useState(false);
+  // Removed mobile/caisse states as payment is handled via backend status or simplified
+  const [validationRequise, setValidationRequise] = useState(true);
 
   const [formData, setFormData] = useState({
     client_id: clientId || '',
@@ -162,7 +150,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     }
 
     // Internal transfer validation
-    if (formData.mode_ouverture === 'Transfert interne') {
+    if (formData.mode_ouverture === 'Virement') {
       if (!formData.compte_source_id) {
         newErrors.compte_source_id = 'Compte source requis';
       } else {
@@ -247,11 +235,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     return Object.keys(newErrors).length === 0;
   }, [formData, comptesExistants, selectedOperator]);
 
-  const calculateTotalBillets = useMemo(() => {
-    return Object.entries(caisseData.billets).reduce((total, [billet, count]) => {
-      return total + (parseInt(billet) * (count || 0));
-    }, 0);
-  }, [caisseData.billets]);
+  // calculateTotalBillets removed as cash breakdown is handled in cashier session, not during account opening request
+
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,120 +246,52 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       return;
     }
 
-    const soldeInitial = parseFloat(formData.solde_initial) || 0;
-
-    // Show payment modals for cash or mobile money deposits
-    if (soldeInitial > 0 && (formData.mode_ouverture === 'Mobile Money' || formData.mode_ouverture === 'Espèces')) {
-      const accountData = {
-        numeroCompte: generateNumeroCompte(),
-        soldeInitial,
-        formData: { ...formData },
-        selectedOperator
-      };
-      setPendingAccountData(accountData);
-
-      if (formData.mode_ouverture === 'Mobile Money') {
-        setShowMobileMoneyModal(true);
-      } else if (formData.mode_ouverture === 'Espèces') {
-        setShowCaisseModal(true);
-      }
-      return;
-    }
-
+    // Direct creation - Cash payment handled via pending status
     await createAccount();
-  }, [formData, validate, generateNumeroCompte, selectedOperator]);
+  }, [formData, validate]);
 
-  const createAccount = useCallback(async (paymentRef?: string) => {
+  const createAccount = useCallback(async () => {
     setLoading(true);
 
     try {
-      const numeroCompte = pendingAccountData?.numeroCompte || generateNumeroCompte();
-      const soldeInitial = pendingAccountData?.soldeInitial || parseFloat(formData.solde_initial) || 0;
+      // Backend handles number generation now if not provided, sending as requested
+      // But keeping frontend generation for consistent UX feedback if needed, 
+      // though backend overrides usually. Let's let backend generate or use this.
+      // Ideally let backend generate.
+      
+      const soldeInitial = parseFloat(formData.solde_initial) || 0;
 
       // Sanitize user inputs
       const sanitizedNotes = sanitizeInput(formData.notes);
       const sanitizedMotif = sanitizeInput(formData.motif_blocage);
-      const sanitizedReference = sanitizeInput(paymentRef || formData.reference_paiement);
 
-      const compteData: any = {
-        client_id: formData.client_id,
-        type_compte: formData.type_compte,
-        numero_compte: numeroCompte,
-        solde_initial: (paymentValidated || formData.mode_ouverture === 'Transfert interne' ? soldeInitial : 0),
-        taux_interet: formData.taux_interet,
-        mode_ouverture: formData.mode_ouverture,
-        montant_ouverture: soldeInitial,
-        statut: validationRequise ? 'En attente validation' : 'Actif',
-        paiement_valide: paymentValidated || formData.mode_ouverture === 'Transfert interne',
-        reference_paiement: sanitizedReference || null,
-        notes: sanitizedNotes || null
+      const payload: any = {
+        clientId: formData.client_id,
+        typeCompte: formData.type_compte,
+        // numeroCompte generated by backend
+        soldeInitial: soldeInitial, // Backend expects soldeInitial but maps it to initial deposit
+        modePaiement: formData.mode_ouverture, // Espèces | Virement
+        compteSourceId: formData.mode_ouverture === 'Virement' ? formData.compte_source_id : undefined,
+        
+        blocageActif: formData.type_compte === 'Bloqué',
+        blocageMotif: formData.type_compte === 'Bloqué' ? sanitizedMotif : undefined,
+        blocageReference: formData.type_compte === 'Bloqué' ? formData.date_echeance : undefined, // passing date as ref for now or handle appropriately
+        
+        // Auto transfer fields
+        versementAutoActif: formData.versement_auto_active,
+        versementAutoMontant: formData.versement_auto_active ? parseFloat(formData.versement_auto_montant) : undefined,
+        versementAutoFrequence: formData.versement_auto_active ? formData.versement_auto_frequence : undefined,
+        versementAutoJour: formData.versement_auto_active ? parseInt(formData.versement_auto_jour) : undefined,
       };
 
-      if (formData.mode_ouverture === 'Mobile Money' && selectedOperator) {
-        compteData.operateur_mobile = selectedOperator;
-        compteData.numero_mobile = sanitizeInput(mobileMoneyData.numero_telephone);
-      }
-
-      if (formData.type_compte === 'Bloqué') {
-        compteData.date_echeance = formData.date_echeance;
-        compteData.motif_blocage = sanitizedMotif;
-      }
-
-      const newCompte = await compteEpargneApi.create(compteData);
-
-      // Handle internal transfer
-      if (formData.mode_ouverture === 'Transfert interne' && formData.compte_source_id && soldeInitial > 0) {
-        const compteSource = comptesExistants.find(c => c.id === formData.compte_source_id);
-
-        if (compteSource && compteSource.solde >= soldeInitial) {
-          await compteEpargneApi.update(formData.compte_source_id, {
-            solde: compteSource.solde - soldeInitial
-          });
-
-          await transactionEpargneApi.create({
-            compte_id: formData.compte_source_id,
-            type_transaction: 'Transfert sortant',
-            montant: soldeInitial,
-            solde_avant: compteSource.solde,
-            solde_apres: compteSource.solde - soldeInitial,
-            mode_paiement: 'Transfert interne',
-            description: `Transfert vers ${numeroCompte}`
-          });
-
-          await transactionEpargneApi.create({
-            compte_id: newCompte.id,
-            type_transaction: 'Transfert entrant',
-            montant: soldeInitial,
-            solde_avant: 0,
-            solde_apres: soldeInitial,
-            mode_paiement: 'Transfert interne',
-            description: 'Dépôt initial'
-          });
-        } else {
-          throw new Error('Solde insuffisant dans le compte source');
-        }
-      }
-
-      // Record initial deposit transaction
-      if (paymentValidated && soldeInitial > 0) {
-        await transactionEpargneApi.create({
-          compte_id: newCompte.id,
-          type_transaction: 'Dépôt',
-          montant: soldeInitial,
-          solde_avant: 0,
-          solde_apres: soldeInitial,
-          mode_paiement: formData.mode_ouverture,
-          reference: sanitizedReference,
-          description: "Dépôt initial à l'ouverture"
-        });
-      }
+      const newCompte = await compteEpargneApi.create(payload);
 
       // Success message
-      if (validationRequise) {
-        toast.success(`Demande d'ouverture créée avec succès ! Numéro: ${numeroCompte}`);
-        toast.info('En attente de validation du chef d\'agence');
+      if (formData.mode_ouverture === 'Espèces' && soldeInitial > 0) {
+        toast.success(`Compte créé avec succès !`);
+        toast.info(`Statut: En attente de paiement. Veuillez encaisser ${formatMoney(soldeInitial)} en caisse.`);
       } else {
-        toast.success(`Compte ${numeroCompte} créé avec succès !`);
+        toast.success(`Compte créé et activé avec succès !`);
       }
 
       onSuccess();
@@ -383,34 +300,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       toast.error(errorMessage);
     } finally {
       setLoading(false);
-      setShowMobileMoneyModal(false);
-      setShowCaisseModal(false);
     }
-  }, [formData, pendingAccountData, generateNumeroCompte, paymentValidated, validationRequise, comptesExistants, selectedOperator, mobileMoneyData, onSuccess]);
+  }, [formData, onSuccess]);
 
-  const handleMobileMoneyValidation = useCallback(async () => {
-    if (!mobileMoneyData.numero_telephone || !mobileMoneyData.numero_transaction) {
-      toast.warning('Veuillez remplir tous les champs obligatoires');
-      return;
-    }
 
-    setPaymentValidated(true);
-    const paymentRef = `MM-${selectedOperator.toUpperCase()}-${sanitizeInput(mobileMoneyData.numero_transaction)}`;
-    await createAccount(paymentRef);
-  }, [mobileMoneyData, selectedOperator, createAccount]);
-
-  const handleCaisseValidation = useCallback(async () => {
-    const montantAttendu = parseFloat(formData.solde_initial) || 0;
-
-    if (calculateTotalBillets !== montantAttendu) {
-      toast.error(`Le total des billets (${formatMoney(calculateTotalBillets)}) ne correspond pas au montant attendu (${formatMoney(montantAttendu)})`);
-      return;
-    }
-
-    setPaymentValidated(true);
-    const paymentRef = `CAISSE-${Date.now()}-${sanitizeInput(caisseData.reference_recu) || 'SANS-REF'}`;
-    await createAccount(paymentRef);
-  }, [formData.solde_initial, calculateTotalBillets, caisseData.reference_recu, createAccount]);
 
   const handleClientSelect = useCallback((client: Client) => {
     setFormData(prev => ({ ...prev, client_id: client.id }));
@@ -682,100 +575,62 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                   <legend className="block text-sm font-semibold text-slate-300 mb-2">
                     Mode de Paiement <span className="text-red-400">*</span>
                   </legend>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2" role="radiogroup">
+                  <div className="grid grid-cols-2 gap-3" role="radiogroup">
                     <button
                       type="button"
                       role="radio"
                       aria-checked={formData.mode_ouverture === 'Espèces'}
                       onClick={() => handleInputChange('mode_ouverture', 'Espèces')}
                       disabled={loading}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         formData.mode_ouverture === 'Espèces'
-                          ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                      } disabled:opacity-50`}
+                          ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
+                          : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+                      }`}
                     >
-                      <Banknote size={20} className="mb-1" aria-hidden="true" />
-                      <span className="text-xs">Espèces</span>
+                      <Banknote size={24} className="mb-2" aria-hidden="true" />
+                      <span className="text-sm font-medium">Espèces</span>
+                      <span className="text-xs opacity-75 mt-1">Paiement en caisse</span>
                     </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={formData.mode_ouverture === 'Chèque'}
-                      onClick={() => handleInputChange('mode_ouverture', 'Chèque')}
-                      disabled={loading}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        formData.mode_ouverture === 'Chèque'
-                          ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                      } disabled:opacity-50`}
-                    >
-                      <FileCheck size={20} className="mb-1" aria-hidden="true" />
-                      <span className="text-xs">Chèque</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={formData.mode_ouverture === 'Virement'}
-                      onClick={() => handleInputChange('mode_ouverture', 'Virement')}
-                      disabled={loading}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        formData.mode_ouverture === 'Virement'
-                          ? 'bg-blue-600 border-blue-500 text-white'
-                          : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                      } disabled:opacity-50`}
-                    >
-                      <Building size={20} className="mb-1" aria-hidden="true" />
-                      <span className="text-xs">Virement</span>
-                    </button>
-                    <div className="relative group">
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={formData.mode_ouverture === 'Mobile Money'}
-                        aria-disabled={!mobileMoneyEnabled}
-                        onClick={() => mobileMoneyEnabled && handleInputChange('mode_ouverture', 'Mobile Money')}
-                        disabled={!mobileMoneyEnabled || loading}
-                        className={`flex flex-col items-center justify-center p-3 rounded-lg border transition w-full focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          !mobileMoneyEnabled
-                            ? 'opacity-50 cursor-not-allowed bg-slate-700 border-slate-600 text-slate-500'
-                            : formData.mode_ouverture === 'Mobile Money'
-                            ? 'bg-blue-600 border-blue-500 text-white'
-                            : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        <Smartphone size={20} className="mb-1" aria-hidden="true" />
-                        <span className="text-xs">Mobile Money</span>
-                        {!mobileMoneyEnabled && (
-                          <span className="absolute -top-1 -right-1 px-1 py-0.5 bg-amber-500/20 text-amber-400 text-[8px] rounded border border-amber-500/30">
-                            Bientôt
-                          </span>
-                        )}
-                      </button>
-                      {!mobileMoneyEnabled && (
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-amber-400 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-amber-500/30 pointer-events-none">
-                          {mobileMoneyMessage}
+                    
+                    {comptesExistants.some(c => c.type_compte === 'Courant' && c.solde > 0) ? (
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={formData.mode_ouverture === 'Virement'}
+                          onClick={() => handleInputChange('mode_ouverture', 'Virement')}
+                          disabled={loading}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            formData.mode_ouverture === 'Virement'
+                              ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
+                              : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
+                          }`}
+                        >
+                          <RefreshCw size={24} className="mb-2" aria-hidden="true" />
+                          <span className="text-sm font-medium">Virement Interne</span>
+                          <span className="text-xs opacity-75 mt-1">Depuis compte courant</span>
+                        </button>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center p-4 rounded-lg border bg-slate-800/50 border-slate-700 text-slate-500 opacity-70 cursor-not-allowed">
+                             <RefreshCw size={24} className="mb-2" />
+                             <span className="text-sm font-medium">Virement Interne</span>
+                             <span className="text-xs text-center mt-1">Aucun compte courant éligible</span>
                         </div>
-                      )}
-                    </div>
-                    {comptesExistants.length > 0 && (
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={formData.mode_ouverture === 'Transfert interne'}
-                        onClick={() => handleInputChange('mode_ouverture', 'Transfert interne')}
-                        disabled={loading}
-                        className={`flex flex-col items-center justify-center p-3 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          formData.mode_ouverture === 'Transfert interne'
-                            ? 'bg-blue-600 border-blue-500 text-white'
-                            : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
-                        } disabled:opacity-50`}
-                      >
-                        <RefreshCw size={20} className="mb-1" aria-hidden="true" />
-                        <span className="text-xs">Transfert</span>
-                      </button>
                     )}
                   </div>
+
+                  {formData.mode_ouverture === 'Espèces' && (
+                     <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-3">
+                        <AlertTriangle className="text-yellow-500 shrink-0 mt-0.5" size={16} />
+                        <div className="text-sm">
+                           <p className="text-yellow-200 font-medium">Information</p>
+                           <p className="text-yellow-200/80">
+                              Le compte sera créé avec le statut <strong>En attente de paiement</strong>. 
+                              Le client devra se rendre en caisse pour effectuer le dépôt initial et activer le compte.
+                           </p>
+                        </div>
+                     </div>
+                  )}
                 </fieldset>
 
                 {/* Mobile Money Operator Selection */}
@@ -817,7 +672,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 )}
 
                 {/* Source Account for Internal Transfer */}
-                {formData.mode_ouverture === 'Transfert interne' && comptesExistants.length > 0 && (
+                {formData.mode_ouverture === 'Virement' && comptesExistants.length > 0 && (
                   <div>
                     <label htmlFor="compte-source" className="block text-sm font-semibold text-slate-300 mb-2">
                       Compte Source <span className="text-red-400">*</span>
@@ -847,7 +702,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 <div className="md:col-span-2">
                   <label htmlFor="solde-initial" className="block text-sm font-semibold text-slate-300 mb-2">
                     <DollarSign size={16} className="inline mr-2" aria-hidden="true" />
-                    Montant Initial (FCFA)
+                    Montant de dépôt initial (FCFA)
                   </label>
                   <input
                     id="solde-initial"
@@ -863,7 +718,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     aria-invalid={!!errors.solde_initial}
                     aria-describedby={compteSource ? 'solde-disponible' : undefined}
                   />
-                  {formData.mode_ouverture === 'Transfert interne' && compteSource && (
+                  {formData.mode_ouverture === 'Virement' && compteSource && (
                     <p id="solde-disponible" className="text-xs text-slate-400 mt-1">
                       Solde disponible: {formatMoney(compteSource.solde)}
                     </p>

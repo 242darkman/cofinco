@@ -388,7 +388,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
    */
   export async function getAllComptesWithClients(
     filter: { agence?: string } = {},
-    options: { search?: string; page?: number; limit?: number; typeCompte?: string } = {}
+    options: { search?: string; page?: number; limit?: number; typeCompte?: string; statut?: string } = {}
   ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = Math.max(1, options.page || 1);
     const limit = Math.min(100, Math.max(1, options.limit || 20));
@@ -405,6 +405,11 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     // Type filter
     if (options.typeCompte) {
       conditions.push(eq(comptes.typeCompte, options.typeCompte as any));
+    }
+
+    // Status filter
+    if (options.statut) {
+      conditions.push(eq(comptes.statut, options.statut as any));
     }
 
     // Search filter (by client name or account number)
@@ -2472,4 +2477,72 @@ export async function updateCreditRefundRequest(
     .where(eq(creditRefundRequests.id, id))
     .returning();
   return updated;
+}
+
+/**
+ * Create a receipt for initial deposit during account opening
+ */
+export async function createFactureForDepotInitial(data: {
+  compteId: string;
+  numeroCompte: string;
+  clientId: string;
+  montant: string;
+  typeCompte: string;
+  modePaiement: string;
+  transactionId?: string;
+  agentId?: string;
+}): Promise<Facture> {
+  let modele = await getModeleFactureByCode('DEPOT_INITIAL');
+  
+  if (!modele) {
+    [modele] = await db.insert(modelesFactures).values({
+      nom: "Reçu Dépôt Initial - Ouverture de Compte",
+      code: 'DEPOT_INITIAL',
+      description: "Reçu de dépôt initial lors de l'ouverture de compte",
+      typeDocument: "recu",
+      prefixeNumero: 'DI',
+      dernierNumero: 0,
+      mentionsLegales: "Ce reçu atteste du dépôt initial effectué lors de l'ouverture de votre compte.",
+      afficherTva: false,
+      isActive: true,
+    }).returning();
+  }
+  
+  const nextNum = await incrementModeleFactureNumero(modele.id);
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const numeroFacture = `${modele.prefixeNumero}-${dateStr}-${String(nextNum).padStart(4, '0')}`;
+  
+  const [facture] = await db.insert(factures).values({
+    numero: numeroFacture,
+    modeleId: modele.id,
+    clientId: data.clientId,
+    agentId: data.agentId,
+    dateFacture: new Date(),
+    sousTotal: data.montant,
+    montantTva: "0",
+    montantTotal: data.montant,
+    montantPaye: data.montant,
+    statut: "payee",
+    modePaiement: data.modePaiement,
+    notes: `Dépôt initial - Ouverture compte ${data.typeCompte} N° ${data.numeroCompte}`,
+  }).returning();
+  
+  await db.insert(lignesFactures).values({
+    factureId: facture.id,
+    description: `Dépôt Initial - Compte ${data.typeCompte} N° ${data.numeroCompte}`,
+    quantite: 1,
+    prixUnitaire: data.montant,
+    montant: data.montant,
+    typeOperation: "Dépôt Initial",
+    referenceId: data.compteId,
+  });
+  
+  // Link facture to transaction
+  if (data.transactionId) {
+    await db.update(transactionsCompte)
+      .set({ factureId: facture.id })
+      .where(eq(transactionsCompte.id, data.transactionId));
+  }
+  
+  return facture;
 }

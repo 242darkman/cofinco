@@ -176,6 +176,7 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "CAISSE_AGENT", // Nouveau module pour les opérations de caisse agent
   "VERSEMENT_AUTO", // Module pour les versements automatiques
   "DECAISSEMENT_PROGRAMME", // Module pour les décaissements programmés
+  "COMPTE", // Module pour les opérations de compte (ex: transfert, frais)
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -237,6 +238,7 @@ export const statutCompteEnum = pgEnum("statut_compte_enum", [
   "Actif",
   "Suspendu",
   "Clôturé",
+  "EN_ATTENTE_PAIEMENT",
 ]);
 
 export const motifBlocageEnum = pgEnum("motif_blocage_enum", [

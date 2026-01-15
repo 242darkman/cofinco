@@ -125,7 +125,7 @@ export interface IStorage {
     getAllComptes(filter?: { agence?: string }): Promise<Compte[]>;
     getAllComptesWithClients(
       filter?: { agence?: string },
-      options?: { search?: string; page?: number; limit?: number; typeCompte?: string }
+      options?: { search?: string; page?: number; limit?: number; typeCompte?: string; statut?: string }
     ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
     createCompte(compte: InsertCompte): Promise<Compte>;
     updateCompte(id: string, compte: Partial<InsertCompte>): Promise<Compte | undefined>;
