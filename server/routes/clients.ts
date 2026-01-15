@@ -232,6 +232,37 @@ export function registerClientRoutes(app: Express) {
     res.json(result);
   });
 
+  // GET Client Comptes - For account type selector
+  app.get("/api/clients/:id/comptes", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      // Validate UUID
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      // Verify client exists and access
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+      if (agenceFilter) {
+        if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
+          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+        } else if (agenceFilter.agence && client.agence !== agenceFilter.agence) {
+          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+        }
+      }
+
+      // Get all accounts for this client
+      const comptes = await getComptesByClient(req.params.id);
+      
+      res.json(addSnakeCaseAliasesDeep(comptes));
+    } catch (error) {
+      console.error("Error fetching client comptes:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des comptes" });
+    }
+  });
+
   // ============================================
   // COMPTES BANCAIRES (Refactored)
   // ============================================
