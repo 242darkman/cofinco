@@ -42,7 +42,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   const { data: agences } = useQuery({
     queryKey: ['agences', 'migration', sourceAgence.id],
     queryFn: async () => {
-      const res = await api.get<Agency[]>('/api/agences?statut=Actif');
+      const res = await api.get<Agency[]>('/agences?statut=Actif');
       return res.filter((a: Agency) => a.id !== sourceAgence.id);
     },
     enabled: isOpen
@@ -54,7 +54,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     if (migrationId) {
       interval = setInterval(async () => {
         try {
-          const status = await api.get<{ status: string; progress: number; error?: string }>(`/api/agences/migrations/${migrationId}/status`);
+          const status = await api.get<{ status: string; progress: number; error?: string }>(`/agences/migrations/${migrationId}/status`);
           setProgress(status.progress);
           
           if (status.status === 'COMPLETED') {
@@ -86,7 +86,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   const startMigration = async () => {
     setIsSubmitting(true);
     try {
-      const res = await api.post<{ id: string }>(`/api/agences/${sourceAgence.id}/migrate`, {
+      const res = await api.post<{ id: string }>(`/agences/${sourceAgence.id}/migrate`, {
         targetAgenceClients: targetClients,
         targetAgenceEmployes: targetEmployees,
         targetAgenceCoffre: targetTreasury
