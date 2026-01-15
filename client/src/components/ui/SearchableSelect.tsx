@@ -56,14 +56,34 @@ export default function SearchableSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter options based on search query
+
+  // Filter options based on search query with flexible name matching
   const filteredOptions = useMemo(() => {
     if (!searchQuery) return options;
-    const lowerQuery = searchQuery.toLowerCase();
-    return options.filter(opt => 
-      opt.label.toLowerCase().includes(lowerQuery) || 
-      (opt.subLabel && opt.subLabel.toLowerCase().includes(lowerQuery))
-    );
+    
+    const lowerQuery = searchQuery.toLowerCase().trim();
+    const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 0);
+    
+    return options.filter(opt => {
+      const lowerLabel = opt.label.toLowerCase();
+      const lowerSubLabel = opt.subLabel?.toLowerCase() || '';
+      
+      // Simple case: direct substring match
+      if (lowerLabel.includes(lowerQuery) || lowerSubLabel.includes(lowerQuery)) {
+        return true;
+      }
+      
+      // Flexible matching: check if all query words are present (any order)
+      // This allows "jean dupont" or "dupont jean" to both match "DUPONT Jean"
+      if (queryWords.length > 1) {
+        const allWordsMatch = queryWords.every(word => 
+          lowerLabel.includes(word) || lowerSubLabel.includes(word)
+        );
+        return allWordsMatch;
+      }
+      
+      return false;
+    });
   }, [options, searchQuery]);
 
   // Find selected option object
