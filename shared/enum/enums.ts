@@ -177,6 +177,7 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "VERSEMENT_AUTO", // Module pour les versements automatiques
   "DECAISSEMENT_PROGRAMME", // Module pour les décaissements programmés
   "COMPTE", // Module pour les opérations de compte (ex: transfert, frais)
+  "COFFRE", // Module pour les opérations de coffre-fort
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -196,6 +197,10 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "OPERATION_TERRAIN_SUBMITTED",
   "OPERATION_TERRAIN_APPROVED",
   "OPERATION_TERRAIN_REJECTED",
+  // Caisse Admin events
+  "SESSION_FORCE_CLOSED",
+  "CAISSE_STATUS_CHANGED",
+  "CAISSE_LIQUIDATED",
 ]);
 
 export const typeTauxInteretEnum = pgEnum("type_taux_interet_enum", [

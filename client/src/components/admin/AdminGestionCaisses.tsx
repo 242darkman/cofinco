@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Monitor, Lock, AlertCircle, Trash2, Building2 } from 'lucide-react';
+import { Plus, Search, Monitor, Lock, MoreVertical, User, XCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, Button, FormField, SelectField, Badge, Modal, ConfirmDialog, Pagination } from '../ui';
+import { Button, FormField, SelectField, Modal, ConfirmDialog } from '../ui';
 import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
+import { ForceCloseModal } from './ForceCloseModal';
 
-// Types
 interface Caisse {
   id: string;
   nom: string;
@@ -26,10 +26,10 @@ export default function AdminGestionCaisses() {
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Agencies per page for admin view
+  const itemsPerPage = 20; // Augmenté pour moins de pagination
   
-  // Fetch Agences for Admin
   const { data: agences = [] } = useQuery<any[]>({
     queryKey: ['agences'],
     queryFn: async () => {
@@ -39,46 +39,32 @@ export default function AdminGestionCaisses() {
     enabled: isAdmin
   });
   
-  // Form State
   const [formData, setFormData] = useState({
     nom: '',
     type: 'Physique',
     agenceId: user?.agenceId || '', 
   }); 
 
-  // Reset form when opening modal for admin
-  React.useEffect(() => {
-     if (isModalOpen && isAdmin && !formData.agenceId) {
-         // Optionally set first agency or keep empty?
-         // Let's keep empty to force selection
-     }
-  }, [isModalOpen, isAdmin]);
-
-  // Assignment State
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedCaisseForAssign, setSelectedCaisseForAssign] = useState<Caisse | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   
-  // Fetch Employees for Assignment (filtered by agency)
+  const [isForceCloseModalOpen, setIsForceCloseModalOpen] = useState(false);
+  const [selectedCaisseForClose, setSelectedCaisseForClose] = useState<Caisse | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
+  
   const { data: employees = [] } = useQuery<any[]>({
     queryKey: ['employees', user?.agence],
     queryFn: async () => {
-        // Use users endpoint or employees endpoint. Users seems safer for auth ID matching.
-        // Assuming we have a way to get users by agency. 
-        // Failing that, we fetch all and filter.
         const res = await api.get<any[]>('/users'); 
         return (res || []).filter((u: any) => u.agence === user?.agence && u.role !== 'admin' && u.role !== 'Administrateur');
     },
     enabled: isAssignModalOpen
   });
 
-  // Assign Mutation
   const assignMutation = useMutation({
       mutationFn: async ({ caisseId, userIds }: { caisseId: string, userIds: string[] }) => {
-          const res = await api.post(`/caisses/${caisseId}/assign`, { userIds });
-          // Note: api.post returns parsed JSON, so we check for error property if backend returns { error: ... } on 200/201?
-          // Actually api-client throws on error status. So here res is success data.
-          return res;
+          return await api.post(`/caisses/${caisseId}/assign`, { userIds });
       },
       onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ['caisses'] });
@@ -92,8 +78,6 @@ export default function AdminGestionCaisses() {
 
   const handleOpenAssign = (caisse: Caisse) => {
       setSelectedCaisseForAssign(caisse);
-      // Pre-select existing assignments directly from caisse object (enriched by backend)
-      // We need to extend the Caisse interface locally to include assignments or cast it
       const existing = (caisse as any).assignments || [];
       setSelectedUserIds(existing);
       setIsAssignModalOpen(true);
@@ -101,15 +85,10 @@ export default function AdminGestionCaisses() {
 
   const toggleUserSelection = (userId: string) => {
       setSelectedUserIds(prev => 
-          prev.includes(userId) 
-            ? prev.filter(id => id !== userId)
-            : [...prev, userId]
+          prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
       );
   };
 
-
-  // Fetch Caisses
-  // Fetch Caisses (Global for admin, Scoped for others)
   const { data: caisses = [], isLoading } = useQuery<Caisse[]>({
     queryKey: ['caisses', isAdmin ? 'all' : user?.agenceId],
     queryFn: async () => {
@@ -120,70 +99,54 @@ export default function AdminGestionCaisses() {
     enabled: !!user?.agenceId || isAdmin
   });
 
-  // Create Mutation
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await api.post('/caisses', data);
-      return res;
-    },
+    mutationFn: async (data: any) => await api.post('/caisses', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['caisses'] });
       setIsModalOpen(false);
       setFormData({ nom: '', type: 'Physique', agenceId: user?.agenceId || '' });
-      toast.success('Caisse créée avec succès');
+      toast.success('Caisse créée');
     },
-    onError: (err: any) => {
-      toast.error(err.error || "Erreur lors de la création");
-    }
+    onError: (err: any) => toast.error(err.error || "Erreur")
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-        await caisseApi.delete(id);
-    },
+    mutationFn: async (id: string) => await caisseApi.delete(id),
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['caisses'] });
         toast.success('Caisse supprimée');
     },
-    onError: (err: any) => {
-        toast.error(err.message || "Impossible de supprimer (Caisse utilisée ?)");
-    }
+    onError: (err: any) => toast.error(err.message || "Impossible de supprimer")
   });
 
   const liquidateMutation = useMutation({
-    mutationFn: async (id: string) => {
-        await caisseApi.liquidate(id);
-    },
+    mutationFn: async (id: string) => await caisseApi.liquidate(id),
     onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['caisses'] });
-        toast.success('Caisse liquidée et supprimée');
+        toast.success('Caisse liquidée');
     },
-    onError: (err: any) => {
-        toast.error(err.message || "Erreur lors de la liquidation");
-    }
+    onError: (err: any) => toast.error(err.message || "Erreur")
   });
 
   const handleDelete = (caisse: Caisse) => {
-      // Check status
+      setOpenMenuId(null);
       if (caisse.statut === 'Ouverte') {
-          toast.error("Impossible de supprimer une caisse ouverte. Veuillez d'abord fermer la session.");
+          toast.error("Fermez d'abord la session");
           return;
       }
-
       const balance = Number(caisse.solde);
-      
       if (balance > 0) {
           openConfirm({
-              title: "Liquider et Supprimer ?",
-              message: `Cette caisse contient ${balance.toLocaleString()} FCFA. Voulez-vous transférer ces fonds au coffre de l'agence et supprimer définitivement la caisse ?`,
+              title: "Liquider ?",
+              message: `${balance.toLocaleString()} FCFA seront transférés au coffre.`,
               variant: 'danger',
-              confirmText: "Liquider et Supprimer",
+              confirmText: "Liquider",
               onConfirm: () => liquidateMutation.mutate(caisse.id)
           });
       } else {
           openConfirm({
-              title: "Supprimer la caisse",
-              message: `Êtes-vous sûr de vouloir supprimer la caisse "${caisse.nom}" ? Cette action est irréversible.`,
+              title: "Supprimer ?",
+              message: `Supprimer "${caisse.nom}" ?`,
               variant: 'danger',
               confirmText: "Supprimer",
               onConfirm: () => deleteMutation.mutate(caisse.id)
@@ -191,180 +154,231 @@ export default function AdminGestionCaisses() {
       }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(formData);
-  };
-
   const filteredCaisses = caisses.filter(c => 
     c.nom.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const renderCaisseCard = (caisse: Caisse) => (
-      <Card key={caisse.id} padding="md" className="flex flex-col gap-3 hover:border-primary/50 transition-colors">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              caisse.type === 'Coffre-Fort' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
-            }`}>
-              {caisse.type === 'Coffre-Fort' ? <Lock className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">{caisse.nom}</h3>
-              <p className="text-xs text-muted-foreground">{caisse.type}</p>
-            </div>
-          </div>
-          <Badge value={caisse.statut} variant={caisse.statut === 'Ouverte' ? 'success' : 'neutral'} />
-        </div>
-
-        <div className="mt-2 space-y-2">
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">Solde Actuel</span>
-            <span className="font-mono font-medium">{Number(caisse.solde).toLocaleString()} FCFA</span>
-          </div>
-            <div className="flex flex-wrap gap-1 mt-1">
-               {(caisse as any).assignments?.length > 0 ? (
-                   <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                       {(caisse as any).assignments.length} agent(s) assigné(s)
-                   </span>
-               ) : (
-                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                       Accès libre / Non assigné
-                   </span>
-               )}
-            </div>
-
-           {caisse.isOccupied && (
-            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded-md">
-               <AlertCircle className="w-3 h-3" />
-               Session en cours (Par: {caisse.occupiedBy})
-            </div>
-          )}
-        </div>
-
-        <div className="pt-4 mt-auto border-t border-border flex items-center justify-between gap-3">
-             <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => handleDelete(caisse)}
-                className="text-red-500 hover:text-red-600 hover:bg-red-50 px-2 h-8"
-                title="Supprimer ou Liquider"
-             >
-                <Trash2 size={15} className="mr-1.5" />
-                <span className="text-xs font-medium">Supprimer</span>
-             </Button>
-
-            <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleOpenAssign(caisse)}
-                className="text-xs h-8 ml-auto"
-            >
-                Assigner
-            </Button>
-        </div>
-      </Card>
+  // Pagination
+  const totalPages = Math.ceil(filteredCaisses.length / itemsPerPage);
+  const paginatedCaisses = filteredCaisses.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <FormField 
-            name="search"
-            label=""
-            placeholder="Rechercher une caisse..." 
+    <div className="space-y-4">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 max-w-sm relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Rechercher..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            icon={Search}
-            containerClassName="mb-0"
+            className="w-full pl-9 pr-3 py-2 bg-slate-800/40 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-600"
           />
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className="bg-primary hover:bg-primary/90 text-white gap-2">
-          <Plus className="w-4 h-4" />
-          Nouvelle Caisse
+        <Button 
+          onClick={() => setIsModalOpen(true)} 
+          size="sm"
+          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Nouvelle
         </Button>
       </div>
 
-      {/* Grid Display */}
-      {isAdmin ? (
-         // Grouped View for Admin with Pagination
-         <div className="space-y-8">
-            {(() => {
-                // Group by Agency
-                const grouped = filteredCaisses.reduce((acc, caisse) => {
-                    const agenceName = agences.find(a => a.id === caisse.agenceId)?.nom || 'Agence Inconnue';
-                    if (!acc[agenceName]) acc[agenceName] = [];
-                    acc[agenceName].push(caisse);
-                    return acc;
-                }, {} as Record<string, Caisse[]>);
+      {/* Compact Table View */}
+      <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/50 border-b border-slate-700/50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Caisse</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Agence</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Statut</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Solde</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Agent</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wider w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/30">
+              {paginatedCaisses.map((caisse) => (
+                <tr key={caisse.id} className="hover:bg-slate-700/20 transition-colors">
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        caisse.type === 'Coffre-Fort' 
+                          ? 'bg-amber-500/10' 
+                          : 'bg-blue-500/10'
+                      }`}>
+                        {caisse.type === 'Coffre-Fort' ? 
+                          <Lock className="w-4 h-4 text-amber-400" /> : 
+                          <Monitor className="w-4 h-4 text-blue-400" />
+                        }
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-white truncate">{caisse.nom}</div>
+                        <div className="text-xs text-slate-500">{caisse.type}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-medium bg-slate-700/50 text-slate-300 border border-slate-600/50 min-w-[100px] max-w-[140px] truncate">
+                      {agences.find(a => a.id === caisse.agenceId)?.nom || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${
+                        caisse.isOccupied 
+                          ? 'bg-emerald-400 shadow-sm shadow-emerald-500/50 animate-pulse' 
+                          : 'bg-slate-500'
+                      }`} />
+                      <span className={`text-xs font-medium ${
+                        caisse.isOccupied ? 'text-emerald-400' : 'text-slate-500'
+                      }`}>
+                        {caisse.isOccupied ? 'En ligne' : 'Fermée'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <div className="font-mono font-semibold text-white">
+                      {Number(caisse.solde).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-slate-500">FCFA</div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {caisse.isOccupied ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs font-medium border border-emerald-500/30">
+                          {(caisse.occupiedBy || 'A')[0].toUpperCase()}
+                        </div>
+                        <span className="text-xs text-slate-300 truncate max-w-[120px]">{caisse.occupiedBy}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-slate-600" />
+                        <span className="text-xs text-slate-500">
+                          {(caisse as any).assignments?.length > 0 
+                            ? `${(caisse as any).assignments.length} agent(s)`
+                            : 'Non assignée'
+                          }
+                        </span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === caisse.id ? null : caisse.id);
+                        }}
+                        className="p-1 hover:bg-slate-700/50 rounded transition-colors"
+                      >
+                        <MoreVertical className="w-4 h-4 text-slate-400" />
+                      </button>
 
-                const sortedAgencies = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
-                
-                // Pagination Logic
-                const totalItems = sortedAgencies.length;
-                const totalPages = Math.ceil(totalItems / itemsPerPage);
-                const startIndex = (currentPage - 1) * itemsPerPage;
-                const visibleAgencies = sortedAgencies.slice(startIndex, startIndex + itemsPerPage);
+                      {openMenuId === caisse.id && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setOpenMenuId(null)}
+                          />
+                          <div className="fixed z-20 w-44 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden"
+                            style={{
+                              top: `${(document.activeElement as HTMLElement)?.getBoundingClientRect().bottom + 4}px`,
+                              right: `${window.innerWidth - (document.activeElement as HTMLElement)?.getBoundingClientRect().right}px`
+                            }}
+                          >
+                            {caisse.isOccupied && (
+                              <button
+                                onClick={() => {
+                                  setSelectedCaisseForClose(caisse);
+                                  setActiveSessionId((caisse as any).sessionId || '');
+                                  setIsForceCloseModalOpen(true);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full px-3 py-2 text-left text-xs text-orange-400 hover:bg-slate-700/50 flex items-center gap-2"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Forcer clôture
+                              </button>
+                            )}
+                            <button
+                              onClick={() => {
+                                handleOpenAssign(caisse);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-700/50 flex items-center gap-2"
+                            >
+                              <User className="w-3.5 h-3.5" />
+                              Assigner
+                            </button>
+                            <button
+                              onClick={() => handleDelete(caisse)}
+                              className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-slate-700/50 flex items-center gap-2 border-t border-slate-700"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Supprimer
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-                return (
-                    <>
-                        {visibleAgencies.map(([agenceName, agenceCaisses]) => (
-                            <div key={agenceName} className="space-y-3">
-                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                                    <Building2 className="w-4 h-4" />
-                                    {agenceName} ({agenceCaisses.length})
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {agenceCaisses.map(caisse => renderCaisseCard(caisse))}
-                                </div>
-                            </div>
-                        ))}
-                        
-                        {totalItems > itemsPerPage && (
-                            <Pagination
-                                currentPage={currentPage}
-                                totalPages={totalPages}
-                                onPageChange={setCurrentPage}
-                                canGoNext={currentPage < totalPages}
-                                canGoPrevious={currentPage > 1}
-                                totalItems={totalItems}
-                                itemsPerPage={itemsPerPage}
-                                className="mt-8"
-                            />
-                        )}
-                        
-                        {totalItems === 0 && (
-                            <div className="text-center py-12 text-muted-foreground">
-                                Aucune caisse trouvée.
-                            </div>
-                        )}
-                    </>
-                );
-            })()}
-         </div>
-      ) : (
-         // Standard View
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCaisses.map((caisse) => renderCaisseCard(caisse))}
-         </div>
-      )}
+        {/* Compact Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700/50 bg-slate-900/30">
+            <div className="text-xs text-slate-400">
+              {filteredCaisses.length} caisse(s) · Page {currentPage}/{totalPages}
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-xs bg-slate-700/50 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors text-white"
+              >
+                Préc.
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-xs bg-slate-700/50 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors text-white"
+              >
+                Suiv.
+              </button>
+            </div>
+          </div>
+        )}
 
+        {filteredCaisses.length === 0 && (
+          <div className="text-center py-12 text-slate-500 text-sm">
+            Aucune caisse trouvée
+          </div>
+        )}
+      </div>
 
-      {/* Modal Creation */}
+      {/* Modals */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nouvelle Caisse">
         <div className="p-6 pt-2 space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(formData); }} className="space-y-4">
             <FormField 
-              label="Nom de la caisse"
+              label="Nom"
               name="nom"
               required 
               placeholder="Ex: Guichet 01"
               value={formData.nom}
               onChange={e => setFormData({...formData, nom: e.target.value})}
             />
-
             {isAdmin && (
                 <SelectField
                   label="Agence"
@@ -375,21 +389,17 @@ export default function AdminGestionCaisses() {
                   onChange={e => setFormData({...formData, agenceId: e.target.value})}
                 />
             )}
-            
             <SelectField
               label="Type"
               name="type"
-              // Standard SelectField uses options prop or children? 
-              // Checking usage: usually options={[ {value, label} ]}
               options={[
-                { value: 'Physique', label: 'Physique (Guichet)' },
+                { value: 'Physique', label: 'Physique' },
                 { value: 'Coffre-Fort', label: 'Coffre-Fort' },
                 { value: 'Virtuelle', label: 'Virtuelle' }
               ]}
               value={formData.type}
               onChange={e => setFormData({...formData, type: e.target.value})}
             />
-
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Annuler</Button>
               <Button type="submit" isLoading={createMutation.isPending}>Créer</Button>
@@ -398,44 +408,31 @@ export default function AdminGestionCaisses() {
         </div>
       </Modal>
 
-      {/* Assignment Modal */}
-      <Modal 
-        isOpen={isAssignModalOpen} 
-        onClose={() => setIsAssignModalOpen(false)} 
-        title={`Assigner - ${selectedCaisseForAssign?.nom}`}
-      >
+      <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title={`Assigner - ${selectedCaisseForAssign?.nom}`}>
         <div className="p-6 pt-2 space-y-4">
-            <p className="text-sm text-muted-foreground">
-                Sélectionnez les agents autorisés à ouvrir cette caisse.
-            </p>
-            
             <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
                 {employees.map(emp => (
-                    <label key={emp.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                    <label key={emp.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-700/30 rounded cursor-pointer">
                         <input 
                             type="checkbox"
                             checked={selectedUserIds.includes(emp.id)}
                             onChange={() => toggleUserSelection(emp.id)}
                             className="rounded border-gray-300 text-primary focus:ring-primary"
                         />
-                        <div className="flex flex-col">
-                            <span className="font-medium text-sm">{emp.nom} {emp.prenom}</span>
-                            <span className="text-xs text-gray-500">@{emp.username} · {emp.role}</span>
+                        <div>
+                            <div className="text-sm font-medium">{emp.nom} {emp.prenom}</div>
+                            <div className="text-xs text-gray-500">@{emp.username}</div>
                         </div>
                     </label>
                 ))}
                 {employees.length === 0 && (
-                    <p className="text-center text-sm text-gray-500 py-4">Aucun agent trouvé dans cette agence.</p>
+                    <p className="text-center text-sm text-gray-500 py-4">Aucun agent</p>
                 )}
             </div>
-
             <div className="flex justify-end gap-3 pt-4">
               <Button variant="ghost" onClick={() => setIsAssignModalOpen(false)}>Annuler</Button>
               <Button 
-                onClick={() => assignMutation.mutate({ 
-                    caisseId: selectedCaisseForAssign!.id, 
-                    userIds: selectedUserIds 
-                })} 
+                onClick={() => assignMutation.mutate({ caisseId: selectedCaisseForAssign!.id, userIds: selectedUserIds })} 
                 isLoading={assignMutation.isPending}
               >
                 Sauvegarder
@@ -444,7 +441,23 @@ export default function AdminGestionCaisses() {
         </div>
       </Modal>
 
-      {/* Confirmation Dialog */}
+      <ForceCloseModal
+        isOpen={isForceCloseModalOpen}
+        caisse={selectedCaisseForClose}
+        sessionId={activeSessionId}
+        onConfirm={async (motif: string, keepFunds: boolean) => {
+          try {
+            await api.post(`/caisses/sessions/${activeSessionId}/force-close`, { motif, keepFunds });
+            queryClient.invalidateQueries({ queryKey: ['caisses'] });
+            toast.success('Session fermée');
+            setIsForceCloseModalOpen(false);
+          } catch (err: any) {
+            throw new Error(err.error || 'Erreur');
+          }
+        }}
+        onClose={() => setIsForceCloseModalOpen(false)}
+      />
+
       <ConfirmDialog
         isOpen={confirmState.isOpen}
         onClose={closeConfirm}

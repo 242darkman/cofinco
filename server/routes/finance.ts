@@ -2192,36 +2192,4 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
-  // DELETE CAISSE - Validated
-  app.delete("/api/caisses/:id", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const [caisse] = await db.select().from(schema.caisses).where(eq(schema.caisses.id, id));
-        
-        if (!caisse) return res.status(404).json({ error: "Caisse not found" });
-
-        // Check conditions
-        if (caisse.statut === 'Ouverte') {
-            return res.status(400).json({ 
-                error: "Impossible de supprimer une caisse ouverte.", 
-                code: "CAISSE_OPEN" 
-            });
-        }
-
-        if (Number(caisse.solde) > 0) {
-             return res.status(400).json({ 
-                error: "Cette caisse contient encore des fonds. Utilisez l'option 'Liquider' pour transférer les fonds au coffre avant suppression.", 
-                code: "CAISSE_HAS_FUNDS" 
-            });
-        }
-
-        await db.delete(schema.caisses).where(eq(schema.caisses.id, id));
-        await logAudit(req, "DELETE", "caisses", id, {});
-
-        res.json({ success: true });
-    } catch (e: any) {
-        res.status(500).json({ error: e.message });
-    }
-  });
-
 }

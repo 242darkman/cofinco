@@ -8,6 +8,7 @@ import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
 import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
+import { coffresForts } from "./coffres-forts";
 
 // Interest Rates
 export const interestRates = pgTable(
@@ -371,6 +372,10 @@ export const mouvementsFinanciers = pgTable(
     chkMontantPos: sql`CONSTRAINT chk_mouvements_montant_pos CHECK (${t.montant} > 0)`,
   }),
 );
+
+export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
+export type InsertMouvementFinancier = typeof mouvementsFinanciers.$inferInsert;
+
 
 // =======================
 // Outbox temps réel fiable
@@ -759,6 +764,17 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   lastActivity: timestamp("last_activity").defaultNow(), // Heartbeat - dernière activité
   timeoutAt: timestamp("timeout_at"), // Date d'expiration prévue
   closedReason: text("closed_reason").default("manual"), // manual, timeout, admin
+  
+  // Force close fields (admin override)
+  forcedClose: boolean("forced_close").default(false),
+  forceClosedBy: uuid("force_closed_by").references(() => users.id, { onDelete: "set null" }),
+  forceCloseMotif: text("force_close_motif"),
+  forceClosedAt: timestamp("force_closed_at"),
+  
+  // Flexible closure options
+  fundsKeptInCaisse: boolean("funds_kept_in_caisse").default(false),
+  transferToCoffreId: uuid("transfer_to_coffre_id").references(() => coffresForts.id, { onDelete: "set null" }),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
