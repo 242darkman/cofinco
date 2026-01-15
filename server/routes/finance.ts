@@ -2145,7 +2145,7 @@ export function registerFinanceRoutes(app: Express) {
                 status: "COMPLETED",
                 description: `Liquidation Caisse ${caisse.nom} -> Coffre`,
                 createdBy: userId,
-                sens: "SORTIE",
+                sens: "Débit", // Débit from caisse perspective
                 sourceModule: "CAISSE",
                 agenceId: caisse.agenceId
             } as any);

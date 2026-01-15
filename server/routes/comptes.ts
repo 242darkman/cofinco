@@ -17,7 +17,7 @@
 
 import type { Express } from "express";
 import { requireAuth, requireRole } from "../auth";
-import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
+import { requireAgenceAccess, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { z } from "zod";
@@ -91,19 +91,21 @@ export function registerComptesRoutes(app: Express) {
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
-        const data = normalizeKeysDeep(req.body);
-        const parsed = createCompteSchema.parse(data);
+        const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user;
 
-        // Vérifier que le client appartient à l'agence de l'utilisateur (si pas admin)
-        if (user?.agenceId && user.role !== "admin") {
-          const client = await storage.getClient(parsed.clientId);
+        // Force l'agenceId du client si non spécifié ou pour garantir la cohérence
+        if (data.clientId) {
+          const client = await storage.getClient(data.clientId);
           if (!client) {
             return res.status(404).json({ message: "Client non trouvé" });
           }
-          // Note: Le client peut être créé dans n'importe quelle agence,
-          // mais le compte sera lié à l'agence spécifiée
+          // On utilise l'agence du client par défaut si non précisé, 
+          // ou on l'écrase pour respecter la règle métier demandée.
+          data.agenceId = client.agenceId;
         }
+
+        const parsed = createCompteSchema.parse(data);
 
         const compte = await comptesService.createCompte(
           {

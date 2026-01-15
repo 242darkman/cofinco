@@ -410,8 +410,11 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
         or(
           sql`LOWER(${clients.nom}) LIKE ${searchTerm}`,
           sql`LOWER(${clients.prenom}) LIKE ${searchTerm}`,
+          sql`LOWER(${users.nom}) LIKE ${searchTerm}`,
+          sql`LOWER(${users.prenom}) LIKE ${searchTerm}`,
           sql`LOWER(${comptes.numeroCompte}) LIKE ${searchTerm}`,
-          sql`LOWER(${clients.telephone}) LIKE ${searchTerm}`
+          sql`LOWER(${clients.telephone}) LIKE ${searchTerm}`,
+          sql`LOWER(${users.telephone}) LIKE ${searchTerm}`
         )
       );
     }
@@ -421,7 +424,8 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     
     const countQuery = db.select({ count: count() })
       .from(comptes)
-      .leftJoin(clients, eq(comptes.clientId, clients.id));
+      .leftJoin(clients, eq(comptes.clientId, clients.id))
+      .leftJoin(users, eq(clients.userId, users.id));
     
     const countResult = whereClause 
       ? await countQuery.where(whereClause)
@@ -432,10 +436,12 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     // Fetch data with pagination
     let dataQuery = db.select({
       compte: comptes,
-      client: clients
+      client: clients,
+      user: users
     })
     .from(comptes)
     .leftJoin(clients, eq(comptes.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
     .orderBy(desc(comptes.createdAt))
     .limit(limit)
     .offset(offset);
@@ -445,7 +451,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
       : await dataQuery;
 
     // Transform data with client info embedded
-    const data = results.map(({ compte, client }) => ({
+    const data = results.map(({ compte, client, user }) => ({
       ...compte,
       // Snake case aliases for frontend compatibility
       numero_compte: compte.numeroCompte,
@@ -461,13 +467,13 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
       // Embedded client info
       clients: client ? {
         id: client.id,
-        nom: client.nom,
-        prenom: client.prenom,
-        telephone: client.telephone,
-        phone: client.telephone, // Alias
-        email: client.email,
+        nom: user?.nom || client.nom,
+        prenom: user?.prenom || client.prenom,
+        telephone: user?.telephone || client.telephone,
+        phone: user?.telephone || client.telephone, // Alias
+        email: user?.email || client.email,
         agence: client.agence,
-        photo_url: client.photoProfile
+        photo_url: user?.photoProfile || client.photoProfile
       } : null
     }));
 

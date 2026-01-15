@@ -28,6 +28,7 @@ interface Client {
 interface CompteExistant {
   id: string;
   numero_compte: string;
+  typeCompte?: string;
   type_compte: string;
   solde: number;
 }
@@ -114,11 +115,20 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       const data = await compteEpargneApi.getByClient(clientIdParam);
       const activeComptes = Array.isArray(data) ? data.filter((c: any) => c.statut === 'Actif') : [];
       setComptesExistants(activeComptes);
+      
+      // Auto-sélectionner un type disponible si celui par défaut est déjà possédé
+      const ownedTypes = activeComptes.map((c: any) => c.typeCompte || c.type_compte);
+      if (ownedTypes.includes(formData.type_compte)) {
+        const available = (['Courant', 'Épargne', 'Bloqué'] as TypeCompte[]).find(t => !ownedTypes.includes(t));
+        if (available) {
+          setFormData(prev => ({ ...prev, type_compte: available }));
+        }
+      }
     } catch (error) {
       console.warn('Erreur chargement comptes:', error);
       setComptesExistants([]);
     }
-  }, []);
+  }, [formData.type_compte]);
 
   const filteredClients = useMemo(() => {
     const query = searchQuery.toLowerCase();
@@ -533,12 +543,18 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     id="type-compte"
                     value={formData.type_compte}
                     onChange={(e) => handleInputChange('type_compte', e.target.value)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     disabled={loading}
                   >
-                    <option value="Courant">Compte Courant</option>
-                    <option value="Épargne">Compte Épargne</option>
-                    <option value="Bloqué">Compte Bloqué</option>
+                    <option value="Courant" disabled={comptesExistants.some(c => (c.typeCompte || c.type_compte) === 'Courant')}>
+                      Compte Courant {comptesExistants.some(c => (c.typeCompte || c.type_compte) === 'Courant') ? '(Déjà existant)' : ''}
+                    </option>
+                    <option value="Épargne" disabled={comptesExistants.some(c => (c.typeCompte || c.type_compte) === 'Épargne')}>
+                      Compte Épargne {comptesExistants.some(c => (c.typeCompte || c.type_compte) === 'Épargne') ? '(Déjà existant)' : ''}
+                    </option>
+                    <option value="Bloqué" disabled={comptesExistants.some(c => (c.typeCompte || c.type_compte) === 'Bloqué')}>
+                      Compte Bloqué {comptesExistants.some(c => (c.typeCompte || c.type_compte) === 'Bloqué') ? '(Déjà existant)' : ''}
+                    </option>
                   </select>
                 </div>
 

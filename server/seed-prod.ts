@@ -659,7 +659,7 @@ async function seedProd() {
 
     console.log('\n✅ PRODUCTION SEED COMPLETE');
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log('👤 Login: admin / Admin123!@#');
+    console.log('👤 Login: s.administrateur / Admin123!@#');
     console.log('');
     console.log('🔐 Coffres-Forts:');
     console.log('   CF-SIEGE : Coffre-Fort Siège (solde initial: 0 XAF)');

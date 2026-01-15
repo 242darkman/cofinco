@@ -36,11 +36,15 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
     .select({
       client: clients,
       type_marche_nom: typesMarches.nom,
-      agence_nom: agences.nom
+      agence_nom: agences.nom,
+      user_nom: users.nom,
+      user_prenom: users.prenom,
+      user_telephone: users.telephone,
     })
     .from(clients)
     .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
     .leftJoin(agences, eq(clients.agenceId, agences.id))
+    .leftJoin(users, eq(clients.userId, users.id))
     .$dynamic();
 
   if (conditions.length > 0) {
@@ -51,6 +55,10 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
 
   return results.map(r => ({
     ...r.client,
+    // Use user data as source of truth for identity, fallback to legacy fields
+    nom: r.user_nom || r.client.nom,
+    prenom: r.user_prenom || r.client.prenom,
+    telephone: r.user_telephone || r.client.telephone,
     type_marche_nom: r.type_marche_nom,
     agence_nom: r.agence_nom
   }));

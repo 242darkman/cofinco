@@ -1,6 +1,6 @@
 {
   "name": "cofinco",
-  "version": "2.14.1",
+  "version": "2.15.1",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -10,7 +10,7 @@
     "start": "NODE_ENV=production node --env-file=.env dist/index.cjs",
     "check": "tsc",
     "db:push": "node --env-file=.env node_modules/drizzle-kit/bin.cjs push",
-    "db:seed:demo": "node --env-file=.env --import tsx server/seed-demo.ts",
+    "db:seed:demo": "node --env-file=.env --import tsx server/seed-demo-simple.ts",
     "db:seed:prod": "node --env-file=.env --import tsx server/seed-prod.ts"
   },
   "dependencies": {
