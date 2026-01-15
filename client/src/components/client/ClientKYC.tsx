@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, Filter, SortAsc, Image } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { FileUploadZone } from '../ui/FileUploadZone';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 // Helper to detect image URLs
@@ -42,6 +43,8 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
     url: '',
     notes: ''
   });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDocuments();
@@ -178,10 +181,15 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   };
 
   const handleDeleteDocument = async (docId: string) => {
-    if (!confirm('Supprimer ce document?')) return;
+    setDocToDelete(docId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!docToDelete) return;
 
     try {
-      const updatedDocs = documents.filter(doc => doc.id !== docId);
+      const updatedDocs = documents.filter(doc => doc.id !== docToDelete);
 
       const res = await fetch(`/api/clients/${clientId}`, {
         method: 'PATCH',
@@ -196,6 +204,9 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
       onUpdate?.();
     } catch (error) {
       console.error('Erreur suppression document:', error);
+    } finally {
+      setShowDeleteConfirm(false);
+      setDocToDelete(null);
     }
   };
 
@@ -437,6 +448,18 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
             ))}
           </div>
         )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Supprimer ce document?"
+        message="Cette action est irréversible. Le document sera définitivement supprimé du dossier KYC."
+        variant="danger"
+        confirmText="Supprimer"
+        cancelText="Annuler"
+      />
     </div>
   );
 }
