@@ -9,6 +9,7 @@ import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { agenceApi } from '../../lib/api-client';
+import { useMinIOUpload } from '../../hooks/useMinIOUpload';
 
 interface ClientFormProps {
   client?: Client | null;
@@ -215,42 +216,78 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
-  // --- Photo Handling ---
+  // MinIO Hooks
+  const { uploadFile: uploadProfile, isUploading: isUploadingProfile } = useMinIOUpload({
+    path: 'profiles',
+    isPublic: true,
+    onError: (err) => console.error("Profile upload error", err)
+  });
 
-  const handleProfileCapture = (imageDataUrl: string) => {
-    handleChange('photoProfile', imageDataUrl);
-  };
+  const { uploadFile: uploadDoc, isUploading: isUploadingDoc } = useMinIOUpload({
+    path: 'kyc',
+    isPublic: false,
+    onError: (err) => console.error("Doc upload error", err)
+  });
 
-  const handleProfileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => handleChange('photoProfile', reader.result as string);
-      reader.readAsDataURL(file);
+  const handleProfileCapture = async (imageDataUrl: string) => {
+    try {
+      const res = await fetch(imageDataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const url = await uploadProfile(file);
+      if (url) handleChange('photoProfile', url);
+    } catch (e) {
+      console.error("Capture upload failed", e);
     }
   };
 
-  const handleDocCapture = (imageDataUrl: string) => {
-      setPieceIdentite(prev => {
-        const newPieces = [...prev, imageDataUrl];
-        handleChange('photoUrl', JSON.stringify(newPieces));
-        return newPieces;
-      });
+  const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const url = await uploadProfile(file);
+        if (url) handleChange('photoProfile', url);
+    }
   };
 
-  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
+  const handleDocCapture = async (imageDataUrl: string) => {
+      try {
+        const res = await fetch(imageDataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `doc_capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const url = await uploadDoc(file);
+        if (url) {
             setPieceIdentite(prev => {
-                const newPieces = [...prev, reader.result as string];
-                handleChange('photoUrl', JSON.stringify(newPieces));
+                const newPieces = [...prev, url]; // URL now, not base64
+                // Update both legacy photoUrl (if needed for compatibility) and documents
+                // Ideally we switch to 'documents' but let's see if InsertClient has it.
+                // Assuming we use 'documents' in formData.
+                // Since schema has it, InsertClient should have it.
+                // handleChange('documents' as any, newPieces); 
+                handleChange('photoUrl', JSON.stringify(newPieces)); // Keep legacy behavior for now but with MinIO URLs
                 return newPieces;
             });
-        };
-        reader.readAsDataURL(file);
+        }
+      } catch (e) {
+          console.error("Doc capture upload failed", e);
+      }
+  };
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(async (file) => {
+        try {
+            const url = await uploadDoc(file);
+            if (url) {
+                setPieceIdentite(prev => {
+                    const newPieces = [...prev, url];
+                    handleChange('photoUrl', JSON.stringify(newPieces));
+                    return newPieces;
+                });
+            }
+        } catch (e) {
+            console.error("Doc upload failed", e);
+        }
       });
     }
   };

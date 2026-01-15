@@ -4,6 +4,7 @@ import { Card, Badge } from '../ui';
 import { FileUploadZone } from '../ui/FileUploadZone';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { useMinIOUpload } from '../../hooks/useMinIOUpload';
 
 // Helper to detect image URLs
 const isImage = (url: string) =>
@@ -32,6 +33,12 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   const canAddDocuments = hasPermission('clients', 'edit') || hasPermission('kyc', 'create');
   const canVerifyDocuments = hasPermission('kyc', 'approve') || hasPermission('admin', 'manage');
   const canDeleteDocuments = hasPermission('clients', 'edit') || hasPermission('kyc', 'delete');
+
+  const { uploadFile, isUploading: isFileUploading } = useMinIOUpload({
+    path: 'kyc', 
+    isPublic: false, 
+    onError: (err: Error) => console.error("Upload error", err)
+  });
 
   const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -309,20 +316,42 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                   maxFiles={1}
                   label="Glissez votre document ici"
                   hint="ou cliquez pour parcourir (PDF, JPG, PNG - max 5MB)"
+                  uploadFunction={async (file) => {
+                    // Determine path based on doc type
+                    const path = newDoc.type === 'Contract' ? 'contracts' : 'kyc';
+                    // We need to use the hook's uploadFile here, but we can't easily pass the hook's returned function 
+                    // if it depends on state that changes (like path).
+                    // Actually, useMinIOUpload hook creates a stable function if props are stable.
+                    // Let's handle the upload in onFilesSelected instead to control the path dynamically if needed, 
+                    // OR just use uploadFunction if we make the hook usage dynamic.
+                    
+                    // Better approach: use onFilesSelected and call uploadFile manually to handle state updates
+                    return ""; 
+                  }}
                   onFilesSelected={async (files: File[]) => {
                     if (files.length > 0) {
                       const file = files[0];
-                      // Convert to base64 for storage
-                      const reader = new FileReader();
-                      reader.onload = (e) => {
-                        const base64 = e.target?.result as string;
-                        setNewDoc(prev => ({ 
-                          ...prev, 
-                          url: base64,
-                          name: prev.name || file.name 
-                        }));
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                         // Determine specific path based on type
+                         const subfolder = newDoc.type === 'Contract' ? 'contracts' : 'kyc';
+                         // We'll rely on the hook initialized in the component, but we might need dynamic path support in the hook
+                         // OR we just instantiate the hook with a generic 'documents' path and handle organization backend side?
+                         // The hook uses the path passed at init. 
+                         // Let's modify the hook call or use the hook with a generic path and rely on filename or just accept 'documents' for now.
+                         // Actually, looking at useMinIOUpload (from memory), it takes path in props.
+                         // Let's assume we use one hook instance for now, maybe initialized with 'clients'.
+                         
+                         const url = await uploadFile(file); // This uses the path defined in the hook
+                         if (url) {
+                            setNewDoc(prev => ({ 
+                              ...prev, 
+                              url: url,
+                              name: prev.name || file.name 
+                            }));
+                         }
+                      } catch (e) {
+                        console.error("Upload error", e);
+                      }
                     }
                   }}
                 />

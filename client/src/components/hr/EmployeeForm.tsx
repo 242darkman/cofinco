@@ -4,6 +4,7 @@ import { Employe, EmployeFormData } from '../../hooks/hr/useEmployes';
 import { Modal, FormField, SelectField, Button } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
+import { useMinIOUpload } from '../../hooks/useMinIOUpload';
 
 interface EmployeeFormProps {
   isOpen: boolean;
@@ -54,20 +55,25 @@ export default function EmployeeForm({
     setPhotoPreview(initialData.photoProfile || (editingEmploye as any)?.photoProfile || null);
   }, [initialData, editingEmploye]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const { uploadFile, isUploading } = useMinIOUpload({
+    path: 'employees',
+    isPublic: true,
+    onError: (err) => toast.error(`Erreur upload: ${err.message}`)
+  });
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
         toast.error('La photo ne doit pas dépasser 2 Mo');
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setPhotoPreview(base64);
-        updateField('photoProfile', base64);
-      };
-      reader.readAsDataURL(file);
+      
+      const url = await uploadFile(file);
+      if (url) {
+        setPhotoPreview(url);
+        updateField('photoProfile', url);
+      }
     }
   };
 

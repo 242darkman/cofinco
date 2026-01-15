@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, serial, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { agences } from "./agences";
@@ -57,6 +57,9 @@ export const clients = pgTable("clients", {
   employeur: text("employeur"),
   typeActivite: text("type_activite"), // Added missing column
   revenuMensuel: numeric("revenu_mensuel"),
+  
+  // KYC Documents
+  documents: jsonb("documents"), // Stockage documents KYC et Contrats format JSON
 
   // Classification
   typeMarcheId: uuid("type_marche_id").references(() => typesMarches.id),

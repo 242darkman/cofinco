@@ -4,6 +4,7 @@ import { prospectionApi } from '../../lib/api-client';
 import { toast } from 'sonner';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { useMinIOUpload } from '../../hooks/useMinIOUpload';
 
 interface ProspectionFormProps {
   agentId?: string;
@@ -125,21 +126,37 @@ export default function ProspectionForm({ agentId, onClose, onSuccess }: Prospec
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const { uploadFile, isUploading: isUploadingPhoto } = useMinIOUpload({
+    path: 'prospections',
+    isPublic: false,
+    onError: (err) => toast.error(`Erreur upload: ${err.message}`)
+  });
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        handleChange('photo_url', reader.result);
+      const url = await uploadFile(file);
+      if (url) {
+        handleChange('photo_url', url);
         setShowPhotoOptions(false);
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
-  const handleLiveCameraCapture = (imageDataUrl: string) => {
-    handleChange('photo_url', imageDataUrl);
-    setShowPhotoOptions(false);
+  const handleLiveCameraCapture = async (imageDataUrl: string) => {
+    try {
+      const res = await fetch(imageDataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `prospect_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const url = await uploadFile(file);
+      if (url) {
+        handleChange('photo_url', url);
+        setShowPhotoOptions(false);
+      }
+    } catch (e) {
+      console.error("Camera upload failed", e);
+      toast.error("Erreur upload caméra");
+    }
   };
 
   return (

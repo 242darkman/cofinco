@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine } from "@shared/schema";
 
+import { StorageService } from '../services/storage-service';
 import { storage } from "../storage";
 import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches } from "../storage/clients";
 
@@ -574,6 +575,16 @@ export function registerClientRoutes(app: Express) {
           }
         }
 
+        // Check for file replacement and cleanup old file
+        if (parsed.photoProfile && existing.photoProfile && parsed.photoProfile !== existing.photoProfile) {
+             // If old photo was a URL (not base64), delete it
+             if (!existing.photoProfile.startsWith('data:')) {
+                 StorageService.deleteFileFromUrl(existing.photoProfile).catch((e: any) => 
+                    console.error("Failed to delete old profile photo:", e)
+                 );
+             }
+        }
+        
         const client = await storage.updateClient(req.params.id, parsed);
 
         // ====== BUSINESS LOGIC: Account Freezing on Client Status Change ======

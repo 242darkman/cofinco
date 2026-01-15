@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Eye, EyeOff, Key, Upload, X, Users, Shield, User as UserIcon, Mail, Phone } from 'lucide-react';
+import { Camera, Eye, EyeOff, Key, Upload, X, Users, Shield, User as UserIcon, Mail, Phone, Loader2 } from 'lucide-react';
 import { Button, Modal, FormField, SelectField, IconButton } from '../../ui';
 import CameraCapture from '../../shared/CameraCapture';
 import { toast } from '../../../lib/toast';
+import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
 
 interface User {
   id?: string;
@@ -50,6 +51,12 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
   const [showCamera, setShowCamera] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { uploadFile, isUploading } = useMinIOUpload({
+    path: 'profiles',
+    isPublic: true,
+    onError: (err: any) => toast.error(`Erreur upload: ${err.message}`)
+  });
 
   useEffect(() => {
     if (initialData) {
@@ -113,8 +120,8 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         setUsernameAvailable(data.available);
         return data.username;
       }
-    } catch (error) {
-      console.error('Erreur vérification username:', error);
+    } catch (err: any) {
+      console.error('Erreur chargement user:', err);
     } finally {
       setUsernameChecking(false);
     }
@@ -146,18 +153,40 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     setShowPassword(true);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.warning('La taille du fichier ne doit pas dépasser 5 Mo');
-        return;
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warning('La taille du fichier ne doit pas dépasser 5 Mo');
+      return;
+    }
+
+    try {
+      const url = await uploadFile(file);
+      if (url) {
+        setFormData({ ...formData, photo_profile: url });
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({ ...formData, photo_profile: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Upload failed:', error);
+    }
+  };
+
+  // Convert Base64 from camera to File and upload
+  const handleCameraCapture = async (imgBase64: string) => {
+    try {
+      const res = await fetch(imgBase64);
+      const blob = await res.blob();
+      const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      
+      const url = await uploadFile(file);
+      if (url) {
+        setFormData({ ...formData, photo_profile: url });
+        setShowCamera(false);
+      }
+    } catch (error) {
+      console.error('Camera upload failed:', error);
+      toast.error('Erreur lors de l\'upload de la photo');
     }
   };
 
@@ -185,9 +214,17 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
           <div className="flex flex-col items-center justify-center -mt-2 mb-6">
             <div className="relative group">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-surface-muted overflow-hidden shadow-lg bg-surface-muted flex items-center justify-center">
-                {formData.photo_profile ? (
+                {isUploading ? (
+                  <Loader2 className="animate-spin text-primary" size={32} />
+                ) : formData.photo_profile ? (
                    <img
-                     src={formData.photo_profile}
+                     src={formData.photo_profile.startsWith('http') ? formData.photo_profile : `/api/uploads/files/${formData.photo_profile}`}
+                     onError={(e) => {
+                       // Fallback if URL fails (e.g. key only)
+                       // If we stored just the key, we need to construct the public URL or use a proxy endpoint
+                       // But the new service returns full URL if isPublic=true
+                       (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + formData.name;
+                     }}
                      alt="Profil"
                      className="w-full h-full object-cover"
                    />
@@ -203,6 +240,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                    onClick={() => setShowCamera(true)}
                    className="text-white hover:text-primary transition-colors p-1"
                    title="Prendre une photo"
+                   disabled={isUploading}
                  >
                    <Camera size={16} />
                  </button>
@@ -211,10 +249,11 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                    onClick={() => fileInputRef.current?.click()}
                    className="text-white hover:text-primary transition-colors p-1"
                    title="Importer"
+                   disabled={isUploading}
                  >
                    <Upload size={16} />
                  </button>
-                 {formData.photo_profile && (
+                 {formData.photo_profile && !isUploading && (
                     <button 
                      type="button"
                      onClick={() => setFormData({ ...formData, photo_profile: '' })}
@@ -376,10 +415,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
       <CameraCapture
         isOpen={showCamera}
         onClose={() => setShowCamera(false)}
-        onCapture={(img) => {
-           setFormData({ ...formData, photo_profile: img });
-           setShowCamera(false);
-        }}
+        onCapture={handleCameraCapture}
       />
     </>
   );

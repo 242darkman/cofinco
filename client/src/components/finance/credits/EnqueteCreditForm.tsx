@@ -7,6 +7,7 @@ import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 import { LocationDisplay } from '../../common/LocationDisplay';
 import { formatClientName } from '../../../lib/format';
+import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
 interface Client {
   id: string;
   nom: string;
@@ -94,6 +95,11 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     garanties_proposees: [] as any[],
     photos_activite: [] as string[],
     documents_justificatifs: [] as string[],
+  });
+
+  const { uploadFile: uploadActivityPhoto, isUploading: isUploadingPhoto } = useMinIOUpload({
+    path: 'credit-investigations',
+    isPublic: false // Sensitive data
   });
 
   useEffect(() => {
@@ -326,20 +332,9 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     }));
   }, []);
 
-  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFormData(prev => ({
-            ...prev,
-            photos_activite: [...prev.photos_activite, reader.result as string]
-          }));
-        };
-        reader.readAsDataURL(file);
-      });
-    }
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Reuse the same logic
+    await handlePhotoUpload(e);
   };
 
   const removePhoto = (index: number) => {
@@ -398,27 +393,42 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     }));
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFormData(prev => ({
-            ...prev,
-            photos_activite: [...prev.photos_activite, reader.result as string]
-          }));
-        };
-        reader.readAsDataURL(file);
-      });
+      for (const file of Array.from(files)) {
+        try {
+          const url = await uploadActivityPhoto(file);
+          if (url) {
+            setFormData(prev => ({
+              ...prev,
+              photos_activite: [...prev.photos_activite, url]
+            }));
+          }
+        } catch (error) {
+          console.error("Error uploading photo", error);
+          toast.error("Erreur lors de l'upload de la photo");
+        }
+      }
     }
   };
 
-  const handleLiveCameraCapture = (imageDataUrl: string) => {
-    setFormData(prev => ({
-      ...prev,
-      photos_activite: [...prev.photos_activite, imageDataUrl]
-    }));
+  const handleLiveCameraCapture = async (imageDataUrl: string) => {
+    try {
+      const res = await fetch(imageDataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const url = await uploadActivityPhoto(file);
+      if (url) {
+        setFormData(prev => ({
+          ...prev,
+          photos_activite: [...prev.photos_activite, url]
+        }));
+      }
+    } catch (e) {
+      console.error("Upload capture failed", e);
+      toast.error("Erreur upload capture");
+    }
   };
 
   const validateForm = (): boolean => {
