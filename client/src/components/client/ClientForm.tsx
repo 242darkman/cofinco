@@ -512,8 +512,8 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                            value={formData.numeroPiece || ''}
                            onChange={(e) => handleChange('numeroPiece', e.target.value)}
                            placeholder="Numéro de pièce"
+                           error={errors.numeroPiece}
                            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500 mb-0"
-                           containerClassName="mb-0"
                        />
                    </div>
                 </div>

@@ -666,20 +666,47 @@ export function registerClientRoutes(app: Express) {
   app.post("/api/clients/check-uniqueness", requireAuth, async (req, res) => {
       try {
           const { telephone, email, numeroPiece, excludeClientId } = req.body;
+          
+          console.log('[DEBUG_V2] Params:', { 
+            phone: telephone, 
+            piece: numeroPiece, 
+            excludeId: excludeClientId, 
+            excludeType: typeof excludeClientId 
+          });
+
+          const cleanPhone = telephone?.trim();
+          const cleanEmail = email?.trim();
+          const cleanPiece = numeroPiece?.trim();
 
           const checks = [];
-          if (telephone) checks.push(eq(clients.telephone, telephone));
-          if (email) checks.push(eq(clients.email, email));
-          if (numeroPiece) checks.push(eq(clients.numeroPiece, numeroPiece));
+          if (cleanPhone) checks.push(eq(clients.telephone, cleanPhone));
+          if (cleanEmail) checks.push(eq(clients.email, cleanEmail));
+          if (cleanPiece) checks.push(eq(clients.numeroPiece, cleanPiece));
 
           if (checks.length === 0) return res.json({ available: true });
 
           let query = db.select().from(clients).where(or(...checks));
           
           const conflicts = await query;
+          console.log('[DEBUG_V2] Raw Conflicts:', conflicts.map(c => ({ 
+              id: c.id, 
+              idType: typeof c.id, 
+              nom: c.nom, 
+              piece: c.numeroPiece 
+          })));
           
-          // Filter out the current client if we are editing
-          const realConflicts = conflicts.filter(c => c.id !== excludeClientId);
+          // Filter out - using very explicit comparison logging
+          const realConflicts = conflicts.filter(c => {
+             if (!excludeClientId) return true;
+             
+             const isSame = String(c.id) === String(excludeClientId);
+             console.log(`[DEBUG_V2] Comparing DB ID "${c.id}" vs Exclude "${excludeClientId}" => isSame? ${isSame}`);
+             
+             return !isSame;
+          });
+          
+          console.log('[DEBUG_V2] Final Conflicts:', realConflicts.length);
+          
 
           if (realConflicts.length > 0) {
               const conflict = realConflicts[0];
