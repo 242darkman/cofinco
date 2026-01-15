@@ -92,12 +92,12 @@ export function registerDashboardRoutes(app: Express) {
           montantEnAttente: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN ('En attente', 'en attente', 'En_attente') THEN ${credits.montant} ELSE 0 END), 0)`
         }).from(credits).where(withAgence(credits)),
 
-        // 3. Epargnes statistics
+        // 3. Epargnes statistics - ONLY Savings accounts
         db.select({
           total: count(),
           actifs: sql<number>`COUNT(CASE WHEN ${comptes.statut} = 'Actif' THEN 1 END)`,
           montantTotal: sql<number>`COALESCE(SUM(${comptes.soldeCourant}::numeric), 0)`
-        }).from(comptes).where(withAgence(comptes)),
+        }).from(comptes).where(withAgence(comptes, eq(comptes.typeCompte, 'Épargne'))),
 
         // 4. Tontines statistics
         db.select({
