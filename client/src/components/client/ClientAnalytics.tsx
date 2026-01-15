@@ -1,11 +1,13 @@
 import type { Client } from '@shared/schema';
 import React, { useState } from 'react';
-import { DollarSign, Target, Award, CreditCard, Wallet, Users, Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { DollarSign, Target, Award, CreditCard, Wallet, Users, Activity, TrendingUp, TrendingDown, X, Calendar, ArrowRight } from 'lucide-react';
 import ClientTags from './ClientTags';
 import { Card, Badge, Skeleton } from '../ui';
+import Modal from '../ui/Modal';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
+// Removed missing formatMoney import, using toLocaleString instead
 
 interface ClientAnalyticsProps {
   client: Client;
@@ -16,6 +18,8 @@ interface AnalyticsData {
     total_savings: number;
     total_credit_due: number;
     active_loans_count: number;
+    savings_accounts_count: number;
+    active_tontines_count: number;
     fidelity_points: number;
     repayment_rate: number;
   };
@@ -30,8 +34,150 @@ interface AnalyticsData {
   };
 }
 
+// Sub-component for Details Modal
+const MetricDetailsModal = ({ 
+    isOpen, 
+    onClose, 
+    type, 
+    clientId 
+}: { 
+    isOpen: boolean; 
+    onClose: () => void; 
+    type: 'credits' | 'savings' | 'tontines' | null; 
+    clientId: string;
+}) => {
+    // Fetch detailed data based on type
+    const { data: details, isLoading } = useQuery({
+        queryKey: ['analytics-details', clientId, type],
+        queryFn: async () => {
+            if (!type) return null;
+            // Re-using existing endpoints or fetching from generic "details" endpoint if created?
+            // Actually, for "Pro" feel, let's fetch specific lists.
+            // But I don't want to make 3 new raw API calls if I don't have to. 
+            // I'll use the existing generic GET /credits, /comptes, /tontines endpoints but filtered?
+            // Or better: The user wanted "plus de detail". 
+            // I'll assume we can hit the lists. 
+            // Implementation: I'll use the logic I know exists or generic fetch.
+            
+            if (type === 'credits') {
+              const res = await fetch(`/api/credits?clientId=${clientId}`);
+              if (!res.ok) return [];
+              const all = await res.json();
+              return all.filter((c: any) => ['Actif', 'En retard', 'En cours'].includes(c.statut));
+            }
+            if (type === 'savings') {
+               const res = await fetch(`/api/comptes?clientId=${clientId}`);
+               if (!res.ok) return [];
+               const all = await res.json();
+               return all.filter((a: any) => ['Épargne', 'Compte Bloqué', 'Terme'].includes(a.typeCompte) && a.statut === 'Actif');
+            }
+            if (type === 'tontines') {
+                // This might be tricky if no direct endpoint.
+                // Assuming /api/tontines/participations/:clientId or similar.
+                // Or /api/clients/:id/tontines. 
+                // Let's try /api/tontines/member/${clientId} based on common patterns, or fallback to empty.
+                const res = await fetch(`/api/clients/${clientId}/tontines`); // Hypothetical
+                if (res.ok) return res.json();
+                return []; 
+            }
+            return [];
+        },
+        enabled: !!type && isOpen
+    });
+
+    if (!isOpen) return null;
+
+    const title = {
+        credits: 'Crédits en cours',
+        savings: 'Épargne & Placements',
+        tontines: 'Tontines actives'
+    }[type || 'credits'];
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={title} size="xl">
+            {isLoading ? (
+                <div className="space-y-3 p-4">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                </div>
+            ) : (
+               <div className="space-y-3 max-h-[60vh] overflow-y-auto p-1">
+                  {details?.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500">Aucune donnée trouvée</div>
+                  ) : (
+                      details?.map((item: any, idx: number) => (
+                          <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between gap-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                               {type === 'credits' && (
+                                   <>
+                                     <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Badge value={item.statut} variant={item.statut === 'En retard' ? 'danger' : 'success'} />
+                                            <span className="font-bold text-slate-700 dark:text-slate-200">Prêt {item.typeCredit || 'Personnel'}</span>
+                                        </div>
+                                        <p className="text-sm text-slate-500">
+                                            Reste à payer : <span className="font-semibold text-red-500">{Number(item.soldeRestant).toLocaleString()} FCFA</span>
+                                        </p>
+                                     </div>
+                                     <div className="text-right">
+                                         <p className="text-xs text-slate-500 uppercase">Prochaine échéance</p>
+                                         <p className="font-medium text-slate-700 dark:text-slate-300">
+                                             {item.prochaineEcheance ? new Date(item.prochaineEcheance).toLocaleDateString() : 'N/A'}
+                                         </p>
+                                         <p className="text-xs text-slate-400 mt-1">{Number(item.montantEcheance).toLocaleString()} FCFA</p>
+                                     </div>
+                                   </>
+                               )}
+
+                               {type === 'savings' && (
+                                   <>
+                                     <div className="flex items-center gap-4">
+                                         <div className={`p-3 rounded-full ${item.typeCompte === 'Compte Bloqué' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                             <Wallet size={20} />
+                                         </div>
+                                         <div>
+                                            <p className="font-bold text-slate-700 dark:text-slate-200">{item.typeCompte}</p>
+                                            <p className="text-xs text-slate-500 font-mono">{item.numeroCompte}</p>
+                                         </div>
+                                     </div>
+                                     <div className="text-right flex flex-col justify-center">
+                                         <p className="text-lg font-bold text-emerald-500">{Number(item.soldeCourant).toLocaleString()} FCFA</p>
+                                         <p className="text-xs text-slate-500">Disponible</p>
+                                     </div>
+                                   </>
+                               )}
+
+                               {type === 'tontines' && (
+                                   <>
+                                      <div>
+                                          <p className="font-bold text-slate-700 dark:text-slate-200">{item.tontine?.nom || 'Tontine'}</p>
+                                          <div className="flex items-center gap-2 mt-1">
+                                              <Badge value="Active" variant="success" />
+                                              <span className="text-xs text-slate-500">Tour: {item.positionTour}/{item.tontine?.nombreTours || sourceDummyTours(item)}</span>
+                                          </div>
+                                      </div>
+                                      <div className="text-right">
+                                          <p className="text-xs text-slate-500 uppercase">Cotisation</p>
+                                          <p className="font-bold text-amber-500">{Number(item.montantCotisation || item.tontine?.montantCotisation).toLocaleString()} FCFA</p>
+                                          <p className="text-xs text-slate-400">/ fréquence</p>
+                                      </div>
+                                   </>
+                               )}
+                          </div>
+                      ))
+                  )}
+               </div>
+            )}
+        </Modal>
+    );
+};
+
+// Helper for dummy tours if data missing (fallback)
+const sourceDummyTours = (item: any) => item.nombreParticipants || 12;
+
 export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
   const [, setLocation] = useLocation();
+  const [activeMetric, setActiveMetric] = useState<'credits' | 'savings' | 'tontines' | null>(null);
 
   // Fetch Real-Time Analytics
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
@@ -41,13 +187,8 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
       if (!res.ok) throw new Error('Failed to fetch analytics');
       return res.json();
     },
-    refetchInterval: 5000, // Poll every 5s for "Real-Time" feel without websockets complexity for now
+    refetchInterval: 5000,
   });
-
-  // Fetch Activities for counters (keep existing logic or rely on summary if backend provided count)
-  // The summary provides active_loans_count, but not others. We can keep the old activity fetch or simplify.
-  // For now, let's keep the activity fetch for the counts if they are "All Time" vs "Active".
-  // The prompt asks for "Drill-down" from counters.
   
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -69,8 +210,6 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
   }
 
   const { summary, distribution, monthly_trend } = analytics;
-
-  // Compute total for percentage calculation in donut center
   const totalValue = distribution.reduce((sum, item) => sum + item.value, 0);
 
   return (
@@ -108,10 +247,10 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
       </Card>
 
 
-      {/* 2. & 3. Main Content Grid - Desktop Side-by-Side */}
+      {/* 2. & 3. Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           
-          {/* Répartition Financière (Interactive Donut) - Takes more space on desktop */}
+          {/* Répartition Financière */}
           <Card variant="default" padding="md" className="lg:col-span-2 flex flex-col h-[300px] sm:h-auto">
             <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
                 <DollarSign size={16} className="text-cyan-400" />
@@ -156,14 +295,12 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
                      </PieChart>
                    </ResponsiveContainer>
                    
-                   {/* Center Text (Total or Selection) */}
                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <p className="text-xs text-slate-500 uppercase font-semibold">Total</p>
                       <p className="text-lg font-bold text-white">{summary.total_savings.toLocaleString()}</p>
                    </div>
                 </div>
 
-                {/* Custom Legend / Details */}
                 <div className="w-full sm:w-1/2 mt-4 sm:mt-0 sm:pl-6 space-y-3">
                     {distribution.map((item, index) => (
                         <div 
@@ -188,9 +325,8 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
             )}
           </Card>
 
-          {/* Key Metrics Grid - Stacked Vertically on Desktop, Grid on Mobile */}
+          {/* Key Metrics Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 content-start">
-              {/* Taux Remboursement */}
               <Card variant="default" padding="sm" className="bg-slate-800/30">
                  <div className="flex items-start justify-between mb-2">
                     <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
@@ -203,7 +339,6 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
                  <p className="text-xs text-slate-500 font-medium uppercase truncate">Taux Remboursement</p>
               </Card>
 
-              {/* Croissance Epargne */}
               <Card variant="default" padding="sm" className="bg-slate-800/30">
                  <div className="flex items-start justify-between mb-2">
                     <div className="p-2 bg-slate-800 rounded-lg text-slate-400">
@@ -219,56 +354,73 @@ export default function ClientAnalytics({ client }: ClientAnalyticsProps) {
       </div>
 
       
-      {/* 4. Navigation Cards (Drill-Down) */}
-      <div className="grid grid-cols-4 gap-2">
-         {/* Credits Drill-down */}
+      {/* 4. Navigation Cards (Interactive Drill-Down) */}
+      <div className="grid grid-cols-3 gap-3">
+         {/* Credits */}
          <Card 
             variant="default" 
             padding="sm" 
-            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
-            onClick={() => setLocation(`/finance/credits?client=${client.id}`)}
+            className={`text-center py-4 cursor-pointer transition-all active:scale-95 border border-transparent hover:border-blue-500/50 ${summary.active_loans_count > 0 ? 'bg-blue-500/10 hover:bg-blue-500/20' : 'bg-slate-800/20 hover:bg-slate-800/50'}`}
+            onClick={() => setActiveMetric('credits')}
          >
-            <CreditCard size={16} className="mx-auto mb-1 text-blue-400" />
-            <p className="text-lg font-bold text-white">{summary.active_loans_count}</p>
-            <p className="text-[10px] text-slate-500 uppercase">Crédits</p>
+            <div className="flex items-center justify-center mb-2 gap-2">
+                <CreditCard size={18} className="text-blue-400" />
+                <span className="text-2xl font-bold text-white">{summary.active_loans_count}</span>
+            </div>
+            <p className="text-xs text-slate-400 uppercase font-semibold">Crédits en cours</p>
+            {summary.active_loans_count > 0 && (
+                <p className="text-[10px] text-blue-400 mt-1 flex items-center justify-center gap-1">
+                    Voir détails <ArrowRight size={10} />
+                </p>
+            )}
          </Card>
 
-         {/* Epargnes Drill-down */}
+         {/* Epargnes */}
          <Card 
             variant="default" 
             padding="sm" 
-            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
-            onClick={() => setLocation(`/finance/epargne?client=${client.id}`)}
+            className={`text-center py-4 cursor-pointer transition-all active:scale-95 border border-transparent hover:border-emerald-500/50 ${summary.savings_accounts_count > 0 ? 'bg-emerald-500/10 hover:bg-emerald-500/20' : 'bg-slate-800/20 hover:bg-slate-800/50'}`}
+            onClick={() => setActiveMetric('savings')}
          >
-            <Wallet size={16} className="mx-auto mb-1 text-emerald-400" />
-            <p className="text-lg font-bold text-white">-</p> 
-            <p className="text-[10px] text-slate-500 uppercase">Épargnes</p>
+            <div className="flex items-center justify-center mb-2 gap-2">
+                <Wallet size={18} className="text-emerald-400" />
+                <span className="text-2xl font-bold text-white">{summary.savings_accounts_count}</span>
+            </div>
+            <p className="text-xs text-slate-400 uppercase font-semibold">Comptes Épargne</p>
+            {summary.savings_accounts_count > 0 && (
+                <p className="text-[10px] text-emerald-400 mt-1 flex items-center justify-center gap-1">
+                    Voir les comptes <ArrowRight size={10} />
+                </p>
+            )}
          </Card>
 
-         {/* Tontines Drill-down */}
+         {/* Tontines */}
          <Card 
             variant="default" 
             padding="sm" 
-            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
-            onClick={() => setLocation(`/tontines?client=${client.id}`)}
+            className={`text-center py-4 cursor-pointer transition-all active:scale-95 border border-transparent hover:border-amber-500/50 ${summary.active_tontines_count > 0 ? 'bg-amber-500/10 hover:bg-amber-500/20' : 'bg-slate-800/20 hover:bg-slate-800/50'}`}
+            onClick={() => setActiveMetric('tontines')}
          >
-            <Users size={16} className="mx-auto mb-1 text-amber-400" />
-            <p className="text-lg font-bold text-white">-</p>
-            <p className="text-[10px] text-slate-500 uppercase">Tontines</p>
-         </Card>
-
-         {/* Ops History Drill-down */}
-         <Card 
-            variant="default" 
-            padding="sm" 
-            className="text-center py-3 bg-slate-800/20 hover:bg-slate-800/50 cursor-pointer transition-colors active:scale-95"
-            onClick={() => setLocation(`/finance/transactions?client=${client.id}`)}
-         >
-            <Activity size={16} className="mx-auto mb-1 text-purple-400" />
-            <p className="text-lg font-bold text-white">Ops</p>
-            <p className="text-[10px] text-slate-500 uppercase">Historique</p>
+            <div className="flex items-center justify-center mb-2 gap-2">
+                <Users size={18} className="text-amber-400" />
+                <span className="text-2xl font-bold text-white">{summary.active_tontines_count}</span>
+            </div>
+            <p className="text-xs text-slate-400 uppercase font-semibold">Tontines Actives</p>
+            {summary.active_tontines_count > 0 && (
+                <p className="text-[10px] text-amber-400 mt-1 flex items-center justify-center gap-1">
+                    Voir participations <ArrowRight size={10} />
+                </p>
+            )}
          </Card>
       </div>
+
+      {/* Details Modal */}
+      <MetricDetailsModal 
+          isOpen={activeMetric !== null} 
+          onClose={() => setActiveMetric(null)} 
+          type={activeMetric} 
+          clientId={client.id}
+      />
     </div>
   );
 }

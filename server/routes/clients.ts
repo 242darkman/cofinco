@@ -843,12 +843,21 @@ export function registerClientRoutes(app: Express) {
             .filter(t => t.sens === 'Crédit')
             .reduce((sum, t) => sum + Number(t.montant), 0);
             
+        // Calculate newly requested counters
+        const savingsAccountsCount = accounts.filter(a => 
+            ['Épargne', 'Compte Bloqué', 'Terme'].includes(a.typeCompte) && a.statut === 'Actif'
+        ).length;
+
+        const activeTontinesCount = membresTontineData.filter(m => m.statut === 'Actif').length;
+
         // 4. Construct Response
         const response = {
             summary: {
                 total_savings: totalSavings,
                 total_credit_due: totalCreditDue,
                 active_loans_count: activeCredits.length,
+                savings_accounts_count: savingsAccountsCount,
+                active_tontines_count: activeTontinesCount,
                 fidelity_points: client.pointsFidelite || 0,
                 repayment_rate: Number(client.tauxRemboursement) || 0
             },
