@@ -102,11 +102,27 @@ const MetricDetailsModal = ({
                     <Skeleton className="h-16 w-full rounded-lg" />
                 </div>
             ) : (
-               <div className="space-y-3 max-h-[60vh] overflow-y-auto p-1">
-                  {details?.length === 0 ? (
-                      <div className="text-center py-8 text-slate-500">Aucune donnée trouvée</div>
+                <div className="space-y-3 max-h-[60vh] overflow-y-auto p-1">
+                  {(!details || details.length === 0) ? (
+                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                          <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-4 text-slate-400 border border-slate-200 dark:border-slate-700">
+                             {type === 'credits' && <CreditCard size={32} className="opacity-50" />}
+                             {type === 'savings' && <Wallet size={32} className="opacity-50" />}
+                             {type === 'tontines' && <Users size={32} className="opacity-50" />}
+                          </div>
+                          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-1">
+                             {type === 'credits' ? 'Aucun crédit actif' : type === 'savings' ? 'Aucun compte actif' : 'Aucune tontine active'}
+                          </h3>
+                          <p className="text-sm text-slate-500 max-w-[280px]">
+                             {type === 'credits' 
+                                ? "Ce client ne dispose actuellement d'aucun dossier de crédit en cours de remboursement." 
+                                : type === 'savings' 
+                                    ? "Aucun compte d'épargne, bloqué ou à terme n'est rattaché à ce client pour le moment." 
+                                    : "Le client n'est inscrit à aucune tontine ou n'a aucune participation active."}
+                          </p>
+                      </div>
                   ) : (
-                      details?.map((item: any, idx: number) => (
+                      details.map((item: any, idx: number) => (
                           <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between gap-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
                                {type === 'credits' && (
                                    <>
