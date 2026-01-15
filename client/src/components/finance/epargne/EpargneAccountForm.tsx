@@ -114,31 +114,13 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     try {
       const data = await compteEpargneApi.getByClient(clientIdParam);
       const activeComptes = Array.isArray(data) ? data.filter((c: any) => c.statut === 'Actif') : [];
-      
-      // Debug: Log the accounts to see what we're getting
-      console.log('📊 Comptes existants chargés:', activeComptes);
-      console.log('📊 Types de comptes:', activeComptes.map((c: any) => ({
-        id: c.id,
-        typeCompte: c.typeCompte,
-        type_compte: c.type_compte,
-        numero: c.numero_compte
-      })));
-      
       setComptesExistants(activeComptes);
       
       // Auto-sélectionner un type disponible si celui par défaut est déjà possédé
-      const ownedTypes = activeComptes.map((c: any) => {
-        const type = c.typeCompte || c.type_compte;
-        console.log('🔍 Type détecté:', type);
-        return type;
-      });
-      
-      console.log('🔍 Types possédés:', ownedTypes);
-      
+      const ownedTypes = activeComptes.map((c: any) => c.typeCompte || c.type_compte);
       if (ownedTypes.includes(formData.type_compte)) {
         const available = (['Courant', 'Épargne', 'Bloqué'] as TypeCompte[]).find(t => !ownedTypes.includes(t));
         if (available) {
-          console.log('✅ Auto-sélection du type disponible:', available);
           setFormData(prev => ({ ...prev, type_compte: available }));
         }
       }
@@ -567,15 +549,11 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       
                       const isOwned = comptesExistants.some(c => {
                         const compteType = c.typeCompte || c.type_compte || '';
-                        const isMatch = normalizeType(compteType) === normalizedType;
-                        console.log(`🔍 Comparaison: "${compteType}" (normalisé: "${normalizeType(compteType)}") === "${type}" (normalisé: "${normalizedType}") ? ${isMatch}`);
-                        return isMatch;
+                        return normalizeType(compteType) === normalizedType;
                       });
                       
                       const isSelected = formData.type_compte === type;
                       const isDisabled = loading || isOwned;
-                      
-                      console.log(`🎯 Type "${type}": isOwned=${isOwned}, isSelected=${isSelected}, isDisabled=${isDisabled}`);
                       
                       return (
                         <button
