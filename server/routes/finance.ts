@@ -381,6 +381,14 @@ export function registerFinanceRoutes(app: Express) {
         }
       }
 
+      // Always enforce the client's agency
+      if (data.clientId) {
+        const client = await storage.getClient(data.clientId);
+        if (client) {
+          data.agenceId = client.agenceId;
+        }
+      }
+
       const parsed = insertDemandeCreditSchema.parse(data);
 
       // Vérifier agence du client

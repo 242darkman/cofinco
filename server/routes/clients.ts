@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine } from "@shared/schema";
+import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine } from "@shared/schema";
 
 import { storage } from "../storage";
 import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches } from "../storage/clients";
@@ -12,7 +12,7 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from 
 import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
-import { eq, sql, or } from "drizzle-orm";
+import { eq, sql, or, isNull, and, gte, desc } from "drizzle-orm";
 import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 
 export function registerClientRoutes(app: Express) {
@@ -1038,8 +1038,7 @@ export function registerClientRoutes(app: Express) {
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
         
-        const { mouvementsFinanciers, remboursements, contributionsTontine, credits } = require("@shared/schema");
-        const { desc, and, gte, lte, isNull } = require("drizzle-orm");
+
         
         // Get all movements for this client
         const movements = await db.select()

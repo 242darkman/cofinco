@@ -87,6 +87,10 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   const [isEligibleForReevaluation, setIsEligibleForReevaluation] = useState(false);
   const [enquetes, setEnquetes] = useState<any[]>([]);
   const [expandedEnquete, setExpandedEnquete] = useState<string | null>(null);
+  
+  // Scheduled disbursement
+  const [scheduledDisbursement, setScheduledDisbursement] = useState(false);
+  const [disbursementDate, setDisbursementDate] = useState('');
 
   useEffect(() => {
     if (demande?.id) {
@@ -220,6 +224,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
          }
     }
 
+    // Validate scheduled disbursement
+    if (action === 'approve' && scheduledDisbursement) {
+      if (!disbursementDate) {
+        newErrors.disbursementDate = 'Date de décaissement requise';
+      } else {
+        const selectedDate = new Date(disbursementDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (selectedDate <= today) {
+          newErrors.disbursementDate = 'La date doit être dans le futur';
+        }
+      }
+    }
+
     // Validate guarantee values
     guarantees.forEach((g, index) => {
       if (g.valeur_estimee) {
@@ -233,26 +251,28 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [action, commentaire, guarantees, reimbursementAmount, demande.montant_frais_engagement]);
+  }, [action, commentaire, guarantees, reimbursementAmount, demande.montant_frais_engagement, scheduledDisbursement, disbursementDate]);
 
   const handleApprove = useCallback(async () => {
     setLoading(true);
 
     try {
       // Prepare approval data to save on the demand
-      const updateData = {
+      const updateData: any = {
         statut: 'Approuvée',
         montant_approuve: montantBase,
-        // We can store guarantees/comments if the backend schema supports it, 
-        // or just rely on the status change for now. 
-        // Ideally, we adds fields to Demande schema for approval details, 
-        // but for now we'll stick to updating the status and essentials.
-        commentaire_approbation: sanitizeInput(commentaire)
+        commentaire_approbation: sanitizeInput(commentaire),
+        decaissement_automatique: scheduledDisbursement,
+        date_decaissement_programme: scheduledDisbursement && disbursementDate ? new Date(disbursementDate).toISOString() : null,
       };
 
       await demandeCreditApi.update(demande.id, updateData);
 
-      toast.success(`Crédit approuvé. Dossier transféré à la Commission Crédit pour décaissement.`);
+      const successMessage = scheduledDisbursement
+        ? `Crédit approuvé. Décaissement programmé pour le ${new Date(disbursementDate).toLocaleDateString('fr-FR')}.`
+        : `Crédit approuvé. Dossier transféré à la Commission Crédit pour décaissement.`;
+      
+      toast.success(successMessage);
       onSuccess();
     } catch (error) {
       const errorMessage = handleApiError(error, "Erreur lors de l'approbation du crédit");
@@ -261,7 +281,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       setLoading(false);
       setShowConfirmApprove(false);
     }
-  }, [demande, montantBase, commentaire, onSuccess]);
+  }, [demande, montantBase, commentaire, scheduledDisbursement, disbursementDate, onSuccess]);
   
   const handleReject = useCallback(async () => {
     setLoading(true);
@@ -902,6 +922,49 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Scheduled Disbursement */}
+                <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={scheduledDisbursement}
+                      onChange={(e) => setScheduledDisbursement(e.target.checked)}
+                      className="w-5 h-5 rounded border-slate-600 bg-slate-700 focus:ring-2 focus:ring-blue-500"
+                      disabled={loading}
+                    />
+                    <div>
+                      <p className="font-semibold text-white">Programmer le décaissement</p>
+                      <p className="text-sm text-slate-400">
+                        Le décaissement sera effectué automatiquement à la date choisie (9h du matin)
+                      </p>
+                    </div>
+                  </label>
+
+                  {scheduledDisbursement && (
+                    <div className="mt-4">
+                      <label htmlFor="disbursement-date" className="block text-sm font-semibold text-slate-300 mb-2">
+                        Date de décaissement <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        id="disbursement-date"
+                        type="date"
+                        value={disbursementDate}
+                        onChange={(e) => setDisbursementDate(e.target.value)}
+                        min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                        className={`w-full bg-slate-700 border ${errors.disbursementDate ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        disabled={loading}
+                        required
+                      />
+                      {errors.disbursementDate && (
+                        <p className="text-red-400 text-sm mt-1" role="alert">{errors.disbursementDate}</p>
+                      )}
+                      <p className="text-xs text-slate-400 mt-2">
+                        💡 Le décaissement sera exécuté automatiquement à 9h du matin à la date choisie
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -202,13 +202,39 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     }
 
     // Auto transfer validation
+    // Validation des versements automatiques
     if (formData.versement_auto_active) {
       const versementMontant = parseFloat(formData.versement_auto_montant) || 0;
-      if (versementMontant <= 0) {
-        newErrors.versement_auto_montant = 'Montant invalide';
+      
+      if (!formData.versement_auto_montant || versementMontant <= 0) {
+        newErrors.versement_auto_montant = 'Montant invalide ou manquant';
       }
+      
+      if (versementMontant < 1000) {
+        newErrors.versement_auto_montant = 'Montant minimum : 1 000 FCFA';
+      }
+      
+      if (versementMontant > 10000000) {
+        newErrors.versement_auto_montant = 'Montant maximum : 10 000 000 FCFA';
+      }
+      
       if (!formData.compte_source_id) {
-        newErrors.compte_source_id = 'Compte source requis pour versement auto';
+        newErrors.compte_source_id = 'Compte source requis pour les versements automatiques';
+      }
+      
+      if (!formData.versement_auto_frequence) {
+        newErrors.versement_auto_frequence = 'Fréquence requise';
+      }
+      
+      const jour = parseInt(formData.versement_auto_jour) || 0;
+      if (formData.versement_auto_frequence === 'Mensuel' || formData.versement_auto_frequence === 'Trimestriel') {
+        if (jour < 1 || jour > 28) {
+          newErrors.versement_auto_jour = 'Jour doit être entre 1 et 28';
+        }
+      } else if (formData.versement_auto_frequence === 'Hebdomadaire') {
+        if (jour < 1 || jour > 7) {
+          newErrors.versement_auto_jour = 'Jour doit être entre 1 (Lundi) et 7 (Dimanche)';
+        }
       }
     }
 
@@ -911,8 +937,9 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                   </>
                 )}
 
-                {/* Auto Transfer Settings */}
-                {formData.type_compte === 'Épargne' && comptesExistants.some(c => c.type_compte === 'Courant') && (
+                {/* Auto Transfer Settings - For Épargne and Bloqué accounts */}
+                {(formData.type_compte === 'Épargne' || formData.type_compte === 'Bloqué') && 
+                  comptesExistants.some(c => c.type_compte === 'Courant') && (
                   <div className="md:col-span-2 bg-green-500/10 border border-green-500/50 rounded-lg p-4">
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
@@ -925,7 +952,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       <div>
                         <p className="font-semibold text-white">Activer les versements automatiques</p>
                         <p className="text-sm text-slate-400">
-                          Transférer automatiquement un montant depuis votre compte courant chaque mois
+                          {formData.type_compte === 'Épargne' 
+                            ? 'Transférer automatiquement depuis votre compte courant pour épargner régulièrement'
+                            : 'Alimenter automatiquement votre épargne bloquée selon la fréquence choisie'
+                          }
                         </p>
                       </div>
                     </label>

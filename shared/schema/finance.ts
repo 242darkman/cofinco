@@ -85,6 +85,14 @@ export const credits = pgTable("credits", {
   garanties: text("garanties"),
   observations: text("observations"),
   agenceId: uuid("agence_id").references(() => agences.id), // Agence du crédit
+  
+  // Décaissement programmé
+  dateDecaissementProgramme: timestamp("date_decaissement_programme"),
+  decaissementAutomatique: boolean("decaissement_automatique").notNull().default(false),
+  dateDecaissementEffectif: timestamp("date_decaissement_effectif"),
+  decaissementTentatives: integer("decaissement_tentatives").notNull().default(0),
+  decaissementErreur: text("decaissement_erreur"),
+  
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -406,6 +414,15 @@ export const comptes = pgTable(
     // Cache solde (la vérité reste le ledger / mouvements)
     soldeCourant: numeric("solde_courant").notNull().default("0"),
 
+    // Versements automatiques
+    versementAutoActif: boolean("versement_auto_actif").notNull().default(false),
+    versementAutoMontant: numeric("versement_auto_montant"),
+    versementAutoFrequence: frequenceRemboursementEnum("versement_auto_frequence"),
+    versementAutoJour: integer("versement_auto_jour"), // 1-28 pour mensuel, 1-7 pour hebdo
+    compteSourceId: uuid("compte_source_id"), // Self-reference, will be linked after table creation
+    dernierVersementAuto: timestamp("dernier_versement_auto"),
+    prochainVersementAuto: timestamp("prochain_versement_auto"),
+
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -426,6 +443,7 @@ export const comptes = pgTable(
     idxClient: index("idx_comptes_client_id").on(t.clientId),
     idxAgenceTypeStatut: index("idx_comptes_agence_type_statut").on(t.agenceId, t.typeCompte, t.statut),
     idxTypeStatut: index("idx_comptes_type_statut").on(t.typeCompte, t.statut),
+    idxVersementAuto: index("idx_comptes_versement_auto").on(t.versementAutoActif, t.prochainVersementAuto),
 
     chkSoldeNonNeg: sql`CONSTRAINT chk_comptes_solde_nonneg CHECK (${t.soldeCourant} >= 0)`,
     chkBlocageRange: sql`CONSTRAINT chk_comptes_blocage_range CHECK (${t.blocageFin} IS NULL OR ${t.blocageDebut} IS NULL OR ${t.blocageFin} > ${t.blocageDebut})`,
@@ -493,6 +511,68 @@ export const compteAgencesHistorique = pgTable(
 export const insertCompteAgenceHistoriqueSchema = createInsertSchema(compteAgencesHistorique).omit({ id: true, createdAt: true });
 export type InsertCompteAgenceHistorique = z.infer<typeof insertCompteAgenceHistoriqueSchema>;
 export type CompteAgenceHistorique = typeof compteAgencesHistorique.$inferSelect;
+
+// Historique des versements automatiques
+export const versementsAutomatiques = pgTable(
+  "versements_automatiques",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    compteSourceId: uuid("compte_source_id").notNull().references(() => comptes.id, { onDelete: "cascade" }),
+    compteDestId: uuid("compte_dest_id").notNull().references(() => comptes.id, { onDelete: "cascade" }),
+
+    montant: numeric("montant").notNull(),
+
+    statut: text("statut").notNull(), // 'success', 'failed', 'pending'
+
+    dateExecution: timestamp("date_execution"),
+    datePlanifiee: timestamp("date_planifiee").notNull(),
+
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    erreur: text("erreur"),
+    tentatives: integer("tentatives").notNull().default(0),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxCompteSource: index("idx_versements_auto_source").on(t.compteSourceId, t.dateExecution),
+    idxCompteDest: index("idx_versements_auto_dest").on(t.compteDestId, t.dateExecution),
+    idxStatut: index("idx_versements_auto_statut").on(t.statut, t.datePlanifiee),
+  }),
+);
+
+export type VersementAutomatique = typeof versementsAutomatiques.$inferSelect;
+
+// Historique des décaissements programmés
+export const decaissementsProgrammes = pgTable(
+  "decaissements_programmes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    creditId: uuid("credit_id").notNull().references(() => credits.id, { onDelete: "cascade" }),
+    
+    montant: numeric("montant").notNull(),
+
+    statut: text("statut").notNull(), // 'success', 'failed', 'pending'
+
+    dateExecution: timestamp("date_execution"),
+    datePlanifiee: timestamp("date_planifiee").notNull(),
+
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    erreur: text("erreur"),
+    tentatives: integer("tentatives").notNull().default(0),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxCredit: index("idx_decaissements_prog_credit").on(t.creditId, t.dateExecution),
+    idxStatut: index("idx_decaissements_prog_statut").on(t.statut, t.datePlanifiee),
+  }),
+);
+
+export type DecaissementProgramme = typeof decaissementsProgrammes.$inferSelect;
 
 // Transactions comptes
 export const transactionsCompte = pgTable(

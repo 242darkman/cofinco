@@ -174,6 +174,8 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "TRANSFERT",
   "SYSTEME",
   "CAISSE_AGENT", // Nouveau module pour les opérations de caisse agent
+  "VERSEMENT_AUTO", // Module pour les versements automatiques
+  "DECAISSEMENT_PROGRAMME", // Module pour les décaissements programmés
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [

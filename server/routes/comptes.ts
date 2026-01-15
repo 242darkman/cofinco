@@ -23,6 +23,9 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { z } from "zod";
 import comptesService, { CompteError } from "../services/comptes";
 import { storage } from "../storage";
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import { comptes } from "@shared/schema";
 
 // Validation schemas
 const createCompteSchema = z.object({
@@ -120,6 +123,27 @@ export function registerComptesRoutes(app: Express) {
           },
           user?.id
         );
+
+        // Traiter la configuration de versement automatique si activée
+        if (data.versementAutoActif) {
+          const { calculateNextTransferDate } = await import("../services/automatic-transfers-service");
+          
+          const prochainVersement = calculateNextTransferDate(
+            data.versementAutoFrequence || 'Mensuel',
+            data.versementAutoJour || 28
+          );
+          
+          await db.update(comptes)
+            .set({
+              versementAutoActif: true,
+              versementAutoMontant: data.versementAutoMontant,
+              versementAutoFrequence: data.versementAutoFrequence,
+              versementAutoJour: data.versementAutoJour,
+              compteSourceId: data.compteSourceId,
+              prochainVersementAuto: prochainVersement,
+            })
+            .where(eq(comptes.id, compte.id));
+        }
 
         await logAudit(
           req,

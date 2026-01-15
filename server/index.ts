@@ -13,6 +13,8 @@ import { scheduleAuditPurge } from "./audit";
 import { sessionActivityMiddleware, scheduleSessionCleanup } from "./session-tracker";
 import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
 import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
+import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
+import { startScheduledDisbursementsCron } from "./cron/scheduled-disbursements";
 
 const app = express();
 // const httpServer = createServer(app); // Removed to avoid duplicate server creation
@@ -202,6 +204,14 @@ async function seedAdminUser() {
   // Start the caisse session cleanup cron job (closes expired sessions, monitors risky ones)
   startSessionCleanupCron();
   log('[Cron] Caisse session cleanup job started');
+
+  // Start the automatic transfers cron job (daily at 2 AM)
+  startAutomaticTransfersCron();
+  log('[Cron] Automatic transfers job started');
+
+  // Start the scheduled disbursements cron job (daily at 9 AM)
+  startScheduledDisbursementsCron();
+  log('[Cron] Scheduled disbursements job started');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
