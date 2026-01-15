@@ -4,7 +4,7 @@ import {
   Building2, Users, Receipt, AlertTriangle, CheckCircle, 
   ArrowRight, Loader2, ArrowRightLeft, Shield 
 } from 'lucide-react';
-import { Modal, Button, SelectField, ProgressBar, Badge } from '../ui';
+import { Modal, Button, SearchableSelect, ProgressBar, Badge } from '../ui';
 import { api } from '../../lib/api-client';
 import { toast } from 'sonner';
 
@@ -31,9 +31,9 @@ const STEPS = [
 
 export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess }: MigrationWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [targetClients, setTargetClients] = useState('');
-  const [targetEmployees, setTargetEmployees] = useState('');
-  const [targetTreasury, setTargetTreasury] = useState('');
+  const [targetClients, setTargetClients] = useState<string | number>('');
+  const [targetEmployees, setTargetEmployees] = useState<string | number>('');
+  const [targetTreasury, setTargetTreasury] = useState<string | number>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [migrationId, setMigrationId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -100,7 +100,8 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
   const agencyOptions = agences?.map((a: Agency) => ({
     value: a.id,
-    label: `${a.nom} (${a.ville})`
+    label: a.nom,
+    subLabel: a.ville || a.codeAgence
   })) || [];
 
   const canProceed = () => {
@@ -164,7 +165,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 <>
                 {currentStep === 0 && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                        <div className="bg-blue-500/10 p-4 rounded-lg flex gap-3 border border-blue-500/20">
+                        <div className="bg-blue-500/10 p-4 rounded-lg flex gap-3 border border-blue-500/20 font-sans">
                             <Users className="text-blue-400 shrink-0" />
                             <div>
                                 <h4 className="font-bold text-blue-400">Transfert de la Clientèle</h4>
@@ -173,20 +174,20 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                                 </p>
                             </div>
                         </div>
-                        <SelectField
+                        <SearchableSelect
                             label="Agence de destination (Clients)"
                             name="targetClients"
                             value={targetClients}
-                            onChange={(e) => setTargetClients(e.target.value)}
+                            onChange={(val) => setTargetClients(val)}
                             options={agencyOptions}
-                            placeholder="Sélectionner une agence..."
+                            placeholder="Rechercher une agence..."
                         />
                     </div>
                 )}
 
                 {currentStep === 1 && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                        <div className="bg-purple-500/10 p-4 rounded-lg flex gap-3 border border-purple-500/20">
+                        <div className="bg-purple-500/10 p-4 rounded-lg flex gap-3 border border-purple-500/20 font-sans">
                             <Building2 className="text-purple-400 shrink-0" />
                             <div>
                                 <h4 className="font-bold text-purple-400">Réaffectation du Personnel</h4>
@@ -195,20 +196,20 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                                 </p>
                             </div>
                         </div>
-                        <SelectField
+                        <SearchableSelect
                             label="Agence d'affectation (Employés)"
                             name="targetEmployees"
                             value={targetEmployees}
-                            onChange={(e) => setTargetEmployees(e.target.value)}
+                            onChange={(val) => setTargetEmployees(val)}
                             options={agencyOptions}
-                            placeholder="Sélectionner une agence..."
+                            placeholder="Rechercher une agence..."
                         />
                     </div>
                 )}
 
                 {currentStep === 2 && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                        <div className="bg-amber-500/10 p-4 rounded-lg flex gap-3 border border-amber-500/20">
+                        <div className="bg-amber-500/10 p-4 rounded-lg flex gap-3 border border-amber-500/20 font-sans">
                             <Receipt className="text-amber-400 shrink-0" />
                             <div>
                                 <h4 className="font-bold text-amber-400">Transfert de Fonds (Trésorerie)</h4>
@@ -217,13 +218,13 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                                 </p>
                             </div>
                         </div>
-                        <SelectField
+                        <SearchableSelect
                             label="Agence de destination (Fonds)"
                             name="targetTreasury"
                             value={targetTreasury}
-                            onChange={(e) => setTargetTreasury(e.target.value)}
+                            onChange={(val) => setTargetTreasury(val)}
                             options={agencyOptions}
-                            placeholder="Sélectionner une agence (ex: Siège)..."
+                            placeholder="Rechercher une agence (ex: Siège)..."
                         />
                     </div>
                 )}
