@@ -3,7 +3,7 @@ import { X, AlertCircle, DollarSign, Calendar, Wallet, Clock } from 'lucide-reac
 import { creditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatClientName } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Button, FormField } from '../../ui';
 
@@ -168,7 +168,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
             <div className="bg-slate-700/50 rounded-lg p-4 grid md:grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">Bénéficiaire</h3>
-                <p className="text-white font-semibold text-lg">{demande.clients.nom} {demande.clients.prenom}</p>
+                <p className="text-white font-semibold text-lg">{formatClientName(demande.clients.nom, demande.clients.prenom)}</p>
                 <p className="text-slate-400">{demande.clients.phone}</p>
               </div>
               <div>

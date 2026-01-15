@@ -17,7 +17,7 @@ interface CreditFeesPaymentModalProps {
 
 export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, onNavigate }: CreditFeesPaymentModalProps) {
   const { payerFrais } = useDemandes();
-  const [amount, setAmount] = useState('5000'); // Default fee
+  const [amount, setAmount] = useState(''); // Obligatoire, pas de montant par défaut
   const [method, setMethod] = useState('Espèces');
   const [loading, setLoading] = useState(false);
   
@@ -287,6 +287,8 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
                                         type="number" 
                                         value={amount} 
                                         onChange={e => setAmount(e.target.value)}
+                                        placeholder="0"
+                                        required
                                         className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-white focus:outline-none focus:border-emerald-500"
                                     />
                                 </div>

@@ -6,6 +6,7 @@ import { GpsSignalQuality } from '../../../hooks/useGeolocation';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 import { LocationDisplay } from '../../common/LocationDisplay';
+import { formatClientName } from '../../../lib/format';
 interface Client {
   id: string;
   nom: string;
@@ -517,7 +518,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               Enquête de Crédit
             </h2>
             <p className="text-slate-400 text-sm mt-1">
-              Client : {clientNom || selectedClient?.nom || 'Non sélectionné'}
+              Client : {clientNom || (selectedClient ? formatClientName(selectedClient.nom, (selectedClient as any).prenom) : 'Non sélectionné')}
             </p>
           </div>
           <button
@@ -544,7 +545,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               >
                 <option value="">-- Choisir un client --</option>
                 {clients.map(client => (
-                  <option key={client.id} value={client.id}>{client.nom}</option>
+                  <option key={client.id} value={client.id}>{formatClientName(client.nom, (client as any).prenom)}</option>
                 ))}
               </select>
 
@@ -558,7 +559,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                     )}
                   </div>
                   <div>
-                    <h3 className="font-bold text-white">{selectedClient.nom}</h3>
+                    <h3 className="font-bold text-white">{formatClientName(selectedClient.nom, (selectedClient as any).prenom)}</h3>
                     <p className="text-sm text-cyan-400">Client sélectionné pour enquête</p>
                   </div>
                 </div>

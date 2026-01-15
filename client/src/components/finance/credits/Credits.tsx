@@ -15,6 +15,7 @@ import CreditFeesPaymentModal from './CreditFeesPaymentModal';
 import EnqueteDetailModal from './EnqueteDetailModal';
 import ReferenceTable from './CreditRemboursement';
 import { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';
+import { formatClientName } from '../../../lib/format';
 import { TableColumn } from '../../ui/ResponsiveTable';
 import { ProtectedFeature } from '../../auth/ProtectedFeature';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -179,7 +180,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   // Column Definitions
   const creditColumns: TableColumn<any>[] = [
     { key: 'numero_credit', label: 'Numéro', primary: true },
-    { key: 'clients.nom', label: 'Client', format: (val, item) => `${item.clients?.nom || 'Client'} ${item.clients?.prenom || ''}`.trim() || 'Client Inconnu' },
+    { key: 'clients.nom', label: 'Client', format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) || 'Client Inconnu' },
     { key: 'montant_principal', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', badge: true },
     { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombre_echeances_payees || 0}/${item.nombre_echeances_total || 0}` },
@@ -188,7 +189,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
   const demandeColumns: TableColumn<any>[] = [
     { key: 'numero_demande', label: 'Numéro', primary: true },
-    { key: 'clients.nom', label: 'Client', format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
+    { key: 'clients.nom', label: 'Client', format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) },
     { key: 'montant_demande', label: 'Montant Demandé', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', badge: true },
     { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
@@ -212,13 +213,13 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         </span>
       )
     },
-    { key: 'clients.nom', label: 'Client', format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
+    { key: 'clients.nom', label: 'Client', format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) },
     { key: 'montant_approuve', label: 'Montant Approuvé', align: 'right', format: (val, item) => formatMoney(val || item.montant_demande) },
     { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
 
   const enqueteColumns: TableColumn<any>[] = [
-    { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => `${item.clients?.nom || ''} ${item.clients?.prenom || ''}` },
+    { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) },
     { key: 'type_activite', label: 'Activité' },
     { key: 'montant_demande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
     { key: 'statut', label: 'Statut', badge: true }
@@ -618,7 +619,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             setSelectedDemande(null);
           }}
           clientId={selectedDemande?.clients?.id}
-          clientNom={selectedDemande ? `${selectedDemande.clients?.nom} ${selectedDemande.clients?.prenom || ''}` : undefined}
+          clientNom={selectedDemande ? formatClientName(selectedDemande.clients?.nom, selectedDemande.clients?.prenom) : undefined}
           initialData={selectedDemande ? {
             client_id: selectedDemande.client_id || selectedDemande.clients?.id,
             montant_demande: selectedDemande.montant_demande?.toString(),

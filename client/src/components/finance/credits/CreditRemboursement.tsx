@@ -5,7 +5,7 @@ import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { creditApi, remboursementApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatClientName } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -43,6 +43,7 @@ interface Credit {
   statut?: string;
   clients: {
     nom: string;
+    prenom?: string;
     email: string;
     phone: string;
     telephone?: string;
@@ -342,7 +343,7 @@ export default function CreditRemboursement() {
       date: new Date(),
       type: 'Remboursement Crédit',
       client: {
-        nom: selectedCredit.clients.nom,
+        nom: formatClientName(selectedCredit.clients.nom, selectedCredit.clients.prenom),
         email: selectedCredit.clients.email,
         telephone: selectedCredit.clients.phone || selectedCredit.clients.telephone, // Handle potential property name diffs
         numeroCompte: selectedCredit.clients.numero_compte
@@ -459,7 +460,7 @@ export default function CreditRemboursement() {
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-cyan-400 font-mono font-bold">{credit.numero_credit}</div>
-                      <div className="text-white text-sm">{escapeHtml(credit.clients?.nom || '')}</div>
+                      <div className="text-white text-sm">{formatClientName(credit.clients?.nom || '', credit.clients?.prenom)}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-white font-bold">{formatMoney(credit.solde_restant)}</div>
@@ -482,7 +483,7 @@ export default function CreditRemboursement() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-2xl font-bold text-white">{selectedCredit.numero_credit}</h3>
-                <p className="text-slate-400 mt-1">{safeClientName}</p>
+                <p className="text-slate-400 mt-1">{formatClientName(selectedCredit.clients?.nom || '', selectedCredit.clients?.prenom)}</p>
               </div>
               {canCreatePayments && (
                 <button

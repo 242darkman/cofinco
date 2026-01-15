@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DollarSign, Calendar, FileText, TrendingUp, AlertCircle, Save, RefreshCw } from 'lucide-react';
 import { clientApi, demandeCreditApi, creditPlanApi } from '../../../lib/api-client';
 import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../ui';
+import { formatClientName } from '../../../lib/format';
 
 interface Client {
   id: string;
@@ -237,7 +238,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       const data = await clientApi.getEligibleForCredit();
       const eligibleClients = data.map((c: any) => ({
         id: c.id,
-        nom: `${c.nom} ${c.prenom || ''}`,
+        nom: formatClientName(c.nom, c.prenom),
         email: c.email || '',
         segment: c.segment || 'Standard',
         taux_remboursement: parseFloat(c.tauxRemboursement || c.taux_remboursement) || 100,

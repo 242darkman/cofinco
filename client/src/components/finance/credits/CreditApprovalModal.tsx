@@ -6,7 +6,7 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
-import ConfirmDialog from '../../ui/ConfirmDialog';
+import { Badge, ConfirmDialog } from '../../ui';
 import { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
 import { ReevaluationModal } from './ReevaluationModal';
 import { CreditTimeline } from './CreditTimeline';
@@ -335,8 +335,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
           {/* Header */}
           <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex justify-between items-center z-10">
             <div>
-              <h2 id="approval-modal-title" className="text-2xl font-bold text-white">
+              <h2 id="approval-modal-title" className="text-2xl font-bold text-white flex items-center gap-3">
                 Analyse de Demande
+                <Badge value={demande.statut} size="sm" />
               </h2>
               <p className="text-slate-400 text-sm mt-1">{demande.numero_demande}</p>
             </div>
@@ -352,14 +353,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
           {/* ====== FEES STATUS BANNER - Above the Fold ====== */}
           <div className={`mx-6 mt-4 p-4 rounded-xl flex items-center gap-4 ${
-              demande.frais_engagement_payes 
-                ? 'bg-emerald-500/10 border border-emerald-500/30' 
-                : 'bg-amber-500/10 border border-amber-500/30'
+              demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                ? 'bg-slate-500/10 border border-slate-500/30'
+                : demande.frais_engagement_payes 
+                    ? 'bg-emerald-500/10 border border-emerald-500/30' 
+                    : 'bg-amber-500/10 border border-amber-500/30'
           }`}>
               <div className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                  demande.frais_engagement_payes ? 'bg-emerald-500/20' : 'bg-amber-500/20'
+                  demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                    ? 'bg-slate-500/20'
+                    : demande.frais_engagement_payes ? 'bg-emerald-500/20' : 'bg-amber-500/20'
               }`}>
-                  {demande.frais_engagement_payes ? (
+                  {demande.statut === 'Annulée' || demande.statut === 'Annulé' ? (
+                      <XCircle className="text-slate-400" size={24} />
+                  ) : demande.frais_engagement_payes ? (
                       <CheckCircle className="text-emerald-400" size={24} />
                   ) : (
                       <AlertCircle className="text-amber-400" size={24} />
@@ -367,18 +374,28 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
               </div>
               <div className="flex-1">
                   <h4 className={`font-bold text-sm ${
-                      demande.frais_engagement_payes ? 'text-emerald-400' : 'text-amber-400'
+                      demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                        ? 'text-slate-400'
+                        : demande.frais_engagement_payes ? 'text-emerald-400' : 'text-amber-400'
                   }`}>
-                      {demande.frais_engagement_payes ? 'Frais de Dossier Payés ✅' : 'Frais de Dossier en Attente ⚠️'}
+                      {demande.statut === 'Annulée' || demande.statut === 'Annulé' 
+                        ? 'Demande Annulée' 
+                        : demande.frais_engagement_payes ? 'Frais de Dossier Payés ✅' : 'Frais de Dossier en Attente ⚠️'}
                   </h4>
                   <p className={`text-xs ${
-                      demande.frais_engagement_payes ? 'text-emerald-300/80' : 'text-amber-300/80'
+                      demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                        ? 'text-slate-400/80'
+                        : demande.frais_engagement_payes ? 'text-emerald-300/80' : 'text-amber-300/80'
                   }`}>
-                      {demande.frais_engagement_payes 
-                          ? `Montant payé : ${formatMoney(demande.montant_frais_engagement || 0)}`
-                          : demande.montant_frais_engagement 
-                              ? `Montant dû : ${formatMoney(demande.montant_frais_engagement)}`
-                              : 'Le client doit régler les frais avant traitement.'
+                      {demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                          ? (demande.frais_engagement_payes 
+                              ? `Cette demande a été annulée. Les frais d'engagement de ${formatMoney(demande.montant_frais_engagement || 0)} ont été réglés.`
+                              : "Cette demande a été annulée. Aucun frais d'engagement n'a été perçu.")
+                          : (demande.frais_engagement_payes 
+                              ? `Montant payé : ${formatMoney(demande.montant_frais_engagement || 0)}`
+                              : demande.montant_frais_engagement 
+                                  ? `Montant dû : ${formatMoney(demande.montant_frais_engagement)}`
+                                  : 'Le client doit régler les frais avant traitement.')
                       }
                   </p>
               </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar, CheckCircle, Clock, AlertTriangle, DollarSign, Filter } from 'lucide-react';
 import { creditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatClientName } from '../../../lib/format';
 import { escapeHtml } from '../../../lib/sanitize';
 import { SkeletonCard } from '../../ui/Skeleton';
 
@@ -53,7 +53,7 @@ export default function CreditEcheancier() {
               credits: {
                 numero_credit: credit.numero_credit,
                 clients: {
-                  nom: credit.clients?.nom || credit.client_nom || 'Client'
+                  nom: formatClientName(credit.clients?.nom || credit.client_nom || 'Client', credit.clients?.prenom)
                 }
               }
             });
