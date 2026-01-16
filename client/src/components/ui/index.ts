@@ -73,3 +73,7 @@ export { Pagination } from './Pagination';
 // Theme Components
 export { default as ThemeToggle } from './ThemeToggle';
 export type { ThemeToggleProps } from './ThemeToggle';
+
+// Tooltip
+export { default as Tooltip } from './Tooltip';
+export type { TooltipProps } from './Tooltip';

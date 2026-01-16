@@ -24,7 +24,7 @@ import {
   Download,
   Eye,
 } from 'lucide-react';
-import { Button, Card, Badge, Pagination, Modal, StatCard } from '@/components/ui';
+import { Button, Card, Badge, Pagination, Modal, StatCard, Tooltip } from '@/components/ui';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -734,51 +734,67 @@ export default function TransfertInterCoffresModule({
                         <Badge value={transfert.statut} variant={getStatutBadge(transfert.statut)} />
                       </td>
                       <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-2">
-                          {getAvailableActions(transfert).includes('approve_l1') && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprove(transfert)}
-                              className="h-8 bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 border border-emerald-500/20"
+                        <div className="flex flex-row items-center justify-end gap-3">
+                          {/* Bouton secondaire (Voir) - Ghost style */}
+                          <Tooltip content="Voir les détails" position="top">
+                            <button
+                              onClick={() => handleViewDetails(transfert)}
+                              className="h-10 w-10 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+                              aria-label="Voir les détails"
                             >
-                              <Shield size={14} className="mr-1" /> N1
-                            </Button>
+                              <Eye size={18} />
+                            </button>
+                          </Tooltip>
+
+                          {/* Boutons principaux d'action - Production Ready */}
+                          {getAvailableActions(transfert).includes('approve_l1') && (
+                            <Tooltip content="Approuver au niveau 1" position="top">
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprove(transfert)}
+                                className="h-9 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm"
+                              >
+                                <CheckCircle size={14} fill="currentColor" className="mr-1.5" />
+                                Valider N1
+                              </Button>
+                            </Tooltip>
                           )}
                           {getAvailableActions(transfert).includes('approve_l2') && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleApprove(transfert)}
-                              className="h-8 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 border border-blue-500/20"
-                            >
-                              <Shield size={14} className="mr-1" /> N2
-                            </Button>
+                            <Tooltip content="Approuver au niveau 2" position="top">
+                              <Button
+                                size="sm"
+                                onClick={() => handleApprove(transfert)}
+                                className="h-9 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-sm"
+                              >
+                                <Shield size={14} fill="currentColor" className="mr-1.5" />
+                                Valider N2
+                              </Button>
+                            </Tooltip>
                           )}
                           {getAvailableActions(transfert).includes('dispatch') && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleDispatch(transfert)}
-                              className="h-8 bg-amber-600/10 text-amber-400 hover:bg-amber-600/20 border border-amber-500/20"
-                            >
-                              <Truck size={14} />
-                            </Button>
+                            <Tooltip content="Expédier le transfert" position="top">
+                              <Button
+                                size="sm"
+                                onClick={() => handleDispatch(transfert)}
+                                className="h-9 px-4 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-sm"
+                              >
+                                <Truck size={14} fill="currentColor" className="mr-1.5" />
+                                Expédier
+                              </Button>
+                            </Tooltip>
                           )}
                           {getAvailableActions(transfert).includes('receive') && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleReceive(transfert)}
-                              className="h-8 bg-cyan-600/10 text-cyan-400 hover:bg-cyan-600/20 border border-cyan-500/20"
-                            >
-                              <Package size={14} />
-                            </Button>
+                            <Tooltip content="Réceptionner le transfert" position="top">
+                              <Button
+                                size="sm"
+                                onClick={() => handleReceive(transfert)}
+                                className="h-9 px-4 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-sm"
+                              >
+                                <Package size={14} fill="currentColor" className="mr-1.5" />
+                                Recevoir
+                              </Button>
+                            </Tooltip>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleViewDetails(transfert)}
-                            className="h-8 w-8 p-0 text-slate-400 hover:text-white"
-                          >
-                            <Eye size={14} />
-                          </Button>
                         </div>
                       </td>
                     </tr>
