@@ -103,6 +103,15 @@ export const useReceiptPDF = (options: UseReceiptPDFOptions = {}) => {
             const cs = doc.defaultView?.getComputedStyle(node);
             if (!cs) return;
 
+            const bgImage = cs.getPropertyValue('background-image');
+            if (bgImage && (hasOkl(bgImage) || bgImage.toLowerCase().includes('gradient'))) {
+              node.style.setProperty('background-image', 'none', 'important');
+              const bgColor = cs.getPropertyValue('background-color');
+              if (!bgColor || bgColor === 'transparent' || bgColor === 'rgba(0, 0, 0, 0)') {
+                node.style.setProperty('background-color', '#ffffff', 'important');
+              }
+            }
+
             for (const p of props) {
               const v = cs.getPropertyValue(p);
               if (!hasOkl(v)) continue;

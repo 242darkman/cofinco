@@ -52,7 +52,11 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   
   // PDF generation hook
   const { downloadPDF } = useReceiptPDF({
-    filename: data ? `Recu-${data.reference}` : 'recu',
+    filename: data
+      ? `${activeTab === 'ticket' ? 'Recu' : 'Facture'}-${data.reference}`
+      : activeTab === 'ticket'
+        ? 'Recu'
+        : 'Facture',
     format: activeTab === 'ticket' ? 'ticket' : 'a4'
   });
 

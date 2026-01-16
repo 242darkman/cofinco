@@ -33,7 +33,11 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
 
   // PDF generation hook
   const { downloadPDF } = useReceiptPDF({
-    filename: facture ? `Recu-${facture.numero}` : 'recu',
+    filename: facture
+      ? `${format === 'ticket' ? 'Recu' : 'Facture'}-${facture.numero}`
+      : format === 'ticket'
+        ? 'Recu'
+        : 'Facture',
     format
   });
 
