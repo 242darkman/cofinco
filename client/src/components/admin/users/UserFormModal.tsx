@@ -4,6 +4,7 @@ import { Button, Modal, FormField, SelectField, IconButton } from '../../ui';
 import CameraCapture from '../../shared/CameraCapture';
 import { toast } from '../../../lib/toast';
 import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
+import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
 
 interface User {
   id?: string;
@@ -12,7 +13,7 @@ interface User {
   name: string;
   email: string;
   phone: string;
-  role: string;
+  role: SystemRole;
   statut: string;
   photo_profile?: string;
 }
@@ -25,15 +26,11 @@ interface UserFormModalProps {
   loading?: boolean;
 }
 
-const roles = [
-  'Administrateur',
-  'Chef d\'Agence',
-  'Agent Caisse',
-  'Agent Terrain',
-  'Comptable',
-  'Gestionnaire Crédit',
-  'Superviseur'
-];
+const roles = getRoleOptions().filter((role) => role.value !== SystemRole.CLIENT);
+
+const normalizeRoleValue = (role?: string) => {
+  return normalizeRole(role) || SystemRole.CAISSIER;
+};
 
 export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, loading }: UserFormModalProps) {
   const [formData, setFormData] = useState<any>({
@@ -42,7 +39,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     name: '',
     email: '',
     phone: '',
-    role: 'Agent Caisse',
+    role: SystemRole.CAISSIER,
     statut: 'Actif',
     photo_profile: ''
   });
@@ -66,7 +63,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         name: initialData.name || '',
         email: initialData.email || '',
         phone: initialData.phone || '',
-        role: initialData.role || 'Agent Caisse',
+        role: normalizeRoleValue(initialData.role),
         statut: initialData.statut || 'Actif',
         photo_profile: initialData.photo_profile || ''
       });
@@ -82,7 +79,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
       name: '',
       email: '',
       phone: '',
-      role: 'Agent Caisse',
+      role: SystemRole.CAISSIER,
       statut: 'Actif',
       photo_profile: ''
     });
@@ -357,7 +354,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                     label="Rôle"
                     name="role"
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as SystemRole })}
                     options={roles}
                     required
                     containerClassName="mt-0"

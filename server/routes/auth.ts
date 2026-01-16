@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { insertUserSchema, users, userPermissions, modules, permissions } from "@shared/schema";
+import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
 import { loginUser, registerUser, requireAuth, requireRole, hashPassword, comparePasswords } from "../auth";
 import { logAudit, logLoginAttempt, isAccountLocked, validatePassword, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
@@ -21,7 +22,7 @@ export function registerAuthRoutes(app: Express) {
       const adminUser = await storage.createUser({
         username: "admin",
         password: hashedPassword,
-        role: "admin",
+        role: SystemRole.ADMIN,
         nom: "Administrator",
         prenom: "System",
         email: "admin@system.local",
@@ -77,7 +78,7 @@ export function registerAuthRoutes(app: Express) {
               type: "NOTIFICATION",
               payload: {
                  message: `Connexion: ${username}`,
-                 targetRole: "admin"
+                 targetRole: SystemRole.ADMIN
               }
            });
            wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
@@ -97,13 +98,15 @@ export function registerAuthRoutes(app: Express) {
         console.error("Failed to fallback to WS notification:", e);
       }
       
+      const normalizedRole = normalizeRole(user.role) || SystemRole.CLIENT;
+
       req.session.userId = user.id;
       req.session.user = {
           id: user.id,
           username: user.username || user.nom,
           nom: user.nom,
           prenom: user.prenom,
-          role: user.role || 'agent',
+          role: normalizedRole,
           agence: user.agence,
           email: user.email || undefined,
           telephone: user.telephone || undefined,
@@ -838,7 +841,7 @@ export function registerAuthRoutes(app: Express) {
       const expectedCode = `${(module as string).toLowerCase()}.${(action as string).toLowerCase()}`;
 
       // Admins have all permissions
-      if (user.role === "admin" || user.role === "Administrateur") {
+      if (isAdminRole(user.role)) {
         return res.json({ allowed: true });
       }
 
@@ -897,8 +900,9 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Check if user has supervisor role
-      const supervisorRoles = ["admin", "Administrateur", "chef_agence", "Chef d'Agence"];
-      if (!user.role || !supervisorRoles.includes(user.role)) {
+      const normalizedRole = normalizeRole(user.role);
+      const supervisorRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE];
+      if (!normalizedRole || !supervisorRoles.includes(normalizedRole)) {
         return res.status(403).json({ message: "Rôle insuffisant. Seul un superviseur peut autoriser l'ouverture." });
       }
 
@@ -936,8 +940,9 @@ export function registerAuthRoutes(app: Express) {
       const { currentPassword, newPin } = req.body;
 
       // Restrict to admins and chefs
-      const authorizedRoles = ["admin", "Administrateur", "chef_agence", "Chef d'Agence"];
-      if (!authorizedRoles.includes(userRole)) {
+      const normalizedRole = normalizeRole(userRole);
+      const authorizedRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE];
+      if (!normalizedRole || !authorizedRoles.includes(normalizedRole)) {
         return res.status(403).json({ message: "Action non autorisée. Seuls les Administrateurs et Chefs d'Agence peuvent modifier leur propre PIN." });
       }
 
@@ -981,8 +986,9 @@ export function registerAuthRoutes(app: Express) {
       const { pin } = req.body;
 
       // Restrict to admins and chefs
-      const authorizedRoles = ["admin", "Administrateur", "chef_agence", "Chef d'Agence"];
-      if (!authorizedRoles.includes(adminRole)) {
+      const normalizedRole = normalizeRole(adminRole);
+      const authorizedRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE];
+      if (!normalizedRole || !authorizedRoles.includes(normalizedRole)) {
         return res.status(403).json({ message: "Action non autorisée. Rôle insuffisant." });
       }
 

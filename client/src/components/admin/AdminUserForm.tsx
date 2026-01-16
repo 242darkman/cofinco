@@ -5,12 +5,11 @@ import { Modal, FormField, SelectField, Button } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { userApi, roleApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
 
-interface Role {
-  id: string;
-  code: string;
-  nom: string;
-  couleur: string;
+interface RoleOption {
+  value: SystemRole;
+  label: string;
 }
 
 interface AdminUserFormProps {
@@ -26,13 +25,13 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
     ? (hasPermission('users', 'edit') || hasPermission('admin', 'manage'))
     : (hasPermission('users', 'create') || hasPermission('admin', 'manage'));
 
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [formData, setFormData] = useState({
     email: user?.email || '',
     prenom: user?.prenom || '',
     nom: user?.nom || '',
     telephone: user?.telephone || '',
-    role: user?.role || 'client',
+    role: normalizeRole(user?.role) || SystemRole.CLIENT,
     statut: user?.statut || 'actif',
     password: ''
   });
@@ -43,7 +42,7 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
   const fetchRoles = useCallback(async () => {
     try {
       const data = await roleApi.getAll();
-      setRoles(data || []);
+      setRoles((data || []) as RoleOption[]);
     } catch (error) {
       // Silently fail - fallback options will be used
     }
@@ -106,14 +105,7 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
     }
   }, [user, formData, passwordValidation, onSuccess, onClose]);
 
-  const roleOptions = roles.length > 0
-    ? roles.map(role => ({ value: role.code, label: role.nom }))
-    : [
-        { value: 'Client', label: 'Client' },
-        { value: 'Agent Caisse', label: 'Agent Caisse' },
-        { value: 'Agent Terrain', label: 'Agent Terrain' },
-        { value: 'Administrateur', label: 'Administrateur' }
-      ];
+  const roleOptions = roles.length > 0 ? roles : getRoleOptions();
 
   const statutOptions = [
     { value: 'actif', label: 'Actif' },
@@ -206,7 +198,7 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
             label="Rôle"
             name="role"
             value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, role: e.target.value as SystemRole })}
             options={roleOptions}
             required
           />

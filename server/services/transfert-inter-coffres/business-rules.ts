@@ -5,6 +5,7 @@ import {
   transfertsInterCoffres,
   users,
 } from "@shared/schema";
+import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, and, isNull } from "drizzle-orm";
 
 export interface ValidationResult {
@@ -58,7 +59,7 @@ export class TransfertInterCoffresValidator {
       separationCreateurApprobateurN1: true,
       separationApprobateurN1N2: true,
       separationApprobateurRecepteur: true,
-      rolesCreateurs: ["Agent Caisse", "Comptable", "Chef d'Agence"],
+      rolesCreateurs: ["agent_caisse", "Comptable", "Chef d'Agence"],
       rolesApprobateursN1: ["Chef d'Agence", "Trésorier"],
       rolesApprobateursN2: ["Directeur", "Directeur Financier", "Administrateur"],
       rolesRecepteurs: ["Trésorier", "Chef d'Agence", "Comptable"],
@@ -71,16 +72,10 @@ export class TransfertInterCoffresValidator {
   /**
    * Normalise le rôle pour comparaison
    */
-  private normalizeRole(role: string): string {
-    const roleMap: Record<string, string> = {
-      admin: "Administrateur",
-      chef: "Chef d'Agence",
-      caisse: "Agent Caisse",
-      comptable: "Comptable",
-      directeur: "Directeur",
-      tresorier: "Trésorier",
-    };
-    return roleMap[role.toLowerCase()] || role;
+  private normalizeRoleToken(role: string): string {
+    const normalized = normalizeRole(role);
+    if (normalized) return normalized;
+    return role.trim().toLowerCase();
   }
 
   /**
@@ -88,14 +83,15 @@ export class TransfertInterCoffresValidator {
    */
   async canCreate(user: UserContext, agenceId?: string): Promise<ValidationResult> {
     const config = await this.getConfig(agenceId);
-    const normalizedRole = this.normalizeRole(user.role);
-    const rolesCreateurs = config.rolesCreateurs as string[] || [];
+    const normalizedRole = this.normalizeRoleToken(user.role);
+    const rolesCreateursRaw = (config.rolesCreateurs as string[] || []);
+    const rolesCreateurs = rolesCreateursRaw.map((r) => this.normalizeRoleToken(r));
 
-    if (!rolesCreateurs.includes(normalizedRole) && normalizedRole !== "Administrateur") {
+    if (!rolesCreateurs.includes(normalizedRole) && !isAdminRole(user.role)) {
       return {
         valid: false,
         errorCode: "TIC_023",
-        error: `Rôle non autorisé pour créer un transfert. Rôles autorisés: ${rolesCreateurs.join(", ")}`,
+        error: `Rôle non autorisé pour créer un transfert. Rôles autorisés: ${rolesCreateursRaw.join(", ")}`,
       };
     }
 
@@ -111,15 +107,16 @@ export class TransfertInterCoffresValidator {
     agenceId?: string
   ): Promise<ValidationResult> {
     const config = await this.getConfig(agenceId);
-    const normalizedRole = this.normalizeRole(user.role);
-    const rolesApprobateurs = config.rolesApprobateursN1 as string[] || [];
+    const normalizedRole = this.normalizeRoleToken(user.role);
+    const rolesApprobateursRaw = (config.rolesApprobateursN1 as string[] || []);
+    const rolesApprobateurs = rolesApprobateursRaw.map((r) => this.normalizeRoleToken(r));
 
     // Vérifier le rôle
-    if (!rolesApprobateurs.includes(normalizedRole) && normalizedRole !== "Administrateur") {
+    if (!rolesApprobateurs.includes(normalizedRole) && !isAdminRole(user.role)) {
       return {
         valid: false,
         errorCode: "TIC_023",
-        error: `Rôle non autorisé pour approuver niveau 1. Rôles autorisés: ${rolesApprobateurs.join(", ")}`,
+        error: `Rôle non autorisé pour approuver niveau 1. Rôles autorisés: ${rolesApprobateursRaw.join(", ")}`,
       };
     }
 
@@ -144,15 +141,16 @@ export class TransfertInterCoffresValidator {
     agenceId?: string
   ): Promise<ValidationResult> {
     const config = await this.getConfig(agenceId);
-    const normalizedRole = this.normalizeRole(user.role);
-    const rolesApprobateurs = config.rolesApprobateursN2 as string[] || [];
+    const normalizedRole = this.normalizeRoleToken(user.role);
+    const rolesApprobateursRaw = (config.rolesApprobateursN2 as string[] || []);
+    const rolesApprobateurs = rolesApprobateursRaw.map((r) => this.normalizeRoleToken(r));
 
     // Vérifier le rôle
-    if (!rolesApprobateurs.includes(normalizedRole) && normalizedRole !== "Administrateur") {
+    if (!rolesApprobateurs.includes(normalizedRole) && !isAdminRole(user.role)) {
       return {
         valid: false,
         errorCode: "TIC_023",
-        error: `Rôle non autorisé pour approuver niveau 2. Rôles autorisés: ${rolesApprobateurs.join(", ")}`,
+        error: `Rôle non autorisé pour approuver niveau 2. Rôles autorisés: ${rolesApprobateursRaw.join(", ")}`,
       };
     }
 
@@ -177,15 +175,16 @@ export class TransfertInterCoffresValidator {
     agenceId?: string
   ): Promise<ValidationResult> {
     const config = await this.getConfig(agenceId);
-    const normalizedRole = this.normalizeRole(user.role);
-    const rolesRecepteurs = config.rolesRecepteurs as string[] || [];
+    const normalizedRole = this.normalizeRoleToken(user.role);
+    const rolesRecepteursRaw = (config.rolesRecepteurs as string[] || []);
+    const rolesRecepteurs = rolesRecepteursRaw.map((r) => this.normalizeRoleToken(r));
 
     // Vérifier le rôle
-    if (!rolesRecepteurs.includes(normalizedRole) && normalizedRole !== "Administrateur") {
+    if (!rolesRecepteurs.includes(normalizedRole) && !isAdminRole(user.role)) {
       return {
         valid: false,
         errorCode: "TIC_023",
-        error: `Rôle non autorisé pour réceptionner. Rôles autorisés: ${rolesRecepteurs.join(", ")}`,
+        error: `Rôle non autorisé pour réceptionner. Rôles autorisés: ${rolesRecepteursRaw.join(", ")}`,
       };
     }
 
@@ -210,10 +209,8 @@ export class TransfertInterCoffresValidator {
     user: UserContext,
     transfert: typeof transfertsInterCoffres.$inferSelect
   ): Promise<ValidationResult> {
-    const normalizedRole = this.normalizeRole(user.role);
-
     // Seul le créateur ou un admin peut annuler
-    if (transfert.createdBy !== user.id && normalizedRole !== "Administrateur") {
+    if (transfert.createdBy !== user.id && !isAdminRole(user.role)) {
       return {
         valid: false,
         errorCode: "TIC_023",

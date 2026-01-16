@@ -6,6 +6,7 @@ import SelectField from '@/components/ui/SelectField';
 import Button from '@/components/ui/Button';
 import { User } from './types';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
+import { getRoleLabel, isAdminRole, normalizeRole } from '@shared/types/roles';
 
 interface GenerateCodeModalProps {
   isOpen: boolean;
@@ -128,9 +129,9 @@ export default function GenerateCodeModal({ isOpen, onClose, users, onGenerate }
               onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
               options={[
                 { value: '', label: 'Tout le monde' },
-                ...users.filter(u => u.role !== 'Administrateur').map(user => ({
+                ...users.filter(u => !isAdminRole(normalizeRole(u.role))).map(user => ({
                   value: user.id,
-                  label: `${user.nom} (${user.role})`
+                  label: `${user.nom} (${getRoleLabel(user.role)})`
                 }))
               ]}
             />

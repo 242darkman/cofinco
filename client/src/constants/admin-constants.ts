@@ -1,27 +1,29 @@
 /**
  * Constantes pour le module Admin
  */
+import { SystemRole } from '@shared/types/roles';
 
 export const ADMIN_ROLES = [
-  'Administrateur',
-  'Chef d\'Agence',
-  'Agent Caisse',
-  'Agent Terrain',
-  'Comptable',
-  'Gestionnaire Crédit',
-  'Superviseur'
+  SystemRole.ADMIN,
+  SystemRole.CHEF_AGENCE,
+  SystemRole.CAISSIER,
+  SystemRole.AGENT_TERRAIN,
+  SystemRole.COMPTABLE,
+  SystemRole.GESTIONNAIRE_CREDIT,
+  SystemRole.SUPERVISEUR
 ] as const;
 
 export type AdminRole = typeof ADMIN_ROLES[number];
 
-export const ROLE_COLORS: Record<string, string> = {
-  'Administrateur': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'Chef d\'Agence': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  'Agent Caisse': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'Agent Terrain': 'bg-green-500/20 text-green-400 border-green-500/30',
-  'Comptable': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  'Gestionnaire Crédit': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  'Superviseur': 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+export const ROLE_COLORS: Record<SystemRole, string> = {
+  [SystemRole.ADMIN]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  [SystemRole.CHEF_AGENCE]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  [SystemRole.CAISSIER]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  [SystemRole.AGENT_TERRAIN]: 'bg-green-500/20 text-green-400 border-green-500/30',
+  [SystemRole.COMPTABLE]: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+  [SystemRole.GESTIONNAIRE_CREDIT]: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+  [SystemRole.SUPERVISEUR]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+  [SystemRole.CLIENT]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
 };
 
 export const CATEGORY_LABELS: Record<string, string> = {

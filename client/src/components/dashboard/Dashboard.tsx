@@ -18,6 +18,7 @@ import DashboardQuickActions from './DashboardQuickActions';
 import DashboardHeader from './DashboardHeader';
 import AdminStatsGrid from './AdminStatsGrid';
 import PerformanceIndicators from './PerformanceIndicators';
+import { SystemRole, getRoleLabel as getSystemRoleLabel, normalizeRole } from '@shared/types/roles';
 import {
   AlertsWidget,
   PerformanceGauge,
@@ -29,7 +30,7 @@ import {
 } from './DashboardGadgets';
 
 interface DashboardProps {
-  userRole?: string;
+  userRole?: SystemRole | string;
   userName?: string;
   onModuleChange?: (module: string) => void;
   onLogout?: () => void;
@@ -45,7 +46,8 @@ export default function Dashboard({
 }: DashboardProps) {
   const { t, language } = useLanguage();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const { stats, loading, error, refresh } = useDashboardStats(userRole);
+  const normalizedRole = normalizeRole(userRole) || SystemRole.CLIENT;
+  const { stats, loading, error, refresh } = useDashboardStats(normalizedRole);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -64,17 +66,21 @@ export default function Dashboard({
   };
 
   const getRoleLabel = (role: string) => {
-    const roleLabels: Record<string, string> = {
-      admin: t('administrateur'),
-      'Administrateur': t('administrateur'),
-      'Chef d\'Agence': t('chefAgence'),
-      'Superviseur': t('superviseur'),
-      'Comptable': t('comptable'),
-      'Agent Caisse': t('agentCaisse'),
-      'Gestionnaire Crédit': t('gestionnaireCredit'),
-      agent: t('agent')
+    const normalized = normalizeRole(role);
+    if (!normalized) return getSystemRoleLabel(role);
+
+    const roleLabels: Record<SystemRole, string> = {
+      [SystemRole.ADMIN]: t('administrateur'),
+      [SystemRole.CHEF_AGENCE]: t('chefAgence'),
+      [SystemRole.SUPERVISEUR]: t('superviseur'),
+      [SystemRole.COMPTABLE]: t('comptable'),
+      [SystemRole.CAISSIER]: t('agentCaisse'),
+      [SystemRole.GESTIONNAIRE_CREDIT]: t('gestionnaireCredit'),
+      [SystemRole.AGENT_TERRAIN]: t('agent'),
+      [SystemRole.CLIENT]: t('client')
     };
-    return roleLabels[role] || role;
+
+    return roleLabels[normalized] || getSystemRoleLabel(normalized);
   };
 
   if (loading) {
@@ -103,7 +109,7 @@ export default function Dashboard({
   const g = stats.global;
   const d = stats.daily || { nouveauxClients: 0, nouveauxCredits: 0 };  // Today's data
   const w = stats.weekly || { nouveauxClients: 0, nouveauxCredits: 0 }; // Last 7 days data
-  const isAdmin = userRole === 'Administrateur' || userRole === "Chef d'Agence";
+  const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
 
   return (
     <div className="space-y-4 sm:space-y-6" data-testid="dashboard-container">
@@ -363,7 +369,7 @@ export default function Dashboard({
       )}
 
       {/* Comptable View */}
-      {userRole === 'Comptable' && (
+      {normalizedRole === SystemRole.COMPTABLE && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <StatCard title={t('volumeCredits')} value={formatMoney(g.montantCreditsTotal || 0)} subtitle={`${g.creditsEnCours || 0} ${t('creditsActifs')}`} icon={DollarSign} color="success" />
@@ -376,7 +382,7 @@ export default function Dashboard({
       )}
 
       {/* Other roles views - simplified */}
-      {(userRole === 'Agent Caisse' || userRole === 'agent') && (
+      {(normalizedRole === SystemRole.CAISSIER || normalizedRole === SystemRole.AGENT_TERRAIN) && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <StatCard title={t('clients')} value={g.totalClients || 0} subtitle={`${g.clientsActifs || 0} ${t('activeClients')}`} icon={Users} color="primary" />

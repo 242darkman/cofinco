@@ -7,7 +7,7 @@ import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
-import { securityConfigApi, SecurityConfigResponse, caisseAgentApi } from '../../lib/api-client';
+import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi } from '../../lib/api-client';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <img src={airtelLogo} alt="Airtel Money" className={className} />
@@ -56,6 +56,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [clientTontines, setClientTontines] = useState<ClientTontine[]>([]);
   const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
   const [loadingTontines, setLoadingTontines] = useState(false);
+  const [clientCredits, setClientCredits] = useState<any[]>([]);
+  const [clientComptes, setClientComptes] = useState<any[]>([]);
+  const [loadingCredits, setLoadingCredits] = useState(false);
+  const [loadingComptes, setLoadingComptes] = useState(false);
   
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
@@ -71,10 +75,14 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     numero_transaction: '',
     type_paiement: 'Versement Tontine',
     reference: '',
-    notes: ''
+    notes: '',
+    credit_id: '',
+    compte_id: ''
   });
 
   const isTontinePayment = formData.type_paiement === 'Versement Tontine';
+  const isCreditPayment = formData.type_paiement === 'Remboursement Crédit';
+  const isComptePayment = ['Dépôt Épargne', 'Dépôt Courant', 'Dépôt Bloqué'].includes(formData.type_paiement);
 
   useEffect(() => {
     loadAgents();
@@ -88,9 +96,17 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       if (isTontinePayment) {
         loadClientTontines(formData.client_id);
       }
+      if (isCreditPayment) {
+        loadClientCredits(formData.client_id);
+      }
+      if (isComptePayment) {
+        loadClientComptes(formData.client_id);
+      }
     } else {
       setClientTontines([]);
       setSelectedTontine(null);
+      setClientCredits([]);
+      setClientComptes([]);
     }
   }, [formData.client_id, formData.type_paiement]);
 
@@ -169,6 +185,32 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
   };
 
+  const loadClientCredits = async (clientId: string) => {
+    setLoadingCredits(true);
+    try {
+      const credits = await creditApi.getByClient(clientId);
+      setClientCredits((credits || []).filter((c: any) => c.statut === 'Actif' || c.statut === 'En retard'));
+    } catch (error) {
+      console.error('Error loading client credits:', error);
+      setClientCredits([]);
+    } finally {
+      setLoadingCredits(false);
+    }
+  };
+
+  const loadClientComptes = async (clientId: string) => {
+    setLoadingComptes(true);
+    try {
+      const comptes = await compteEpargneApi.getByClient(clientId);
+      setClientComptes(comptes || []);
+    } catch (error) {
+      console.error('Error loading client accounts:', error);
+      setClientComptes([]);
+    } finally {
+      setLoadingComptes(false);
+    }
+  };
+
   const selectTontine = (tontine: ClientTontine) => {
     setSelectedTontine(tontine);
     const montantCotisation = tontine.tontine.montantCotisation;
@@ -195,6 +237,12 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
     if (isTontinePayment && !selectedTontine) {
       newErrors.tontine = 'Veuillez sélectionner une tontine';
+    }
+    if (isCreditPayment && !formData.credit_id) {
+      newErrors.credit_id = 'Veuillez sélectionner un crédit';
+    }
+    if (isComptePayment && !formData.compte_id) {
+      newErrors.compte_id = 'Veuillez sélectionner un compte';
     }
     if (!selectedClient) {
       newErrors.client_id = 'Chargement des données client...';
@@ -226,7 +274,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         notes: formData.notes.trim(),
         statut: 'Pending',
         tontineId: selectedTontine?.tontineId || null,
-        membreId: selectedTontine?.id || null
+        membreId: selectedTontine?.id || null,
+        creditId: formData.credit_id || null,
+        compteId: formData.compte_id || null
       };
 
       const needsPresenceVerification = requiresPresenceVerification(formData.type_paiement);
@@ -256,6 +306,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         numeroRecu: paiementData.reference,
         observations: `${paiementData.notes} [Methode: ${paiementData.methode_paiement}] ${paiementData.numeroTelephone ? `[Tel: ${paiementData.numeroTelephone}]` : ''} ${paiementData.numeroTransaction ? `[Trans: ${paiementData.numeroTransaction}]` : ''}`,
         tontineId: paiementData.tontineId || undefined,
+        creditId: paiementData.creditId || undefined,
+        compteId: paiementData.compteId || undefined,
         // membreId not supported in schema directly, implicit via tontine logic?
       });
 
@@ -412,7 +464,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               label="Client *"
               name="client_id"
               value={formData.client_id}
-              onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, client_id: e.target.value, credit_id: '', compte_id: '' })}
               options={clients.map(c => ({ value: c.id, label: `${c.nom} - ${c.telephone}` }))}
               error={errors.client_id}
               disabled={!!clientId}
@@ -445,7 +497,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               name="type_paiement"
               value={formData.type_paiement}
               onChange={(e) => {
-                setFormData({ ...formData, type_paiement: e.target.value });
+                setFormData({ ...formData, type_paiement: e.target.value, credit_id: '', compte_id: '' });
                 setSelectedTontine(null);
               }}
               options={[
@@ -470,6 +522,45 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               step="100"
             />
           </div>
+
+          {isCreditPayment && (
+            <SelectField
+              label="Crédit *"
+              name="credit_id"
+              value={formData.credit_id}
+              onChange={(e) => setFormData({ ...formData, credit_id: e.target.value })}
+              options={clientCredits.map((credit: any) => ({
+                value: credit.id,
+                label: `Crédit #${credit.numero || credit.reference || credit.id.slice(0, 8)} - ${Number(credit.solde_restant || credit.soldeRestant || 0).toLocaleString('fr-FR')} FCFA`
+              }))}
+              error={errors.credit_id}
+              disabled={loadingCredits || clientCredits.length === 0}
+              placeholder={loadingCredits ? 'Chargement des crédits...' : 'Sélectionner un crédit'}
+            />
+          )}
+
+          {isComptePayment && (
+            <SelectField
+              label="Compte *"
+              name="compte_id"
+              value={formData.compte_id}
+              onChange={(e) => setFormData({ ...formData, compte_id: e.target.value })}
+              options={clientComptes
+                .filter((compte: any) => {
+                  const type = (compte.type_compte || compte.typeCompte || '').toLowerCase();
+                  if (formData.type_paiement === 'Dépôt Courant') return type.includes('courant');
+                  if (formData.type_paiement === 'Dépôt Bloqué') return type.includes('bloqué') || type.includes('bloque');
+                  return type.includes('épargne') || type.includes('epargne');
+                })
+                .map((compte: any) => ({
+                  value: compte.id,
+                  label: `${compte.type_compte || compte.typeCompte || 'Compte'} - ${compte.numero || compte.numero_compte || compte.numeroCompte || compte.id.slice(0, 8)}`
+                }))}
+              error={errors.compte_id}
+              disabled={loadingComptes || clientComptes.length === 0}
+              placeholder={loadingComptes ? 'Chargement des comptes...' : 'Sélectionner un compte'}
+            />
+          )}
 
           {isTontinePayment && formData.client_id && (
             <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3 sm:p-4">

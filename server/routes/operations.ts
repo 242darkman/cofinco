@@ -3,6 +3,7 @@ import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainS
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { getWsInstance } from "../ws-server";
 
 export function registerOperationsRoutes(app: Express) {
@@ -164,11 +165,12 @@ export function registerOperationsRoutes(app: Express) {
         let agenceId: string | undefined;
 
         // For chef d'agence, automatically filter by their agency
-        if (user?.role === 'chef' || user?.role === 'chef_agence') {
+        const normalizedRole = normalizeRole(user?.role);
+        if (normalizedRole === SystemRole.CHEF_AGENCE) {
           // Get employe record to find agenceId
           const employe = await storage.getEmployeByUserId(user.id);
           agenceId = employe?.agenceId || undefined;
-        } else if (user?.role === 'admin' || user?.role === 'admin_generale' || user?.role === 'Administrateur') {
+        } else if (normalizedRole === SystemRole.ADMIN) {
           // For admin, use query parameter (optional)
           agenceId = req.query.agenceId as string | undefined;
           if (agenceId === 'all') agenceId = undefined;

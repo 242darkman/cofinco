@@ -22,6 +22,7 @@ import CaisseMobileMoney from './CaisseMobileMoney';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { SupervisionSession } from './shared/SupervisionConfirmModal';
+import { isAdminRole } from '@shared/types/roles';
 
 import CaisseAccessControl from './CaisseAccessControl';
 import CaisseClientInfos from './CaisseClientInfos';
@@ -103,7 +104,7 @@ export default function CaisseDashboard({
   const [supervisionInfo, setSupervisionInfo] = useState<SupervisionSession | null>(null);
   const [supervisionTimeElapsed, setSupervisionTimeElapsed] = useState(0);
 
-  const [accessGranted, setAccessGranted] = useState(userRole === 'Administrateur');
+  const [accessGranted, setAccessGranted] = useState(isAdminRole(userRole));
 
   // End of day reminder state
   const [showEndOfDayReminder, setShowEndOfDayReminder] = useState(false);
@@ -856,4 +857,3 @@ export default function CaisseDashboard({
     </div>
   );
 }
-

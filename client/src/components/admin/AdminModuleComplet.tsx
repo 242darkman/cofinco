@@ -26,6 +26,7 @@ import AdminGestionAgences from './AdminGestionAgences';
 import AdminGestionZones from './AdminGestionZones';
 import AdminSmsSettings from './AdminSmsSettings';
 import AdminVersionInfo from './AdminVersionInfo';
+import { SystemRole } from '@shared/types/roles';
 import AdminCaisseAccessCodes from './AdminCaisseAccessCodes';
 import AdminGestionCaisses from './AdminGestionCaisses';
 import AdminCreditsGestion from './AdminCreditsGestion';
@@ -39,7 +40,7 @@ interface AdminModuleCompletProps {
 
 export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
   const [activeTab, setActiveTab] = useState<AdminTabId>('dashboard');
-  const [selectedRole, setSelectedRole] = useState('Administrateur');
+  const [selectedRole, setSelectedRole] = useState<SystemRole>(SystemRole.ADMIN);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
@@ -96,7 +97,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     }
   }, [confirmMessage]);
 
-  const handleRoleChange = (role: string) => setSelectedRole(role);
+  const handleRoleChange = (role: SystemRole) => setSelectedRole(role);
   const handleToggleRolePermission = async (_role: string, permCode: string) => {
     const perm = permissions.find(p => p.code === permCode);
     if (!perm) return;
@@ -255,9 +256,9 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 permissions={permissions}
                 selectedRole={selectedRole}
                 onRoleChange={handleRoleChange}
-                roleHasPermission={(_role, code) => selectedRole === 'Administrateur' ? true : roleHasPermission(code)}
+                roleHasPermission={(_role, code) => selectedRole === SystemRole.ADMIN ? true : roleHasPermission(code)}
                 toggleRolePermission={handleToggleRolePermission}
-                activePermissionsCount={selectedRole === 'Administrateur' ? (permissions?.length || 0) : activeRolePermissionsCount}
+                activePermissionsCount={selectedRole === SystemRole.ADMIN ? (permissions?.length || 0) : activeRolePermissionsCount}
                 confirmMessage={confirmMessage}
               />
             )}

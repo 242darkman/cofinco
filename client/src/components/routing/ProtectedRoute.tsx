@@ -2,6 +2,7 @@ import { ReactNode, Suspense } from 'react';
 import { Route, Redirect } from 'wouter';
 import { authService } from '@/lib/auth';
 import { canAccessRoute, type RouteConfig } from '@/lib/routes-config';
+import { SystemRole } from '@shared/types/roles';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 
 interface ProtectedRouteProps {
@@ -40,7 +41,7 @@ export function useRouteAccess(moduleKey: string) {
   const user = authService.getCurrentUser();
   
   return {
-    canAccess: (requiredRoles?: string[], requireAdmin?: boolean) => {
+    canAccess: (requiredRoles?: SystemRole[], requireAdmin?: boolean) => {
       if (!user) return false;
       
       if (requireAdmin) {

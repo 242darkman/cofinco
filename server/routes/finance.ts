@@ -35,6 +35,7 @@ import {
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import * as sessionService from "../services/caisse/session-service";
 
 export function registerFinanceRoutes(app: Express) {
@@ -653,7 +654,8 @@ export function registerFinanceRoutes(app: Express) {
 
           if (user) {
               // Admin override
-              if (data.sessionCaisseId && ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role)) {
+              const normalizedRole = normalizeRole(user.role);
+              if (data.sessionCaisseId && (normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE)) {
                   activeSession = await storage.getSessionCaisse(data.sessionCaisseId);
                   if (activeSession && activeSession.statut === 'Ouverte') {
                       sessionCaisseId = activeSession.id;
@@ -1062,7 +1064,7 @@ export function registerFinanceRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body) as any;
       const user = req.session.user!;
       
-      const isAdmin = user.role === 'admin' || user.role === 'admin_generale' || user.role === 'Administrateur';
+      const isAdmin = isAdminRole(user.role);
       
       // If admin, use provided agenceId (validate it exists?)
       // If not admin, FORCE user's agenceId
@@ -1088,7 +1090,7 @@ export function registerFinanceRoutes(app: Express) {
     if (!caisse) return res.status(404).json({ message: "Caisse non trouvée" });
 
     // Check Agency Access
-    if (user.role !== 'admin' && user.role !== 'admin_generale' && user.role !== 'Administrateur' && caisse.agenceId !== user.agenceId) {
+    if (!isAdminRole(user.role) && caisse.agenceId !== user.agenceId) {
         return res.status(403).json({ message: "Accès refusé à cette agence" });
     }
 
@@ -1144,7 +1146,8 @@ export function registerFinanceRoutes(app: Express) {
       const user = req.session.user;
       if (!user) return res.status(401).json({ message: "Non authentifié" });
 
-      const isManager = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role);
+      const normalizedRole = normalizeRole(user.role);
+      const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
 
       const data = normalizeKeysDeep(req.body) as any;
 
@@ -1220,7 +1223,8 @@ export function registerFinanceRoutes(app: Express) {
       if (!session) return res.status(404).json({ message: "Session introuvable" });
 
       // Permission check: User must be the owner OR Admin/Chef
-      const isManager = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role);
+      const normalizedRole = normalizeRole(user.role);
+      const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
       if (session.caissierId !== user.id && !isManager) {
           return res.status(403).json({ message: "Vous n'avez pas l'autorisation de fermer cette session" });
       }
@@ -1454,7 +1458,8 @@ export function registerFinanceRoutes(app: Express) {
         const session = await storage.getSessionCaisse(data.sessionId);
         if (!session) return res.status(404).json({ message: "Session introuvable" });
         
-        const isManager = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role);
+        const normalizedRole = normalizeRole(user.role);
+        const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
         if (session.caissierId !== user.id && !isManager) {
             return res.status(403).json({ message: "Vous n'avez pas l'autorisation d'ajouter des opérations à cette session" });
         }
@@ -1714,7 +1719,8 @@ export function registerFinanceRoutes(app: Express) {
 
       // Permission check: User must be owner or manager
       const user = req.session.user!;
-      const isManager = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(user.role);
+      const normalizedRole = normalizeRole(user.role);
+      const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
       if (sessionSource.caissierId !== user.id && !isManager) {
           return res.status(403).json({ message: "Vous n'avez pas l'autorisation d'initier un transfert depuis cette session" });
       }
@@ -1982,7 +1988,7 @@ export function registerFinanceRoutes(app: Express) {
          return res.status(400).json({ message: `Cannot approve refund in status '${refund.statut}'` });
        }
 
-       if (refund.makerId === user.id && user.role !== 'admin') {
+       if (refund.makerId === user.id && !isAdminRole(user.role)) {
          return res.status(403).json({ message: "Segregation of Duties: Maker cannot approve their own request." });
        }
 

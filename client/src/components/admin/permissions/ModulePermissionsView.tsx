@@ -4,6 +4,7 @@ import { Card, SearchInput } from '../../ui';
 import { Module } from '../../../hooks/admin/useModules';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { CATEGORY_LABELS, ADMIN_ROLES } from '../../../constants/admin-constants';
+import { getRoleBadgeStyle } from '../../../lib/role-utils';
 import { getPermissionDetails } from '../../../constants/permission-descriptions';
 
 interface ModulePermissionsViewProps {
@@ -123,7 +124,7 @@ export default function ModulePermissionsView({
                                             {rolesWithPermission.length > 0 ? (
                                                rolesWithPermission.map(role => (
                                                   <span key={role} className="text-[9px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded border border-emerald-500/20">
-                                                     {role}
+                                                     {getRoleBadgeStyle(role).label}
                                                   </span>
                                                ))
                                             ) : (

@@ -22,6 +22,7 @@ import {
 } from "../services/caisse-agent";
 import { idempotencyMiddleware } from "../middleware/idempotency";
 import { requireAuth } from "../auth";
+import { SystemRole, normalizeRole } from "@shared/types/roles";
 
 export const caisseAgentRouter = Router();
 
@@ -199,8 +200,9 @@ caisseAgentRouter.post(
       }
 
       // Vérification basique des rôles (à remplacer par RBAC complet)
-      const allowedRoles = ["admin", "Administrateur", "superviseur", "chef_agence", "chef_caisse"];
-      if (!allowedRoles.includes(userRole)) {
+      const normalizedRole = normalizeRole(userRole);
+      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER]);
+      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
         return res.status(403).json({
           error: "Permission refusée",
           code: "FORBIDDEN",
@@ -253,8 +255,9 @@ caisseAgentRouter.post(
       }
 
       // Vérification basique des rôles
-      const allowedRoles = ["admin", "Administrateur", "superviseur", "chef_agence", "chef_caisse"];
-      if (!allowedRoles.includes(userRole)) {
+      const normalizedRole = normalizeRole(userRole);
+      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE]);
+      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
         return res.status(403).json({
           error: "Permission refusée",
           code: "FORBIDDEN",
@@ -489,8 +492,9 @@ caisseAgentRouter.post(
       }
 
       // Vérification basique des rôles
-      const allowedRoles = ["admin", "Administrateur", "chef_agence"];
-      if (!allowedRoles.includes(userRole)) {
+      const normalizedRole = normalizeRole(userRole);
+      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.CHEF_AGENCE]);
+      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
         return res.status(403).json({
           error: "Permission refusée",
           code: "FORBIDDEN",
@@ -585,8 +589,9 @@ caisseAgentRouter.post(
       }
 
       // Vérification basique des rôles
-      const allowedRoles = ["admin", "Administrateur", "chef_agence", "superviseur"];
-      if (!allowedRoles.includes(userRole)) {
+      const normalizedRole = normalizeRole(userRole);
+      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE]);
+      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
         return res.status(403).json({
           error: "Permission refusée",
           code: "FORBIDDEN",
@@ -635,8 +640,9 @@ caisseAgentRouter.post(
       }
 
       // Vérification basique des rôles
-      const allowedRoles = ["admin", "Administrateur", "chef_agence", "superviseur"];
-      if (!allowedRoles.includes(userRole)) {
+      const normalizedRole = normalizeRole(userRole);
+      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE]);
+      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
         return res.status(403).json({
           error: "Permission refusée",
           code: "FORBIDDEN",

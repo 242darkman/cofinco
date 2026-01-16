@@ -176,7 +176,7 @@ export function registerSettingsRoutes(app: Express) {
         -- DELETE FROM employes;
         -- DELETE FROM types_marches;
         
-        DELETE FROM users WHERE role != 'admin';
+        DELETE FROM users WHERE role != 'ADMIN';
         
         SET session_replication_role = 'origin';
       `);

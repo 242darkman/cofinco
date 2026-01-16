@@ -32,6 +32,7 @@ import { useToast } from '../../hooks/use-toast';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { SystemRole, normalizeRole } from '@shared/types/roles';
 
 // Types for Detail Modal
 import type { OperationTerrainWithRelations, OperationTerrainMetadata } from '@shared/schema';
@@ -92,7 +93,8 @@ export default function AgentValidations() {
   const itemsPerPage = 10;
 
   // Check role for Agency Filter
-  const isAdmin = user?.role === 'Administrateur' || user?.role === 'Superviseur Général';
+  const normalizedRole = normalizeRole(user?.role);
+  const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.SUPERVISEUR;
 
   useEffect(() => {
     loadData();

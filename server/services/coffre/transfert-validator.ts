@@ -1,9 +1,16 @@
 import { db } from "../../db";
 import { caisses, configCoffreFort, users } from "@shared/schema";
+import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, and } from "drizzle-orm";
 import { validateTransition } from "./state-machine";
 
 export class TransfertCoffreValidator {
+  private normalizeRoleToken(role?: string | null): string {
+    if (!role) return "";
+    const normalized = normalizeRole(role);
+    if (normalized) return normalized;
+    return role.trim().toLowerCase();
+  }
   
   // ─────────────────────────────────────────────────────────────────────────
   // Valider une transition d'état
@@ -39,12 +46,13 @@ export class TransfertCoffreValidator {
       separationValideurExecuteur: false,
     };
 
-    const userRole = user.role?.toLowerCase() || "";
+    const userRoleToken = this.normalizeRoleToken(user.role);
 
     switch (params.action) {
       case "create": {
         const roles = (effectiveConfig.rolesInitiateurs as string[]) || [];
-        const hasRole = roles.some(r => userRole.includes(r.toLowerCase()));
+        const roleTokens = roles.map((r) => this.normalizeRoleToken(r));
+        const hasRole = roleTokens.includes(userRoleToken);
         if (!hasRole) {
           return { valid: false, error: "Vous n'avez pas le rôle requis pour créer un transfert" };
         }
@@ -53,7 +61,8 @@ export class TransfertCoffreValidator {
 
       case "validate": {
         const roles = (effectiveConfig.rolesValideurs as string[]) || [];
-        const hasRole = roles.some(r => userRole.includes(r.toLowerCase()));
+        const roleTokens = roles.map((r) => this.normalizeRoleToken(r));
+        const hasRole = roleTokens.includes(userRoleToken);
         if (!hasRole) {
           return { valid: false, error: "Vous n'avez pas le rôle requis pour valider" };
         }
@@ -66,7 +75,8 @@ export class TransfertCoffreValidator {
 
       case "execute": {
         const roles = (effectiveConfig.rolesExecuteurs as string[]) || [];
-        const hasRole = roles.some(r => userRole.includes(r.toLowerCase()));
+        const roleTokens = roles.map((r) => this.normalizeRoleToken(r));
+        const hasRole = roleTokens.includes(userRoleToken);
         if (!hasRole) {
           return { valid: false, error: "Vous n'avez pas le rôle requis pour exécuter" };
         }
@@ -78,7 +88,7 @@ export class TransfertCoffreValidator {
       }
 
       case "cancel": {
-        const isAdmin = userRole.includes("admin") || userRole.includes("administrateur");
+        const isAdmin = isAdminRole(user.role);
         const isInitiator = params.transfert?.requestedBy === params.userId;
         if (!isAdmin && !isInitiator) {
           return { valid: false, error: "Seul l'initiateur ou un admin peut annuler" };

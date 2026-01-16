@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, UserPlus, Users, Clock, Building2, AlertTriangle } from 'lucide-react';
+import { SystemRole, getRoleLabel, normalizeRole } from '@shared/types/roles';
 import Modal from '@/components/ui/Modal';
 import FormField from '@/components/ui/FormField';
 import SelectField from '@/components/ui/SelectField';
@@ -70,9 +71,9 @@ export default function GrantPermissionModal({ isOpen, onClose, users, onGrant }
           onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
           options={[
             { value: '', label: '-- Choisir --' },
-            ...users.filter(u => u.role === "Chef d'Agence").map(user => ({
+            ...users.filter(u => normalizeRole(u.role) === SystemRole.CHEF_AGENCE).map(user => ({
               value: user.id,
-              label: `${user.nom} (${user.role})`
+              label: `${user.nom} (${getRoleLabel(user.role)})`
             }))
           ]}
         />

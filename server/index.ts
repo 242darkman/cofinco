@@ -15,6 +15,7 @@ import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
 import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
 import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
 import { startScheduledDisbursementsCron } from "./cron/scheduled-disbursements";
+import { SystemRole } from "@shared/types/roles";
 import { startAutomaticRepaymentsCron } from "./cron/automatic-repayments";
 
 const app = express();
@@ -168,7 +169,7 @@ async function seedAdminUser() {
         nom: 'Administrateur',
         prenom: 'Système',
         email: 'admin@cofin.com',
-        role: 'admin',
+        role: SystemRole.ADMIN,
         agence: 'Siège',
         statut: 'Actif',
       });

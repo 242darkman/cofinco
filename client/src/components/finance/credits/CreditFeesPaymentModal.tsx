@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { sessionCaisseApi, authApi } from '../../../lib/api-client';
 import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { SystemRole, normalizeRole } from '@shared/types/roles';
 
 interface CreditFeesPaymentModalProps {
   demande: any;
@@ -43,7 +44,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
   const [checkingSession, setCheckingSession] = useState(true);
   const [userSession, setUserSession] = useState<any>(null); // The user's own session
   const [takenSession, setTakenSession] = useState<any>(null); // The session user decided to take over
-  const [userRole, setUserRole] = useState<string>('');
+  const [userRole, setUserRole] = useState<SystemRole>(SystemRole.CLIENT);
   
   // Caisse List State
   const [showCaisseList, setShowCaisseList] = useState(false);
@@ -68,7 +69,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
       ]);
       
       setUserSession(session && session.statut === 'Ouverte' ? session : null);
-      setUserRole(user?.role || '');
+      setUserRole(normalizeRole(user?.role) || SystemRole.CLIENT);
     } catch (e) {
       console.error("Error checking session", e);
     } finally {
@@ -186,7 +187,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
       }
   };
 
-  const isAdmin = ['admin', 'Administrateur', 'Chef d\'Agence'].includes(userRole);
+  const isAdmin = userRole === SystemRole.ADMIN || userRole === SystemRole.CHEF_AGENCE;
 
   return (
     <>

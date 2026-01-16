@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { isAdminRole } from '@shared/types/roles';
 
 interface PaiementTerrain {
   id: string;
@@ -56,7 +57,7 @@ export default function AdminValidationTerrain() {
   };
 
   // Check if user is admin (supports multiple role variants)
-  const isAdmin = user?.role === 'admin' || user?.role === 'admin_generale' || user?.role === 'Administrateur';
+  const isAdmin = isAdminRole(user?.role);
 
   // Fetch agences for selector (admins only)
   const { data: agences = [] } = useQuery<Agence[]>({

@@ -38,6 +38,7 @@ import {
   configTransfertInterCoffres,
 } from '@shared/schema';
 import { hashPassword } from './auth';
+import { SystemRole } from '@shared/types/roles';
 
 // ----------------------------------------------------------------------
 // DATA DEFINITIONS
@@ -271,7 +272,7 @@ async function seedProd() {
           seuilDoubleValidation: '10000000', // 10 millions for prod
           separationInitiateurValideur: true,
           actif: true,
-          rolesInitiateurs: ['Chef d\'Agence', 'Agent Caisse'],
+          rolesInitiateurs: ['Chef d\'Agence', 'agent_caisse'],
           rolesValideurs: ['Chef d\'Agence', 'Superviseur'],
           rolesExecuteurs: ['Chef d\'Agence'],
         });
@@ -346,7 +347,7 @@ async function seedProd() {
         separationCreateurApprobateurN1: true,
         separationApprobateurN1N2: true,
         separationApprobateurRecepteur: true,
-        rolesCreateurs: ['Agent Caisse', 'Comptable', 'Chef d\'Agence'],
+        rolesCreateurs: ['agent_caisse', 'Comptable', 'Chef d\'Agence'],
         rolesApprobateursN1: ['Chef d\'Agence', 'Trésorier'],
         rolesApprobateursN2: ['Directeur', 'Directeur Financier'],
         rolesRecepteurs: ['Trésorier', 'Chef d\'Agence', 'Comptable'],
@@ -543,7 +544,7 @@ async function seedProd() {
       nom: 'Administrateur',
       prenom: 'Système',
       email: 'admin@cofin.com',
-      role: 'Administrateur',
+      role: SystemRole.ADMIN,
       agence: 'Siège', // Linked to inserted Agence by name or ID? Schema says string?
       // Check auth.ts or schema used. In seed-demo it used 'Siège'.
       // If schema is text, it works. If link, might fail. 

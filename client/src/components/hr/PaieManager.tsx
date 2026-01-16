@@ -5,6 +5,7 @@ import { Card, Button, ResponsiveTable, Badge, TabGroup } from '../ui';
 import { FileText, Play, CheckCircle, Download, FileCheck, Calculator, AlertCircle } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
+import { isAdminRole } from '@shared/types/roles';
 
 export default function PaieManager() {
   // RBAC permissions
@@ -15,7 +16,7 @@ export default function PaieManager() {
   const { user } = useUserProfile();
   const { myBulletins, allBulletins, generatePaie, isGenerating, loadingMyBulletins } = usePaie();
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-  const isRH = user?.role === 'rh' || user?.role === 'Administrateur' || canViewAllPaie;
+  const isRH = isAdminRole(user?.role) || canViewAllPaie || canGeneratePaie;
   const [activeTab, setActiveTab] = useState('my');
 
   const handleGenerate = async () => {

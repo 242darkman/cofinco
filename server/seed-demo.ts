@@ -122,7 +122,8 @@ import {
   creditRefundRequests,
   configTransfertInterCoffres,
 } from '@shared/schema';
-import { hashPassword, ROLES } from './auth';
+import { hashPassword } from './auth';
+import { SystemRole } from '@shared/types/roles';
 import { eq } from 'drizzle-orm';
 import { faker } from '@faker-js/faker/locale/fr';
 
@@ -649,7 +650,7 @@ async function seedDemo() {
       separationCreateurApprobateurN1: true,
       separationApprobateurN1N2: true,
       separationApprobateurRecepteur: true,
-      rolesCreateurs: ['Agent Caisse', 'Comptable', 'Chef d\'Agence'],
+      rolesCreateurs: ['agent_caisse', 'Comptable', 'Chef d\'Agence'],
       rolesApprobateursN1: ['Chef d\'Agence', 'Trésorier'],
       rolesApprobateursN2: ['Directeur', 'Directeur Financier'],
       rolesRecepteurs: ['Trésorier', 'Chef d\'Agence', 'Comptable'],
@@ -672,7 +673,7 @@ async function seedDemo() {
           separationCreateurApprobateurN1: true,
           separationApprobateurN1N2: true,
           separationApprobateurRecepteur: true,
-          rolesCreateurs: ['Agent Caisse', 'Chef d\'Agence'],
+          rolesCreateurs: ['agent_caisse', 'Chef d\'Agence'],
           rolesApprobateursN1: ['Chef d\'Agence'],
           rolesApprobateursN2: ['Directeur'],
           rolesRecepteurs: ['Chef d\'Agence', 'Comptable'],
@@ -899,7 +900,7 @@ async function seedDemo() {
       {
         username: 'admin',
         password: hashedAdmin,
-        role: ROLES.ADMIN,
+        role: SystemRole.ADMIN,
         nom: 'Administrateur',
         prenom: 'Système',
         email: 'admin@cofin.com',
@@ -918,7 +919,7 @@ async function seedDemo() {
       {
         username: 'chef_siege',
         password: hashedDefault,
-        role: ROLES.CHEF,
+        role: SystemRole.CHEF_AGENCE,
         nom: 'Mballa',
         prenom: 'Jean',
         email: 'chef.siege@cofin.com',
@@ -936,7 +937,7 @@ async function seedDemo() {
       {
         username: 'chef_nord',
         password: hashedDefault,
-        role: ROLES.CHEF,
+        role: SystemRole.CHEF_AGENCE,
         nom: 'Ondoa',
         prenom: 'Marc',
         email: 'chef.nord@cofin.com',
@@ -954,7 +955,7 @@ async function seedDemo() {
       {
         username: 'chef_sud',
         password: hashedDefault,
-        role: ROLES.CHEF,
+        role: SystemRole.CHEF_AGENCE,
         nom: 'Bikoumou',
         prenom: 'Eric',
         email: 'chef.sud@cofin.com',
@@ -972,7 +973,7 @@ async function seedDemo() {
       {
         username: 'chef_est',
         password: hashedDefault,
-        role: ROLES.CHEF,
+        role: SystemRole.CHEF_AGENCE,
         nom: 'Ossa',
         prenom: 'Luc',
         email: 'chef.est@cofin.com',
@@ -990,7 +991,7 @@ async function seedDemo() {
       {
         username: 'comptable_siege',
         password: hashedDefault,
-        role: ROLES.COMPTABLE,
+        role: SystemRole.COMPTABLE,
         nom: 'Ngoma',
         prenom: 'Patrick',
         email: 'compta@cofin.com',
@@ -1007,7 +1008,7 @@ async function seedDemo() {
       {
         username: 'superviseur',
         password: hashedDefault,
-        role: ROLES.SUPERVISEUR,
+        role: SystemRole.SUPERVISEUR,
         nom: 'Ekoka',
         prenom: 'Brice',
         email: 'superviseur@cofin.com',
@@ -1025,7 +1026,7 @@ async function seedDemo() {
       {
         username: 'rh_manager',
         password: hashedDefault,
-        role: ROLES.SUPERVISEUR,  // Changed from 'rh' to use standard role
+        role: SystemRole.SUPERVISEUR,  // Changed from 'rh' to use standard role
         nom: 'Mouyabi',
         prenom: 'Claudine',
         email: 'rh@cofin.com',
@@ -1042,7 +1043,7 @@ async function seedDemo() {
       {
         username: 'direction',
         password: hashedDefault,
-        role: ROLES.ADMIN,  // Changed from 'direction' to use standard role
+        role: SystemRole.ADMIN,  // Changed from 'direction' to use standard role
         nom: 'Nguimbi',
         prenom: 'Alain',
         email: 'direction@cofin.com',
@@ -1059,7 +1060,7 @@ async function seedDemo() {
       {
         username: 'agent_interne',
         password: hashedDefault,
-        role: ROLES.TERRAIN,  // Changed from 'agent' to use standard role
+        role: SystemRole.AGENT_TERRAIN,  // Changed from 'agent' to use standard role
         nom: 'Support',
         prenom: 'Interne',
         email: 'agent.interne@cofin.com',
@@ -1087,9 +1088,9 @@ async function seedDemo() {
 
     const agenciesList = ['Siège', 'Agence Nord', 'Agence Sud', 'Agence Est'];
     const staffRoles = [
-      { role: ROLES.CAISSE, prefix: 'caisse', count: 2, label: 'Caissier', poste: 'Caissier' },
-      { role: ROLES.CREDIT, prefix: 'credit', count: 2, label: 'Gestionnaire', poste: 'Gestionnaire Crédit' },
-      { role: ROLES.TERRAIN, prefix: 'agent', count: 2, label: 'Agent', poste: 'Agent Terrain' },
+      { role: SystemRole.CAISSIER, prefix: 'caisse', count: 2, label: 'Caissier', poste: 'Caissier' },
+      { role: SystemRole.GESTIONNAIRE_CREDIT, prefix: 'credit', count: 2, label: 'Gestionnaire', poste: 'Gestionnaire Crédit' },
+      { role: SystemRole.AGENT_TERRAIN, prefix: 'agent', count: 2, label: 'Agent', poste: 'Agent Terrain' },
     ];
 
     const staffGroups: Record<string, any[]> = { Caissiers: [], Agents: [], Credits: [] };
@@ -1119,18 +1120,18 @@ async function seedDemo() {
             statut: 'Actif',
             matricule,
             poste: roleConfig.poste,
-            departement: roleConfig.role === ROLES.TERRAIN ? 'Terrain' : roleConfig.role === ROLES.CAISSE ? 'Caisse' : 'Crédit',
+            departement: roleConfig.role === SystemRole.AGENT_TERRAIN ? 'Terrain' : roleConfig.role === SystemRole.CAISSIER ? 'Caisse' : 'Crédit',
             dateEmbauche: dateOnly(monthsAgo(12 + i * 2)),
             managerId: manager?.id,
-            salaireBase: roleConfig.role === ROLES.TERRAIN ? 250000 : 300000,
-            caissePin: (roleConfig.role === ROLES.CAISSE || roleConfig.role === ROLES.TERRAIN) ? hashedPin : null,
+            salaireBase: roleConfig.role === SystemRole.AGENT_TERRAIN ? 250000 : 300000,
+            caissePin: (roleConfig.role === SystemRole.CAISSIER || roleConfig.role === SystemRole.AGENT_TERRAIN) ? hashedPin : null,
           }).returning();
 
           insertedUsers[username] = user;
 
-          if (roleConfig.role === ROLES.TERRAIN) staffGroups.Agents.push(user);
-          if (roleConfig.role === ROLES.CAISSE) staffGroups.Caissiers.push(user);
-          if (roleConfig.role === ROLES.CREDIT) staffGroups.Credits.push(user);
+          if (roleConfig.role === SystemRole.AGENT_TERRAIN) staffGroups.Agents.push(user);
+          if (roleConfig.role === SystemRole.CAISSIER) staffGroups.Caissiers.push(user);
+          if (roleConfig.role === SystemRole.GESTIONNAIRE_CREDIT) staffGroups.Credits.push(user);
         }
       }
     }
@@ -3793,7 +3794,7 @@ async function seedDemo() {
         status: 'pending',
         expiresAt: daysFromNow(1),
         createdBy: staffGroups.Caissiers[0]?.id,
-        createdByRole: ROLES.CAISSE,
+        createdByRole: SystemRole.CAISSIER,
       },
       {
         transactionType: 'transfer',
@@ -3805,11 +3806,11 @@ async function seedDemo() {
         status: 'validated',
         validatedBy: adminUser.id,
         validatedByName: adminUser.nom || 'Admin',
-        validatedByRole: ROLES.ADMIN,
+        validatedByRole: SystemRole.ADMIN,
         validatedAt: daysAgo(1),
         expiresAt: daysFromNow(1),
         createdBy: staffGroups.Caissiers[0]?.id,
-        createdByRole: ROLES.CAISSE,
+        createdByRole: SystemRole.CAISSIER,
       },
     ]);
 
@@ -4150,12 +4151,12 @@ async function seedDemo() {
 
         // Map standard role name to roleSystem code
         let roleSystem = 'agent';
-        if (user.role === ROLES.ADMIN) roleSystem = 'admin';
-        else if (user.role === ROLES.CHEF) roleSystem = 'chef_agence';
-        else if (user.role === ROLES.CAISSE) roleSystem = 'caissier';
-        else if (user.role === ROLES.TERRAIN) roleSystem = 'terrain';
-        else if (user.role === ROLES.COMPTABLE) roleSystem = 'comptable';
-        else if (user.role === ROLES.CREDIT) roleSystem = 'gestionnaire_credit';
+        if (user.role === SystemRole.ADMIN) roleSystem = 'admin';
+        else if (user.role === SystemRole.CHEF_AGENCE) roleSystem = 'chef_agence';
+        else if (user.role === SystemRole.CAISSIER) roleSystem = 'caissier';
+        else if (user.role === SystemRole.AGENT_TERRAIN) roleSystem = 'terrain';
+        else if (user.role === SystemRole.COMPTABLE) roleSystem = 'comptable';
+        else if (user.role === SystemRole.GESTIONNAIRE_CREDIT) roleSystem = 'gestionnaire_credit';
 
         return {
           userId: user.id,
@@ -4371,7 +4372,7 @@ async function seedDemo() {
 
     // Ajouter plus de candidatures
     const candidaturesData: any[] = [];
-    const postesVises = ['Agent Caisse', 'Agent Terrain', 'Analyste Crédit', 'Comptable', 'Chef d\'agence', 'Responsable RH'];
+    const postesVises = ['agent_caisse', 'Agent Terrain', 'Analyste Crédit', 'Comptable', 'Chef d\'agence', 'Responsable RH'];
     const candidatureStatuts = ['En attente', 'Entretien', 'Retenu', 'Refusé', 'En cours'];
 
     for (let i = 0; i < 15; i++) {

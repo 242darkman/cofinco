@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { modules, permissions, rolePermissions, userPermissions } from "@shared/schema";
+import { SystemRole, getRoleOptions, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { requireAuth, requireRole } from "../auth";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
@@ -98,8 +99,9 @@ export function registerRbacRoutes(app: Express) {
   app.get("/api/role-permissions", requireAuth, async (req, res) => {
     try {
       const { role } = req.query;
+      const normalizedRole = normalizeRole(role as string);
 
-      if (!role) {
+      if (!normalizedRole) {
         return res.status(400).json({ message: "Le paramètre 'role' est requis" });
       }
 
@@ -116,7 +118,7 @@ export function registerRbacRoutes(app: Express) {
         .from(rolePermissions)
         .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
         .leftJoin(modules, eq(permissions.moduleId, modules.id))
-        .where(eq(rolePermissions.role, role as string));
+        .where(eq(rolePermissions.role, normalizedRole));
 
       res.json(rolePerms);
     } catch (error) {
@@ -126,11 +128,12 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Create a new role permission
-  app.post("/api/role-permissions", requireRole("admin"), async (req, res) => {
+  app.post("/api/role-permissions", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { role, permission_id, permission_code, granted = true } = req.body;
+      const normalizedRole = normalizeRole(role);
 
-      if (!role) {
+      if (!normalizedRole) {
         return res.status(400).json({ message: "Le rôle est requis" });
       }
 
@@ -153,7 +156,7 @@ export function registerRbacRoutes(app: Express) {
       const [existing] = await db.select()
         .from(rolePermissions)
         .where(and(
-          eq(rolePermissions.role, role),
+          eq(rolePermissions.role, normalizedRole),
           eq(rolePermissions.permissionId, permId)
         ));
 
@@ -169,7 +172,7 @@ export function registerRbacRoutes(app: Express) {
 
       const [created] = await db.insert(rolePermissions)
         .values({
-          role,
+          role: normalizedRole,
           permissionId: permId,
           granted,
         })
@@ -180,7 +183,7 @@ export function registerRbacRoutes(app: Express) {
         "CREATE_ROLE_PERMISSION",
         "rbac",
         created.id,
-        { role, permissionId: permId, granted },
+        { role: normalizedRole, permissionId: permId, granted },
         "success",
         "medium"
       );
@@ -188,7 +191,7 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_created', role } });
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_created', role: normalizedRole } });
       }
 
       res.status(201).json(created);
@@ -199,7 +202,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Update a role permission
-  app.patch("/api/role-permissions/:id", requireRole("admin"), async (req, res) => {
+  app.patch("/api/role-permissions/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const { granted } = req.body;
@@ -237,7 +240,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Delete a role permission
-  app.delete("/api/role-permissions/:id", requireRole("admin"), async (req, res) => {
+  app.delete("/api/role-permissions/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -273,12 +276,13 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Bulk update role permissions (toggle multiple at once)
-  app.put("/api/role-permissions/bulk", requireRole("admin"), async (req, res) => {
+  app.put("/api/role-permissions/bulk", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { role, permissions: permUpdates } = req.body;
       // permUpdates is an array of { permissionId, granted }
 
-      if (!role || !Array.isArray(permUpdates)) {
+      const normalizedRole = normalizeRole(role);
+      if (!normalizedRole || !Array.isArray(permUpdates)) {
         return res.status(400).json({ message: "role et permissions sont requis" });
       }
 
@@ -291,7 +295,7 @@ export function registerRbacRoutes(app: Express) {
         const [existing] = await db.select()
           .from(rolePermissions)
           .where(and(
-            eq(rolePermissions.role, role),
+            eq(rolePermissions.role, normalizedRole),
             eq(rolePermissions.permissionId, permissionId)
           ));
 
@@ -312,7 +316,7 @@ export function registerRbacRoutes(app: Express) {
         } else if (granted) {
           // Create new
           const [created] = await db.insert(rolePermissions)
-            .values({ role, permissionId, granted: true })
+            .values({ role: normalizedRole, permissionId, granted: true })
             .returning();
           results.push(created);
         }
@@ -323,7 +327,7 @@ export function registerRbacRoutes(app: Express) {
         "BULK_UPDATE_ROLE_PERMISSIONS",
         "rbac",
         undefined,
-        { role, count: permUpdates.length },
+        { role: normalizedRole, count: permUpdates.length },
         "success",
         "high"
       );
@@ -331,7 +335,7 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'bulk_update', role } });
+          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'bulk_update', role: normalizedRole } });
       }
 
       res.json({ message: "Permissions mises à jour", count: results.length, results });
@@ -344,17 +348,7 @@ export function registerRbacRoutes(app: Express) {
   // Get available roles
   app.get("/api/roles", requireAuth, async (req, res) => {
     try {
-      const roles = [
-        'Administrateur',
-        "Chef d'Agence",
-        'Comptable',
-        'Gestionnaire Crédit',
-        'Superviseur',
-        'Agent Caisse',
-        'Agent Terrain'
-      ];
-
-      res.json(roles);
+      res.json(getRoleOptions());
     } catch (error) {
       console.error("Get roles error:", error);
       res.status(500).json({ message: "Erreur lors de la récupération des rôles" });
@@ -377,7 +371,7 @@ export function registerRbacRoutes(app: Express) {
       }
 
       // Administrateur has all permissions
-      if (userRole === 'Administrateur' || userRole === 'admin') {
+      if (isAdminRole(userRole)) {
         // Return all permissions as granted
         const allPerms = await db.select({
           id: permissions.id,
@@ -488,7 +482,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Get permissions for a specific user (admin only) - format expected by useUserPermissions hook
-  app.get("/api/user-permissions/:userId", requireRole("admin"), async (req, res) => {
+  app.get("/api/user-permissions/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
 
@@ -546,7 +540,7 @@ export function registerRbacRoutes(app: Express) {
         }
 
         // Admin has all permissions
-        if (userRole === 'Administrateur' || userRole === 'admin') {
+        if (isAdminRole(userRole)) {
           granted = true;
           source = 'role';
         }
@@ -569,7 +563,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Toggle a permission for a specific user (admin only)
-  app.post("/api/user-permissions/:userId", requireRole("admin"), async (req, res) => {
+  app.post("/api/user-permissions/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
       const { permission_id, granted } = req.body;
@@ -632,7 +626,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Reset all custom permissions for a user (admin only)
-  app.delete("/api/user-permissions/:userId", requireRole("admin"), async (req, res) => {
+  app.delete("/api/user-permissions/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
 
@@ -673,7 +667,7 @@ export function registerRbacRoutes(app: Express) {
       }
 
       // Administrateur has all permissions
-      if (userRole === 'Administrateur' || userRole === 'admin') {
+      if (isAdminRole(userRole)) {
         return res.json({ hasPermission: true });
       }
 

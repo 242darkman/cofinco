@@ -4,6 +4,7 @@ import { clientSearchApi, demandeCreditApi, creditPlanApi, clientApi } from '../
 import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../ui';
 import { formatClientName } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
+import { SystemRole, normalizeRole } from '@shared/types/roles';
 
 interface Client {
   id: string;
@@ -38,7 +39,7 @@ interface CreditRequestFormProps {
   onClose: () => void;
   onSuccess: () => void;
   clientId?: string;
-  userRole?: string;
+  userRole?: SystemRole | string;
 }
 
 export default function CreditRequestForm({ onClose, onSuccess, clientId, userRole }: CreditRequestFormProps) {
@@ -76,14 +77,15 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   const RATE_BASE = 20;
   const RATE_MIN = 10;
   const RATE_MAX = 24;
-  const overrideRoles = new Set([
-    'Administrateur',
-    'Comptable',
-    'Chef d\'Agence',
-    'Gestionnaire Crédit',
-    'Superviseur'
+  const overrideRoles = new Set<SystemRole>([
+    SystemRole.ADMIN,
+    SystemRole.COMPTABLE,
+    SystemRole.CHEF_AGENCE,
+    SystemRole.GESTIONNAIRE_CREDIT,
+    SystemRole.SUPERVISEUR
   ]);
-  const canOverrideRate = userRole ? overrideRoles.has(userRole) : false;
+  const normalizedUserRole = normalizeRole(userRole);
+  const canOverrideRate = normalizedUserRole ? overrideRoles.has(normalizedUserRole) : false;
 
   const [calculatedData, setCalculatedData] = useState({
     montantTotal: 0,

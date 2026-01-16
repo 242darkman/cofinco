@@ -1,10 +1,39 @@
 /**
  * Configuration RBAC : Modules accessibles par rôle
  */
+import { SystemRole, normalizeRole } from '../types/roles';
 
-export type ModuleAccessConfig = {
-  [role: string]: string[];
-};
+export const APP_MODULES = [
+  'Dashboard',
+  'Caisse',
+  'Crédits',
+  'Remboursements',
+  'Clients',
+  'Comptes',
+  'Tontines',
+  'Comptabilité',
+  'Agent Terrain',
+  'CaisseAgent',
+  'Transferts',
+  'Rapports',
+  'RH',
+  'Communications',
+  'Bourse',
+  'Loge',
+  'Paramètres',
+  'Administration',
+  'Audit',
+  'Messages',
+  'Coffre-Fort',
+  'Incidents',
+  'Visites',
+  'Prospection',
+  'Paiements Agent',
+] as const;
+
+export type AppModule = (typeof APP_MODULES)[number];
+
+export type ModuleAccessConfig = Record<SystemRole, AppModule[]>;
 
 /**
  * Liste des modules par rôle
@@ -13,11 +42,11 @@ export type ModuleAccessConfig = {
  * Comptable : Comptabilité, Rapports, Dashboard
  * Gestionnaire Crédit : Crédits, Clients, Remboursements, Dashboard
  * Superviseur : Supervision équipe, Dashboard
- * Agent Caisse : Clients, Comptes, Transactions, Caisse, Dashboard
+ * agent_caisse : Clients, Comptes, Transactions, Caisse, Dashboard
  * Agent Terrain : Clients, Terrain, Communications, Dashboard
  */
 export const MODULE_ACCESS: ModuleAccessConfig = {
-  'Administrateur': [
+  [SystemRole.ADMIN]: [
     'Dashboard',
     'Clients',
     'Crédits',
@@ -26,20 +55,20 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Comptabilité',
     'Remboursements',
     'Rapports',
-    'Terrain',
+    'Agent Terrain',
     'Communications',
     'Caisse',
     'CaisseAgent',
     'RH',
     'Paramètres',
-    'Admin',
+    'Administration',
     'Coffre-Fort',
     'Incidents',
     'Visites',
     'Prospection',
     'Paiements Agent'
   ],
-  "Chef d'Agence": [
+  [SystemRole.CHEF_AGENCE]: [
     'Dashboard',
     'Clients',
     'Crédits',
@@ -48,7 +77,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Comptabilité',
     'Remboursements',
     'Rapports',
-    'Terrain',
+    'Agent Terrain',
     'Communications',
     'Caisse',
     'CaisseAgent',
@@ -58,9 +87,9 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Prospection',
     'Paiements Agent',
     'RH',
-    'Admin'
+    'Administration'
   ],
-  'Comptable': [
+  [SystemRole.COMPTABLE]: [
     'Dashboard',
     'Comptabilité',
     'Rapports',
@@ -68,7 +97,7 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Communications',
     'RH'
   ],
-  'Gestionnaire Crédit': [
+  [SystemRole.GESTIONNAIRE_CREDIT]: [
     'Dashboard',
     'Clients',
     'Crédits',
@@ -77,16 +106,16 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Communications',
     'RH'
   ],
-  'Superviseur': [
+  [SystemRole.SUPERVISEUR]: [
     'Dashboard',
     'Clients',
-    'Terrain',
+    'Agent Terrain',
     'CaisseAgent',
     'Rapports',
     'Communications',
     'RH'
   ],
-  'Agent Caisse': [
+  [SystemRole.CAISSIER]: [
     'Dashboard',
     'Clients',
     'Comptes',
@@ -94,10 +123,10 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Communications',
     'RH'
   ],
-  'Agent Terrain': [
+  [SystemRole.AGENT_TERRAIN]: [
     'Dashboard',
     'Clients',
-    'Terrain',
+    'Agent Terrain',
     'CaisseAgent',
     'Incidents',
     'Visites',
@@ -105,38 +134,43 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Paiements Agent',
     'Communications',
     'RH'
-  ]
+  ],
+  [SystemRole.CLIENT]: []
 };
 
 /**
  * Vérifie si un rôle a accès à un module
  */
-export function canAccessModule(role: string, moduleName: string): boolean {
-  const allowedModules = MODULE_ACCESS[role] || [];
+export function canAccessModule(role: string, moduleName: AppModule): boolean {
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole) return false;
+  const allowedModules = MODULE_ACCESS[normalizedRole] || [];
   return allowedModules.includes(moduleName);
 }
 
 /**
  * Obtient la liste des modules accessibles pour un rôle
  */
-export function getAccessibleModules(role: string): string[] {
-  return MODULE_ACCESS[role] || [];
+export function getAccessibleModules(role: string): AppModule[] {
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole) return [];
+  return MODULE_ACCESS[normalizedRole] || [];
 }
 
 /**
  * Configuration des permissions par action et module
  */
 export type PermissionConfig = {
-  [role: string]: {
+  [role in SystemRole]: {
     [module: string]: string[]; // Liste d'actions autorisées
   };
 };
 
 export const ROLE_PERMISSIONS: PermissionConfig = {
-  'Administrateur': {
+  [SystemRole.ADMIN]: {
     '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide', 'caisseagent.approve', 'caisseagent.reject', 'supervision.view']
   },
-  "Chef d'Agence": {
+  [SystemRole.CHEF_AGENCE]: {
     'clients': ['view', 'create', 'edit', 'delete'],
     'credits': ['view', 'create', 'edit', 'approve', 'delete', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide'],
     'epargnes': ['view', 'create', 'edit'],
@@ -155,7 +189,7 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'prospection': ['view'],
     'paiements': ['view']
   },
-  'Comptable': {
+  [SystemRole.COMPTABLE]: {
     'clients': ['view'],
     'credits': ['view'],
     'epargnes': ['view'],
@@ -163,14 +197,14 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'rapports': ['view', 'export'],
     'rh': ['view'] // Pointage uniquement
   },
-  'Gestionnaire Crédit': {
+  [SystemRole.GESTIONNAIRE_CREDIT]: {
     'clients': ['view', 'create', 'edit'],
     'credits': ['view', 'create', 'edit', 'approve', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide'],
     'remboursements': ['view', 'create'],
     'rapports': ['view', 'export'],
     'rh': ['view'] // Pointage uniquement
   },
-  'Superviseur': {
+  [SystemRole.SUPERVISEUR]: {
     'clients': ['view'],
     'terrain': ['view', 'manage'],
     'tontines': ['view', 'manage'],
@@ -178,14 +212,14 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'rapports': ['view'],
     'rh': ['view'] // Pointage uniquement
   },
-  'Agent Caisse': {
+  [SystemRole.CAISSIER]: {
     'clients': ['view', 'create'],
     'epargnes': ['view', 'create', 'edit'],
     'caisse': ['view', 'create', 'edit'],
     'remboursements': ['view', 'create'],
     'rh': ['view'] // Pointage uniquement
   },
-  'Agent Terrain': {
+  [SystemRole.AGENT_TERRAIN]: {
     'clients': ['view', 'create', 'edit'],
     'terrain': ['view', 'create'],
     'prospection': ['view', 'create'],
@@ -194,14 +228,17 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'visites': ['view', 'create'],
     'paiements': ['view', 'create'],
     'rh': ['view'] // Pointage uniquement
-  }
+  },
+  [SystemRole.CLIENT]: {}
 };
 
 /**
  * Vérifie si un rôle a une permission spécifique
  */
 export function hasPermission(role: string, module: string, action: string): boolean {
-  const rolePerms = ROLE_PERMISSIONS[role];
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole) return false;
+  const rolePerms = ROLE_PERMISSIONS[normalizedRole];
   if (!rolePerms) return false;
 
   // Check wildcard permissions (admins)
@@ -219,7 +256,15 @@ export function hasPermission(role: string, module: string, action: string): boo
 /**
  * Metadata des Modules pour le seeding et l'UI
  */
-export const MODULES_DATA = [
+export type ModuleSeed = {
+  name: AppModule;
+  description: string;
+  icon: string;
+  category: string;
+  orderIndex: number;
+};
+
+export const MODULES_DATA: ModuleSeed[] = [
   { name: 'Dashboard', description: 'Vue d\'ensemble des indicateurs', icon: 'LayoutDashboard', category: 'general', orderIndex: 1 },
   { name: 'Caisse', description: 'Gestion des opérations de caisse', icon: 'Wallet', category: 'operations', orderIndex: 2 },
   { name: 'Crédits', description: 'Gestion des crédits et prêts', icon: 'CreditCard', category: 'finance', orderIndex: 3 },
@@ -249,7 +294,9 @@ export const MODULES_DATA = [
 /**
  * Metadata des Permissions pour le seeding et l'UI
  */
-export const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string; description: string }>> = {
+export type PermissionSeed = { name: string; code: string; description: string };
+
+export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
   'Dashboard': [
     { name: 'Voir le tableau de bord', code: 'dashboard.view', description: 'Accès au tableau de bord' },
   ],
@@ -418,9 +465,9 @@ export const PERMISSIONS_DATA: Record<string, Array<{ name: string; code: string
  * Configuration des permissions par rôle pour le Seeding (Codes plats)
  * Cette configuration doit être synchronisée avec ROLE_PERMISSIONS (Logique UI)
  */
-export const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
-  'Administrateur': ['*'],
-  'Chef d\'Agence': [
+export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
+  [SystemRole.ADMIN]: ['*'],
+  [SystemRole.CHEF_AGENCE]: [
     'dashboard.view',
     'clients.view', 'clients.create', 'clients.edit', 'clients.delete',
     'credits.view', 'credits.create', 'credits.edit', 'credits.approve', 'credits.delete',
@@ -444,7 +491,7 @@ export const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
     'communications.view',
     'messages.view', 'messages.send',
   ],
-  'Comptable': [
+  [SystemRole.COMPTABLE]: [
     'dashboard.view',
     'clients.view',
     'credits.view',
@@ -454,7 +501,7 @@ export const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
     'communications.view',
     'rh.view', 
   ],
-  'Gestionnaire Crédit': [
+  [SystemRole.GESTIONNAIRE_CREDIT]: [
     'dashboard.view',
     'clients.view', 'clients.create', 'clients.edit',
     'credits.view', 'credits.create', 'credits.edit', 'credits.approve',
@@ -464,7 +511,7 @@ export const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
     'communications.view',
     'rh.view',
   ],
-  'Superviseur': [
+  [SystemRole.SUPERVISEUR]: [
     'dashboard.view',
     'clients.view',
     'agent.view', 'agent.manage',
@@ -474,7 +521,7 @@ export const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
     'communications.view',
     'rh.view',
   ],
-  'Agent Caisse': [
+  [SystemRole.CAISSIER]: [
     'dashboard.view',
     'clients.view', 'clients.create',
     'epargnes.view', 'epargnes.create', 'epargnes.edit',
@@ -483,7 +530,7 @@ export const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
     'communications.view',
     'rh.view',
   ],
-  'Agent Terrain': [
+  [SystemRole.AGENT_TERRAIN]: [
     'dashboard.view',
     'clients.view', 'clients.create', 'clients.edit',
     'agent.view', 'agent.create',
@@ -494,5 +541,6 @@ export const SEED_ROLE_PERMISSIONS: Record<string, string[]> = {
     'paiements.view', 'paiements.create',
     'communications.view',
     'rh.view',
-  ]
+  ],
+  [SystemRole.CLIENT]: []
 };

@@ -3,6 +3,7 @@ import session from 'express-session';
 import bcrypt from 'bcrypt';
 import { storage } from './storage';
 import type { User } from '@shared/schema';
+import { SystemRole, normalizeRole as normalizeSystemRole } from '@shared/types/roles';
 import pgSession from 'connect-pg-simple';
 import pg from 'pg';
 
@@ -19,7 +20,7 @@ declare module 'express-session' {
       username: string;
       nom: string;
       prenom: string | null;
-      role: string;
+      role: SystemRole;
       agence: string | null;
       agenceId?: string;
       email?: string;
@@ -102,42 +103,20 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Standard role names (full French names)
-export const ROLES = {
-  ADMIN: 'Administrateur',
-  CHEF: 'Chef d\'Agence',
-  CAISSE: 'Agent Caisse',
-  TERRAIN: 'Agent Terrain',
-  COMPTABLE: 'Comptable',
-  CREDIT: 'Gestionnaire Crédit',
-  SUPERVISEUR: 'Superviseur',
-} as const;
+export const ROLES = SystemRole;
 
-// Normalize legacy short role names to standard full names
-function normalizeRole(role: string): string {
-  const legacyMap: Record<string, string> = {
-    'admin': ROLES.ADMIN,
-    'chef': ROLES.CHEF,
-    'caisse': ROLES.CAISSE,
-    'terrain': ROLES.TERRAIN,
-    'comptable': ROLES.COMPTABLE,
-    'credit': ROLES.CREDIT,
-    'superviseur': ROLES.SUPERVISEUR,
-  };
-  return legacyMap[role.toLowerCase()] || role;
-}
-
-export function requireRole(...roles: string[]) {
+export function requireRole(...roles: Array<SystemRole | string>) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.session.userId || !req.session.user) {
       return res.status(401).json({ error: 'Non authentifié' });
     }
     
-    // Normalize user role and allowed roles to standard names
-    const userRole = normalizeRole(req.session.user.role);
-    const normalizedAllowedRoles = roles.map(normalizeRole);
-    
-    if (!normalizedAllowedRoles.includes(userRole)) {
+    const userRole = normalizeSystemRole(req.session.user.role);
+    const normalizedAllowedRoles = roles
+      .map((role) => normalizeSystemRole(role))
+      .filter((role): role is SystemRole => !!role);
+
+    if (!userRole || !normalizedAllowedRoles.includes(userRole)) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
     next();

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, Settings, LogOut, ChevronDown, Check } from 'lucide-react';
 import { authService } from '../../lib/auth';
 import { useLocation } from 'wouter';
+import { getRoleLabel } from '@shared/types/roles';
 
 interface UserProfileDropdownProps {
   user: {
@@ -63,7 +64,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
         
         <div className="hidden md:flex flex-col items-start sr-only sm:not-sr-only">
           <span className="text-xs font-bold leading-tight">{user?.nom || 'Admin'} {user?.prenom}</span>
-          <span className="text-[10px] opacity-60 font-medium tracking-wide uppercase">{user?.role || 'Administrateur'}</span>
+          <span className="text-[10px] opacity-60 font-medium tracking-wide uppercase">{getRoleLabel(user?.role || '')}</span>
         </div>
         
         <ChevronDown size={14} className={`opacity-50 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
@@ -85,7 +86,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
                </div>
                <div className="flex items-center gap-2">
                  <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold uppercase tracking-wider rounded-md">
-                   {user?.role}
+                   {getRoleLabel(user?.role || '')}
                  </span>
 
                </div>

@@ -1,5 +1,6 @@
 import { authApi, AuthUser, setOnUnauthorized } from './api-client';
-import { canAccessModule as rbacCanAccessModule, getAccessibleModules, MODULE_ACCESS, hasPermission as rbacHasPermission, ROLE_PERMISSIONS } from '@shared/config/rbac';
+import { canAccessModule as rbacCanAccessModule, hasPermission as rbacHasPermission, ROLE_PERMISSIONS, AppModule, APP_MODULES } from '@shared/config/rbac';
+import { SystemRole, hasRole as hasSystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 
 export interface User {
   id: string;
@@ -8,7 +9,7 @@ export interface User {
   name: string;
   nom?: string;
   prenom?: string | null;
-  role: string;
+  role: SystemRole;
   status: string;
   agence?: string | null;
   agenceId?: string;
@@ -36,6 +37,21 @@ interface ApiPermissionsResponse {
  * - Vérification de session via /api/auth/me
  * - Permissions chargées dynamiquement depuis la BDD via /api/my-permissions
  */
+const normalizeModuleKey = (module: string): string => module
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, '');
+
+const APP_MODULE_MAP: Record<string, AppModule> = APP_MODULES.reduce((map, module) => {
+  map[normalizeModuleKey(module)] = module;
+  return map;
+}, {} as Record<string, AppModule>);
+
+const resolveAppModule = (module: string): AppModule | undefined => {
+  return APP_MODULE_MAP[normalizeModuleKey(module)];
+};
+
 class AuthService {
   private currentUser: User | null = null;
   private permissions: Permission[] = [];
@@ -72,6 +88,11 @@ class AuthService {
    * Mapper AuthUser vers User
    */
   private mapAuthUser(authUser: AuthUser): User {
+    const normalizedRole = normalizeRole(authUser.role);
+    if (!normalizedRole) {
+      console.warn('[Auth] Unknown role received:', authUser.role);
+    }
+
     return {
       id: authUser.id,
       username: authUser.username,
@@ -79,18 +100,12 @@ class AuthService {
       name: `${authUser.prenom || ''} ${authUser.nom}`.trim(),
       nom: authUser.nom,
       prenom: authUser.prenom,
-      role: this.mapRole(authUser.role),
+      role: normalizedRole || SystemRole.CLIENT,
       status: authUser.statut || 'Actif',
       agence: authUser.agence,
       agenceId: authUser.agenceId,
       mustChangePassword: authUser.mustChangePassword,
     };
-  }
-
-  private mapRole(role: string): string {
-    // Roles are now standardized as full French names
-    // Legacy short names are normalized at the server level
-    return role;
   }
 
   /**
@@ -112,9 +127,12 @@ class AuthService {
       this.permissionsLoaded = true;
 
       // Sync role if changed
-      if (this.currentUser && data.role && this.currentUser.role !== data.role) {
-          console.log(`👤 Role updated: ${this.currentUser.role} -> ${data.role}`);
-          this.currentUser.role = this.mapRole(data.role);
+      if (this.currentUser && data.role) {
+          const normalizedRole = normalizeRole(data.role);
+          if (normalizedRole && this.currentUser.role !== normalizedRole) {
+            console.log(`👤 Role updated: ${this.currentUser.role} -> ${normalizedRole}`);
+            this.currentUser.role = normalizedRole;
+          }
       }
 
       // Also populate legacy permissions array for backward compatibility
@@ -147,7 +165,14 @@ class AuthService {
    * Fallback: Charge les permissions depuis rbac-config.ts (statique)
    */
   private loadPermissionsFromStaticConfig(role: string) {
-    const rolePerms = ROLE_PERMISSIONS[role];
+    const normalizedRole = normalizeRole(role);
+    if (!normalizedRole) {
+      this.permissions = [{ module: '*', action: 'view', autorise: true }];
+      this.permissionsMap = { '*': ['view'] };
+      return;
+    }
+
+    const rolePerms = ROLE_PERMISSIONS[normalizedRole];
 
     if (!rolePerms) {
       // Rôle inconnu - permissions minimales (lecture seule)
@@ -171,11 +196,11 @@ class AuthService {
       }
     }
 
-    this.isAdminUser = role === 'Administrateur' || role === 'admin';
+    this.isAdminUser = isAdminRole(normalizedRole);
     this.permissionsLoaded = true;
 
     console.group('🔐 Permissions Loaded (Static)');
-    console.log('👤 Role:', role);
+    console.log('👤 Role:', normalizedRole);
     console.log('🔑 IsAdmin:', this.isAdminUser);
     console.log('📦 Total Modules:', Object.keys(this.permissionsMap).length);
     console.log('✅ Total Permissions:', this.permissions.length);
@@ -299,8 +324,11 @@ class AuthService {
     return this.currentUser !== null;
   }
 
-  hasRole(roleCode: string): boolean {
-    return this.currentUser?.role === roleCode;
+  hasRole(roleCode: SystemRole | string): boolean {
+    if (!this.currentUser?.role) return false;
+    const normalizedRole = normalizeRole(roleCode);
+    if (!normalizedRole) return false;
+    return hasSystemRole(this.currentUser.role, normalizedRole);
   }
 
   /**
@@ -335,11 +363,7 @@ class AuthService {
    * Ex: "Crédits" -> "credits", "Épargnes" -> "epargnes"
    */
   private normalizeModuleName(module: string): string {
-    return module
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
-      .replace(/\s+/g, ''); // Supprime les espaces
+    return normalizeModuleKey(module);
   }
 
   /**
@@ -367,7 +391,11 @@ class AuthService {
     }
 
     // Fallback to static config
-    return rbacCanAccessModule(this.currentUser.role, module);
+    const appModule = resolveAppModule(module);
+    if (!appModule) {
+      return false;
+    }
+    return rbacCanAccessModule(this.currentUser.role, appModule);
   }
 
   /**
@@ -388,15 +416,15 @@ class AuthService {
   }
 
   isAdmin(): boolean {
-    return this.hasRole('Administrateur') || this.hasRole('admin') || this.isAdminUser;
+    return isAdminRole(this.currentUser?.role) || this.isAdminUser;
   }
 
   isAgentCaisse(): boolean {
-    return this.hasRole('Agent Caisse');
+    return hasSystemRole(this.currentUser?.role, SystemRole.CAISSIER);
   }
 
   isManager(): boolean {
-    return this.hasRole("Chef d'Agence");
+    return hasSystemRole(this.currentUser?.role, SystemRole.CHEF_AGENCE);
   }
 
   getAgence(): string | null | undefined {

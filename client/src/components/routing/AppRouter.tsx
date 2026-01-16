@@ -1,12 +1,13 @@
 import React, { Suspense } from 'react';
 import { ROUTES, canAccessRoute, getRouteByKey, type RouteConfig } from '@/lib/routes-config';
 import { authService } from '@/lib/auth';
+import { SystemRole, getRoleLabel } from '@shared/types/roles';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 
 interface AppRouterProps {
   currentModule: string;
   currentSubModule?: string;
-  userRole: string;
+  userRole: SystemRole | string;
   onAccessDenied?: () => void;
   componentProps?: Record<string, any>;
 }
@@ -47,7 +48,7 @@ export default function AppRouter({
             Vous n'avez pas les permissions nécessaires pour accéder à ce module.
           </p>
           <p className="text-sm text-slate-500 mt-2">
-            Rôle requis : {route.requiredRoles?.join(', ') || 'Administrateur'}
+            Rôle requis : {route.requiredRoles?.map(getRoleLabel).join(', ') || getRoleLabel(SystemRole.ADMIN)}
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Globe, User, ChevronDown, Shield } from 'lucide-react';
 import NotificationBadge from '../shared/NotificationBadge';
+import { SystemRole, getRoleLabel, normalizeRole } from '@shared/types/roles';
 
 interface HeaderProps {
   language: string;
@@ -26,15 +27,15 @@ export default function Header({
 
   const getRoleBadgeColor = (role: string) => {
     // Professional blue-based palette for institutional consistency
-    switch (role?.toLowerCase()) {
-      case 'Administrateur':
-      case 'administrateur':
+    const normalizedRole = normalizeRole(role);
+    switch (normalizedRole) {
+      case SystemRole.ADMIN:
         return 'bg-slate-800 text-white border-slate-700';
-      case 'comptable':
+      case SystemRole.COMPTABLE:
         return 'bg-blue-700 text-white border-blue-600';
-      case 'chef d\'agence':
+      case SystemRole.CHEF_AGENCE:
         return 'bg-blue-600 text-white border-blue-500';
-      case 'superviseur':
+      case SystemRole.SUPERVISEUR:
         return 'bg-blue-500 text-white border-blue-400';
       default:
         return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -127,7 +128,7 @@ export default function Header({
                   {user?.name || 'Utilisateur'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {user?.role || 'Agent'}
+                  {getRoleLabel(user?.role || '')}
                 </p>
               </div>
               <ChevronDown size={16} className="hidden lg:block text-slate-400" />
@@ -148,7 +149,7 @@ export default function Header({
                         {user?.email || 'email@cofin.cg'}
                       </p>
                       <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-md border ${getRoleBadgeColor(user?.role || '')}`}>
-                        {user?.role || 'Agent'}
+                        {getRoleLabel(user?.role || '')}
                       </span>
                     </div>
                   </div>

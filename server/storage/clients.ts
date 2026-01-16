@@ -1,4 +1,5 @@
 import { clients, typesMarches, tags, clientTags, clientActivities, users, agences } from "@shared/schema";
+import { SystemRole } from "@shared/types/roles";
 import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, isNull } from "drizzle-orm";
@@ -282,6 +283,7 @@ export async function createClientWithUser(
       username: userData.username,
       password: userData.password,
       typeCompte: 'client',
+      role: SystemRole.CLIENT,
       canLogin: !!userData.username, // Peut se connecter seulement si username est fourni
       statut: 'Actif',
     }).returning();
@@ -333,6 +335,10 @@ export async function createClientForUser(userId: string, clientData: Omit<Inser
   if (user && user.typeCompte === 'employe') {
     await db.update(users)
       .set({ typeCompte: 'both' })
+      .where(eq(users.id, userId));
+  } else if (user && user.typeCompte === 'client') {
+    await db.update(users)
+      .set({ role: SystemRole.CLIENT })
       .where(eq(users.id, userId));
   }
 

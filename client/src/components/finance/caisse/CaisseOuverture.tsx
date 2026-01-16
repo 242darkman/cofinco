@@ -5,6 +5,7 @@ import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { authService } from '../../../lib/auth';
 import { api } from '../../../lib/api';
+import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 
 interface CaisseOuvertureProps {
   onClose: () => void;
@@ -38,7 +39,7 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
   const { hasPermission } = usePermissions();
   const hasGlobalPermission = hasPermission('caisse', 'create') || hasPermission('caisse', 'manage');
   const currentUser = authService.getCurrentUser();
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'Administrateur';
+  const isAdmin = isAdminRole(currentUser?.role);
   
   // Allow ANY logged in user to attempt self-auth via PIN if they have permissions
   const canSelfAuthorize = true; 
@@ -106,7 +107,8 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
                 let availableCaisses = res.data;
 
                 // Filter for Cashiers (Non-Admin & Non-Manager)
-                const isManager = currentUser?.role === 'Chef d\'Agence' || currentUser?.role === 'Administrateur' || currentUser?.role === 'admin';
+                const normalizedRole = normalizeRole(currentUser?.role);
+                const isManager = normalizedRole === SystemRole.CHEF_AGENCE || normalizedRole === SystemRole.ADMIN;
                 
                 if (!isManager && currentUser?.id) {
                     availableCaisses = res.data.filter(c => 

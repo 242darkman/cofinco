@@ -1,4 +1,5 @@
 import type { TransfertCoffreCaisse, ConfigCoffreFort } from "@shared/schema";
+import { isAdminRole, normalizeRole } from "@shared/types/roles";
 // Assuming User type needs to be defined or imported. Using basic shape matching usage.
 interface User {
   id: string;
@@ -13,6 +14,12 @@ interface Caisse {
   [key: string]: any;
 }
 
+const normalizeRoleToken = (role?: string | null): string | undefined => {
+  if (!role) return undefined;
+  const normalized = normalizeRole(role);
+  if (normalized) return normalized;
+  return role.trim().toLowerCase();
+};
 
 export interface TransfertBusinessRules {
   // Qui peut faire quoi
@@ -31,7 +38,11 @@ export const businessRules: TransfertBusinessRules = {
   canInitiate: (user, caisse, config) => {
     // L'utilisateur doit avoir un rôle autorisé
     const rolesAutorisés = (config.rolesInitiateurs as string[]) || ["caissier", "chef_caisse"];
-    if (!user.role || !rolesAutorisés.some(r => user.role?.toLowerCase().includes(r.toLowerCase()))) {
+    const userRoleToken = normalizeRoleToken(user.role);
+    const roleTokens = rolesAutorisés
+      .map((role) => normalizeRoleToken(role))
+      .filter((role): role is string => !!role);
+    if (!userRoleToken || !roleTokens.includes(userRoleToken)) {
       return false;
     }
     // L'utilisateur doit avoir une session ouverte sur cette caisse (ou être le coffre)
@@ -46,7 +57,11 @@ export const businessRules: TransfertBusinessRules = {
     }
     // Vérifier le rôle
     const rolesAutorisés = (config.rolesValideurs as string[]) || ["chef_agence", "superviseur"];
-    return !!user.role && rolesAutorisés.some(r => user.role?.toLowerCase().includes(r.toLowerCase()));
+    const userRoleToken = normalizeRoleToken(user.role);
+    const roleTokens = rolesAutorisés
+      .map((role) => normalizeRoleToken(role))
+      .filter((role): role is string => !!role);
+    return !!userRoleToken && roleTokens.includes(userRoleToken);
   },
 
   canExecute: (user, transfert, config) => {
@@ -56,14 +71,16 @@ export const businessRules: TransfertBusinessRules = {
     }
     // Vérifier le rôle
     const rolesAutorisés = (config.rolesExecuteurs as string[]) || ["caissier", "chef_caisse", "chef_agence"];
-    return !!user.role && rolesAutorisés.some(r => user.role?.toLowerCase().includes(r.toLowerCase()));
+    const userRoleToken = normalizeRoleToken(user.role);
+    const roleTokens = rolesAutorisés
+      .map((role) => normalizeRoleToken(role))
+      .filter((role): role is string => !!role);
+    return !!userRoleToken && roleTokens.includes(userRoleToken);
   },
 
   canCancel: (user, transfert) => {
     // Seul l'initiateur ou un admin peut annuler avant validation
-    return transfert.requestedBy === user.id || 
-           user.role === "admin" || 
-           user.role === "Administrateur";
+    return transfert.requestedBy === user.id || isAdminRole(user.role);
   },
 
   validateSufficientFunds: (caisse, montant) => {

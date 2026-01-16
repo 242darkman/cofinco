@@ -10,6 +10,7 @@ import {
   horairesTravail,
   presences
 } from "@shared/schema";
+import { normalizeRole } from "@shared/types/roles";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { getAuthUser, requireRole } from "server/middleware";
 import { storage } from "server/storage";
@@ -17,6 +18,22 @@ import { users } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 
 export const hrRouter = Router();
+
+const normalizeRoleToken = (role?: string | null): string | undefined => {
+  if (!role) return undefined;
+  const normalized = normalizeRole(role);
+  if (normalized) return normalized;
+  return role.trim().toLowerCase();
+};
+
+const roleIn = (role: string | null | undefined, allowed: string[]): boolean => {
+  const roleToken = normalizeRoleToken(role);
+  if (!roleToken) return false;
+  const allowedTokens = allowed
+    .map((value) => normalizeRoleToken(value))
+    .filter((value): value is string => !!value);
+  return allowedTokens.includes(roleToken);
+};
 
 /**
  * ========================================
@@ -39,10 +56,10 @@ hrRouter.get("/conges", getAuthUser, async (req, res) => {
     // Note: Manager should ideally see only their subordinates, implemented here for simplicity as "all" for Manager role for now, or filtered via frontend + rigorous check later.
     // Ideally: if role === 'manager', fetch subordinates IDs and filter.
     // For now, let's restrict standard 'agent'/'employe'
-    const userRole = req.user?.role || 'agent';
+    const userRole = req.user?.role;
     const restrictedRoles = ['agent', 'employe', 'stagiaire'];
 
-    if (restrictedRoles.includes(userRole)) {
+    if (roleIn(userRole, restrictedRoles)) {
         // Force filter to own ID
         conditions.push(eq(demandesConges.employeId, req.user!.id));
     }
@@ -74,7 +91,7 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
     // Check if the requester (or the target employee if created by admin) has role 'direction'
     // Here we assume creator is the requester usually, or user object has role.
     const userRole = req.user?.role;
-    const isDirection = userRole === 'direction' || userRole === 'pdg' || userRole === 'dg' || userRole === 'admin'; 
+    const isDirection = roleIn(userRole, ['direction', 'pdg', 'dg', 'admin']);
     const initialStatus = isDirection ? 'Approuvé' : 'En attente';
     const approuvePar = isDirection ? req.user?.id : null;
     const dateDecision = isDirection ? new Date() : null;
@@ -110,16 +127,16 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     const { id } = req.params;
     const { commentaire } = req.body;
     const userId = req.user?.id;
-    const userRole = req.user?.role || 'agent';
+    const userRole = req.user?.role;
     
     // RBAC Check - Supports both code-style roles (admin, manager) and display-style roles (Administrateur, Chef d'Agence)
     const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
-    if (!allowedRoles.includes(userRole)) {
+    if (!roleIn(userRole, allowedRoles)) {
         return res.status(403).json({ error: "Non autorisé à approuver" });
     }
 
     // Manager Specific Check
-    if (userRole === 'manager') {
+    if (roleIn(userRole, ['manager'])) {
         const conge = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
         if (!conge.length) return res.status(404).json({ error: "Demande non trouvée" });
         
@@ -162,16 +179,16 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
     const { id } = req.params;
     const { commentaire } = req.body;
     const userId = req.user?.id;
-    const userRole = req.user?.role || 'agent';
+    const userRole = req.user?.role;
     
     // RBAC Check - Supports both code-style roles (admin, manager) and display-style roles (Administrateur, Chef d'Agence)
     const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
-    if (!allowedRoles.includes(userRole)) {
+    if (!roleIn(userRole, allowedRoles)) {
         return res.status(403).json({ error: "Non autorisé à refuser" });
     }
 
     // Manager Specific Check
-    if (userRole === 'manager') {
+    if (roleIn(userRole, ['manager'])) {
         const conge = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
         if (!conge.length) return res.status(404).json({ error: "Demande non trouvée" });
         

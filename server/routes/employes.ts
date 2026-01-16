@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users, employes, insertEmployeSchema } from "@shared/schema";
+import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
 import { requireAuth, requireRole, hashPassword } from "../auth";
 import { logAudit } from "../audit";
@@ -196,6 +197,10 @@ export function registerEmployesRoutes(app: Express) {
       }
 
       const data = parsed.data;
+      const resolvedRole = normalizeRole(data.roleSystem);
+      if (data.roleSystem && !resolvedRole) {
+        return res.status(400).json({ message: "Rôle employé invalide" });
+      }
 
       // Vérifier si username existe déjà
       if (data.username) {
@@ -226,7 +231,7 @@ export function registerEmployesRoutes(app: Express) {
           typeCompte: 'employe',
           canLogin: !!data.username,
           statut: 'Actif',
-          role: data.roleSystem || 'agent', // LEGACY: pour compatibilité
+          role: resolvedRole || SystemRole.AGENT_TERRAIN,
         }).returning();
 
         // 2. Créer l'employé lié
@@ -322,9 +327,12 @@ export function registerEmployesRoutes(app: Express) {
       if (data.agenceId !== undefined) employeData.agenceId = data.agenceId;
       if (data.managerId !== undefined) employeData.managerId = data.managerId;
       if (data.roleSystem !== undefined) {
+        const normalizedRole = normalizeRole(data.roleSystem);
+        if (!normalizedRole) {
+          return res.status(400).json({ message: "Rôle employé invalide" });
+        }
         employeData.roleSystem = data.roleSystem;
-        // Aussi mettre à jour le champ legacy dans users
-        userData.role = data.roleSystem;
+        userData.role = normalizedRole;
       }
       if (data.salaireBase !== undefined) employeData.salaireBase = data.salaireBase;
       if (data.tauxHoraire !== undefined) employeData.tauxHoraire = data.tauxHoraire;
@@ -429,12 +437,16 @@ export function registerEmployesRoutes(app: Express) {
       if (!parsed.success) {
         return res.status(400).json({ message: "Données invalides", errors: parsed.error.errors });
       }
+      const normalizedRole = normalizeRole(parsed.data.roleSystem);
+      if (parsed.data.roleSystem && !normalizedRole) {
+        return res.status(400).json({ message: "Rôle employé invalide" });
+      }
 
       // Mettre à jour le type_compte de l'utilisateur
       await db.update(users)
         .set({
           typeCompte: user.typeCompte === 'client' ? 'both' : 'employe',
-          role: parsed.data.roleSystem || 'agent' // LEGACY
+          role: normalizedRole || SystemRole.AGENT_TERRAIN,
         })
         .where(eq(users.id, userId));
 

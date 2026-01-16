@@ -11,6 +11,7 @@ import {
 import { eq, and, or, desc, gte, lte, count } from "drizzle-orm";
 import { executeTransfertCoffre } from "./transfer-executor";
 import { TransfertCoffreValidator } from "./transfert-validator";
+import { isAdminRole } from "@shared/types/roles";
 
 export class TransfertCoffreService {
   private validator = new TransfertCoffreValidator();
@@ -280,7 +281,7 @@ export class TransfertCoffreService {
 
     // Seul l'initiateur ou un admin peut annuler
     const [user] = await db.select().from(users).where(eq(users.id, params.cancelledBy));
-    const isAdmin = user?.role === "admin" || user?.role === "Administrateur";
+    const isAdmin = isAdminRole(user?.role);
     
     if (transfert.requestedBy !== params.cancelledBy && !isAdmin) {
       return { success: false, errorCode: "PERMISSION_DENIED", error: "Seul l'initiateur peut annuler" };

@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 const ROLE_MAPPING: Record<string, string> = {
   'Administrateur': 'admin',
   'Chef d\'Agence': 'chef_agence',
-  'Agent Caisse': 'caissier',
+  'Agent Caisse': 'agent_caisse',
   'Agent Terrain': 'terrain',
   'Comptable': 'comptable',
   'Gestionnaire Crédit': 'gestionnaire_credit',

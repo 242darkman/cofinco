@@ -1,9 +1,10 @@
 import { ReactNode } from 'react';
 import { authService } from '@/lib/auth';
 import { usePermissionsContext } from '@/contexts/PermissionsContext';
+import { SystemRole } from '@shared/types/roles';
 
 interface ProtectedFeatureProps {
-  requiredRoles?: string[];
+  requiredRoles?: SystemRole[];
   requiredPermission?: { module: string; action: string };
   requireAdmin?: boolean;
   children: ReactNode;
@@ -21,7 +22,7 @@ interface ProtectedFeatureProps {
  * 
  * @example
  * // Afficher pour plusieurs rôles
- * <ProtectedFeature requiredRoles={['Administrateur', 'Gestionnaire Crédit']}>
+ * <ProtectedFeature requiredRoles={[SystemRole.ADMIN, SystemRole.GESTIONNAIRE_CREDIT]}>
  *   <Button>Créer Crédit</Button>
  * </ProtectedFeature>
  * 
@@ -90,7 +91,7 @@ export function usePermissions() {
     isAdmin: authService.isAdmin(),
     isAgentCaisse: authService.isAgentCaisse(),
     isManager: authService.isManager(),
-    hasRole: (role: string) => authService.hasRole(role),
+    hasRole: (role: SystemRole | string) => authService.hasRole(role),
     hasPermission: (module: string, action: string) =>
       authService.hasPermission(module, action),
     canAccessModule: (module: string) => authService.canAccessModule(module),

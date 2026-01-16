@@ -1,5 +1,6 @@
 import { lazy, ComponentType } from 'react';
-import { canAccessModule, MODULE_ACCESS } from '@shared/config/rbac';
+import { canAccessModule, MODULE_ACCESS, AppModule } from '@shared/config/rbac';
+import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { authService } from './auth';
 
 // Lazy load components
@@ -28,8 +29,8 @@ export interface RouteConfig {
   key: string;
   path: string;
   component: React.LazyExoticComponent<ComponentType<any>> | null;
-  requiredModule?: string; // Module from MODULE_ACCESS (source unique de vérité)
-  requiredRoles?: string[]; // Override manuel (cas particuliers uniquement)
+  requiredModule?: AppModule; // Module from MODULE_ACCESS (source unique de vérité)
+  requiredRoles?: SystemRole[]; // Override manuel (cas particuliers uniquement)
   requireAdmin?: boolean;
   label: string;
   labelKey?: string;
@@ -115,7 +116,7 @@ export const ROUTES: RouteConfig[] = [
     key: 'agentTerrain',
     path: '/terrain',
     component: AgentTerrain,
-    requiredModule: 'Terrain',
+    requiredModule: 'Agent Terrain',
     label: 'Collecte terrain',
     labelKey: 'menuTerrain',
     group: 'Opérations',
@@ -124,7 +125,7 @@ export const ROUTES: RouteConfig[] = [
     key: 'agentValidations',
     path: '/terrain/validations',
     component: AgentValidations,
-    requiredRoles: ['Administrateur', "Chef d'Agence", 'Superviseur'],
+    requiredRoles: [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR],
     label: 'Validations',
     labelKey: 'menuValidations',
     group: 'Opérations',
@@ -180,7 +181,7 @@ export const ROUTES: RouteConfig[] = [
     key: 'rh',
     path: '/rh',
     component: RessourcesHumaines,
-    requiredModule: 'Admin',
+    requiredModule: 'Administration',
     label: 'Personnel',
     labelKey: 'menuRH',
     group: 'Gestion',
@@ -200,7 +201,7 @@ export const ROUTES: RouteConfig[] = [
     key: 'administrateur',
     path: '/admin',
     component: AdminModuleComplet,
-    requiredModule: 'Admin',
+    requiredModule: 'Administration',
     label: 'Administration',
     labelKey: 'menuAdmin',
     group: 'Système',
@@ -241,7 +242,7 @@ export const ROUTES: RouteConfig[] = [
  */
 export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
   // Admin a accès à tout
-  if (userRole === 'Administrateur') {
+  if (isAdminRole(userRole)) {
     return true;
   }
 
@@ -252,7 +253,9 @@ export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
 
   // Override avec requiredRoles si spécifié (cas particuliers)
   if (route.requiredRoles && route.requiredRoles.length > 0) {
-    return route.requiredRoles.includes(userRole);
+    const normalizedRole = normalizeRole(userRole);
+    if (!normalizedRole) return false;
+    return route.requiredRoles.includes(normalizedRole);
   }
 
   // Vérifier via authService qui combine permissions rôle + custom
@@ -262,7 +265,9 @@ export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
       return authService.canAccessModule(route.requiredModule);
     }
     // Fallback sur MODULE_ACCESS statique si pas authentifié
-    const allowedModules = MODULE_ACCESS[userRole] || [];
+    const normalizedRole = normalizeRole(userRole);
+    if (!normalizedRole) return false;
+    const allowedModules = MODULE_ACCESS[normalizedRole] || [];
     return allowedModules.includes(route.requiredModule);
   }
 

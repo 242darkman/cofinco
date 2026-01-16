@@ -8,6 +8,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
 import { ForceCloseModal } from './ForceCloseModal';
 import { useCaisseWebSocket } from '../../hooks/useCaisseWebSocket';
+import { isAdminRole, normalizeRole } from '@shared/types/roles';
 
 interface Caisse {
   id: string;
@@ -22,7 +23,7 @@ interface Caisse {
 
 export default function AdminGestionCaisses() {
   const user = authService.getCurrentUser();
-  const isAdmin = user?.role === 'admin' || user?.role === 'admin_generale' || user?.role === 'Administrateur';
+  const isAdmin = isAdminRole(user?.role);
   const queryClient = useQueryClient();
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,7 +59,10 @@ export default function AdminGestionCaisses() {
     queryKey: ['employees', user?.agence],
     queryFn: async () => {
         const res = await api.get<any[]>('/users'); 
-        return (res || []).filter((u: any) => u.agence === user?.agence && u.role !== 'admin' && u.role !== 'Administrateur');
+        return (res || []).filter((u: any) => {
+          const normalizedRole = normalizeRole(u.role);
+          return u.agence === user?.agence && !isAdminRole(normalizedRole);
+        });
     },
     enabled: isAssignModalOpen
   });

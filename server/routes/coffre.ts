@@ -2,6 +2,7 @@ import { Router } from "express";
 import { TransfertCoffreService } from "../services/coffre/transfert-service";
 import { idempotencyMiddleware } from "../middleware/idempotency";
 import { z } from "zod";
+import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { db } from "../db";
 import { configCoffreFort } from "@shared/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -86,8 +87,8 @@ coffreRouter.post(
       
       // Verify Admin Role (or at least Manager)
       const userRole = (req as any).user?.role;
-      // Adaptez selon vos rôles : Admin, Chef Agence, etc.
-      if (!["Administrateur", "admin", "Chef Agence"].includes(userRole)) {
+      const normalizedRole = normalizeRole(userRole);
+      if (!(normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE)) {
          return res.status(403).json({ error: "Action réservée aux administrateurs" });
       }
 
@@ -546,7 +547,7 @@ coffreRouter.put("/config", async (req, res) => {
     
     // Vérification ROLE ADMIN
     const userRole = (req as any).user?.role;
-    if (userRole !== "Administrateur" && userRole !== "admin") {
+    if (!isAdminRole(userRole)) {
       return res.status(403).json({ error: "Access denied. Admin only." });
     }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SystemRole, getRoleLabel as getSystemRoleLabel, normalizeRole } from '@shared/types/roles';
 
 export interface UserData {
   id: string;
@@ -7,7 +8,7 @@ export interface UserData {
   prenom: string;
   email?: string;
   telephone?: string;
-  role: string;
+  role: SystemRole;
   agence?: string;
   actif?: boolean;
   createdAt?: string;
@@ -55,7 +56,8 @@ export function useUserProfile() {
         throw new Error('Erreur lors du chargement du profil');
       }
       const data = await response.json();
-      setUser(data);
+      const normalizedRole = normalizeRole(data.role) || SystemRole.CLIENT;
+      setUser({ ...data, role: normalizedRole });
       setFormData({
         nom: data.nom || '',
         prenom: data.prenom || '',
@@ -133,8 +135,7 @@ export function useUserProfile() {
   };
 
   const getRoleLabel = (role: string) => {
-    // Roles are now standardized as full French names
-    return role;
+    return getSystemRoleLabel(role);
   };
 
   return {

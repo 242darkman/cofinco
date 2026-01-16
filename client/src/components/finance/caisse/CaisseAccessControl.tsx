@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Unlock, Clock, AlertTriangle, Key, Shield, RefreshCw, X, CheckCircle } from 'lucide-react';
 import { Card, Button, IconButton, LoadingSpinner, Badge } from '../../ui';
+import { isAdminRole } from '@shared/types/roles';
 
 interface AccessStatus {
   accessible: boolean;
@@ -105,7 +106,7 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
     );
   }
 
-  if (userRole === 'Administrateur' || (accessStatus?.accessible && authStatus?.authorized)) return null;
+  if (isAdminRole(userRole) || (accessStatus?.accessible && authStatus?.authorized)) return null;
 
   const isOutsideHours = !accessStatus?.accessible;
 

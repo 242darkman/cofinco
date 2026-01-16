@@ -3,6 +3,7 @@ import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock } from 'lucide-react'
 import { DemandeConge } from '../../hooks/hr/useConges';
 import { Card, Button, Modal, FormField, SelectField, Badge, StatCard, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { isAdminRole } from '@shared/types/roles';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 interface CongesManagerProps {
@@ -118,7 +119,7 @@ export default function CongesManager({
       key: 'actions',
       format: (_: any, item: DemandeConge) => {
         const { user } = useUserProfile();
-        const canApprove = ['Administrateur', 'rh', "Chef d'Agence", 'direction', 'pdg', 'dg'].includes(user?.role || '');
+        const canApprove = canApproveConges || isAdminRole(user?.role);
         
         if (!canApprove || item.statut !== 'En attente') return null;
 

@@ -1,5 +1,6 @@
 import { employes, users, agences } from "@shared/schema";
 import { type Employe, type InsertEmploye, type User, type EmployeWithUser } from "@shared/schema";
+import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { db } from "../db";
 import { eq, desc, and, isNull } from "drizzle-orm";
 
@@ -126,6 +127,7 @@ export async function createEmployeWithUser(
   },
   employeData: Omit<InsertEmploye, 'userId'>
 ): Promise<{ user: User; employe: Employe }> {
+  const resolvedRole = normalizeRole(employeData.roleSystem) || SystemRole.AGENT_TERRAIN;
   return await db.transaction(async (tx) => {
     // Créer l'utilisateur
     const [user] = await tx.insert(users).values({
@@ -139,7 +141,7 @@ export async function createEmployeWithUser(
       typeCompte: 'employe',
       canLogin: !!userData.username,
       statut: 'Actif',
-      role: employeData.roleSystem || 'agent', // LEGACY: pour compatibilité
+      role: resolvedRole,
     }).returning();
 
     // Créer l'employé lié

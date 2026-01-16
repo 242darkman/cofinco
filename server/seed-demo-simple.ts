@@ -1,5 +1,6 @@
 
 import { db } from './db';
+import { SystemRole } from '@shared/types/roles';
 import { seedRBAC } from './seed-rbac-logic';
 import {
   users,
@@ -495,7 +496,7 @@ async function seedDemoSimple() {
       nom: 'Administrateur',
       prenom: 'Super',
       email: 'admin@cofin.com',
-      role: 'Administrateur',
+      role: SystemRole.ADMIN,
       agence: 'Siège',
       statut: 'Actif',
     }).returning();

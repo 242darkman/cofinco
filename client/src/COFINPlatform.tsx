@@ -38,6 +38,7 @@ import { authService } from './lib/auth';
 import ComptabiliteSageOHADA from './components/finance/accounting/ComptabiliteSageOHADA';
 import GlobalSearchModal from './components/shared/GlobalSearchModal';
 import CreditRefundsPage from './pages/finance/CreditRefundsPage';
+import { SystemRole, normalizeRole } from '@shared/types/roles';
 
 
 interface COFINPlatformProps {
@@ -72,7 +73,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
     // Find the route config for currentModule
     const route = getRouteByKey(currentModule);
     
-    if (route && !canAccessRoute(route, currentUser?.role || 'user')) {
+    if (route && !canAccessRoute(route, normalizedRole)) {
        // Access revoked!
        console.warn(`[Security] Access to module ${currentModule} revoked. Redirecting...`);
        showNotification('error', "Votre accès à ce module a été révoqué.");
@@ -104,6 +105,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
   const [showCreditRequestForm, setShowCreditRequestForm] = useState(false);
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [pendingCaissePayment, setPendingCaissePayment] = useState(false);
+  const normalizedRole = normalizeRole(currentUser?.role) || SystemRole.CLIENT;
 
 
 
@@ -181,7 +183,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
 
   const renderDashboard = () => (
     <Dashboard 
-      userRole={currentUser?.role || 'Administrateur'} 
+      userRole={normalizedRole} 
       userName={currentUser?.prenom || currentUser?.nom || currentUser?.username || 'Utilisateur'}
       onModuleChange={handleModuleChange}
       onLogout={onLogout}
@@ -208,7 +210,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
       case 'tontines':
         return <Tontines />;
       case 'credits':
-        return <Credits userRole={currentUser?.role} activeView={currentSubModule} onModuleChange={handleModuleChange} />;
+        return <Credits userRole={normalizedRole} activeView={currentSubModule} onModuleChange={handleModuleChange} />;
       case 'remboursements':
         return <CreditRefundsPage />;
       case 'epargnes':
@@ -218,7 +220,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
       case 'caisse':
         return (
           <CaisseDashboard 
-            userRole={currentUser?.role} 
+            userRole={normalizedRole} 
             onModuleChange={handleModuleChange} 
             activeView={currentSubModule} 
             initialShowPaiement={pendingCaissePayment}
@@ -283,7 +285,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
             currentSubModule={currentSubModule}
             onModuleChange={handleModuleChange}
             onLogout={onLogout}
-            userRole={currentUser?.role}
+            userRole={normalizedRole}
           />
         }
         header={
@@ -335,7 +337,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
                 setShowCreditRequestForm(false);
                 showNotification('success', t('demandeCreditEnvoyee'));
               }}
-              userRole={currentUser?.role}
+              userRole={normalizedRole}
             />
           </div>
         </div>

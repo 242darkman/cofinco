@@ -8,6 +8,7 @@ import FormField from '../ui/FormField';
 import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { isAdminRole } from '@shared/types/roles';
 import { agenceApi } from '../../lib/api-client';
 import { useMinIOUpload } from '../../hooks/useMinIOUpload';
 
@@ -25,7 +26,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
   // User and Agency Data
   const { user } = useUserProfile();
   const [agences, setAgences] = useState<{ id: string; nom: string }[]>([]);
-  const isAdmin = user?.role === 'admin' || user?.role === 'Administrateur';
+  const isAdmin = isAdminRole(user?.role);
 
   // Form State
   const [formData, setFormData] = useState<InsertClient>({

@@ -8,6 +8,7 @@ import { useAgence } from '../../contexts/AgenceContext';
 // ObjectUploader removed as it is no longer used
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
 
 // Import hooks and component for permissions
 import { getRoleBadgeStyle, getStatusBadgeStyle } from '../../lib/role-utils';
@@ -63,7 +64,7 @@ export default function AdminGestionProfils() {
   const [userAccess, setUserAccess] = useState<Record<string, UserAccess>>({});
   const [allUsersAccess, setAllUsersAccess] = useState<Record<string, Record<string, UserAccess>>>({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<SystemRole | 'all'>('all');
   const [moduleFilter, setModuleFilter] = useState<string>('all');
   const [permissionFilter, setPermissionFilter] = useState<string>('all');
   
@@ -129,25 +130,23 @@ export default function AdminGestionProfils() {
     phone: '',
     password: '',
     confirmPassword: '',
-    role: 'Caissier',
+    role: SystemRole.CAISSIER,
     agenceId: '',
     photoProfile: ''
   });
 
-  const roleMap: Record<string, string> = {
-    'Administrateur': 'admin',
-    'Chef Agence': 'chef_agence',
-    'Comptable': 'comptable',
-    'Caissier': 'caissier',
-    'Agent Caisse': 'caissier',
-    'Agent Terrain': 'terrain',
-    'Superviseur': 'superviseur',
-    'Agent': 'agent'
+  const roleMap: Record<SystemRole, string> = {
+    [SystemRole.ADMIN]: 'admin',
+    [SystemRole.CHEF_AGENCE]: 'chef_agence',
+    [SystemRole.COMPTABLE]: 'comptable',
+    [SystemRole.CAISSIER]: 'agent_caisse',
+    [SystemRole.AGENT_TERRAIN]: 'terrain',
+    [SystemRole.SUPERVISEUR]: 'superviseur',
+    [SystemRole.GESTIONNAIRE_CREDIT]: 'gestionnaire_credit',
+    [SystemRole.CLIENT]: 'client'
   };
 
-  const roles = [
-    'Caissier', 'Chef Agence', 'Comptable', 'Superviseur', 'Administrateur', 'Agent Terrain', 'Agent'
-  ];
+  const roles = getRoleOptions().filter((role) => role.value !== SystemRole.CLIENT);
 
   const passwordValidation = useMemo(() => {
     const pwd = formData.password;
@@ -280,24 +279,25 @@ export default function AdminGestionProfils() {
 
   const getDefaultAccessForRole = (role: string): Record<string, UserAccess> => {
     const defaults: Record<string, UserAccess> = {};
+    const normalizedRole = normalizeRole(role);
 
-    if (role === 'Caissier' || role === 'Agent Caisse') {
+    if (normalizedRole === SystemRole.CAISSIER) {
       defaults['Caisse'] = { module_name: 'Caisse', peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: false, peut_valider: true, peut_exporter: false };
       defaults['Clients'] = { module_name: 'Clients', peut_voir: true, peut_creer: false, peut_modifier: false, peut_supprimer: false, peut_valider: false, peut_exporter: false };
       defaults['Épargnes'] = { module_name: 'Épargnes', peut_voir: true, peut_creer: false, peut_modifier: false, peut_supprimer: false, peut_valider: false, peut_exporter: false };
       defaults['Crédits'] = { module_name: 'Crédits', peut_voir: true, peut_creer: false, peut_modifier: false, peut_supprimer: false, peut_valider: false, peut_exporter: false };
-    } else if (role === 'Agent Terrain') {
+    } else if (normalizedRole === SystemRole.AGENT_TERRAIN) {
       defaults['Clients'] = { module_name: 'Clients', peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: false, peut_valider: false, peut_exporter: false };
       defaults['Crédits'] = { module_name: 'Crédits', peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: false, peut_valider: false, peut_exporter: false };
       defaults['Tontines'] = { module_name: 'Tontines', peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: false, peut_valider: false, peut_exporter: false };
-    } else if (role === 'Chef Agence') {
+    } else if (normalizedRole === SystemRole.CHEF_AGENCE) {
       modules.forEach(mod => {
         defaults[mod] = { module_name: mod, peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: false, peut_valider: true, peut_exporter: true };
       });
-    } else if (role === 'Comptable') {
+    } else if (normalizedRole === SystemRole.COMPTABLE) {
       defaults['Comptabilité'] = { module_name: 'Comptabilité', peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: false, peut_valider: false, peut_exporter: true };
       defaults['Caisse'] = { module_name: 'Caisse', peut_voir: true, peut_creer: false, peut_modifier: false, peut_supprimer: false, peut_valider: false, peut_exporter: true };
-    } else if (role === 'Administrateur') {
+    } else if (normalizedRole === SystemRole.ADMIN) {
       modules.forEach(mod => {
         defaults[mod] = { module_name: mod, peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: true, peut_valider: true, peut_exporter: true };
       });
@@ -369,14 +369,18 @@ export default function AdminGestionProfils() {
       const fullName = `${user.nom} ${user.prenom}`.toLowerCase();
       const email = (user.email || '').toLowerCase();
       const phone = (user.telephone || user.phone || '').toLowerCase();
-      const role = emp.roleSystem || user.role || '';
+      const roleSystem = emp.roleSystem || '';
+      const userRole = normalizeRole(user.role);
       
       const matchesSearch = fullName.includes(searchQuery.toLowerCase()) || 
                           email.includes(searchQuery.toLowerCase()) ||
                           phone.includes(searchQuery.toLowerCase());
       
-      const targetSystemRole = roleFilter === 'all' ? 'all' : (roleMap[roleFilter] || roleFilter);
-      const matchesRole = targetSystemRole === 'all' || role === targetSystemRole;
+      const targetSystemRole = roleFilter === 'all' ? 'all' : roleMap[roleFilter];
+      const matchesRole =
+        targetSystemRole === 'all' ||
+        (targetSystemRole ? roleSystem === targetSystemRole : false) ||
+        (userRole ? userRole === roleFilter : false);
       
       return matchesSearch && matchesRole;
     });
@@ -423,7 +427,7 @@ export default function AdminGestionProfils() {
                 icon={Plus}
                 onClick={() => {
                   setFormData({
-                    nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '', role: 'Caissier',
+                    nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '', role: SystemRole.CAISSIER,
                     agenceId: (contextAgence && contextAgence.id !== 'all') ? contextAgence.id : '',
                     photoProfile: ''
                   });
@@ -450,12 +454,12 @@ export default function AdminGestionProfils() {
             </div>
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e) => setRoleFilter(e.target.value as SystemRole | 'all')}
               className="px-3 py-2 bg-surface-base border border-edge rounded-lg text-content-primary text-sm focus:border-primary outline-none"
             >
               <option value="all">Tous les rôles</option>
-              {roles.map(role => (
-                <option key={role} value={role}>{role}</option>
+              {roles.map((role) => (
+                <option key={role.value} value={role.value}>{role.label}</option>
               ))}
             </select>
           </div>
@@ -809,12 +813,12 @@ export default function AdminGestionProfils() {
                   <label className="text-xs font-semibold text-content-secondary">Rôle *</label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                    onChange={(e) => setFormData({...formData, role: e.target.value as SystemRole})}
                     className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
                     required
                   >
-                    {roles.map(role => (
-                      <option key={role} value={role}>{role}</option>
+                    {roles.map((role) => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
                     ))}
                   </select>
                 </div>

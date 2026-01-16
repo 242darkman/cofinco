@@ -253,7 +253,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                     <ul className="list-disc list-inside space-y-1">
                       <li>Fichier CSV avec colonnes : email, prenom, nom, telephone, role, statut</li>
                       <li>Colonnes obligatoires : email, role, statut</li>
-                      <li>Rôles valides : Administrateur, Chef d'Agence, Comptable, Agent Caisse, Agent Terrain, Gestionnaire Crédit, Superviseur, Client</li>
+                      <li>Rôles valides : ADMIN, CHEF_AGENCE, CAISSIER, AGENT_TERRAIN, COMPTABLE, GESTIONNAIRE_CREDIT, SUPERVISEUR, CLIENT</li>
                       <li>Statuts valides : actif, inactif, bloqué</li>
                       <li>Mot de passe temporaire généré automatiquement</li>
                     </ul>

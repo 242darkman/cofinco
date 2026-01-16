@@ -8,6 +8,7 @@ import IconButton from '../ui/IconButton';
 import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 import { usePermissionsContext } from '../../contexts/PermissionsContext';
 import { caisseAgentApi } from '../../lib/api-client';
+import { isAdminRole } from '@shared/types/roles';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -241,7 +242,7 @@ export default function PlatformSidebarContent({
     
     // Allow admin to bypass maintenance visual lock if needed, but for now we show lock to all
     // Or better, check role:
-    const isAdmin = userRole === 'admin';
+    const isAdmin = isAdminRole(userRole);
     const showMaintenanceLock = (isMaintenanceLocked || isPlatformLocked) && !isAdmin;
 
     const isDisabled = route.key === 'transfert' || route.key === 'bourse' || showMaintenanceLock;

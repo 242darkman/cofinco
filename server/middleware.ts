@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { userAgences, agences } from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { SystemRole, isAdminRole, normalizeRole } from '../shared/types/roles';
 
 // Extend Express Request type to include user property and agency filter
 declare global {
@@ -12,7 +13,7 @@ declare global {
         username: string;
         nom: string;
         prenom: string | null;
-        role: string;
+        role: SystemRole;
         agence: string | null;
         email?: string;
         telephone?: string;
@@ -61,7 +62,7 @@ export function requireAgenceAccess(entityAgenceField: string = "agence") {
     const userAgence = req.user.agence;
 
     // 1. Administrateurs : Accès global
-    if (userRole === "admin" || userRole === "Administrateur") {
+    if (isAdminRole(userRole)) {
       req.agenceFilter = null; // Pas de filtre
       return next();
     }
@@ -97,7 +98,7 @@ export function validateAgenceAction(bodyAgenceField: string = "agence") {
     req.user = req.session.user;
 
     // Admin bypass
-    if (req.user.role === "admin" || req.user.role === "Administrateur") {
+    if (isAdminRole(req.user.role)) {
       return next();
     }
 
@@ -124,7 +125,7 @@ export function validateAgenceAction(bodyAgenceField: string = "agence") {
  * Middleware pour vérifier le rôle de l'utilisateur.
  * @param allowedRoles Liste des rôles autorisés
  */
-export function requireRole(allowedRoles: string[]) {
+export function requireRole(allowedRoles: Array<SystemRole | string>) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.session.userId || !req.session.user) {
         return res.status(401).json({ error: 'Non authentifié' });
@@ -134,13 +135,13 @@ export function requireRole(allowedRoles: string[]) {
     req.user = req.session.user;
 
     // Normalize roles (handle undefined roles as 'agent' or similar if needed)
-    const userRole = req.user.role || 'agent';
+    const userRole = normalizeRole(req.user.role);
+    const normalizedAllowedRoles = allowedRoles
+      .map((role) => normalizeRole(role))
+      .filter((role): role is SystemRole => !!role);
 
-    if (!allowedRoles.includes(userRole) && !allowedRoles.includes('admin')) { // Admin always allowed typically? Or explicit?
-        // Let's stick to explicit allowedRoles, but usually admin is allowed.
-        // If allowedRoles includes 'admin', then fine. If not, maybe denied.
-        // But let's assume if I ask for ['rh'], admin should probably access too.
-        if (req.user.role === 'admin' || req.user.role === 'Administrateur') {
+    if (!userRole || !normalizedAllowedRoles.includes(userRole)) {
+        if (isAdminRole(req.user.role)) {
              return next();
         }
         return res.status(403).json({ error: 'Accès refusé. Rôle insuffisant.' });
@@ -177,11 +178,11 @@ export function requireAgenceIdAccess() {
     // Si aucune agence sélectionnée
     if (!selectedAgenceId) {
       // Pour les admins: pas de filtre (accès global)
-      if (userRole === 'admin' || userRole === 'Administrateur') {
-        req.selectedAgenceId = null;
-        req.agenceFilter = null;
-        return next();
-      }
+    if (isAdminRole(userRole)) {
+      req.selectedAgenceId = null;
+      req.agenceFilter = null;
+      return next();
+    }
 
       // Pour les autres: récupérer l'agence principale
       try {
@@ -231,7 +232,7 @@ export function requireAgenceIdAccess() {
     // Une agence est sélectionnée: vérifier l'accès
     // Admins: accès à toutes les agences
     // Admins: accès à toutes les agences
-    if (userRole === 'admin' || userRole === 'Administrateur') {
+    if (isAdminRole(userRole)) {
       if (selectedAgenceId === 'all') {
         req.selectedAgenceId = null;
         req.agenceFilter = null;
@@ -285,7 +286,7 @@ export function validateAgenceIdAction() {
     const targetAgenceId = req.body.agenceId;
 
     // Admin: peut spécifier n'importe quelle agence
-    if (userRole === 'admin' || userRole === 'Administrateur') {
+    if (isAdminRole(userRole)) {
       // Si pas d'agenceId dans le body mais une agence sélectionnée, l'injecter
       if (!targetAgenceId && req.selectedAgenceId) {
         req.body.agenceId = req.selectedAgenceId;

@@ -14,6 +14,7 @@ import { ProtectedFeature, usePermissions } from '../auth/ProtectedFeature';
 import { userApi, roleApi, auditApi, notificationApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { SystemRole, getRoleLabel, normalizeRole } from '@shared/types/roles';
 
 interface User {
   id: string;
@@ -30,14 +31,9 @@ interface User {
   failed_logins_24h?: number;
 }
 
-interface Role {
-  id: string;
-  code: string;
-  nom: string;
-  description?: string;
-  niveau: number;
-  couleur: string;
-  actif: boolean;
+interface RoleOption {
+  value: SystemRole;
+  label: string;
 }
 
 interface Permission {
@@ -91,7 +87,7 @@ export default function AdminGestionAcces() {
 
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'sessions' | 'activity' | 'analytics' | 'alerts'>('users');
   const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -104,7 +100,7 @@ export default function AdminGestionAcces() {
   const [showImportCSV, setShowImportCSV] = useState(false);
   const [userForPasswordReset, setUserForPasswordReset] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState('');
+  const [filterRole, setFilterRole] = useState<SystemRole | ''>('');
   const [filterStatus, setFilterStatus] = useState('');
   const [dailyStats, setDailyStats] = useState<any[]>([]);
   const [roleDistribution, setRoleDistribution] = useState<any[]>([]);
@@ -121,7 +117,7 @@ export default function AdminGestionAcces() {
   const fetchRoles = useCallback(async () => {
     try {
       const data = await roleApi.getAll();
-      setRoles(data || []);
+      setRoles((data || []) as RoleOption[]);
     } catch (error) {
       // Silent fail - roles are optional
     }
@@ -278,8 +274,27 @@ export default function AdminGestionAcces() {
   };
 
   const getRoleColor = (role?: string) => {
-    const roleObj = roles.find(r => r.code === role);
-    return roleObj?.couleur || '#3B82F6';
+    const normalizedRole = normalizeRole(role);
+    switch (normalizedRole) {
+      case SystemRole.ADMIN:
+        return '#1E293B';
+      case SystemRole.CHEF_AGENCE:
+        return '#059669';
+      case SystemRole.CAISSIER:
+        return '#2563EB';
+      case SystemRole.AGENT_TERRAIN:
+        return '#10B981';
+      case SystemRole.COMPTABLE:
+        return '#0EA5E9';
+      case SystemRole.GESTIONNAIRE_CREDIT:
+        return '#9333EA';
+      case SystemRole.SUPERVISEUR:
+        return '#64748B';
+      case SystemRole.CLIENT:
+        return '#94A3B8';
+      default:
+        return '#3B82F6';
+    }
   };
 
   const formatTimeAgo = (date?: string) => {
@@ -293,7 +308,8 @@ export default function AdminGestionAcces() {
   };
 
   const filteredUsers = users.filter(user => {
-    if (filterRole && user.role !== filterRole) return false;
+    const normalizedRole = normalizeRole(user.role);
+    if (filterRole && normalizedRole !== filterRole) return false;
     if (filterStatus && user.statut !== filterStatus) return false;
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
@@ -402,12 +418,12 @@ export default function AdminGestionAcces() {
                     </div>
                     <select
                       value={filterRole}
-                      onChange={(e) => setFilterRole(e.target.value)}
+                      onChange={(e) => setFilterRole(e.target.value as SystemRole | '')}
                       className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-cyan-500 outline-none"
                     >
                       <option value="">Rôles</option>
-                      {roles.map(r => (
-                        <option key={r.id} value={r.code}>{r.nom}</option>
+                      {roles.map((role) => (
+                        <option key={role.value} value={role.value}>{role.label}</option>
                       ))}
                     </select>
                     <select
@@ -499,7 +515,7 @@ export default function AdminGestionAcces() {
                                     borderColor: getRoleColor(user.role) + '20'
                                     }}
                                 >
-                                    {roles.find(r => r.code === user.role)?.nom || user.role}
+                                    {getRoleLabel(user.role || '')}
                                 </span>
                                 )}
                             </td>

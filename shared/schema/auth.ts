@@ -1,6 +1,18 @@
-import { pgTable, text, varchar, integer, boolean, timestamp, uuid, date, unique } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, varchar, integer, boolean, timestamp, uuid, date, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { SystemRole } from "../types/roles";
+
+export const roleEnum = pgEnum("user_role", [
+  SystemRole.ADMIN,
+  SystemRole.CHEF_AGENCE,
+  SystemRole.CAISSIER,
+  SystemRole.AGENT_TERRAIN,
+  SystemRole.COMPTABLE,
+  SystemRole.SUPERVISEUR,
+  SystemRole.GESTIONNAIRE_CREDIT,
+  SystemRole.CLIENT
+]);
 
 /**
  * Table Users - Source de vérité pour l'identité
@@ -31,7 +43,7 @@ export const users = pgTable("users", {
   // ===== CHAMPS LEGACY (à migrer vers employes) =====
   // Ces champs sont conservés temporairement pour la rétro-compatibilité
   // Ils seront supprimés après migration complète
-  role: text("role").default("agent"), // LEGACY: Remplacé par employes.roleSystem
+  role: roleEnum("role").notNull().default(SystemRole.CAISSIER), // LEGACY: Remplacé par employes.roleSystem
   agence: text("agence"), // LEGACY: Remplacé par employes.agenceId
   lastLatitude: text("last_latitude"), // LEGACY: Déplacé vers agents_terrain
   lastLongitude: text("last_longitude"), // LEGACY: Déplacé vers agents_terrain
@@ -165,7 +177,7 @@ export type Permission = typeof permissions.$inferSelect;
 // Role Permissions table - Permissions par défaut pour chaque rôle
 export const rolePermissions = pgTable("role_permissions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  role: text("role").notNull(), // 'Administrateur', 'Chef d\'Agence', 'Comptable', etc.
+  role: roleEnum("role").notNull(),
   permissionId: uuid("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
   granted: boolean("granted").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),

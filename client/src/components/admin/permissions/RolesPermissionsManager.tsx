@@ -4,15 +4,17 @@ import { Card, SelectField } from '../../ui';
 import { Module } from '../../../hooks/admin/useModules';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { ADMIN_ROLES, ROLE_COLORS, CATEGORY_LABELS } from '../../../constants/admin-constants';
+import { getRoleBadgeStyle } from '../../../lib/role-utils';
 import { getPermissionDetails } from '../../../constants/permission-descriptions';
+import { SystemRole } from '@shared/types/roles';
 
 interface RolesPermissionsManagerProps {
   modules: Module[];
   permissions: Permission[];
-  selectedRole: string;
-  onRoleChange: (role: string) => void;
-  roleHasPermission: (role: string, permCode: string) => boolean;
-  toggleRolePermission: (role: string, permCode: string) => void;
+  selectedRole: SystemRole;
+  onRoleChange: (role: SystemRole) => void;
+  roleHasPermission: (role: SystemRole, permCode: string) => boolean;
+  toggleRolePermission: (role: SystemRole, permCode: string) => void;
   activePermissionsCount: number;
   confirmMessage?: string;
 }
@@ -36,9 +38,9 @@ export default function RolesPermissionsManager({
     return acc;
   }, {} as Record<string, Module[]>);
 
-  const roleOptions = ADMIN_ROLES.map(role => ({ value: role, label: role }));
+  const roleOptions = ADMIN_ROLES.map(role => ({ value: role, label: getRoleBadgeStyle(role).label }));
   
-  const isSuperAdmin = selectedRole === 'Administrateur';
+  const isSuperAdmin = selectedRole === SystemRole.ADMIN;
 
   return (
     <div className="space-y-4">
@@ -61,7 +63,7 @@ export default function RolesPermissionsManager({
                   label=""
                   name="role"
                   value={selectedRole}
-                  onChange={(e) => onRoleChange(e.target.value)}
+                  onChange={(e) => onRoleChange(e.target.value as SystemRole)}
                   options={roleOptions}
                   className="bg-slate-800 border-slate-700 text-white focus:border-primary focus:ring-primary/20"
                 />

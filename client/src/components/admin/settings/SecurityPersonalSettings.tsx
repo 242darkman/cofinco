@@ -3,6 +3,7 @@ import { KeyRound, Lock, Smartphone, Shield, Eye, EyeOff, Check, AlertCircle, In
 import { Card, Button, Badge } from '../../ui';
 import { authApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { SystemRole, normalizeRole } from '@shared/types/roles';
 
 interface SecurityPersonalSettingsProps {
   user?: { id: string; role: string; } | null;
@@ -16,7 +17,8 @@ export default function SecurityPersonalSettings({ user }: SecurityPersonalSetti
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const isSupervisor = user?.role && ['Administrateur', "Chef d'Agence"].includes(user.role);
+  const normalizedRole = normalizeRole(user?.role);
+  const isSupervisor = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
 
   const handleSubmitPin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
