@@ -13,7 +13,7 @@ interface User {
   email: string;
   phone: string;
   role: string;
-  status: string;
+  statut: string;
   photo_profile?: string;
 }
 
@@ -43,7 +43,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     email: '',
     phone: '',
     role: 'Agent Caisse',
-    status: 'Actif',
+    statut: 'Actif',
     photo_profile: ''
   });
   
@@ -67,7 +67,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         email: initialData.email || '',
         phone: initialData.phone || '',
         role: initialData.role || 'Agent Caisse',
-        status: initialData.status || 'Actif',
+        statut: initialData.statut || 'Actif',
         photo_profile: initialData.photo_profile || ''
       });
     } else {
@@ -83,7 +83,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
       email: '',
       phone: '',
       role: 'Agent Caisse',
-      status: 'Actif',
+      statut: 'Actif',
       photo_profile: ''
     });
     setShowPassword(false);
@@ -365,9 +365,9 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                  />
                  <SelectField
                     label="Statut"
-                    name="status"
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    name="statut"
+                    value={formData.statut}
+                    onChange={(e) => setFormData({ ...formData, statut: e.target.value })}
                     options={['Actif', 'Inactif', 'Suspendu']}
                     containerClassName="mt-0"
                     className="bg-slate-800 border-slate-700 text-white focus:border-primary focus:ring-primary/20"
