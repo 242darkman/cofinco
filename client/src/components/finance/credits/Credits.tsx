@@ -177,21 +177,60 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     return <LoadingScreen />;
   }
 
+  // Common renderer for client name with avatar
+  const renderClientName = (item: any) => {
+    const client = item.clients || item.client;
+    const name = formatClientName(client?.nom, client?.prenom) || 'Client Inconnu';
+    const photoUrl = client?.photo_url || client?.photoProfile;
+    const initials = (client?.nom?.[0] || 'C').toUpperCase();
+
+    return (
+      <div className="flex items-center gap-3">
+        <div className="relative flex-shrink-0">
+          {photoUrl ? (
+            <img 
+              src={photoUrl} 
+              alt={name} 
+              className="w-8 h-8 rounded-full object-cover border border-slate-700/50 shadow-sm"
+            />
+          ) : (
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white border border-white/10 shadow-sm ${
+              item.statut === 'Actif' ? 'bg-emerald-600/80' : 
+              item.statut === 'En retard' ? 'bg-red-600/80' : 'bg-slate-700'
+            }`}>
+              {initials}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col min-w-0">
+          <span className="font-medium truncate text-slate-200 group-hover:text-white transition-colors">
+            {name}
+          </span>
+          {client?.phone && (
+            <span className="text-[10px] text-slate-500 font-mono truncate">
+              {client.phone}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Column Definitions
   const creditColumns: TableColumn<any>[] = [
     { key: 'numero_credit', label: 'Numéro', primary: true },
-    { key: 'clients.nom', label: 'Client', format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) || 'Client Inconnu' },
+    { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
     { key: 'montant_principal', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', badge: true },
+    { key: 'statut', label: 'Statut', badge: true, align: 'center', badgeClassName: 'min-w-[100px]' },
     { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombre_echeances_payees || 0}/${item.nombre_echeances_total || 0}` },
     { key: 'jours_retard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : <span className="text-slate-500">0j</span> }
   ];
 
   const demandeColumns: TableColumn<any>[] = [
     { key: 'numero_demande', label: 'Numéro', primary: true },
-    { key: 'clients.nom', label: 'Client', format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) },
+    { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
     { key: 'montant_demande', label: 'Montant Demandé', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', badge: true },
+    { key: 'statut', label: 'Statut', badge: true, align: 'center', badgeClassName: 'min-w-[100px]' },
     { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
 
@@ -213,16 +252,16 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         </span>
       )
     },
-    { key: 'clients.nom', label: 'Client', format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) },
+    { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
     { key: 'montant_approuve', label: 'Montant Approuvé', align: 'right', format: (val, item) => formatMoney(val || item.montant_demande) },
     { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
 
   const enqueteColumns: TableColumn<any>[] = [
-    { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => formatClientName(item.clients?.nom, item.clients?.prenom) },
+    { key: 'clients.nom', label: 'Client', primary: true, format: (val, item) => renderClientName(item) },
     { key: 'type_activite', label: 'Activité' },
     { key: 'montant_demande', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', badge: true }
+    { key: 'statut', label: 'Statut', badge: true, align: 'center', badgeClassName: 'min-w-[100px]' }
   ];
 
   return (

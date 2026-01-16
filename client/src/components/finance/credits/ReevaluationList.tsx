@@ -32,6 +32,7 @@ interface Reevaluation {
   client?: {
     nom: string;
     prenom?: string;
+    photo_url?: string;
   };
 }
 
@@ -266,9 +267,24 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                     
                     {/* Client */}
                     {reeval.client && (
-                      <p className="text-slate-400 text-sm mb-2">
-                        {formatClientName(reeval.client.nom, reeval.client.prenom)}
-                      </p>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex-shrink-0">
+                          {reeval.client.photo_url ? (
+                            <img 
+                              src={reeval.client.photo_url} 
+                              alt={formatClientName(reeval.client.nom, reeval.client.prenom)} 
+                              className="w-8 h-8 rounded-full object-cover border border-slate-700"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600">
+                              {(reeval.client.nom?.[0] || 'C').toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-slate-300 font-medium text-sm">
+                          {formatClientName(reeval.client.nom, reeval.client.prenom)}
+                        </p>
+                      </div>
                     )}
                     
                     {/* Montants */}
