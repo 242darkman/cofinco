@@ -4,6 +4,7 @@ import { Card, Button, IconButton, ResponsiveTable } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { sessionApi } from '../../lib/api-client';
+import { getRoleBadgeStyle } from '../../lib/role-utils';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
@@ -226,12 +227,17 @@ export default function AdminSessionsManager() {
                 key: 'user',
                 label: 'Utilisateur',
                 primary: true,
-                format: (_, session) => (
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-content-primary">{session.user_name}</span>
-                    <span className="text-xs text-content-muted">{session.user_role}</span>
-                  </div>
-                )
+                format: (_, session) => {
+                  const style = getRoleBadgeStyle(session.user_role);
+                  return (
+                    <div className="flex flex-col gap-1">
+                      <span className="font-semibold text-content-primary">{session.user_name}</span>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-medium border whitespace-nowrap w-fit transition-colors ${style.classes}`}>
+                        {style.label}
+                      </span>
+                    </div>
+                  );
+                }
               },
               {
                 key: 'status',

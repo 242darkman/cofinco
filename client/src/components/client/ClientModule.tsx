@@ -430,23 +430,62 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       key: 'nom',
                       label: 'Nom',
                       primary: true,
-                      format: (_, item) => formatClientName(item.nom, item.prenom) || 'Sans nom'
+                      format: (_, item) => (
+                        <div className="flex items-center gap-3">
+                          {item.photoProfile || item.photoUrl ? (
+                            <img 
+                              src={item.photoProfile || item.photoUrl} 
+                              alt="" 
+                              className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600 text-xs font-bold text-slate-500 dark:text-slate-400">
+                              {(item.prenom?.[0] || item.nom?.[0] || '?').toUpperCase()}
+                            </div>
+                          )}
+                          <span className="font-medium text-slate-900 dark:text-slate-100">
+                            {formatClientName(item.nom, item.prenom) || 'Sans nom'}
+                          </span>
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'agence',
+                      label: 'Agence',
+                      hideOnMobile: true,
+                      headerAlign: 'center',
+                      align: 'center',
+                      format: (_, item) => (
+                        <div className="w-32">
+                          <Badge 
+                            value={item.agence_nom || item.agence || 'N/A'} 
+                            variant="neutral"
+                            className="w-full justify-center text-xs font-medium"
+                          />
+                        </div>
+                      )
                     },
                     {
                       key: 'telephone',
                       label: 'Téléphone',
-                      hideOnMobile: true
+                      hideOnMobile: true,
+                      headerAlign: 'center',
+                      align: 'center'
                     },
                     {
                       key: 'segment',
                       label: 'Segment',
                       badge: true,
-                      hideOnMobile: true
+                      hideOnMobile: true,
+                      headerAlign: 'center',
+                      align: 'center',
                     },
                     {
                       key: 'status',
                       label: 'Statut',
-                      badge: true
+                      badge: true,
+                      headerAlign: 'center',
+                      align: 'center',
                     }
                   ]}
                   actions={(client) => (

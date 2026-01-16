@@ -31,6 +31,7 @@ export interface TableColumn<T> {
   badge?: boolean;          // Render as badge
   icon?: LucideIcon;
   align?: 'left' | 'center' | 'right';
+  headerAlign?: 'left' | 'center' | 'right';
 }
 
 export interface ResponsiveTableProps<T> {
@@ -191,21 +192,24 @@ function ResponsiveTable<T extends Record<string, any>>({
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
             <tr>
-              {columns.map((column) => (
-                <th
-                  key={column.key as string}
-                  className={`px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 text-xs ${
-                    column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'
-                  }`}
-                >
-                  <div className={`flex items-center gap-2 ${
-                    column.align === 'right' ? 'justify-end' : column.align === 'center' ? 'justify-center' : 'justify-start'
-                  }`}>
-                    {column.icon && <column.icon size={14} />}
-                    {column.label}
-                  </div>
-                </th>
-              ))}
+              {columns.map((column) => {
+                const align = column.headerAlign || column.align || 'left';
+                return (
+                  <th
+                    key={column.key as string}
+                    className={`px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 text-xs ${
+                      align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
+                    }`}
+                  >
+                    <div className={`flex items-center gap-2 ${
+                      align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'
+                    }`}>
+                      {column.icon && <column.icon size={14} />}
+                      {column.label}
+                    </div>
+                  </th>
+                );
+              })}
               {actions && (
                 <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 text-xs">
                   Actions

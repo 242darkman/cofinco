@@ -10,6 +10,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 // Import hooks and component for permissions
+import { getRoleBadgeStyle } from '../../lib/role-utils';
 import { usePermissions as useAdminPermissions } from '../../hooks/admin/usePermissions';
 import { useUserPermissions } from '../../hooks/admin/useUserPermissions';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
@@ -524,11 +525,11 @@ export default function AdminGestionProfils() {
                     key: 'roleSystem',
                     label: 'Rôle',
                     format: (role, emp) => {
-                      // Reverse map or just show role
                       const uiRole = Object.keys(roleMap).find(key => roleMap[key] === role) || role || (emp.user && emp.user.role);
+                      const style = getRoleBadgeStyle(uiRole);
                       return (
-                        <span className="px-2 py-1 rounded-md bg-surface-muted border border-edge text-[10px] sm:text-xs font-medium text-content-secondary whitespace-nowrap">
-                          {uiRole}
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap min-w-[100px] text-center transition-colors ${style.classes}`}>
+                          {style.label}
                         </span>
                       );
                     }

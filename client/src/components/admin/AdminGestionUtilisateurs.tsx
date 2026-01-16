@@ -5,6 +5,7 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import UserFormModal from './users/UserFormModal';
 import UserPinModal from './users/UserPinModal';
 import { ProtectedFeature, usePermissions } from '../auth/ProtectedFeature';
+import { getRoleBadgeStyle } from '../../lib/role-utils';
 import { userApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -122,16 +123,6 @@ export default function AdminGestionUtilisateurs() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'Administrateur': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'Chef d\'Agence': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'Agent Caisse': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'Comptable': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-    }
-  };
-
   return (
     <div className="space-y-4">
       <Card variant="default" padding="none" className="overflow-hidden">
@@ -204,11 +195,14 @@ export default function AdminGestionUtilisateurs() {
                   {
                     key: 'role',
                     label: 'Rôle',
-                    format: (role: string) => (
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap ${getRoleBadgeColor(role)}`}>
-                        {role}
-                      </span>
-                    )
+                    format: (role: string) => {
+                      const style = getRoleBadgeStyle(role);
+                      return (
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap min-w-[100px] text-center transition-colors ${style.classes}`}>
+                          {style.label}
+                        </span>
+                      );
+                    }
                   },
                   {
                     key: 'status',
