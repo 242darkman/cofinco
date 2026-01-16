@@ -10,35 +10,6 @@ import { eq, and } from "drizzle-orm";
 import { db } from "../db";
 
 export function registerAuthRoutes(app: Express) {
-  // Init Admin
-  app.get("/api/init-admin", async (req, res) => {
-    try {
-      const existingUsers = await storage.getAllUsers();
-      if (existingUsers.length > 0) {
-        return res.status(403).json({ message: "Admin user already exists" });
-      }
-
-      const hashedPassword = await hashPassword("admin123");
-      const adminUser = await storage.createUser({
-        username: "admin",
-        password: hashedPassword,
-        role: SystemRole.ADMIN,
-        nom: "Administrator",
-        prenom: "System",
-        email: "admin@system.local",
-        telephone: "00000000",
-        statut: "Actif",
-        mustChangePassword: true, // Force password change on first login
-      } as any); // forced cast if schema strictness varies, but statut is correct
-
-      res.json(adminUser);
-    } catch (error) {
-      console.error("Error creating admin user:", error);
-      res.status(500).json({ message: "Failed to create admin user" });
-    }
-  });
-
-  // Auth Routes
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
