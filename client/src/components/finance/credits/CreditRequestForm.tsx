@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DollarSign, Calendar, FileText, TrendingUp, AlertCircle, Save, RefreshCw } from 'lucide-react';
-import { clientApi, demandeCreditApi, creditPlanApi } from '../../../lib/api-client';
+import { clientSearchApi, demandeCreditApi, creditPlanApi, clientApi } from '../../../lib/api-client';
 import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../ui';
 import { formatClientName } from '../../../lib/format';
+import { toast } from '../../../lib/toast';
 
 interface Client {
   id: string;
@@ -13,6 +14,8 @@ interface Client {
   taux_remboursement: number;
   credit_total: number;
   photo_url?: string;
+  isEligible?: boolean;
+  ineligibilityReason?: string;
   // Champs pour clients éligibles au crédit
   compteCourantId?: string;
   compteCourantNumero?: string;
@@ -41,6 +44,7 @@ interface CreditRequestFormProps {
 export default function CreditRequestForm({ onClose, onSuccess, clientId, userRole }: CreditRequestFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rateOverrideEnabled, setRateOverrideEnabled] = useState(false);
   const [rateOverrideReason, setRateOverrideReason] = useState('');
@@ -66,8 +70,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     revenus_mensuels: '',
     type_revenu: 'Mensuel',
     revenu_journalier: '',
-    charges_mensuelles: '',
-    frais_dossier: ''
+    charges_mensuelles: ''
   });
 
   const RATE_BASE = 20;
@@ -91,13 +94,14 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   });
 
   useEffect(() => {
-    loadClients();
+    // Initial load: fetch some clients or at least verify initial clientId
+    loadClients(""); 
     loadCreditPlans();
 
-    // Listen for real-time client updates (Item 22 fix - Automatic)
+    // Listen for real-time client updates
     const handleClientUpdate = () => {
         console.log("🔄 Real-time update: Reloading clients...");
-        loadClients();
+        loadClients("");
     };
 
     window.addEventListener('client-update', handleClientUpdate);
@@ -137,7 +141,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       duree_valeur: String(plan.dureeValeur || plan.duree_valeur),
       duree_unite: plan.dureeUnite || plan.duree_unite,
       frequence_remboursement: plan.frequenceRemboursement || plan.frequence_remboursement,
-      frais_dossier: plan.fraisDossier ? String(plan.fraisDossier) : prev.frais_dossier,
       objet_credit: plan.description ? `${plan.nom} - ${plan.description}` : prev.objet_credit,
       montant_demande: fixedMontant !== undefined ? fixedMontant : prev.montant_demande
     }));
@@ -216,8 +219,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   }, [convertirDureeEnJours]);
 
   const suggestedRate = useMemo(() => {
-    // SIMPLIFICATION: Le taux est fixe à 20% par défaut, sans ajustement de risque automatique.
-    // L'utilisateur peut toujours l'ajuster manuellement si nécessaire via l'option d'override.
+    // SIMPLIFICATION: Le taux est fixe à 20% par défaut
     return RATE_BASE;
   }, []);
 
@@ -232,11 +234,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     calculateLoan();
   }, [formData.montant_demande, formData.duree_valeur, formData.duree_unite, formData.taux_interet, formData.frequence_remboursement, formData.revenus_mensuels, formData.charges_mensuelles]);
 
-  const loadClients = async () => {
+  const loadClients = async (query: string) => {
+    setSearchLoading(true);
     try {
-      // Charger uniquement les clients éligibles (avec compte courant actif)
-      const data = await clientApi.getEligibleForCredit();
-      const eligibleClients = data.map((c: any) => ({
+      // Si la requête est vide, on charge les clients éligibles par défaut pour aider l'UI
+      let data;
+      if (!query || query.trim() === "") {
+        data = await clientApi.getEligibleForCredit();
+      } else {
+        data = await clientSearchApi.search(query);
+      }
+
+      const enrichedClients = data.map((c: any) => ({
         id: c.id,
         nom: formatClientName(c.nom, c.prenom),
         email: c.email || '',
@@ -246,12 +255,29 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         photo_url: c.photoUrl || c.photo_url,
         compteCourantId: c.compteCourantId || c.compte_courant_id,
         compteCourantNumero: c.compteCourantNumero || c.compte_courant_numero,
-        compteCourantSolde: parseFloat(c.compteCourantSolde || c.compte_courant_solde) || 0
+        compteCourantSolde: parseFloat(c.compteCourantSolde || c.compte_courant_solde) || 0,
+        isEligible: c.isEligible !== undefined ? c.isEligible : true, // Par défaut éligible si vient de /eligible-credit
+        ineligibilityReason: c.ineligibilityReason
       }));
-      setClients(eligibleClients);
+      setClients(enrichedClients);
     } catch (error) {
-      console.error('Erreur chargement clients éligibles:', error);
+      console.error('Erreur chargement clients:', error);
+    } finally {
+        setSearchLoading(false);
     }
+  };
+
+  // Debounced search logic
+  const searchTimeoutRef = useRef<any>(null);
+  const handleSearchChange = (query: string) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+        loadClients(query);
+    }, 400); // 400ms debounce
+  };
+
+  const handleIneligibleClick = (option: any) => {
+      toast.error(`Inéligible : ${option.disabledReason}`);
   };
 
   const calculateLoan = () => {
@@ -300,6 +326,13 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     const newErrors: Record<string, string> = {};
 
     if (!formData.client_id) newErrors.client_id = 'Client requis';
+    
+    // Vérifier l'éligibilité avant de valider
+    const client = clients.find(c => c.id === formData.client_id);
+    if (client && client.isEligible === false) {
+        newErrors.client_id = `Inéligible : ${client.ineligibilityReason}`;
+    }
+
     if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) {
       newErrors.montant_demande = 'Montant invalide';
     } else if (selectedPlan) {
@@ -393,7 +426,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     value: client.id,
     label: client.nom,
     subLabel: `Remb: ${client.taux_remboursement}%`,
-    image: client.photo_url
+    image: client.photo_url,
+    disabled: client.isEligible === false,
+    disabledReason: client.ineligibilityReason
   })), [clients]);
 
   const selectedPlan = creditPlans.find(p => p.id === formData.credit_plan_id);
@@ -486,17 +521,20 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 value={formData.client_id}
                 onChange={(value) => setFormData({ ...formData, client_id: String(value) })}
                 options={clientOptions}
+                onSearchChange={handleSearchChange}
+                onDisabledClick={handleIneligibleClick}
+                isLoading={searchLoading}
                 disabled={!!clientId}
                 required
                 error={errors.client_id}
-                placeholder="Rechercher un client..."
+                placeholder="Rechercher un client (Nom ou Tél)..."
               />
             </div>
             <Button 
                 type="button" 
                 variant="secondary" 
                 icon={RefreshCw} 
-                onClick={loadClients}
+                onClick={() => loadClients("")}
                 className="mt-7" // Align with input
                 title="Actualiser la liste des clients"
             />

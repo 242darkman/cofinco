@@ -6,6 +6,8 @@ export interface SearchableSelectOption {
   label: string;
   subLabel?: string; // For additional info like score or ID
   image?: string;    // For avatar/photo
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 interface SearchableSelectProps {
@@ -14,6 +16,9 @@ interface SearchableSelectProps {
   options: SearchableSelectOption[];
   value: string | number;
   onChange: (value: string | number) => void;
+  onDisabledClick?: (option: SearchableSelectOption) => void;
+  onSearchChange?: (query: string) => void;
+  isLoading?: boolean;
   placeholder?: string;
   error?: string;
   helperText?: string;
@@ -32,6 +37,9 @@ export default function SearchableSelect({
   options,
   value,
   onChange,
+  onDisabledClick,
+  onSearchChange,
+  isLoading,
   placeholder = 'Sélectionner...',
   error,
   helperText,
@@ -89,8 +97,12 @@ export default function SearchableSelect({
   // Find selected option object
   const selectedOption = options.find(opt => String(opt.value) === String(value));
 
-  const handleSelect = (optionValue: string | number) => {
-    onChange(optionValue);
+  const handleSelect = (option: SearchableSelectOption) => {
+    if (option.disabled) {
+      if (onDisabledClick) onDisabledClick(option);
+      return;
+    }
+    onChange(option.value);
     setIsOpen(false);
     setSearchQuery('');
   };
@@ -156,7 +168,10 @@ export default function SearchableSelect({
                 autoFocus
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (onSearchChange) onSearchChange(e.target.value);
+                }}
                 placeholder="Rechercher..."
                 className="w-full h-9 pl-9 pr-3 bg-slate-900/50 border border-slate-700 rounded-md text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500"
                 onClick={(e) => e.stopPropagation()}
@@ -166,34 +181,53 @@ export default function SearchableSelect({
 
           {/* Options List */}
           <div className="max-h-60 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-            {filteredOptions.length > 0 ? (
+            {isLoading ? (
+              <div className="p-4 flex items-center justify-center gap-2 text-slate-500">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm">Recherche en cours...</span>
+              </div>
+            ) : filteredOptions.length > 0 ? (
               filteredOptions.map((option) => (
                 <div
                   key={option.value}
-                  onClick={() => handleSelect(option.value)}
+                  onClick={() => handleSelect(option)}
                   className={`
                     w-full px-4 py-2.5 flex items-center gap-3
                     cursor-pointer transition-colors
+                    ${option.disabled 
+                      ? 'bg-slate-900/40 opacity-50 cursor-not-allowed hover:bg-slate-900/60' 
+                      : 'hover:bg-slate-700/50 hover:text-white'
+                    }
                     ${String(value) === String(option.value) 
                       ? 'bg-blue-600/20 text-blue-100' 
-                      : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                      : 'text-slate-300'
                     }
                   `}
                 >
                   {/* Optional Image/Avatar */}
-                  {option.image ? (
-                    <img src={option.image} alt="" className="w-8 h-8 rounded-full object-cover border border-slate-600" />
-                  ) : (
-                     // Fallback avatar if needed or just nothing
-                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600 flex-shrink-0">
-                        {option.label.charAt(0).toUpperCase()}
-                     </div>
-                  )}
+                  <div className={`relative ${option.disabled ? 'grayscale opacity-70' : ''}`}>
+                    {option.image ? (
+                      <img src={option.image} alt="" className="w-8 h-8 rounded-full object-cover border border-slate-600" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600 flex-shrink-0">
+                          {option.label.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{option.label}</div>
+                    <div className={`font-medium truncate flex items-center gap-2 ${option.disabled ? 'text-slate-500' : ''}`}>
+                        {option.label}
+                        {option.disabled && (
+                            <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold uppercase tracking-wider">
+                                {option.disabledReason || 'Inéligible'}
+                            </span>
+                        )}
+                    </div>
                     {option.subLabel && (
-                      <div className="text-xs text-slate-500 truncate">{option.subLabel}</div>
+                      <div className={`text-xs truncate ${option.disabled ? 'text-slate-600' : 'text-slate-500'}`}>
+                        {option.subLabel}
+                      </div>
                     )}
                   </div>
 
@@ -203,8 +237,21 @@ export default function SearchableSelect({
                 </div>
               ))
             ) : (
-              <div className="p-4 text-center text-sm text-slate-500">
-                Aucun résultat trouvé
+              <div className="p-8 text-center">
+                <div className="mb-2 flex justify-center text-slate-600">
+                  <Search size={32} opacity={0.3} />
+                </div>
+                <p className="text-sm text-slate-500 font-medium">
+                  {searchQuery.trim() === '' 
+                    ? "Recherchez un client par son nom ou son numéro de téléphone pour commencer."
+                    : "Aucun client ne correspond à votre recherche"
+                  }
+                </p>
+                {searchQuery.trim() !== '' && (
+                  <p className="text-[11px] text-slate-600 mt-1">
+                    Vérifiez l'orthographe ou essayez d'autres mots-clés
+                  </p>
+                )}
               </div>
             )}
           </div>

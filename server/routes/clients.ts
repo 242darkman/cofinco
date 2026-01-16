@@ -36,7 +36,7 @@ export function registerClientRoutes(app: Express) {
 
         // Chercher un compte courant actif dans l'agence de la demande
         const compteCourant = accounts.find((acc: any) => {
-          const isCompteCourant = acc.typeCompte === 'Courant' || acc.type_compte === 'Courant';
+          const isCompteCourant = acc.typeCompte === 'Courant';
           const isActif = acc.statut === 'Actif';
 
           // Vérifier l'agence du compte si un filtre agence est appliqué
@@ -114,13 +114,9 @@ export function registerClientRoutes(app: Express) {
         const filtered = clients.filter(c => {
             const nom = normalize(c.nom || '');
             const prenom = normalize(c.prenom || '');
-            const email = (c.email || '').toLowerCase(); // Email shouldn't have accents usually, but safe to keep
+            const email = (c.email || '').toLowerCase();
             const telephone = c.telephone || '';
             
-            // Reconstruct full normalized names for searching "First Last" or "Last First" as a continuous block if needed
-            // But individual term matching is more robust for "Last First"
-            
-            // If multiple words, ALL words must match somewhere in client data
             if (searchTerms.length > 1) {
                 return searchTerms.every(term =>
                     nom.includes(term) ||
@@ -130,8 +126,6 @@ export function registerClientRoutes(app: Express) {
                 );
             }
 
-            // Single word search - original logic refined
-            // Check matching against normalized combined strings too just in case
             const fullName = `${nom} ${prenom}`;
             const fullNameReverse = `${prenom} ${nom}`;
             
@@ -145,8 +139,67 @@ export function registerClientRoutes(app: Express) {
             );
         });
         
-        console.log(`[Search] Found ${filtered.length} results`);
-        res.json(addSnakeCaseAliasesDeep(filtered));
+        // Calculer l'éligibilité pour les résultats filtrés
+        const enrichedResults = [];
+        for (const client of filtered) {
+            let isEligible = true;
+            let ineligibilityReason = null;
+
+            // 1. Statut Client
+            if (client.status !== 'Actif') {
+                isEligible = false;
+                ineligibilityReason = "Client Inactif/Suspendu";
+            }
+
+            if (isEligible) {
+                // 2. Compte Courant
+                const accounts = await getComptesByClient(client.id);
+                const hasCompteCourant = accounts.some(acc => 
+                    acc.typeCompte === 'Courant' && 
+                    acc.statut === 'Actif'
+                );
+                
+                if (!hasCompteCourant) {
+                    isEligible = false;
+                    ineligibilityReason = "Pas de Compte Courant Actif";
+                }
+            }
+
+            if (isEligible) {
+                // 3. Crédit en cours
+                const creditsList = await getCreditsByClient(client.id);
+                const activeCredit = creditsList.find(c => 
+                    ['Actif', 'En retard', 'En cours', 'Contentieux'].includes(c.statut)
+                );
+                
+                if (activeCredit) {
+                    isEligible = false;
+                    ineligibilityReason = "Crédit en cours";
+                }
+            }
+
+            if (isEligible) {
+                // 4. Demande en cours
+                const demandes = await getDemandesByClient(client.id);
+                const pendingDemand = demandes.find(d => 
+                    d.statut && ['En attente', 'A enquêter', 'En comité', 'Approuvée'].includes(d.statut)
+                );
+
+                if (pendingDemand) {
+                    isEligible = false;
+                    ineligibilityReason = "Dossier déjà en cours";
+                }
+            }
+
+            enrichedResults.push({
+                ...client,
+                isEligible,
+                ineligibilityReason
+            });
+        }
+        
+        console.log(`[Search] Found ${enrichedResults.length} results (Enriched)`);
+        res.json(addSnakeCaseAliasesDeep(enrichedResults));
     } catch (e) {
         res.status(500).json({ message: "Search failed" });
     }

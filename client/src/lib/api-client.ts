@@ -204,6 +204,7 @@ export const clientApi = {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
+  search: (query: string) => request<any[]>(`/clients/search?q=${encodeURIComponent(query)}`),
   delete: (id: string) => request<void>(`/clients/${id}`, {
     method: 'DELETE',
   }),

@@ -176,7 +176,7 @@ export function registerFinanceRoutes(app: Express) {
       const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
 
       const compteCourant = comptesClient.find((c: any) => {
-        const isCompteCourant = c.typeCompte === 'Courant' || c.type_compte === 'Courant';
+        const isCompteCourant = c.typeCompte === 'Courant';
         const isActif = c.statut === 'Actif';
 
         // Vérifier l'agence si nécessaire
