@@ -1,8 +1,7 @@
 import React from 'react';
 import {
   X,
-  ArrowRight,
-  Calendar,
+  ArrowRightLeft,
   Clock,
   User,
   Building2,
@@ -17,14 +16,15 @@ import {
   AlertTriangle,
   History,
   Lock,
-  Hash,
   Users,
   Phone,
   MessageSquare,
   Scale,
   ChevronRight,
+  Tag,
+  Calendar,
 } from 'lucide-react';
-import { Button, Badge, Modal } from '@/components/ui';
+import { Button, Badge } from '@/components/ui';
 import { formatMoney } from '../../../lib/format';
 
 interface CoffreFort {
@@ -223,391 +223,492 @@ export default function TransfertInterCoffresDetail({
   };
 
   return (
-    <Modal isOpen onClose={onClose} size="xl" title="">
-      <div className="max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className={`p-6 rounded-t-2xl ${statutConfig.bg} ${statutConfig.border} border-b`}>
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-xl ${statutConfig.bg} ${statutConfig.color}`}>
-                {statutConfig.icon}
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
+
+      {/* Modal Container */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div
+          className="
+            pointer-events-auto
+            w-full max-w-3xl lg:max-w-4xl
+            bg-slate-900 border border-slate-700/50 rounded-2xl
+            shadow-2xl shadow-black/50
+            flex flex-col
+            max-h-[90vh]
+            animate-in fade-in zoom-in-95 duration-200
+          "
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* ═══════════════════════════════════════════════════════════════════
+              HEADER - Reference & Status
+          ═══════════════════════════════════════════════════════════════════ */}
+          <div className={`flex-shrink-0 p-5 sm:p-6 border-b border-slate-700/50 rounded-t-2xl ${statutConfig.bg}`}>
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${statutConfig.bg} ${statutConfig.border} border`}>
+                  {statutConfig.icon}
+                  <span className={statutConfig.color} />
+                </div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                    {transfert.reference}
+                    {transfert.verrouille && (
+                      <span title="Transfert verrouillé" className="p-1 rounded bg-amber-500/20">
+                        <Lock size={14} className="text-amber-400" />
+                      </span>
+                    )}
+                  </h2>
+                  <div className={`inline-flex items-center gap-2 mt-1 text-sm font-medium ${statutConfig.color}`}>
+                    {statutConfig.icon}
+                    <span>{transfert.statut}</span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  {transfert.reference}
-                  {transfert.verrouille && (
-                    <span title="Transfert verrouillé">
-                      <Lock size={16} className="text-amber-400" />
-                    </span>
-                  )}
-                </h2>
-                <p className={`text-sm ${statutConfig.color}`}>{transfert.statut}</p>
-              </div>
+              <button
+                onClick={onClose}
+                className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all border border-slate-700/50"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
 
-          {/* Route display */}
-          <div className="flex items-center justify-center gap-4 py-4 bg-slate-950/30 rounded-xl">
-            <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-2 rounded-xl bg-slate-800 flex items-center justify-center">
-                <Building2 size={24} className="text-slate-400" />
-              </div>
-              <p className="font-medium text-white text-sm">
-                {transfert.coffreSource?.agenceNom || transfert.coffreSource?.nom || 'Source'}
-              </p>
-              <p className="text-xs text-slate-500">{transfert.coffreSource?.code}</p>
-            </div>
+            {/* ─────────────────────────────────────────────────────────────────
+                HERO SECTION - Transfer Flow & Amount
+            ───────────────────────────────────────────────────────────────── */}
+            <div className="bg-slate-950/40 rounded-xl p-5 border border-slate-800/50">
+              {/* Transfer Route - Horizontal */}
+              <div className="flex items-center justify-center gap-4 sm:gap-8 mb-5">
+                {/* Source */}
+                <div className="text-center flex-shrink-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-2 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 flex items-center justify-center shadow-lg">
+                    <Building2 size={28} className="text-slate-300" />
+                  </div>
+                  <p className="font-semibold text-white text-sm sm:text-base max-w-[100px] sm:max-w-[140px] truncate">
+                    {transfert.coffreSource?.nom || 'Coffre Source'}
+                  </p>
+                  <p className="text-xs text-slate-500">{transfert.coffreSource?.code}</p>
+                </div>
 
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 rounded-full">
-                <span className="text-xs text-slate-400 uppercase">{transfert.typeTransfert.replace(/_/g, ' → ')}</span>
-                <ArrowRight size={16} className="text-cyan-400" />
-              </div>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-2 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-                <Vault size={24} className="text-cyan-400" />
-              </div>
-              <p className="font-medium text-white text-sm">
-                {transfert.coffreDestination?.agenceNom || transfert.coffreDestination?.nom || 'Destination'}
-              </p>
-              <p className="text-xs text-slate-500">{transfert.coffreDestination?.code}</p>
-            </div>
-          </div>
-
-          {/* Amount */}
-          <div className="text-center mt-4">
-            <p className="text-3xl font-bold text-white">
-              {formatMoney(parseFloat(transfert.montant))}
-              <span className="text-lg text-slate-400 ml-2">{transfert.devise}</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Workflow Timeline */}
-          <section>
-            <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
-              <History size={16} /> Progression
-            </h3>
-            <div className="relative">
-              {/* Progress line */}
-              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-slate-800" />
-              <div
-                className="absolute left-6 top-0 w-0.5 bg-gradient-to-b from-cyan-500 to-emerald-500 transition-all duration-500"
-                style={{ height: `${(activeStep / (workflowSteps.length - 1)) * 100}%` }}
-              />
-
-              <div className="space-y-4 relative">
-                {workflowSteps.map((step, index) => {
-                  const isCompleted = index <= activeStep && step.date;
-                  const isCurrent = index === activeStep;
-
-                  return (
-                    <div key={step.key} className="flex items-start gap-4">
-                      <div
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 z-10 transition-all ${
-                          isCompleted
-                            ? 'bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 text-cyan-400 border border-cyan-500/30'
-                            : 'bg-slate-900 text-slate-600 border border-slate-700'
-                        } ${isCurrent ? 'ring-2 ring-cyan-500/50' : ''}`}
-                      >
-                        {step.icon}
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <p className={`font-medium ${isCompleted ? 'text-white' : 'text-slate-500'}`}>
-                          {step.label}
-                        </p>
-                        {step.date && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            {formatDate(step.date)}
-                            {step.user && (
-                              <span className="text-slate-400 ml-2">
-                                par {step.user.prenom} {step.user.nom}
-                              </span>
-                            )}
-                          </p>
-                        )}
+                {/* Arrow with Type */}
+                <div className="flex-shrink-0 flex flex-col items-center">
+                  <div className="px-3 py-1.5 bg-slate-800/80 rounded-full text-xs text-slate-400 uppercase tracking-wide mb-2">
+                    {transfert.typeTransfert.replace(/_/g, ' → ')}
+                  </div>
+                  <div className="relative">
+                    <div className="w-12 sm:w-20 h-1 bg-gradient-to-r from-cyan-500/50 via-cyan-400 to-cyan-500/50 rounded-full" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="p-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/40">
+                        <ArrowRightLeft size={16} className="text-cyan-400" />
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
+
+                {/* Destination */}
+                <div className="text-center flex-shrink-0">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-2 rounded-xl bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 border border-cyan-600/50 flex items-center justify-center shadow-lg shadow-cyan-500/10">
+                    <Vault size={28} className="text-cyan-400" />
+                  </div>
+                  <p className="font-semibold text-white text-sm sm:text-base max-w-[100px] sm:max-w-[140px] truncate">
+                    {transfert.coffreDestination?.nom || 'Coffre Destination'}
+                  </p>
+                  <p className="text-xs text-slate-500">{transfert.coffreDestination?.code}</p>
+                </div>
+              </div>
+
+              {/* Amount - Massive & Centered */}
+              <div className="text-center py-4 bg-slate-900/60 rounded-xl border border-slate-800">
+                <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight">
+                  {formatMoney(parseFloat(transfert.montant))}
+                </p>
+                <p className="text-sm sm:text-base text-slate-400 mt-1 font-medium uppercase tracking-wider">
+                  {transfert.devise}
+                </p>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Details Grid */}
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Transfer Info */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-4">
-              <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <FileText size={16} className="text-slate-400" /> Informations
-              </h4>
+          {/* ═══════════════════════════════════════════════════════════════════
+              SCROLLABLE CONTENT (single overflow container)
+          ═══════════════════════════════════════════════════════════════════ */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
 
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">Date de transfert</span>
-                  <span className="text-sm text-white">
-                    {new Date(transfert.dateTransfert).toLocaleDateString('fr-FR')}
-                  </span>
+            {/* ─────────────────────────────────────────────────────────────────
+                PROGRESSION TIMELINE
+            ───────────────────────────────────────────────────────────────── */}
+            <section className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
+                <History size={16} /> Progression
+              </h3>
+              <div className="relative">
+                {/* Progress line */}
+                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-700" />
+                <div
+                  className="absolute left-5 top-0 w-0.5 bg-gradient-to-b from-cyan-500 to-emerald-500 transition-all duration-500"
+                  style={{ height: `${(activeStep / (workflowSteps.length - 1)) * 100}%` }}
+                />
+
+                <div className="space-y-4 relative">
+                  {workflowSteps.map((step, index) => {
+                    const isCompleted = index <= activeStep && step.date;
+                    const isCurrent = index === activeStep;
+
+                    return (
+                      <div key={step.key} className="flex items-start gap-4">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 z-10 transition-all ${
+                            isCompleted
+                              ? 'bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 text-cyan-400 border border-cyan-500/30'
+                              : 'bg-slate-800 text-slate-600 border border-slate-700'
+                          } ${isCurrent ? 'ring-2 ring-cyan-500/50 ring-offset-2 ring-offset-slate-900' : ''}`}
+                        >
+                          {step.icon}
+                        </div>
+                        <div className="flex-1 pt-0.5">
+                          <p className={`font-medium ${isCompleted ? 'text-white' : 'text-slate-500'}`}>
+                            {step.label}
+                          </p>
+                          {step.date && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {formatDate(step.date)}
+                              {step.user && (
+                                <span className="text-slate-400 ml-2">
+                                  par {step.user.prenom} {step.user.nom}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                {transfert.dateComptable && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-slate-500">Date comptable</span>
-                    <span className="text-sm text-white">{transfert.dateComptable}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-sm text-slate-500">Conditionnement</span>
-                  <span className="text-sm text-white">{transfert.typeConditionnement}</span>
-                </div>
-                {transfert.numeroScelle && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-slate-500">N° Scellé</span>
-                    <span className="text-sm text-cyan-400 font-mono">{transfert.numeroScelle}</span>
-                  </div>
-                )}
               </div>
-            </div>
+            </section>
+
+            {/* ─────────────────────────────────────────────────────────────────
+                DETAILS GRID - 3 columns on desktop
+            ───────────────────────────────────────────────────────────────── */}
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Date de transfert */}
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-slate-700/50">
+                  <Calendar size={18} className="text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Date de transfert</p>
+                  <p className="text-base text-white font-medium">
+                    {new Date(transfert.dateTransfert).toLocaleDateString('fr-FR', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Conditionnement */}
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-slate-700/50">
+                  <Package size={18} className="text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Conditionnement</p>
+                  <p className="text-base text-white font-medium">{transfert.typeConditionnement}</p>
+                </div>
+              </div>
+
+              {/* N° Scellé */}
+              {transfert.numeroScelle && (
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10">
+                    <Lock size={18} className="text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">N° Scellé</p>
+                    <p className="text-base text-cyan-400 font-mono font-medium">{transfert.numeroScelle}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Date comptable */}
+              {transfert.dateComptable && (
+                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-slate-700/50">
+                    <Clock size={18} className="text-slate-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Date comptable</p>
+                    <p className="text-base text-white font-medium">{transfert.dateComptable}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Type */}
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-slate-700/50">
+                  <Tag size={18} className="text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Type</p>
+                  <p className="text-base text-white font-medium">{transfert.typeTransfert.replace(/_/g, ' → ')}</p>
+                </div>
+              </div>
+            </section>
 
             {/* Transport Agents */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-4">
-              <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Users size={16} className="text-slate-400" /> Agents de transport
-              </h4>
-
-              {transfert.agentsTransport && transfert.agentsTransport.length > 0 ? (
-                <div className="space-y-2">
+            {transfert.agentsTransport && transfert.agentsTransport.length > 0 && (
+              <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-4">
+                  <Users size={16} className="text-slate-400" /> Agents de transport
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {transfert.agentsTransport.map((agent, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-slate-950/50 p-3 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
-                          <User size={14} className="text-slate-400" />
+                    <div key={idx} className="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center">
+                          <User size={16} className="text-slate-400" />
                         </div>
-                        <span className="text-sm text-white">{agent.nom}</span>
+                        <span className="text-sm font-medium text-white">{agent.nom}</span>
                       </div>
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <span className="text-xs text-slate-500 flex items-center gap-1.5">
                         <Phone size={12} /> {agent.contact}
                       </span>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-slate-500 text-center py-4">Aucun agent défini</p>
-              )}
-            </div>
-          </section>
+              </section>
+            )}
 
-          {/* Motif */}
-          {transfert.motif && (
-            <section className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
-              <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-2">
-                <MessageSquare size={16} className="text-slate-400" /> Motif
-              </h4>
-              <p className="text-sm text-slate-400">{transfert.motif}</p>
-            </section>
-          )}
+            {/* Motif */}
+            {transfert.motif && (
+              <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-3">
+                  <MessageSquare size={16} className="text-slate-400" /> Motif du transfert
+                </h4>
+                <p className="text-sm text-slate-400">{transfert.motif}</p>
+              </section>
+            )}
 
-          {/* Reception Info (if received) */}
-          {(transfert.statut === 'Reçu' || transfert.statut === 'Reçu avec écart') && (
-            <section className="bg-emerald-950/20 border border-emerald-800/30 rounded-xl p-4 space-y-4">
-              <h4 className="text-sm font-medium text-emerald-300 flex items-center gap-2">
-                <Package size={16} /> Réception
-              </h4>
+            {/* Reception Info (if received) */}
+            {(transfert.statut === 'Reçu' || transfert.statut === 'Reçu avec écart') && (
+              <section className="bg-emerald-950/20 border border-emerald-700/30 rounded-xl p-5 space-y-4">
+                <h4 className="text-sm font-semibold text-emerald-300 flex items-center gap-2">
+                  <Package size={16} /> Réception
+                </h4>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Montant reçu</p>
-                  <p className="text-lg font-bold text-white">
-                    {formatMoney(parseFloat(transfert.montantRecu || transfert.montant))}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Conformité</p>
-                  <Badge
-                    value={transfert.conforme ? 'Conforme' : 'Non conforme'}
-                    variant={transfert.conforme ? 'success' : 'danger'}
-                  />
-                </div>
-              </div>
-
-              {/* Ecart */}
-              {transfert.ecartMontant && parseFloat(transfert.ecartMontant) !== 0 && (
-                <div className="bg-orange-950/30 border border-orange-700/30 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Scale size={16} className="text-orange-400" />
-                    <span className="text-sm font-medium text-orange-400">Écart détecté</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-slate-900/50 rounded-lg p-4">
+                    <p className="text-xs text-slate-500 mb-1">Montant reçu</p>
+                    <p className="text-xl font-bold text-white">
+                      {formatMoney(parseFloat(transfert.montantRecu || transfert.montant))}
+                    </p>
                   </div>
-                  <p className="text-lg font-bold text-orange-300">
-                    {formatMoney(Math.abs(parseFloat(transfert.ecartMontant)))}
-                  </p>
-                  {transfert.motifEcart && (
-                    <p className="text-xs text-slate-400 mt-2">Motif: {transfert.motifEcart}</p>
-                  )}
+                  <div className="bg-slate-900/50 rounded-lg p-4">
+                    <p className="text-xs text-slate-500 mb-1">Conformité</p>
+                    <Badge
+                      value={transfert.conforme ? 'Conforme' : 'Non conforme'}
+                      variant={transfert.conforme ? 'success' : 'danger'}
+                    />
+                  </div>
                 </div>
-              )}
 
-              {transfert.commentaireReception && (
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Commentaire</p>
-                  <p className="text-sm text-slate-400">{transfert.commentaireReception}</p>
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* Rejection/Cancellation reason */}
-          {transfert.motifRejet && (
-            <section className="bg-red-950/20 border border-red-800/30 rounded-xl p-4">
-              <h4 className="text-sm font-medium text-red-300 flex items-center gap-2 mb-2">
-                <XCircle size={16} /> Motif de rejet
-              </h4>
-              <p className="text-sm text-red-200">{transfert.motifRejet}</p>
-            </section>
-          )}
-
-          {transfert.motifAnnulation && (
-            <section className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-              <h4 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-2">
-                <X size={16} /> Motif d'annulation
-              </h4>
-              <p className="text-sm text-slate-400">{transfert.motifAnnulation}</p>
-            </section>
-          )}
-
-          {/* Documents */}
-          {documents.length > 0 && (
-            <section>
-              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
-                <FileText size={16} /> Documents ({documents.length})
-              </h3>
-              <div className="space-y-2">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-3 bg-slate-900/50 border border-slate-800 rounded-lg hover:border-slate-700 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-slate-800">
-                        <FileText size={16} className="text-cyan-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-white">{doc.type}</p>
-                        <p className="text-xs text-slate-500">{formatDate(doc.createdAt)}</p>
-                      </div>
+                {/* Ecart */}
+                {transfert.ecartMontant && parseFloat(transfert.ecartMontant) !== 0 && (
+                  <div className="bg-orange-950/30 border border-orange-700/30 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Scale size={16} className="text-orange-400" />
+                      <span className="text-sm font-semibold text-orange-400">Écart détecté</span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-slate-400 hover:text-cyan-400"
-                    >
-                      <Download size={16} />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Reconciliation */}
-          {reconciliation && (
-            <section className="bg-indigo-950/20 border border-indigo-800/30 rounded-xl p-4">
-              <h4 className="text-sm font-medium text-indigo-300 flex items-center gap-2 mb-3">
-                <Scale size={16} /> Réconciliation comptable
-              </h4>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500">Statut</p>
-                  <Badge
-                    value={reconciliation.statut}
-                    variant={reconciliation.statut === 'Rapproché' ? 'success' : 'warning'}
-                  />
-                </div>
-                {reconciliation.dateRapprochement && (
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">Date de rapprochement</p>
-                    <p className="text-sm text-white">{formatDate(reconciliation.dateRapprochement)}</p>
+                    <p className="text-xl font-bold text-orange-300">
+                      {formatMoney(Math.abs(parseFloat(transfert.ecartMontant)))}
+                    </p>
+                    {transfert.motifEcart && (
+                      <p className="text-xs text-slate-400 mt-2">Motif: {transfert.motifEcart}</p>
+                    )}
                   </div>
                 )}
-              </div>
-            </section>
-          )}
 
-          {/* Audit Trail */}
-          {auditLogs.length > 0 && (
-            <section>
-              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2">
-                <History size={16} /> Historique d'audit ({auditLogs.length})
-              </h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {auditLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-start gap-3 p-3 bg-slate-900/30 border border-slate-800/50 rounded-lg text-sm"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-white">{formatAuditAction(log.action)}</span>
-                        <span className="text-xs text-slate-500">{formatDate(log.createdAt)}</span>
+                {transfert.commentaireReception && (
+                  <div className="bg-slate-900/50 rounded-lg p-4">
+                    <p className="text-xs text-slate-500 mb-1">Commentaire</p>
+                    <p className="text-sm text-slate-400">{transfert.commentaireReception}</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Rejection/Cancellation reason */}
+            {transfert.motifRejet && (
+              <section className="bg-red-950/20 border border-red-700/30 rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-red-300 flex items-center gap-2 mb-3">
+                  <XCircle size={16} /> Motif de rejet
+                </h4>
+                <p className="text-sm text-red-200">{transfert.motifRejet}</p>
+              </section>
+            )}
+
+            {transfert.motifAnnulation && (
+              <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-3">
+                  <X size={16} /> Motif d'annulation
+                </h4>
+                <p className="text-sm text-slate-400">{transfert.motifAnnulation}</p>
+              </section>
+            )}
+
+            {/* Documents */}
+            {documents.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <FileText size={16} /> Documents ({documents.length})
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl hover:border-slate-600 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-lg bg-slate-700/50">
+                          <FileText size={18} className="text-cyan-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{doc.type}</p>
+                          <p className="text-xs text-slate-500">{formatDate(doc.createdAt)}</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                        {log.utilisateur && (
-                          <span>
-                            {log.utilisateur.prenom} {log.utilisateur.nom}
-                          </span>
-                        )}
-                        {log.statutAvant && log.statutApres && (
-                          <span className="flex items-center gap-1">
-                            <span className="text-slate-500">{log.statutAvant}</span>
-                            <ChevronRight size={12} />
-                            <span className="text-cyan-400">{log.statutApres}</span>
-                          </span>
-                        )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 w-9 p-0 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10"
+                      >
+                        <Download size={18} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Reconciliation */}
+            {reconciliation && (
+              <section className="bg-indigo-950/20 border border-indigo-700/30 rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-indigo-300 flex items-center gap-2 mb-4">
+                  <Scale size={16} /> Réconciliation comptable
+                </h4>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Statut</p>
+                    <Badge
+                      value={reconciliation.statut}
+                      variant={reconciliation.statut === 'Rapproché' ? 'success' : 'warning'}
+                    />
+                  </div>
+                  {reconciliation.dateRapprochement && (
+                    <div className="text-right">
+                      <p className="text-xs text-slate-500 mb-1">Date de rapprochement</p>
+                      <p className="text-sm font-medium text-white">{formatDate(reconciliation.dateRapprochement)}</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Audit Trail */}
+            {auditLogs.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <History size={16} /> Historique d'audit ({auditLogs.length})
+                </h3>
+                <div className="space-y-2">
+                  {auditLogs.slice(0, 5).map((log) => (
+                    <div
+                      key={log.id}
+                      className="flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700/50 rounded-xl text-sm"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-cyan-400 mt-2 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-white">{formatAuditAction(log.action)}</span>
+                          <span className="text-xs text-slate-500">{formatDate(log.createdAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                          {log.utilisateur && (
+                            <span>
+                              {log.utilisateur.prenom} {log.utilisateur.nom}
+                            </span>
+                          )}
+                          {log.statutAvant && log.statutApres && (
+                            <span className="flex items-center gap-1">
+                              <span className="text-slate-500">{log.statutAvant}</span>
+                              <ChevronRight size={12} />
+                              <span className="text-cyan-400">{log.statutApres}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
+                  {auditLogs.length > 5 && (
+                    <p className="text-xs text-slate-500 text-center py-2">
+                      + {auditLogs.length - 5} autres entrées
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              STICKY FOOTER - Action Buttons
+          ═══════════════════════════════════════════════════════════════════ */}
+          {availableActions.length > 0 && (
+            <div className="flex-shrink-0 p-5 sm:p-6 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur rounded-b-2xl">
+              <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                <Button variant="ghost" onClick={onClose} className="sm:min-w-[100px]">
+                  Fermer
+                </Button>
+                {availableActions.map((action) => (
+                  <Button
+                    key={action.key}
+                    onClick={() => onAction(action.action)}
+                    variant={action.variant}
+                    className={`sm:min-w-[140px] ${
+                      action.variant === 'primary'
+                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/20'
+                        : action.variant === 'success'
+                        ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 shadow-lg shadow-emerald-500/20'
+                        : action.variant === 'warning'
+                        ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-lg shadow-amber-500/20'
+                        : 'bg-red-600 hover:bg-red-500'
+                    }`}
+                  >
+                    {action.icon}
+                    <span className="ml-2">{action.label}</span>
+                  </Button>
                 ))}
               </div>
-            </section>
+            </div>
+          )}
+
+          {/* Close button only footer if no actions */}
+          {availableActions.length === 0 && (
+            <div className="flex-shrink-0 p-5 sm:p-6 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur rounded-b-2xl">
+              <div className="flex justify-end">
+                <Button variant="ghost" onClick={onClose} className="min-w-[100px]">
+                  Fermer
+                </Button>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Footer Actions */}
-        {availableActions.length > 0 && (
-          <div className="p-6 border-t border-slate-800 bg-slate-900/50">
-            <div className="flex flex-wrap gap-3 justify-end">
-              {availableActions.map((action) => (
-                <Button
-                  key={action.key}
-                  onClick={() => onAction(action.action)}
-                  variant={action.variant}
-                  className={
-                    action.variant === 'primary'
-                      ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500'
-                      : action.variant === 'success'
-                      ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500'
-                      : action.variant === 'warning'
-                      ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500'
-                      : 'bg-red-600 hover:bg-red-500'
-                  }
-                >
-                  {action.icon}
-                  <span className="ml-2">{action.label}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-    </Modal>
+    </>
   );
 }
