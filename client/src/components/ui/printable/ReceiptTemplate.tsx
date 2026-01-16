@@ -1,7 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Badge, Card } from '../index';
 import { Building2, Phone, Mail, Globe, MapPin, QrCode } from 'lucide-react';
 import cofinLogo from '@/assets/logo.png';
 
@@ -72,9 +71,14 @@ export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateP
       hour: '2-digit',
       minute: '2-digit'
     });
+    const operationLabel = data.type || data.items?.[0]?.description || data.title;
 
     return (
-      <div className="hidden print:block font-sans text-slate-900 bg-white" ref={ref}>
+      <div 
+        data-receipt-root
+        className="font-sans text-slate-900 bg-white" 
+        ref={ref}
+      >
         {/* Print specific styles to ensure background colors print */}
         <style type="text/css" media="print">
           {`
@@ -122,11 +126,11 @@ export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateP
               <div className="flex flex-col gap-1">
                 <span className="font-mono text-lg font-bold text-slate-900">#{data.reference}</span>
                 <span className="text-sm text-slate-500">{formattedDate}</span>
-                <Badge 
-                  variant="outline" 
-                  className="ml-auto mt-2 border-slate-900 text-slate-900"
-                  value={data.type}
-                />
+                {operationLabel && (
+                  <span className="ml-auto mt-2 inline-flex max-w-full items-center justify-center rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-700">
+                    <span className="whitespace-normal text-center leading-none">{operationLabel}</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -217,12 +221,6 @@ export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateP
                    <p className="text-xs text-right text-slate-500 italic pr-1">
                       Arrêté la présente facture à la somme de : {data.montantLettres}
                    </p>
-                )}
-                {data.notes && (
-                  <div className="mt-6 p-3 bg-yellow-50 border border-yellow-100 rounded text-xs text-slate-600">
-                    <span className="font-bold block mb-1">Notes:</span>
-                    {data.notes}
-                  </div>
                 )}
               </div>
             </div>

@@ -197,6 +197,7 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "OPERATION_TERRAIN_SUBMITTED",
   "OPERATION_TERRAIN_APPROVED",
   "OPERATION_TERRAIN_REJECTED",
+  "OPERATION_TERRAIN_SETTLED",
   // Caisse Admin events
   "SESSION_FORCE_CLOSED",
   "CAISSE_STATUS_CHANGED",
@@ -280,6 +281,7 @@ export const statutOperationTerrainEnum = pgEnum("statut_operation_terrain_enum"
   "APPROVED",    // Approuvée, écritures postées
   "REJECTED",    // Rejetée, aucune écriture
   "CANCELLED",   // Annulée par l'agent/admin
+  "SETTLED",     // Apurée/Versée (finalisé)
 ]);
 
 // ========== TRANSFERTS INTER-COFFRES ENUMS ==========

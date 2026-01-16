@@ -46,8 +46,7 @@ export const ADMIN_TABS = [
   { id: 'zones', label: 'Zones', icon: 'MapPin' },
   { id: 'sms', label: 'SMS', icon: 'MessageSquare', disabled: true },
   { id: 'updates', label: 'Version', icon: 'Package' },
-  { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound' },
-  { id: 'validations', label: 'Validations', icon: 'CheckCircle' }
+  { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound' }
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];

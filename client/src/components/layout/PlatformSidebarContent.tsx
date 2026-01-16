@@ -3,10 +3,11 @@ import { Menu, X, LogOut, Lock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { maintenanceApi } from '../../lib/api-client';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
-import { ROUTES, canAccessRoute, type RouteConfig } from '../../lib/routes-config';
+import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 import { usePermissionsContext } from '../../contexts/PermissionsContext';
+import { caisseAgentApi } from '../../lib/api-client';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -33,6 +34,22 @@ export default function PlatformSidebarContent({
 
   // Maintenance Status State
   const [lockedModules, setLockedModules] = useState<Set<string>>(new Set());
+  const [pendingValidationsCount, setPendingValidationsCount] = useState<number>(0);
+
+  // Fetch Pending Validations Count
+  const fetchPendingCount = async () => {
+    try {
+      if (canAccessRoute(getRouteByKey('agentValidations')!, userRole)) {
+        const result = await caisseAgentApi.countPendingOperations();
+        if (result && typeof result.count === 'number') {
+          setPendingValidationsCount(result.count);
+        }
+      }
+    } catch (error) {
+       // Silent error for dashboard counters
+       console.error("Dashboard counter error:", error);
+    }
+  };
 
   // Fetch Maintenance Status on Mount
   useEffect(() => {
@@ -50,7 +67,9 @@ export default function PlatformSidebarContent({
         console.error("Failed to fetch sidebar maintenance status", error);
       }
     };
+
     fetchStatus();
+    fetchPendingCount();
 
     // Real-time Updates Listener
     const handleMaintenanceUpdate = (event: CustomEvent) => {
@@ -79,12 +98,19 @@ export default function PlatformSidebarContent({
         });
     };
 
+    const handleOperationUpdate = (event: CustomEvent) => {
+      // Refresh count when operations change status
+      fetchPendingCount();
+    };
+
     window.addEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
+    window.addEventListener('operation-update', handleOperationUpdate as EventListener);
 
     return () => {
         window.removeEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
+        window.removeEventListener('operation-update', handleOperationUpdate as EventListener);
     };
-  }, []);
+  }, [userRole]);
 
   // Configure Module Mapping: Route Key -> Maintenance Module Name
   // This must match the backend list: 'PLATFORM', 'CAISSE', 'CREDITS', 'TONTINES', 'EPARGNE', 'RH', 'MESSAGES', 'ADMIN'
@@ -258,11 +284,23 @@ export default function PlatformSidebarContent({
           )
         )}
 
+        {/* Real-time Badge for Collapsed Sidebar */}
+        {!sidebarOpen && route.key === 'agentValidations' && pendingValidationsCount > 0 && (
+          <div className="absolute top-1 right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+            {pendingValidationsCount}
+          </div>
+        )}
+
         {sidebarOpen && (
           <>
             <span className={`flex-1 text-left truncate transition-all duration-300 ${isActive ? 'translate-x-1' : ''}`}>
               {t(route.labelKey || route.key)}
             </span>
+            {route.key === 'agentValidations' && pendingValidationsCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+                {pendingValidationsCount}
+              </span>
+            )}
             {isDisabled && (
               <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${
                 showMaintenanceLock 

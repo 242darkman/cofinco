@@ -18,6 +18,7 @@ import {
   UserCircle,
   RefreshCw,
   BarChart3,
+  CheckCircle,
 } from 'lucide-react';
 import { MenuItem } from '../types/layout';
 
@@ -35,6 +36,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   // Opérations
   { labelKey: 'menuCaisse', icon: Wallet, key: 'caisse', section: 'operations' },
   { labelKey: 'menuAgentTerrain', icon: MapPinned, key: 'agentTerrain', section: 'operations' },
+  { labelKey: 'menuValidations', icon: CheckCircle, key: 'agentValidations', section: 'operations' },
   { labelKey: 'menuTransfert', icon: ArrowLeftRight, key: 'transfert', section: 'operations' },
   { labelKey: 'menuCoffre', icon: Shield, key: 'coffre', section: 'operations' },
 

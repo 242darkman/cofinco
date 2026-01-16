@@ -12,6 +12,7 @@ import AgentTerrain from './components/agent/AgentTerrain';
 import CaisseDashboard from './components/finance/caisse/CaisseDashboard';
 import { CoffreFortDashboard } from './components/finance/caisse/CoffreFortDashboard';
 import ClientModule from './components/client/ClientModule';
+import AgentValidations from './components/agent/AgentValidations';
 
 import ReportGenerator from './components/shared/ReportGenerator';
 import AdminGestionAcces from './components/admin/AdminGestionAcces';
@@ -252,6 +253,8 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
         return <MessagesModule />;
       case 'excel':
         return <ExcelModule />;
+      case 'agentValidations':
+        return <AgentValidations />;
       default:
         return (
           <div className="text-center py-20">

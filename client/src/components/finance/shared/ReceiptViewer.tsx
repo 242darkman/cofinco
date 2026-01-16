@@ -94,15 +94,23 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
         ) : undefined
       }
     >
-      {/* Hidden print templates */}
-      <div style={{ display: 'none' }}>
-        {facture && (
-          <>
-            <ReceiptTemplate ref={ticketRef} data={facture as any} />
-            <InvoiceTemplate ref={invoiceRef} data={facture as any} />
-          </>
-        )}
-      </div>
+      {/* Hidden Print Templates (offscreen, not display:none) */}
+      {facture && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            width: '210mm',
+            background: 'white',
+            zIndex: -1,
+          }}
+        >
+          <ReceiptTemplate ref={ticketRef} data={facture as any} />
+          <InvoiceTemplate ref={invoiceRef} data={facture as any} />
+        </div>
+      )}
 
       {/* Content */}
       {isLoading && (

@@ -386,8 +386,22 @@ export default function CreditRemboursement() {
   return (
     <div className="space-y-6 relative">
       
-      {/* Hidden Receipt Template for Printing */}
-      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
+      {/* Hidden Receipt Template for Printing (offscreen, not display:none) */}
+      {printData && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            width: '210mm',
+            background: 'white',
+            zIndex: -1,
+          }}
+        >
+          <ReceiptTemplate ref={componentRef} data={printData} />
+        </div>
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && (

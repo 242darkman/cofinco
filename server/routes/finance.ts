@@ -1416,7 +1416,7 @@ export function registerFinanceRoutes(app: Express) {
 
   // ============================================================================
 
-  app.get("/api/caisses/status", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+  app.get("/api/caisses/status", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence', 'agent', 'terrain'), async (req, res) => {
     const agenceId = req.query.agenceId as string;
     const caisses = await storage.getCaissesWithStatus(agenceId);
     res.json(addSnakeCaseAliasesDeep(caisses));

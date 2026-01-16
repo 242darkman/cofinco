@@ -155,8 +155,22 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
 
   return (
     <div className="space-y-4">
-      {/* Hidden Receipt Template */}
-      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
+      {/* Hidden Receipt Template (offscreen, not display:none) */}
+      {printData && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            width: '210mm',
+            background: 'white',
+            zIndex: -1,
+          }}
+        >
+          <ReceiptTemplate ref={componentRef} data={printData} />
+        </div>
+      )}
 
       {/* 1. Header & Stats - Compact Mobile First */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">

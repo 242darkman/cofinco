@@ -185,6 +185,10 @@ export const caisseApi = {
   liquidate: (id: string) => request<any>(`/caisses/${id}/liquidate`, {
     method: 'POST',
   }),
+  getStatus: (agenceId?: string) => {
+    const query = agenceId ? `?agenceId=${agenceId}` : '';
+    return request<any[]>(`/caisses/status${query}`);
+  },
   delete: (id: string) => request<void>(`/caisses/${id}`, {
     method: 'DELETE',
   }),
@@ -1241,7 +1245,7 @@ export interface OperationTerrainFilters {
   agentId?: string;
   clientId?: string;
   type?: 'COLLECT_CASH' | 'SETTLEMENT_CASH';
-  statut?: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  statut?: 'SUBMITTED' | 'APPROVED' | 'SETTLED' | 'REJECTED' | 'CANCELLED';
   dateDebut?: string;
   dateFin?: string;
   limit?: number;
@@ -1310,6 +1314,15 @@ export const caisseAgentApi = {
   approveOperation: (operationId: string) =>
     request<OperationTerrainWithRelations>(`/caisse-agent/operations-terrain/${operationId}/approve`, {
       method: 'POST',
+    }),
+
+  /**
+   * Approuver plusieurs opérations terrain en une fois
+   */
+  bulkApproveOperations: (operationIds: string[]) =>
+    request<{ success: boolean; results: any[] }>('/caisse-agent/operations-terrain/bulk-approve', {
+      method: 'POST',
+      body: JSON.stringify({ operationIds }),
     }),
 
   /**
@@ -1402,4 +1415,19 @@ export const caisseAgentApi = {
       tauxApprobation: number;
     }>(`/caisse-agent/agents/${agentId}/stats${query ? `?${query}` : ''}`);
   },
+};
+
+/**
+ * Agence API
+ */
+export interface Agence {
+  id: string;
+  nom: string;
+  code: string;
+  ville: string;
+  adresse?: string;
+}
+
+export const agencesApi = {
+  getAgences: () => request<Agence[]>('/agences'),
 };

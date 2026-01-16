@@ -75,7 +75,7 @@ const cancelOperationSchema = z.object({
 const listOperationsQuerySchema = z.object({
   agentId: z.string().uuid().optional(),
   clientId: z.string().uuid().optional(),
-  statut: z.enum(["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"]).optional(),
+  statut: z.enum(["SUBMITTED", "APPROVED", "SETTLED", "REJECTED", "CANCELLED"]).optional(),
   type: z.enum(["COLLECT_CASH", "SETTLEMENT_CASH"]).optional(),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
@@ -86,6 +86,20 @@ const listOperationsQuerySchema = z.object({
 // ============================================================================
 // ROUTES - OPÉRATIONS TERRAIN
 // ============================================================================
+
+/**
+ * GET /api/caisse-agent/operations-terrain/pending/count
+ * Récupère le nombre d'opérations en attente (SUBMITTED)
+ */
+caisseAgentRouter.get("/operations-terrain/pending/count", async (req, res) => {
+  try {
+    const result = await operationService.getPendingOperationsCount();
+    res.json(result);
+  } catch (error: any) {
+    console.error("Erreur stats pending count:", error);
+    res.status(500).json({ error: "Erreur interne" });
+  }
+});
 
 /**
  * POST /api/caisse-agent/operations-terrain
@@ -144,6 +158,28 @@ caisseAgentRouter.post(
     }
   }
 );
+
+/**
+ * POST /api/caisse-agent/operations-terrain/bulk-approve
+ */
+caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
+  try {
+    const { operationIds } = req.body;
+    if (!Array.isArray(operationIds) || operationIds.length === 0) {
+      return res.status(400).json({ error: "Liste d'IDs invalide" });
+    }
+    const result = await approvalService.approveOperationsBulk({
+      operationIds,
+      approvedBy: (req as any).user!.id,
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+    res.json(result);
+  } catch (error: any) {
+    console.error("Bulk approve error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 /**
  * POST /api/caisse-agent/operations-terrain/:id/approve
@@ -504,7 +540,7 @@ caisseAgentRouter.get(
       const parsed = z.object({
         limit: z.coerce.number().min(1).max(100).default(50),
         offset: z.coerce.number().min(0).default(0),
-        statut: z.enum(["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"]).optional(),
+        statut: z.enum(["SUBMITTED", "APPROVED", "SETTLED", "REJECTED", "CANCELLED"]).optional(),
       }).safeParse(req.query);
 
       if (!parsed.success) {

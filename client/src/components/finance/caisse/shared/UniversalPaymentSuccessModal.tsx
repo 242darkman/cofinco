@@ -114,8 +114,18 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-      {/* Hidden Print Templates */}
-      <div style={{ display: "none" }}>
+      {/* Hidden Print Templates (offscreen, not display:none) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          left: '-10000px',
+          top: '0',
+          width: '210mm',
+          background: 'white',
+          zIndex: -1,
+        }}
+      >
         <ReceiptTemplate ref={ticketRef} data={data} />
         <InvoiceTemplate ref={invoiceRef} data={data} />
       </div>

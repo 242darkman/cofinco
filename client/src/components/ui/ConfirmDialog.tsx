@@ -138,9 +138,9 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
 
           <div className="flex-1 text-center sm:text-left max-w-full overflow-hidden">
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed break-words">
+            <div className="text-sm sm:text-base text-slate-300 leading-relaxed break-words">
               {message}
-            </p>
+            </div>
           </div>
         </div>
         

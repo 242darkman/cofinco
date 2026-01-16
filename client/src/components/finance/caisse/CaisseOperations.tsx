@@ -371,7 +371,21 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
 
   return (
     <div className="flex flex-col min-h-[85vh] font-sans selection:bg-cyan-500/30">
-      {printData && <div style={{ display: "none" }}><ReceiptTemplate ref={componentRef} data={printData} /></div>}
+      {printData && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            width: '210mm',
+            background: 'white',
+            zIndex: -1,
+          }}
+        >
+          <ReceiptTemplate ref={componentRef} data={printData} />
+        </div>
+      )}
       <SuccessModal />
       <ConfirmDialog isOpen={showConfirmDialog} title="Confirmer" message={`Valider le ${direction.toLowerCase()} de ${formatMoney(parseFloat(montant || '0'))} ?`} onConfirm={confirmerOperation} onClose={() => setShowConfirmDialog(false)} />
 

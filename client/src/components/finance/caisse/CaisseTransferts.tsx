@@ -925,14 +925,24 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
         </div>
       )}
 
-      {/* Hidden Print Template */}
-      <div style={{ display: 'none' }}>
-         <TransferHistoryPrintTemplate 
-           ref={componentRef} 
-           data={printData || { 
-             title: '', agencyName: '', generatedBy: '', date: new Date(), transfers: [], stats: { totalCount: 0, totalAmount: 0 } 
-           }} 
-         />
+      {/* Hidden Print Template (offscreen, not display:none) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          left: '-10000px',
+          top: '0',
+          width: '210mm',
+          background: 'white',
+          zIndex: -1,
+        }}
+      >
+        <TransferHistoryPrintTemplate 
+          ref={componentRef} 
+          data={printData || { 
+            title: '', agencyName: '', generatedBy: '', date: new Date(), transfers: [], stats: { totalCount: 0, totalAmount: 0 } 
+          }} 
+        />
       </div>
 
       {/* Confirmation Dialog */}

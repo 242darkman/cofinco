@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MapPin, Phone, TrendingUp, Calendar, Eye, Users, CheckCircle, Clock, FileText, DollarSign, UserPlus, Layers, Satellite, Filter } from 'lucide-react';
+import { Plus, Search, MapPin, Phone, TrendingUp, Calendar, Eye, Users, CheckCircle, Clock, FileText, DollarSign, UserPlus, Layers, Satellite, Filter, ArrowRightCircle, History } from 'lucide-react';
 import { agentTerrainApi, visiteTerrainApi } from '../../lib/api-client';
 import AgentTerrainForm from './AgentTerrainForm';
 import AgentTerrainProfile from './AgentTerrainProfile';
@@ -8,6 +8,8 @@ import AgentTerrainPaiement from './AgentTerrainPaiement';
 import ProspectionForm from './ProspectionForm';
 import AgentTerrainExtended from './AgentTerrainExtended';
 import AgentTerrainMap from './AgentTerrainMap';
+import SettlementModal from './SettlementModal';
+import AgentHistory from './AgentHistory';
 import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 
@@ -68,6 +70,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const [showAgentProfile, setShowAgentProfile] = useState(false);
   const [showPaiementForm, setShowPaiementForm] = useState(false);
   const [showProspectionForm, setShowProspectionForm] = useState(false);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
   
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
@@ -205,6 +208,9 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
           <Button onClick={() => setShowPaiementForm(true)} variant="success" icon={DollarSign} className="flex-1 sm:flex-none justify-center">
             Paiement
           </Button>
+          <Button onClick={() => setShowSettlementModal(true)} variant="outline" icon={ArrowRightCircle} className="flex-1 sm:flex-none justify-center text-cyan-500 border-cyan-500/30 hover:bg-cyan-500/10">
+            Remise
+          </Button>
           <Button onClick={() => setShowAgentForm(true)} variant="primary" icon={Plus} className="flex-1 sm:flex-none justify-center">
             Agent
           </Button>
@@ -223,6 +229,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
           { key: 'agents', label: 'Agents', icon: Users },
           { key: 'visites', label: 'Visites', icon: MapPin },
           { key: 'prospection', label: 'Prospection', icon: UserPlus },
+          { key: 'historique', label: 'Historique', icon: History },
           { key: 'performance', label: 'Perf.', icon: TrendingUp, disabled: true },
           { key: 'modules', label: 'Avancé', icon: Layers, disabled: true },
           { key: 'carte', label: 'GPS', icon: Satellite, disabled: true },
@@ -368,6 +375,10 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
           </div>
       )}
       
+      {activeTab === 'historique' && (
+          <AgentHistory agentId={selectedAgent?.id} />
+      )}
+      
       {activeTab === 'modules' && <AgentTerrainExtended agentId={selectedAgent?.id} />}
       
       {activeTab === 'carte' && (
@@ -382,6 +393,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       {showAgentProfile && selectedAgent && <AgentTerrainProfile agentId={selectedAgent.id} onClose={() => { setShowAgentProfile(false); setSelectedAgent(null); }} onEdit={() => { setEditingAgent(selectedAgent); setShowAgentProfile(false); setShowAgentForm(true); }} />}
       {showPaiementForm && <AgentTerrainPaiement agentId={selectedAgent?.id} onClose={() => { setShowPaiementForm(false); setSelectedAgent(null); }} onSuccess={() => { setShowPaiementForm(false); setSelectedAgent(null); loadData(); }} />}
       {showProspectionForm && <ProspectionForm agentId={selectedAgent?.id} onClose={() => { setShowProspectionForm(false); setSelectedAgent(null); }} onSuccess={() => { setShowProspectionForm(false); setSelectedAgent(null); loadData(); }} />}
+      {showSettlementModal && <SettlementModal isOpen={showSettlementModal} agentId={selectedAgent?.id || ''} onClose={() => setShowSettlementModal(false)} onSuccess={() => { loadData(); }} />}
     
       <UniversalPaymentSuccessModal 
         isOpen={showHistoryReceipt}

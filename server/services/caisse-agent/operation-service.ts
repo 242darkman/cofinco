@@ -456,7 +456,7 @@ export class OperationService {
     agentId?: string;
     clientId?: string;
     caisseAgentId?: string;
-    statut?: "SUBMITTED" | "APPROVED" | "REJECTED" | "CANCELLED";
+    statut?: "SUBMITTED" | "APPROVED" | "SETTLED" | "REJECTED" | "CANCELLED";
     type?: "COLLECT_CASH" | "SETTLEMENT_CASH";
     dateFrom?: Date;
     dateTo?: Date;
@@ -591,6 +591,18 @@ export class OperationService {
       .from(operationsTerrainAuditLogs)
       .where(eq(operationsTerrainAuditLogs.operationId, operationId))
       .orderBy(desc(operationsTerrainAuditLogs.timestamp));
+  }
+
+  /**
+   * Récupère le nombre d'opérations en attente de validation
+   */
+  async getPendingOperationsCount(): Promise<{ count: number }> {
+    const [result] = await db
+      .select({ val: count() })
+      .from(operationsTerrain)
+      .where(eq(operationsTerrain.statut, "SUBMITTED"));
+    
+    return { count: Number(result?.val || 0) };
   }
 }
 

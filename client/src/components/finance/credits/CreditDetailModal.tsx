@@ -477,15 +477,25 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
         </div>
       </div>
 
-      {/* Hidden Download-ready Printable Schedule */}
+      {/* Hidden Download-ready Printable Schedule (offscreen, not display:none) */}
       {credit && client && (
-        <div style={{ display: 'none' }}>
-           <CreditSchedulePDF 
-              ref={printRef}
-              credit={credit}
-              client={client}
-              schedule={stats.schedule}
-           />
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            width: '210mm',
+            background: 'white',
+            zIndex: -1,
+          }}
+        >
+          <CreditSchedulePDF 
+            ref={printRef}
+            credit={credit}
+            client={client}
+            schedule={stats.schedule}
+          />
         </div>
       )}
     </div>

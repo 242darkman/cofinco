@@ -26,6 +26,9 @@ import {
   type ApproveOperationInput,
   type RejectOperationInput,
   type OperationTerrainMetadata,
+  contributionsTontine,
+  remboursements,
+  transactionsCompte,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { generateReference, type MouvementFinancier } from "../ledger";
@@ -97,10 +100,11 @@ export class ApprovalService {
       }
 
       // 5. Mettre à jour l'opération
+      const finalStatut = operation.type === "SETTLEMENT_CASH" ? "SETTLED" : "APPROVED";
       const [updatedOperation] = await tx
         .update(operationsTerrain)
         .set({
-          statut: "APPROVED",
+          statut: finalStatut,
           approvedBy: params.approvedBy,
           approvedAt: new Date(),
           postedAt: new Date(),
@@ -116,9 +120,9 @@ export class ApprovalService {
       // 6. Log audit
       await tx.insert(operationsTerrainAuditLogs).values({
         operationId: operation.id,
-        action: "APPROVED",
+        action: finalStatut,
         statutAvant: "SUBMITTED",
-        statutApres: "APPROVED",
+        statutApres: finalStatut,
         details: {
           mouvementIds: mouvements.map((m) => m.id),
           paiementTerrainId,
@@ -153,7 +157,7 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Crédit",
+        sens: "Débit", // Débit = Augmente la créance envers l'agent
         statut: "Posté",
         methodePaiement: "Espèces",
         reference: refCaisseAgent,
@@ -257,6 +261,18 @@ export class ApprovalService {
       })
       .where(eq(credits.id, metadata.creditId!));
 
+    // NEW: Insérer dans la table métier remboursements
+    await tx.insert(remboursements).values({
+      creditId: metadata.creditId!,
+      mouvementId: mouvementCredit.id,
+      montant: operation.montant,
+      dateRemboursement: new Date(),
+      statut: "Posté",
+      methodePaiement: "Espèces",
+      observations: metadata.observations,
+      createdBy: approvedBy,
+    });
+
     // Créer le paiement terrain
     const refPaiement = `PAY-${generateReference("TERRAIN")}`;
     const [paiement] = await tx
@@ -340,6 +356,18 @@ export class ApprovalService {
       })
       .where(eq(comptes.id, metadata.compteId!));
 
+    // NEW: Insérer dans la table métier transactionsCompte
+    await tx.insert(transactionsCompte).values({
+      compteId: metadata.compteId!,
+      mouvementId: mouvementCompte.id,
+      typePaiement,
+      statut: "Posté",
+      montant: operation.montant,
+      methodePaiement: "Espèces",
+      observations: metadata.observations,
+      createdBy: approvedBy,
+    });
+
     // Créer le paiement terrain
     const refPaiement = `PAY-${generateReference("TERRAIN")}`;
     const [paiement] = await tx
@@ -395,6 +423,21 @@ export class ApprovalService {
         metadata: { fromCaisseAgent: true },
       })
       .returning();
+
+    // NEW: Insérer dans la table métier contributionsTontine
+    const refContribution = generateReference("CONTRIBUTION" as any);
+    await tx.insert(contributionsTontine).values({
+      tontineId: metadata.tontineId!,
+      clientId: operation.clientId,
+      mouvementId: mouvementTontine.id,
+      typeOperation: "Versement",
+      montant: operation.montant,
+      methodePaiement: "Espèces",
+      statutTransaction: "Posté",
+      reference: refContribution,
+      observations: metadata.observations,
+      createdBy: approvedBy,
+    });
 
     // Créer le paiement terrain
     const refPaiement = `PAY-${generateReference("TERRAIN")}`;
@@ -452,7 +495,7 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Débit",
+        sens: "Crédit", // Crédit = Réduit la créance de l'agent
         statut: "Posté",
         methodePaiement: "Espèces",
         reference: refCaisseAgent,
@@ -484,7 +527,7 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Crédit",
+        sens: "Débit", // Débit = Entrée en caisse physique
         statut: "Posté",
         methodePaiement: "Espèces",
         reference: refCaisse,
@@ -600,8 +643,10 @@ export class ApprovalService {
     mouvements: MouvementFinancier[]
   ): Promise<void> {
     // Événement principal d'approbation
+    const eventType = operation.statut === "SETTLED" ? "OPERATION_TERRAIN_SETTLED" : "OPERATION_TERRAIN_APPROVED";
+    
     await tx.insert(evenementsOutbox).values({
-      type: "OPERATION_TERRAIN_APPROVED" as any,
+      type: eventType as any,
       aggregateType: "operation_terrain",
       aggregateId: operation.id,
       payload: {
@@ -641,6 +686,36 @@ export class ApprovalService {
         },
       });
     }
+  }
+
+  /**
+   * Approuve plusieurs opérations en une seule transaction
+   */
+  async approveOperationsBulk(params: {
+    operationIds: string[];
+    approvedBy: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<{ success: boolean; results: { id: string; success: boolean; error?: string }[] }> {
+    const results: { id: string; success: boolean; error?: string }[] = [];
+
+    // On traite individuellement mais si on veut une transaction totale :
+    return await db.transaction(async (tx) => {
+      for (const id of params.operationIds) {
+        try {
+          const res = await this.approveOperation({
+            operationId: id,
+            approvedBy: params.approvedBy,
+            ipAddress: params.ipAddress,
+            userAgent: params.userAgent,
+          });
+          results.push({ id, success: res.success, error: res.error });
+        } catch (error: any) {
+          results.push({ id, success: false, error: error.message });
+        }
+      }
+      return { success: results.every(r => r.success), results };
+    });
   }
 }
 

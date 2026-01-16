@@ -39,7 +39,11 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
     );
 
     return (
-      <div className="hidden print:block" ref={ref}>
+      <div 
+        data-receipt-root
+        className="bg-white" 
+        ref={ref}
+      >
         {/* Print specific styles for A4 */}
         <style type="text/css" media="print">
           {`
