@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  DollarSign, 
-  MapPin, 
-  CheckCircle, 
-  AlertTriangle, 
-  CreditCard,
+import {
+  DollarSign,
+  CheckCircle,
+  AlertTriangle,
   Building2,
   Wallet,
   ArrowRight,
-  Info
+  Banknote,
+  Clock,
+  X,
 } from 'lucide-react';
-import { Modal, Button, FormField, SelectField, TextareaField } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { caisseAgentApi, caisseApi } from '@/lib/api-client';
 import { useLanguage } from '@/contexts/LanguageContext';
-import Badge from '@/components/ui/Badge';
 import { useToast } from '@/hooks/use-toast';
 
 interface SettlementModalProps {
@@ -31,8 +30,7 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
   const [caisses, setCaisses] = useState<any[]>([]);
   const [agentSummary, setAgentSummary] = useState<any>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [remitFullAmount, setRemitFullAmount] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     destinationCaisseId: '',
     montant: '',
@@ -112,146 +110,334 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
     }
   };
 
+  // Don't render if not open
+  if (!isOpen) return null;
+
+  const disponible = agentSummary ? parseFloat(agentSummary.disponible) : 0;
+  const valide = agentSummary ? parseFloat(agentSummary.valide) : 0;
+  const pendingOut = agentSummary ? parseFloat(agentSummary.pendingOut || 0) : 0;
+  const hasCaisses = caisses.length > 0;
+
+  const handleMaxClick = () => {
+    if (agentSummary && disponible > 0) {
+      setFormData(prev => ({ ...prev, montant: disponible.toString() }));
+      if (errors.montant) setErrors(prev => ({ ...prev, montant: '' }));
+    }
+  };
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Remise des Fonds (Apurement)"
-      size="md"
-      footer={
-        <div className="flex gap-2 w-full">
-          <Button variant="ghost" onClick={onClose} disabled={submitting} className="flex-1">
-            Annuler
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleSubmit} 
-            isLoading={submitting}
-            icon={CheckCircle}
-            className="flex-1"
-          >
-            Confirmer la Remise
-          </Button>
-        </div>
-      }
-    >
-      <div className="space-y-6">
-        {/* Résumé Solde Agent */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-4 border border-slate-700 shadow-lg">
-          <div className="flex justify-between items-start mb-4">
-             <div>
-                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Mon Solde Collecté</span>
-                <div className="text-2xl font-bold text-white mt-1">
-                   {agentSummary ? Number(agentSummary.valide).toLocaleString() : '...'} <span className="text-xs text-slate-400">FCFA</span>
-                </div>
-             </div>
-             <div className="bg-cyan-500/20 p-2 rounded-lg">
-                <Wallet className="text-cyan-400" size={20} />
-             </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 border-t border-slate-700/50 pt-4">
-             <div>
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Validé</span>
-                <div className="text-sm font-semibold text-cyan-400">
-                    {agentSummary ? Number(agentSummary.valide).toLocaleString() : '0'}
-                </div>
-             </div>
-             <div className="text-right">
-                <span className="text-[10px] text-slate-500 uppercase font-bold">Disponible</span>
-                <div className="text-sm font-semibold text-emerald-400">
-                    {agentSummary ? Number(agentSummary.disponible).toLocaleString() : '0'}
-                </div>
-             </div>
-          </div>
-          
-          {agentSummary && parseFloat(agentSummary.pendingOut) > 0 && (
-             <div className="mt-3 flex items-center gap-2 text-[10px] text-amber-400/80 bg-amber-400/10 p-2 rounded border border-amber-400/20">
-                <Info size={12} />
-                <span>{Number(agentSummary.pendingOut).toLocaleString()} FCFA en attente de remise.</span>
-             </div>
-          )}
-        </div>
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-           {/* Debug: Log received caisses */}
-           {/* {console.log('Available Caisses:', caisses)} */}
-
-           <SelectField
-            label="Caisse de Réception *"
-            name="destinationCaisseId"
-            value={formData.destinationCaisseId}
-            onChange={(e) => setFormData({ ...formData, destinationCaisseId: e.target.value })}
-            options={caisses.map((c: any) => ({ 
-                value: c.id, 
-                label: `${c.nom} (${c.caissierNom || 'Auto'})` 
-            }))}
-            error={errors.destinationCaisseId}
-            placeholder={caisses.length === 0 ? "Aucune caisse disponible" : "Sélectionner une caisse d'agence"}
-            icon={Building2}
-            disabled={caisses.length === 0}
-          />
-
-          <div className="space-y-2">
-             <div className="flex items-center gap-2">
-                <input
-                   type="checkbox"
-                   id="remitFull"
-                   checked={remitFullAmount}
-                   onChange={(e) => {
-                      const isChecked = e.target.checked;
-                      setRemitFullAmount(isChecked);
-                      if (isChecked && agentSummary) {
-                         setFormData(prev => ({ ...prev, montant: agentSummary.disponible.toString() }));
-                         if (errors.montant) setErrors(prev => ({ ...prev, montant: '' }));
-                      } else {
-                         setFormData(prev => ({ ...prev, montant: '' }));
-                      }
-                   }}
-                   className="w-4 h-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500/20"
-                />
-                <label htmlFor="remitFull" className="text-sm text-slate-600 dark:text-slate-400 cursor-pointer select-none">
-                   Remettre l'intégralité du montant disponible
-                </label>
-             </div>
-
-             {!remitFullAmount && (
-                <FormField
-                   label="Montant de la Remise *"
-                   name="montant"
-                   type="number"
-                   value={formData.montant}
-                   onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
-                   error={errors.montant}
-                   icon={DollarSign}
-                   placeholder="Montant à remettre..."
-                   min="0"
-                />
-             )}
-          </div>
-
-          <TextareaField
-            label="Observations"
-            name="observations"
-            value={formData.observations}
-            onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-            placeholder="Précisions si nécessaire..."
-            rows={3}
-          />
-
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-3">
-             <div className="w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-500">
-                <ArrowRight size={20} />
-             </div>
-             <div className="flex-1">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Procédure de remise</p>
-                <p className="text-[10px] text-slate-500">
-                   Le caissier devra valider la réception physique de ces fonds pour apurer votre compte.
+      {/* Modal Container */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div
+          className="
+            pointer-events-auto
+            w-full max-w-2xl
+            bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-2xl
+            shadow-2xl shadow-black/20 dark:shadow-black/50
+            flex flex-col
+            max-h-[90vh]
+            animate-in fade-in zoom-in-95 duration-200
+          "
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* ═══════════════════════════════════════════════════════════════════
+              HEADER
+          ═══════════════════════════════════════════════════════════════════ */}
+          <div className="flex-shrink-0 p-5 sm:p-6 border-b border-slate-200 dark:border-slate-700/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30">
+                <Banknote size={24} className="text-cyan-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                  Remise des Fonds
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Apurement de votre solde collecté
                 </p>
-             </div>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white transition-all"
+            >
+              <X size={20} />
+            </button>
           </div>
-        </form>
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              SCROLLABLE CONTENT (unique overflow container)
+          ═══════════════════════════════════════════════════════════════════ */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+
+            {/* ─────────────────────────────────────────────────────────────────
+                HERO SECTION - Solde à Remettre
+            ───────────────────────────────────────────────────────────────── */}
+            <section className="bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-800/50 rounded-2xl p-5 border border-slate-200 dark:border-slate-700/50 shadow-sm">
+              {/* Header Row */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Wallet size={18} className="text-slate-500 dark:text-slate-400" />
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Mon Solde Collecté
+                  </span>
+                </div>
+                {loading && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="w-3 h-3 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+                    Chargement...
+                  </div>
+                )}
+              </div>
+
+              {/* Main Amount Display */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                {/* Solde Validé (Théorique) */}
+                <div className="bg-white dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-cyan-500" />
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">
+                      Solde Validé
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">
+                    {valide.toLocaleString('fr-FR')}
+                    <span className="text-sm font-normal text-slate-400 ml-1">FCFA</span>
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">Montant théorique encaissé</p>
+                </div>
+
+                {/* Disponible (Hero - Physique) */}
+                <div className="bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 dark:from-emerald-500/20 dark:to-cyan-500/20 rounded-xl p-4 border-2 border-emerald-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase">
+                      Disponible à Remettre
+                    </span>
+                  </div>
+                  <p className="text-3xl sm:text-4xl font-bold text-emerald-600 dark:text-emerald-400">
+                    {disponible.toLocaleString('fr-FR')}
+                    <span className="text-base font-normal text-emerald-500/70 ml-1">FCFA</span>
+                  </p>
+                  <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">Espèces physiques encaissables</p>
+                </div>
+              </div>
+
+              {/* Pending Alert */}
+              {pendingOut > 0 && (
+                <div className="mt-4 flex items-center gap-3 text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 p-3 rounded-xl border border-amber-200 dark:border-amber-500/30">
+                  <Clock size={18} className="flex-shrink-0" />
+                  <span>
+                    <strong>{pendingOut.toLocaleString('fr-FR')} FCFA</strong> en attente de validation (remise en cours).
+                  </span>
+                </div>
+              )}
+            </section>
+
+            {/* ─────────────────────────────────────────────────────────────────
+                FORMULAIRE
+            ───────────────────────────────────────────────────────────────── */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+
+              {/* Caisse Selector */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Caisse de Réception <span className="text-red-500">*</span>
+                </label>
+
+                {hasCaisses ? (
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Building2 size={20} />
+                    </div>
+                    <select
+                      value={formData.destinationCaisseId}
+                      onChange={(e) => {
+                        setFormData({ ...formData, destinationCaisseId: e.target.value });
+                        if (errors.destinationCaisseId) setErrors(prev => ({ ...prev, destinationCaisseId: '' }));
+                      }}
+                      className={`
+                        w-full h-14 pl-12 pr-4 rounded-xl text-base font-medium
+                        bg-white dark:bg-slate-800
+                        border-2 ${errors.destinationCaisseId ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'}
+                        text-slate-900 dark:text-white
+                        focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10
+                        transition-all cursor-pointer
+                        appearance-none
+                      `}
+                    >
+                      <option value="">Sélectionner une caisse d'agence</option>
+                      {caisses.map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nom} ({c.caissierNom || 'Auto'})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+                        <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  /* No Caisse Alert */
+                  <div className="bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-500/30 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-500/20">
+                        <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-amber-700 dark:text-amber-300">
+                          Aucune caisse disponible
+                        </p>
+                        <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1">
+                          Aucune caisse n'est actuellement ouverte dans votre agence.
+                          Veuillez demander l'ouverture d'une caisse à votre responsable.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {errors.destinationCaisseId && hasCaisses && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertTriangle size={14} /> {errors.destinationCaisseId}
+                  </p>
+                )}
+              </div>
+
+              {/* Montant Field with MAX Button */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Montant de la Remise <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    <DollarSign size={22} />
+                  </div>
+                  <input
+                    type="number"
+                    value={formData.montant}
+                    onChange={(e) => {
+                      setFormData({ ...formData, montant: e.target.value });
+                      if (errors.montant) setErrors(prev => ({ ...prev, montant: '' }));
+                    }}
+                    placeholder="0"
+                    min="0"
+                    max={disponible}
+                    className={`
+                      w-full h-14 pl-12 pr-24 rounded-xl text-lg font-semibold
+                      bg-white dark:bg-slate-800
+                      border-2 ${errors.montant ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'}
+                      text-slate-900 dark:text-white
+                      placeholder-slate-400
+                      focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10
+                      transition-all
+                      [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+                    `}
+                  />
+                  {/* MAX Button inside input */}
+                  <button
+                    type="button"
+                    onClick={handleMaxClick}
+                    disabled={disponible <= 0}
+                    className={`
+                      absolute right-2 top-1/2 -translate-y-1/2
+                      px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wide
+                      transition-all
+                      ${disponible > 0
+                        ? 'bg-cyan-500 hover:bg-cyan-400 text-white shadow-lg shadow-cyan-500/30'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    Max
+                  </button>
+                </div>
+                {errors.montant && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertTriangle size={14} /> {errors.montant}
+                  </p>
+                )}
+                {formData.montant && !errors.montant && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Vous remettez <span className="font-semibold text-emerald-500">{parseFloat(formData.montant).toLocaleString('fr-FR')} FCFA</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Observations */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Observations
+                </label>
+                <textarea
+                  value={formData.observations}
+                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                  placeholder="Précisions si nécessaire..."
+                  rows={2}
+                  className="
+                    w-full px-4 py-3 rounded-xl text-sm
+                    bg-white dark:bg-slate-800
+                    border-2 border-slate-200 dark:border-slate-700
+                    text-slate-900 dark:text-white
+                    placeholder-slate-400
+                    focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10
+                    transition-all resize-none
+                  "
+                />
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 flex items-center justify-center text-cyan-500 flex-shrink-0">
+                  <ArrowRight size={22} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Procédure de remise
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Le caissier devra valider la réception physique de ces fonds pour apurer votre compte.
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════════════════
+              STICKY FOOTER - Action Buttons
+          ═══════════════════════════════════════════════════════════════════ */}
+          <div className="flex-shrink-0 p-5 sm:p-6 border-t border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-900/95">
+            <div className="flex flex-col-reverse sm:flex-row gap-3">
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                disabled={submitting}
+                className="flex-1 h-12"
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSubmit}
+                isLoading={submitting}
+                disabled={!hasCaisses || disponible <= 0 || submitting}
+                icon={CheckCircle}
+                className="flex-1 h-12 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 shadow-lg shadow-cyan-500/20"
+              >
+                Confirmer la Remise
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
-    </Modal>
+    </>
   );
 }
