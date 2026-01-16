@@ -5,7 +5,7 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import UserFormModal from './users/UserFormModal';
 import UserPinModal from './users/UserPinModal';
 import { ProtectedFeature, usePermissions } from '../auth/ProtectedFeature';
-import { getRoleBadgeStyle } from '../../lib/role-utils';
+import { getRoleBadgeStyle, getStatusBadgeStyle } from '../../lib/role-utils';
 import { userApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -17,7 +17,7 @@ interface User {
   email: string;
   phone: string;
   role: string;
-  status: string;
+  statut: string;
   photo_profile?: string;
   created_at: string;
 }
@@ -94,9 +94,9 @@ export default function AdminGestionUtilisateurs() {
   }, [openConfirm, loadUsers]);
 
   const toggleStatus = useCallback(async (user: User) => {
-    const newStatus = user.status === 'Actif' ? 'Inactif' : 'Actif';
+    const newStatus = user.statut === 'Actif' ? 'Inactif' : 'Actif';
     try {
-      await userApi.update(user.id, { status: newStatus });
+      await userApi.update(user.id, { statut: newStatus });
       toast.success(`Utilisateur ${newStatus === 'Actif' ? 'activé' : 'désactivé'}`);
       loadUsers();
     } catch (error) {
@@ -205,18 +205,18 @@ export default function AdminGestionUtilisateurs() {
                     }
                   },
                   {
-                    key: 'status',
+                    key: 'statut',
                     label: 'Statut',
-                    format: (status: string) => (
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border ${
-                        status === 'Actif' 
-                          ? 'bg-success/10 text-success border-success/20' 
-                          : 'bg-content-muted/10 text-content-muted border-edge'
-                      }`}>
-                        {status === 'Actif' ? <CheckCircle size={10} /> : <XCircle size={10} />}
-                        {status}
-                      </span>
-                    )
+                    format: (status: string) => {
+                      const style = getStatusBadgeStyle(status);
+                      const isActif = (status || '').toLowerCase().includes('actif');
+                      return (
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium border min-w-[80px] justify-center transition-colors ${style.classes}`}>
+                          {isActif ? <CheckCircle size={10} /> : <XCircle size={10} />}
+                          {style.label}
+                        </span>
+                      );
+                    }
                   }
                 ]}
                 actions={(user: User) => (

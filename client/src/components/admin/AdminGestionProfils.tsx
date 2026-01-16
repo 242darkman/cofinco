@@ -10,7 +10,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 // Import hooks and component for permissions
-import { getRoleBadgeStyle } from '../../lib/role-utils';
+import { getRoleBadgeStyle, getStatusBadgeStyle } from '../../lib/role-utils';
 import { usePermissions as useAdminPermissions } from '../../hooks/admin/usePermissions';
 import { useUserPermissions } from '../../hooks/admin/useUserPermissions';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
@@ -539,14 +539,12 @@ export default function AdminGestionProfils() {
                     label: 'Statut',
                     format: (_, emp) => {
                       const status = emp.user ? emp.user.statut : emp.statut;
+                      const style = getStatusBadgeStyle(status);
+                      const isActif = (status || '').toLowerCase().includes('actif');
                       return (
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
-                          status === 'Actif'
-                            ? 'bg-success/10 text-success border-success/20'
-                            : 'bg-content-muted/10 text-content-muted border-edge'
-                        }`}>
-                          {status === 'Actif' ? <CheckCircle size={10} /> : <XCircle size={10} />}
-                          {status}
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium border min-w-[80px] justify-center transition-colors ${style.classes}`}>
+                          {isActif ? <CheckCircle size={10} /> : <XCircle size={10} />}
+                          {style.label}
                         </span>
                       );
                     }
