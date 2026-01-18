@@ -36,7 +36,16 @@ export function useCaisseWebSocket({
 }: UseCaisseWebSocketOptions) {
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
-      const data = JSON.parse(event.data);
+      const message = JSON.parse(event.data);
+      let data = message;
+
+      // Unpack REALTIME_EVENT if wrapped by outbox-worker
+      if (message.type === 'REALTIME_EVENT' && message.payload) {
+        data = {
+          type: message.payload.eventType,
+          payload: message.payload.data
+        };
+      }
       
       switch (data.type) {
         case 'CAISSE_STATUS_CHANGED':
@@ -77,7 +86,7 @@ export function useCaisseWebSocket({
 
     // Connect to WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
     ws.addEventListener('open', () => {
       console.log('WebSocket connected for caisse updates');
