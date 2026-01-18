@@ -1,4 +1,3 @@
-
 import { db } from './db';
 import { seedRBAC } from './seed-rbac-logic';
 import {
@@ -36,6 +35,13 @@ import {
   reconciliationsLiaison,
   tachesRegularisation,
   configTransfertInterCoffres,
+  userAgences,
+  // New financial tables
+  maintenanceModules,
+  produitsCompte,
+  versementsAutomatiques,
+  virementsProgrammes,
+  decaissementsProgrammes,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 import { SystemRole } from '@shared/types/roles';
@@ -193,9 +199,7 @@ async function seedProd() {
     await db.delete(journaux);
     await db.delete(exercices);
     await db.delete(creditPlans);
-    
-    await db.delete(creditPlans);
-    await db.delete(creditPlans);
+    await db.delete(maintenanceModules); // Module lock status
     
     // Deletion for reevaluation dependencies
     await db.delete(scoringHistory);
@@ -203,6 +207,11 @@ async function seedProd() {
     await db.delete(transfertsCoffreAuditLogs);
     await db.delete(transfertsCoffreCaisse);
     await db.delete(configCoffreFort);
+
+    // New financial automation tables
+    await db.delete(versementsAutomatiques);
+    await db.delete(virementsProgrammes);
+    await db.delete(decaissementsProgrammes);
 
     // Inter-vault transfer dependencies (delete in correct order)
     await db.delete(tachesRegularisation);
@@ -213,6 +222,9 @@ async function seedProd() {
     await db.delete(comptesLiaison);
     await db.delete(configTransfertInterCoffres);
     await db.delete(coffresForts);
+    
+    // Products catalog (after tables that reference it are cleaned)
+    await db.delete(produitsCompte);
     
     // NOTE: We do NOT delete users, agences, or zones if they have data linked
     // But for a fresh install we might want to ensure they exist.
@@ -362,8 +374,68 @@ async function seedProd() {
     // 3. SEED RBAC MODULES & PERMISSIONS
     await seedRBAC();
 
+    // 4. BANKING PRODUCTS CATALOG (Required before creating accounts)
+    console.log('\n🏦 Seeding Banking Products Catalog...');
+    const [produitCourant] = await db.insert(produitsCompte).values({
+      code: 'COURANT_STD',
+      nom: 'Compte Courant Standard',
+      typeCompte: 'Courant',
+      tauxInteret: '0',
+      frais: { ouverture: 5000, tenue: 1500 },
+      actif: true,
+    }).returning();
 
-    // 4. SEED BUSINESS CONFIG
+    const [produitEpargne] = await db.insert(produitsCompte).values({
+      code: 'EPARGNE_STD',
+      nom: 'Compte Épargne Classique',
+      typeCompte: 'Épargne',
+      tauxInteret: '3.5',
+      frais: { ouverture: 2500 },
+      actif: true,
+    }).returning();
+
+    const [produitTontine] = await db.insert(produitsCompte).values({
+      code: 'TONTINE_STD',
+      nom: 'Compte Tontine',
+      typeCompte: 'Bloqué',
+      tauxInteret: '0',
+      actif: true,
+    }).returning();
+    console.log(`   ✅ Products created: ${produitCourant.code}, ${produitEpargne.code}, ${produitTontine.code}`);
+
+    // 5. MAINTENANCE MODULES (Module lock status)
+    console.log('\n🔧 Seeding Maintenance Modules...');
+    await db.insert(maintenanceModules).values([
+      { moduleName: 'Dashboard', isLocked: false },
+      { moduleName: 'Caisse', isLocked: false },
+      { moduleName: 'Crédits', isLocked: false },
+      { moduleName: 'Remboursements', isLocked: false },
+      { moduleName: 'Clients', isLocked: false },
+      { moduleName: 'Comptes', isLocked: false },
+      { moduleName: 'Tontines', isLocked: false },
+      { moduleName: 'Comptabilité', isLocked: false },
+      { moduleName: 'Agent Terrain', isLocked: false },
+      { moduleName: 'CaisseAgent', isLocked: false },
+      { moduleName: 'Transferts', isLocked: false },
+      { moduleName: 'Virements Programmes', isLocked: false },
+      { moduleName: 'Rapports', isLocked: false },
+      { moduleName: 'RH', isLocked: false },
+      { moduleName: 'Communications', isLocked: false },
+      { moduleName: 'Bourse', isLocked: false },
+      { moduleName: 'Loge', isLocked: false },
+      { moduleName: 'Paramètres', isLocked: false },
+      { moduleName: 'Administration', isLocked: false },
+      { moduleName: 'Audit', isLocked: false },
+      { moduleName: 'Messages', isLocked: false },
+      { moduleName: 'Coffre-Fort', isLocked: false },
+      { moduleName: 'Incidents', isLocked: false },
+      { moduleName: 'Visites', isLocked: false },
+      { moduleName: 'Prospection', isLocked: false },
+      { moduleName: 'Paiements Agent', isLocked: false },
+      { moduleName: 'PLATFORM', isLocked: false },
+    ]);
+
+    // 6. SEED BUSINESS CONFIG
     console.log('\n🏷️ Seeding Business Config (Tags, Marchés)...');
     await db.insert(typesMarches).values(TYPES_MARCHES_DATA);
     await db.insert(tags).values(TAGS_DATA);
@@ -535,22 +607,29 @@ async function seedProd() {
     });
     
     // 6. CREATE ADMIN USER
-    console.log('\n👤 Creating Super Admin...');
-    const hashedPassword = await hashPassword('Admin123!@#');
+    console.log('\n👤 Creating Standard Admin...');
+    const hashedPassword = await hashPassword('password123');
     
-    await db.insert(users).values({
-      username: 'admin',
+    const [adminUser] = await db.insert(users).values({
+      username: 's.administrateur',
       password: hashedPassword,
       nom: 'Administrateur',
-      prenom: 'Système',
+      prenom: 'Super',
       email: 'admin@cofin.com',
       role: SystemRole.ADMIN,
-      agence: 'Siège', // Linked to inserted Agence by name or ID? Schema says string?
-      // Check auth.ts or schema used. In seed-demo it used 'Siège'.
-      // If schema is text, it works. If link, might fail. 
-      // Assuming schema definition for `users.agence` is text based on demo.
       statut: 'Actif',
-    });
+    }).returning();
+
+    if (siegeAgenceId) {
+      await db.insert(userAgences).values({
+        userId: adminUser.id,
+        agenceId: siegeAgenceId,
+        isPrimary: true,
+        role: SystemRole.ADMIN,
+        actif: true,
+        dateAffectation: new Date().toISOString().split('T')[0],
+      });
+    }
 
 
     // SEED DUREES SUGGEREES (Credit)
@@ -660,7 +739,7 @@ async function seedProd() {
 
     console.log('\n✅ PRODUCTION SEED COMPLETE');
     console.log('═══════════════════════════════════════════════════════════════');
-    console.log('👤 Login: s.administrateur / Admin123!@#');
+    console.log('👤 Login: s.administrateur / password123');
     console.log('');
     console.log('🔐 Coffres-Forts:');
     console.log('   CF-SIEGE : Coffre-Fort Siège (solde initial: 0 XAF)');

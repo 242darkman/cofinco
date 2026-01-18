@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Client } from '@shared/schema';
 import { Users, TrendingUp, TrendingDown, Award, DollarSign, Activity, Calendar, Target, PieChart, BarChart3 } from 'lucide-react';
+import { clientApi } from '../../lib/api-client';
 
 export default function ClientStatsDashboard() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -13,9 +14,7 @@ export default function ClientStatsDashboard() {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/clients', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch clients');
-      const data = await res.json();
+      const data = await clientApi.getAllList();
       setClients(data || []);
     } catch (error) {
       console.error('Erreur chargement clients:', error);

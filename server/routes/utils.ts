@@ -99,3 +99,74 @@ export const coerceValueToSchema = (schema: z.ZodTypeAny, value: unknown): unkno
 
   return value;
 };
+
+export const parsePagination = (query: Record<string, unknown>, defaults?: { page?: number; perPage?: number }) => {
+  const rawPage = Array.isArray(query.page) ? query.page[0] : query.page;
+  const rawPerPage = Array.isArray(query.per_page) ? query.per_page[0] : query.per_page;
+
+  const page = Math.max(1, Number(rawPage ?? defaults?.page ?? 1) || 1);
+  const perPage = Math.max(1, Number(rawPerPage ?? defaults?.perPage ?? 25) || 25);
+
+  return {
+    page,
+    perPage,
+    offset: (page - 1) * perPage,
+  };
+};
+
+const buildPaginationLink = (
+  path: string,
+  query: Record<string, unknown> | undefined,
+  page: number,
+  perPage: number
+) => {
+  const params = new URLSearchParams();
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (value === undefined || value === null) continue;
+      if (key === "page" || key === "per_page") continue;
+      if (Array.isArray(value)) {
+        value.forEach((entry) => params.append(key, String(entry)));
+      } else {
+        params.set(key, String(value));
+      }
+    }
+  }
+  params.set("page", String(page));
+  params.set("per_page", String(perPage));
+  return `${path}?${params.toString()}`;
+};
+
+export const paginateResponse = <T>(
+  data: T[],
+  totalItems: number,
+  page: number,
+  perPage: number,
+  options: { path: string; query?: Record<string, unknown>; filters?: Record<string, unknown> } = { path: "" }
+) => {
+  const totalPages = Math.max(1, Math.ceil(totalItems / perPage));
+  const safePage = Math.min(page, totalPages);
+
+  const self = buildPaginationLink(options.path, options.query, safePage, perPage);
+  const next = safePage < totalPages ? buildPaginationLink(options.path, options.query, safePage + 1, perPage) : null;
+  const prev = safePage > 1 ? buildPaginationLink(options.path, options.query, safePage - 1, perPage) : null;
+
+  return {
+    success: true,
+    data,
+    meta: {
+      pagination: {
+        page: safePage,
+        per_page: perPage,
+        total_items: totalItems,
+        total_pages: totalPages,
+      },
+      filters: options.filters || {},
+    },
+    links: {
+      self,
+      next,
+      prev,
+    },
+  };
+};

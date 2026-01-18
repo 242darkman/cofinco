@@ -10,6 +10,7 @@ import { Send, Wallet, Building2, FileText, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal, Button, FormField, SelectField } from '../../ui';
 import { caisseAgentApi, sessionCaisseApi } from '../../../lib/api-client';
+import { computeSessionStatus } from '../../../lib/format';
 
 interface SettlementCashModalProps {
   agentId: string;
@@ -46,7 +47,10 @@ export default function SettlementCashModal({
       try {
         // Récupérer les sessions de caisse ouvertes
         const sessions = await sessionCaisseApi.getAll();
-        const activeSessions = sessions?.filter((s: any) => s.statut === 'Ouverte') || [];
+        const activeSessions = sessions?.filter((s: any) => {
+          const status = s.computedStatus || computeSessionStatus(s);
+          return status === 'OPEN';
+        }) || [];
         setCaisses(activeSessions);
 
         // Sélectionner la première par défaut

@@ -41,7 +41,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
     return (
       <div 
         data-receipt-root
-        className="bg-white" 
+        className="invoice-a4 bg-white" 
         ref={ref}
       >
         {/* Print specific styles for A4 */}

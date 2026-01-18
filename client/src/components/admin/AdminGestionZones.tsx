@@ -3,6 +3,7 @@ import { MapPin, Save, X, Circle, Edit2, AlertCircle, CheckCircle, Users, Chevro
 import { Card, Button, SearchInput, Badge, FormField, LoadingSpinner, IconButton } from '../ui';
 import AdminGestionZonesMap from '../maps/AdminGestionZonesMap';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { agentTerrainApi } from '../../lib/api-client';
 
 interface Agent {
   id: string;
@@ -60,13 +61,8 @@ export default function AdminGestionZones() {
 
   const loadAgents = async () => {
     try {
-      const response = await fetch('/api/agents-terrain', {
-        credentials: 'include'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setAgents(data);
-      }
+      const data = await agentTerrainApi.getAllList();
+      setAgents(data || []);
     } catch (error) {
       console.error('Erreur chargement agents:', error);
     } finally {

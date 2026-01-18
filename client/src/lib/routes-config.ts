@@ -23,6 +23,7 @@ const MessagesModule = lazy(() => import('@/components/shared/MessagesModule'));
 const UserProfile = lazy(() => import('@/components/shared/UserProfile'));
 const ExcelModule = lazy(() => import('@/components/shared/ExcelModule'));
 const CreditRefundsPage = lazy(() => import('@/pages/finance/CreditRefundsPage'));
+const AdminVirementsProgrammes = lazy(() => import('@/components/admin/AdminVirementsProgrammes'));
 
 
 export interface RouteConfig {
@@ -79,7 +80,7 @@ export const ROUTES: RouteConfig[] = [
     path: '/remboursements',
     component: CreditRefundsPage,
     requiredModule: 'Remboursements',
-    label: 'Remboursements',
+    label: 'Restitutions Frais',
     labelKey: 'menuRemboursements',
     group: 'Services Clients',
   },
@@ -146,6 +147,15 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Coffre-Fort',
     label: 'Coffre-Fort',
     labelKey: 'menuCoffre',
+    group: 'Opérations',
+  },
+  {
+    key: 'virements_programmes',
+    path: '/virements',
+    component: AdminVirementsProgrammes,
+    requiredModule: 'Virements Programmes',
+    label: 'Virements Programmés',
+    labelKey: 'menuVirementsProgrammes',
     group: 'Opérations',
   },
 

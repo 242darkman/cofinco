@@ -36,7 +36,7 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
 
   const loadClients = useCallback(async () => {
     try {
-      const data = await clientApi.getAll();
+      const data = await clientApi.getAllList();
       // Filter for active clients only
       const activeClients = (data || []).filter((c: any) => c.statut === 'Actif');
       setClients(activeClients);

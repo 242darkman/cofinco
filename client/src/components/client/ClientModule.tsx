@@ -60,6 +60,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   useEffect(() => {
     loadClients();
@@ -67,27 +69,47 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   // Reload when filters change
   useEffect(() => {
-    if (Object.keys(searchFilters).length > 0) {
-      loadClients();
-    }
-  }, [searchFilters]);
-
-  // Reset pagination when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchFilters]);
+    loadClients();
+  }, [searchFilters, currentPage]);
 
   const loadClients = async () => {
     setLoading(true);
     try {
-      const data = await clientService.getAll(searchFilters);
-      setClients(data);
+      const result = await clientService.getAll(searchFilters, { page: currentPage, perPage: itemsPerPage });
+      setClients(result.data);
+      setTotalItems(result.meta.pagination.total_items);
+      setTotalPages(result.meta.pagination.total_pages);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast.error('Erreur lors du chargement des clients');
     } finally {
       setLoading(false);
     }
+  };
+
+  const getPhotoUrl = (client: any) => {
+    const raw = client.photoProfile || client.photoUrl || '';
+    if (!raw) return '';
+    if (raw.startsWith('data:')) return raw;
+    if (raw.startsWith('/api/')) return raw;
+    if (raw.startsWith('/')) return raw;
+    if (raw.startsWith('http')) {
+      try {
+        const url = new URL(raw);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        // Special handling for MinIO URLs if needed, or generic
+        if (pathParts.length >= 2) {
+             // Assuming structure might be /bucket/key or similar
+             // But following the pattern from AdminGestionUtilisateurs which seemed to work for user
+             const key = pathParts.slice(1).join('/');
+             return `/api/uploads/files/${key}`;
+        }
+        return raw;
+      } catch {
+         return raw;
+      }
+    }
+    return `/api/uploads/files/${raw}`;
   };
 
   const handleSaveClient = async (clientData: any) => {
@@ -156,14 +178,10 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   const handleFilterChange = (filters: any) => {
     setSearchFilters(filters);
+    setCurrentPage(1);
   };
 
-  // Pagination logic
-  const totalPages = Math.ceil(clients.length / itemsPerPage);
-  const paginatedClients = clients.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedClients = clients;
 
   // Profile view with tabs (when a client is selected)
   if (viewingClient) {
@@ -181,10 +199,10 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
         {/* Client Header */}
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            {viewingClient.photoProfile || viewingClient.photoUrl ? (
+            {getPhotoUrl(viewingClient) ? (
               <div className="relative">
                 <img 
-                  src={viewingClient.photoProfile || viewingClient.photoUrl} 
+                  src={getPhotoUrl(viewingClient)} 
                   alt={viewingClient.nom || ''} 
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-slate-700 shadow-lg"
                 />
@@ -432,9 +450,9 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       primary: true,
                       format: (_, item) => (
                         <div className="flex items-center gap-3">
-                          {item.photoProfile || item.photoUrl ? (
+                          {getPhotoUrl(item) ? (
                             <img 
-                              src={item.photoProfile || item.photoUrl} 
+                              src={getPhotoUrl(item)} 
                               alt="" 
                               className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
                             />
@@ -522,7 +540,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       onPageChange={setCurrentPage}
                       canGoNext={currentPage < totalPages}
                       canGoPrevious={currentPage > 1}
-                      totalItems={clients.length}
+                      totalItems={totalItems}
                       itemsPerPage={itemsPerPage}
                     />
                   </div>

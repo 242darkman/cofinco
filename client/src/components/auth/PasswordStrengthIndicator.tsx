@@ -3,17 +3,36 @@ import { Check, X, AlertCircle } from 'lucide-react';
 
 interface PasswordStrengthIndicatorProps {
   password: string;
+  requirements?: {
+    min_length?: number;
+    require_uppercase?: boolean;
+    require_lowercase?: boolean;
+    require_numbers?: boolean;
+    require_special_chars?: boolean;
+  };
   onChange?: (validation: any) => void;
 }
 
-function validatePasswordLocally(password: string) {
-  const requirements = {
-    min_length: 8,
-    require_uppercase: true,
-    require_lowercase: true,
-    require_numbers: true,
-    require_special_chars: true
+const DEFAULT_REQUIREMENTS = {
+  min_length: 8,
+  require_uppercase: true,
+  require_lowercase: true,
+  require_numbers: true,
+  require_special_chars: true
+};
+
+function normalizeRequirements(overrides?: PasswordStrengthIndicatorProps['requirements']) {
+  return {
+    min_length: overrides?.min_length ?? DEFAULT_REQUIREMENTS.min_length,
+    require_uppercase: overrides?.require_uppercase ?? DEFAULT_REQUIREMENTS.require_uppercase,
+    require_lowercase: overrides?.require_lowercase ?? DEFAULT_REQUIREMENTS.require_lowercase,
+    require_numbers: overrides?.require_numbers ?? DEFAULT_REQUIREMENTS.require_numbers,
+    require_special_chars: overrides?.require_special_chars ?? DEFAULT_REQUIREMENTS.require_special_chars
   };
+}
+
+function validatePasswordLocally(password: string, overrides?: PasswordStrengthIndicatorProps['requirements']) {
+  const requirements = normalizeRequirements(overrides);
 
   const errors: string[] = [];
   let score = 0;
@@ -46,7 +65,7 @@ function validatePasswordLocally(password: string) {
   };
 }
 
-export default function PasswordStrengthIndicator({ password, onChange }: PasswordStrengthIndicatorProps) {
+export default function PasswordStrengthIndicator({ password, requirements, onChange }: PasswordStrengthIndicatorProps) {
   const [validation, setValidation] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -60,7 +79,7 @@ export default function PasswordStrengthIndicator({ password, onChange }: Passwo
     const validatePassword = () => {
       setLoading(true);
       try {
-        const data = validatePasswordLocally(password);
+        const data = validatePasswordLocally(password, requirements);
         setValidation(data);
         onChange?.(data);
       } catch (error) {
@@ -72,7 +91,7 @@ export default function PasswordStrengthIndicator({ password, onChange }: Passwo
 
     const timeoutId = setTimeout(validatePassword, 300);
     return () => clearTimeout(timeoutId);
-  }, [password]);
+  }, [password, requirements, onChange]);
 
   if (!password || !validation) return null;
 
@@ -204,7 +223,7 @@ export default function PasswordStrengthIndicator({ password, onChange }: Passwo
       )}
 
       {/* Message succès */}
-      {validation.isValid && validation.strength === 'strong' && (
+      {validation.valid && validation.strength === 'strong' && (
         <div className="bg-green-500/20 border border-green-500 rounded-lg p-3 flex items-center gap-2 text-green-400">
           <Check size={16} />
           <span className="text-sm">Excellent mot de passe ! 🎉</span>

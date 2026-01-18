@@ -1,4 +1,5 @@
 import { clientApi, clientSearchApi } from '../lib/api-client';
+import type { PaginationMeta } from '../lib/api-client';
 
 export interface Client {
   id: string;
@@ -32,41 +33,100 @@ export interface Client {
   type_marche_nom?: string | null;
 }
 
+export interface ClientListResult {
+  data: Client[];
+  meta: PaginationMeta;
+}
+
 export class ClientService {
-  async getAll(filters?: {
-    search?: string;
-    searchTerm?: string;
-    status?: string;
-    segment?: string;
-  }): Promise<Client[]> {
+  async getAll(
+    filters?: {
+      search?: string;
+      searchTerm?: string;
+      status?: string;
+      segment?: string;
+    },
+    pagination?: { page?: number; perPage?: number }
+  ): Promise<ClientListResult> {
     try {
-      let clients;
+      const page = pagination?.page ?? 1;
+      const perPage = pagination?.perPage ?? 20;
+
+      let clients: Client[] = [];
+      let meta: PaginationMeta = {
+        pagination: { page, per_page: perPage, total_items: 0, total_pages: 1 },
+        filters: {}
+      };
+
       const searchQuery = filters?.search || filters?.searchTerm;
-      
+
+      const hasClientFilters =
+        (filters?.status && filters.status !== 'all') ||
+        (filters?.segment && filters.segment !== 'all');
+
       if (searchQuery) {
         // Use backend search for robust full-text search (name, phone, email, full name)
-        clients = await clientSearchApi.search(searchQuery);
+        const response = await clientSearchApi.search(searchQuery, { page, perPage });
+        clients = response.data || [];
+        meta = response.meta;
+      } else if (hasClientFilters) {
+        clients = await clientApi.getAllList();
+        meta = {
+          pagination: {
+            page,
+            per_page: perPage,
+            total_items: clients.length,
+            total_pages: Math.max(1, Math.ceil(clients.length / perPage))
+          },
+          filters: {}
+        };
       } else {
-        clients = await clientApi.getAll();
+        const response = await clientApi.getAll({ page, perPage });
+        clients = response.data || [];
+        meta = response.meta;
       }
       
       let filteredClients = clients;
-      
+
       // Removed client-side search filtering as it is now handled by the backend
       // kept other filters (status, segment) as client-side filtering for now
-      
+
       if (filters?.status && filters.status !== 'all') {
         filteredClients = filteredClients.filter(client => client.status === filters.status);
       }
-      
+
       if (filters?.segment && filters.segment !== 'all') {
         filteredClients = filteredClients.filter(client => client.segment === filters.segment);
       }
-      
-      return filteredClients;
+
+      if ((filters?.status && filters.status !== 'all') || (filters?.segment && filters.segment !== 'all')) {
+        const total = filteredClients.length;
+        const totalPages = Math.max(1, Math.ceil(total / perPage));
+        const offset = (page - 1) * perPage;
+        return {
+          data: filteredClients.slice(offset, offset + perPage),
+          meta: {
+            pagination: {
+              page,
+              per_page: perPage,
+              total_items: total,
+              total_pages: totalPages
+            },
+            filters: meta.filters
+          }
+        };
+      }
+
+      return { data: filteredClients, meta };
     } catch (error) {
       console.error('Error fetching clients:', error);
-      return [];
+      return {
+        data: [],
+        meta: {
+          pagination: { page: 1, per_page: 20, total_items: 0, total_pages: 1 },
+          filters: {}
+        }
+      };
     }
   }
 
@@ -109,7 +169,8 @@ export class ClientService {
 
   async search(query: string): Promise<Client[]> {
     if (!query) return [];
-    return this.getAll({ search: query });
+    const result = await this.getAll({ search: query }, { page: 1, perPage: 20 });
+    return result.data;
   }
 
   async getStats(): Promise<{
@@ -119,7 +180,7 @@ export class ClientService {
     vip: number;
   }> {
     try {
-      const clients = await clientApi.getAll();
+      const clients = await clientApi.getAllList();
       
       const total = clients.length;
       const actifs = clients.filter(c => c.status === 'Actif').length;

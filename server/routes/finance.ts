@@ -20,7 +20,7 @@ import {
 } from "@shared/schema";
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
-import { getComptesByClient } from "../storage/finance";
+import { getComptesByClient, DecaissementInsufficientFundsError } from "../storage/finance";
 import { requireAuth, requireRole } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
 import { logAudit } from "../audit";
@@ -34,7 +34,7 @@ import {
   type DureeUnite
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, count } from "drizzle-orm";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import * as sessionService from "../services/caisse/session-service";
 
@@ -314,7 +314,19 @@ export function registerFinanceRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Erreur décaissement crédit:", error);
-      res.status(500).json({ message: error.message || "Erreur lors du décaissement" });
+
+      // Gestion d'erreur structurée pour le workflow de réapprovisionnement
+      if (error instanceof DecaissementInsufficientFundsError) {
+        return res.status(error.httpStatus).json({
+          success: false,
+          error: error.data,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Erreur lors du décaissement"
+      });
     }
   });
 
@@ -335,6 +347,80 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Demandes
+  // Aggregation endpoint for dashboard badges
+  app.get("/api/demandes-credit/counts", requireAuth, requireAgenceAccess(), async (req, res) => {
+      try {
+        const agenceFilter = req.agenceFilter as { agence?: string } | null;
+        
+        // Base query - only select status and count
+        const query = db.select({ 
+            status: demandesCredit.statut, 
+            count: count() 
+        })
+        .from(demandesCredit)
+        .groupBy(demandesCredit.statut);
+
+        // Apply Agency Filter
+        if (agenceFilter?.agence) {
+             // We need to join with clients to filter by agency if the filter is string-based
+             // However, for performance on counts, if we have agencyId on demandesCredit it is better.
+             // Checking schema... yes, agenceId is on demandesCredit.
+             
+             // First, get the agency ID(s) corresponding to the name filter if needed, 
+             // but requireAgenceAccess middleware (if standard) might just work with storage logic.
+             // To be safe and consistent with "storage" usage pattern but optimized:
+             
+             // If we use pure drizzle here we must replicate filter logic. 
+             // Let's use the explicit relation if possible.
+             
+             const agencesList = await db.select({ id: schema.agences.id }).from(schema.agences).where(eq(schema.agences.nom, agenceFilter.agence));
+             if (agencesList.length > 0) {
+                 const agenceId = agencesList[0].id;
+                 query.where(eq(demandesCredit.agenceId, agenceId));
+             }
+        }
+        
+        const results = await query;
+
+        // Map to frontend tabs
+        // toProcess = 'En attente' + 'Rejetée' + 'Annulée' (as per Credits.tsx 'demandes' tab)
+        // investigation = 'A enquêter'
+        // approval = 'En enquête' + 'Enquête terminée'
+        // commission = 'Approuvée' + 'Approuvée après réévaluation'
+        // reevaluation = 'Réévaluation en cours'
+
+        const mapping = {
+            toProcess: 0,
+            investigation: 0,
+            approval: 0,
+            commission: 0,
+            reevaluation: 0
+        };
+
+        for (const row of results) {
+            const s = row.status || '';
+            const c = Number(row.count);
+
+            if (['En attente', 'Rejetée', 'Annulée'].includes(s)) {
+                mapping.toProcess += c;
+            } else if (s === 'A enquêter') {
+                mapping.investigation += c;
+            } else if (['En enquête', 'Enquête terminée'].includes(s)) {
+                mapping.approval += c;
+            } else if (['Approuvée', 'Approuvée après réévaluation'].includes(s)) {
+                mapping.commission += c;
+            } else if (s === 'Réévaluation en cours') {
+                mapping.reevaluation += c;
+            }
+        }
+
+        res.json(addSnakeCaseAliasesDeep(mapping));
+      } catch (error: any) {
+          console.error("Error fetching credit counts:", error);
+          res.status(500).json({ message: "Erreur lors du comptage des dossiers" });
+      }
+  });
+
   app.get("/api/demandes-credit", requireAuth, requireAgenceAccess(), async (req, res) => {
       const agenceFilter = req.agenceFilter as { agence?: string } | null;
       const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
@@ -358,16 +444,16 @@ export function registerFinanceRoutes(app: Express) {
 
       // Validation coherence frequence/duree
       if (data.frequenceRemboursement && data.dureeValeur && data.dureeUnite) {
-        const erreurValidation = validerCoherenceFrequenceDuree(
+        const resultatValidation = validerCoherenceFrequenceDuree(
           data.frequenceRemboursement as FrequenceRemboursement,
           Number(data.dureeValeur),
           data.dureeUnite as DureeUnite
         );
 
-        if (erreurValidation) {
+        if (!resultatValidation.isValid) {
           return res.status(400).json({
-            message: erreurValidation,
-            code: "INVALID_DURATION_FREQUENCY"
+            message: resultatValidation.debugMessage || "Durée invalide pour cette fréquence",
+            code: resultatValidation.errorCode || "INVALID_DURATION_FREQUENCY"
           });
         }
 
@@ -657,7 +743,7 @@ export function registerFinanceRoutes(app: Express) {
               const normalizedRole = normalizeRole(user.role);
               if (data.sessionCaisseId && (normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE)) {
                   activeSession = await storage.getSessionCaisse(data.sessionCaisseId);
-                  if (activeSession && activeSession.statut === 'Ouverte') {
+                  if (activeSession && !activeSession.closedAt) {
                       sessionCaisseId = activeSession.id;
                   }
               }
@@ -690,10 +776,7 @@ export function registerFinanceRoutes(app: Express) {
                  return res.status(403).json({ message: "Le client est affilié à une autre agence. Encaissement refusé." });
              } 
              
-             // Fallback Legacy (Comparaison par nom si les IDs manquent)
-             if ((!sessionAgenceId || !clientAgenceId) && activeSession.agence && client.agence && activeSession.agence !== client.agence) {
-                  return res.status(403).json({ message: "Le client est affilié à une autre agence (" + client.agence + ")." });
-             }
+             // Legacy fallback removed: agenceId is now the source of truth.
           }
 
           const result = await storage.payerFraisEngagement({
@@ -954,11 +1037,11 @@ export function registerFinanceRoutes(app: Express) {
       const caisses = await storage.getCaissesByAgence(req.params.id);
       
       // Enrichir avec le statut "Occupé" en temps réel
-      // Une caisse est occupée si elle a une session 'Ouverte'
+      // Une caisse est occupée si elle a une session active (closedAt IS NULL)
       const activeSessions = await storage.getActiveSessions();
       
       const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
-         const activeSession = activeSessions.find(s => s.caisseId === c.id && s.statut === 'Ouverte');
+         const activeSession = activeSessions.find(s => s.caisseId === c.id && !s.closedAt);
          let currentSolde = c.solde || "0";
 
          if (activeSession) {
@@ -1015,7 +1098,7 @@ export function registerFinanceRoutes(app: Express) {
       // Let's stick to returning the caisses list. Frontend will handle grouping.
 
       const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
-         const activeSession = activeSessions.find(s => s.caisseId === c.id && s.statut === 'Ouverte');
+         const activeSession = activeSessions.find(s => s.caisseId === c.id && !s.closedAt);
          let currentSolde = c.solde || "0";
 
          if (activeSession) {
@@ -1388,7 +1471,7 @@ export function registerFinanceRoutes(app: Express) {
       if (!session) {
           return res.status(404).json({ message: "Session introuvable" });
       }
-      if (session.statut !== 'Ouverte') {
+      if (session.closedAt) {
           return res.status(400).json({ message: "Session déjà fermée" });
       }
 
@@ -1713,7 +1796,7 @@ export function registerFinanceRoutes(app: Express) {
       
       // 1. Vérification session active émetteur
       const sessionSource = await storage.getSessionCaisse(data.sessionId);
-      if (!sessionSource || sessionSource.statut !== 'Ouverte') {
+      if (!sessionSource || sessionSource.closedAt) {
          return res.status(400).json({ message: "Session source invalide ou fermée" });
       }
 
@@ -1772,7 +1855,7 @@ export function registerFinanceRoutes(app: Express) {
       const { sessionId } = req.body; // Session qui reçoit
 
       const sessionDest = await storage.getSessionCaisse(sessionId);
-      if (!sessionDest || sessionDest.statut !== 'Ouverte') {
+      if (!sessionDest || sessionDest.closedAt) {
           return res.status(400).json({ message: "Vous devez avoir une session ouverte pour recevoir des fonds" });
       }
 
@@ -1961,6 +2044,34 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   /**
+   * GET /api/finance/credit-refunds/pending/count - Count pending refunds (SUBMITTED + APPROVED)
+   * Used for sidebar badge notification
+   */
+  app.get("/api/finance/credit-refunds/pending/count", requireAuth, requireRole('admin', 'chef', 'credit', 'caisse'), requireAgenceAccess(), async (req, res) => {
+    try {
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      const conditions = [
+        // Count both SUBMITTED (needs approval) and APPROVED (needs payment)
+        sql`${creditRefundRequests.statut} IN ('SUBMITTED', 'APPROVED')`
+      ];
+
+      if (agenceFilter?.agenceId) {
+        conditions.push(eq(creditRefundRequests.agenceId, agenceFilter.agenceId));
+      }
+
+      const [result] = await db
+        .select({ count: count() })
+        .from(creditRefundRequests)
+        .where(and(...conditions));
+
+      res.json({ count: result?.count || 0 });
+    } catch (error: any) {
+      console.error("Error counting pending refunds:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
    * GET /api/finance/credit-refunds/:id - Get Single Refund Details
    */
   app.get("/api/finance/credit-refunds/:id", requireAuth, async (req, res) => {
@@ -2073,7 +2184,7 @@ export function registerFinanceRoutes(app: Express) {
              
              // Check Session Balance
              const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionCaisseId));
-             if (!session || session.statut !== 'Ouverte') throw new Error("Session caisse invalid or closed");
+             if (!session || session.closedAt) throw new Error("Session caisse invalid or closed");
              
              // Debit Caisse -> Insert Operation
              const [op] = await tx.insert(operationsCaisse).values({

@@ -5,6 +5,38 @@ import { agences } from "./agences";
 import { users } from "./auth";
 import { employes } from "./employes";
 
+// ===== Document Types for KYC =====
+export const documentTypeEnum = z.enum([
+  'ID_CARD_FRONT',
+  'ID_CARD_BACK',
+  'PROOF_OF_ADDRESS',
+  'AVATAR',
+  'OTHER'
+]);
+export type DocumentType = z.infer<typeof documentTypeEnum>;
+
+export const documentStatusEnum = z.enum(['pending', 'verified', 'rejected']);
+export type DocumentStatus = z.infer<typeof documentStatusEnum>;
+
+// Schema for a single uploaded document
+export const clientDocumentSchema = z.object({
+  id: z.string().uuid(),
+  documentType: documentTypeEnum,
+  documentName: z.string().min(1),
+  documentUrl: z.string().min(1), // MinIO object key or full URL
+  status: documentStatusEnum.default('pending'),
+  createdAt: z.string().datetime().optional(),
+  isPrivate: z.boolean().default(true),
+  notes: z.string().optional(),
+  verifiedAt: z.string().datetime().optional(),
+  verifiedBy: z.string().uuid().optional(),
+});
+export type ClientDocument = z.infer<typeof clientDocumentSchema>;
+
+// Schema for an array of documents (for JSONB validation)
+export const clientDocumentsArraySchema = z.array(clientDocumentSchema).optional();
+export type ClientDocumentsArray = z.infer<typeof clientDocumentsArraySchema>;
+
 // Types de marchés commerciaux
 export const typesMarches = pgTable("types_marches", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -127,6 +159,8 @@ export const insertClientSchema = createInsertSchema(clients, {
       },
       schema,
     ),
+  // Validate documents as an array of ClientDocument objects
+  documents: () => clientDocumentsArraySchema,
 }).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;

@@ -28,7 +28,8 @@ interface SupervisionConfirmModalProps {
     caisse_nom?: string;
     agence_nom?: string;
     solde_theorique: number;
-    date_ouverture: string;
+    openedAt?: string;
+    opened_at?: string;
   } | null;
   isLoading?: boolean;
   existingSupervision?: SupervisionSession | null;
@@ -176,7 +177,7 @@ export default function SupervisionConfirmModal({
               <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Session ouverte</div>
               <div className="text-base font-medium text-white flex items-center gap-1.5">
                 <Clock size={14} className="text-cyan-400" />
-                {formatTimeAgo(session.date_ouverture)}
+                {formatTimeAgo(session.openedAt || session.opened_at || '')}
               </div>
             </div>
           </div>

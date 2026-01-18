@@ -1,5 +1,5 @@
 import { db } from './db';
-import { auditLogs, loginAttempts, InsertAuditLog, InsertLoginAttempt } from '@shared/schema';
+import { auditLogs, loginAttempts, InsertAuditLog, InsertLoginAttempt, securitySettings } from '@shared/schema';
 import { Request } from 'express';
 import { eq, and, gte, lte, desc, sql, count } from 'drizzle-orm';
 
@@ -152,7 +152,15 @@ export async function getAuditLogs(
   }
 }
 
-export const PASSWORD_REQUIREMENTS = {
+export interface PasswordRequirements {
+  minLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireNumbers: boolean;
+  requireSpecialChars: boolean;
+}
+
+export const DEFAULT_PASSWORD_REQUIREMENTS: PasswordRequirements = {
   minLength: 8,
   requireUppercase: true,
   requireLowercase: true,
@@ -160,26 +168,47 @@ export const PASSWORD_REQUIREMENTS = {
   requireSpecialChars: true,
 };
 
-export function validatePassword(password: string): { valid: boolean; errors: string[] } {
+export async function getPasswordRequirements(): Promise<PasswordRequirements> {
+  try {
+    const [settings] = await db.select().from(securitySettings).limit(1);
+    if (!settings) return DEFAULT_PASSWORD_REQUIREMENTS;
+
+    return {
+      minLength: settings.passwordMinLength ?? DEFAULT_PASSWORD_REQUIREMENTS.minLength,
+      requireUppercase: settings.passwordRequireUppercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireUppercase,
+      requireLowercase: settings.passwordRequireLowercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireLowercase,
+      requireNumbers: settings.passwordRequireNumbers ?? DEFAULT_PASSWORD_REQUIREMENTS.requireNumbers,
+      requireSpecialChars: settings.passwordRequireSpecial ?? DEFAULT_PASSWORD_REQUIREMENTS.requireSpecialChars,
+    };
+  } catch (error) {
+    console.error('Failed to load security settings for password rules:', error);
+    return DEFAULT_PASSWORD_REQUIREMENTS;
+  }
+}
+
+export function validatePassword(
+  password: string,
+  requirements: PasswordRequirements = DEFAULT_PASSWORD_REQUIREMENTS
+): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  if (password.length < PASSWORD_REQUIREMENTS.minLength) {
-    errors.push(`Le mot de passe doit contenir au moins ${PASSWORD_REQUIREMENTS.minLength} caractères`);
+  if (password.length < requirements.minLength) {
+    errors.push(`Le mot de passe doit contenir au moins ${requirements.minLength} caractères`);
   }
 
-  if (PASSWORD_REQUIREMENTS.requireUppercase && !/[A-Z]/.test(password)) {
+  if (requirements.requireUppercase && !/[A-Z]/.test(password)) {
     errors.push('Le mot de passe doit contenir au moins une lettre majuscule');
   }
 
-  if (PASSWORD_REQUIREMENTS.requireLowercase && !/[a-z]/.test(password)) {
+  if (requirements.requireLowercase && !/[a-z]/.test(password)) {
     errors.push('Le mot de passe doit contenir au moins une lettre minuscule');
   }
 
-  if (PASSWORD_REQUIREMENTS.requireNumbers && !/[0-9]/.test(password)) {
+  if (requirements.requireNumbers && !/[0-9]/.test(password)) {
     errors.push('Le mot de passe doit contenir au moins un chiffre');
   }
 
-  if (PASSWORD_REQUIREMENTS.requireSpecialChars && !/[@$!%*?&]/.test(password)) {
+  if (requirements.requireSpecialChars && !/[@$!%*?&]/.test(password)) {
     errors.push('Le mot de passe doit contenir au moins un caractère spécial (@$!%*?&)');
   }
 

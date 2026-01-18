@@ -353,30 +353,26 @@ export default function AdminCreditPlansGestion({
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, taux_interet: e.target.value})}
                 />
                 
-                <div className="flex gap-2">
-                   <div className="w-2/3">
-                    <FormField
-                      label="Durée"
-                      name="duree_valeur"
-                      type="number"
-                      value={formData.duree_valeur}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, duree_valeur: e.target.value})}
-                    />
-                   </div>
-                   <div className="w-1/3">
-                     <SelectField
-                       label="Unité"
-                       name="duree_unite"
-                       value={formData.duree_unite}
-                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, duree_unite: e.target.value})}
-                       options={[
-                         { value: 'Jour', label: 'Jours' },
-                         { value: 'Semaine', label: 'Semaines' },
-                         { value: 'Mois', label: 'Mois' }
-                       ]}
-                     />
-                   </div>
-                </div>
+                <FormField
+                  label="Durée"
+                  name="duree_valeur"
+                  type="number"
+                  value={formData.duree_valeur}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, duree_valeur: e.target.value})}
+                />
+                
+                <SelectField
+                  label="Unité"
+                  name="duree_unite"
+                  value={formData.duree_unite}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, duree_unite: e.target.value})}
+                  options={[
+                    { value: 'Jour', label: 'Jours' },
+                    { value: 'Semaine', label: 'Semaines' },
+                    { value: 'Mois', label: 'Mois' }
+                  ]}
+                />
+
 
                 <SelectField
                   label="Remboursement"

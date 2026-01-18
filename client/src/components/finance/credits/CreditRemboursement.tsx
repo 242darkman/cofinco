@@ -12,6 +12,7 @@ import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
 import { Button } from '../../ui';
 import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
+import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
 
 const MOBILE_OPERATORS = [
@@ -68,6 +69,12 @@ interface Echeance {
 export default function CreditRemboursement() {
   const { mobileMoneyEnabled, mobileMoneyMessage } = useFeatureFlags();
   const { componentRef, printData, print, isPrinting } = usePrinter();
+  const {
+    componentRef: invoiceRef,
+    printData: invoicePrintData,
+    print: printInvoice,
+    isPrinting: isInvoicePrinting
+  } = usePrinter();
 
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -89,6 +96,9 @@ export default function CreditRemboursement() {
   const [lastPaymentRef, setLastPaymentRef] = useState<string | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastPaymentAmount, setLastPaymentAmount] = useState<number>(0);
+  const [lastPenaltiesPaid, setLastPenaltiesPaid] = useState<number>(0);
+  const [lastEcheanceAmount, setLastEcheanceAmount] = useState<number | null>(null);
+  const [lastSoldeAvant, setLastSoldeAvant] = useState<number | null>(null);
 
   const [paymentData, setPaymentData] = useState({
     montant: '',
@@ -278,6 +288,12 @@ export default function CreditRemboursement() {
 
     try {
       const distribution = calculatePaymentDistribution(montant);
+      const penalitesPayees = distribution.reduce((sum, item) => sum + (item.penalites || 0), 0);
+      const echeanceAmount = nextEcheance?.montant_total ?? selectedCredit.montant_echeance ?? montant;
+
+      setLastSoldeAvant(selectedCredit.solde_restant);
+      setLastPenaltiesPaid(penalitesPayees);
+      setLastEcheanceAmount(echeanceAmount);
 
       const finalRef = sanitizeInput(paymentRef || paymentData.reference_paiement || `REF-${Date.now()}`);
 
@@ -328,40 +344,88 @@ export default function CreditRemboursement() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCredit, paymentData, selectedOperator, calculatePaymentDistribution, loadCredits, loadEcheances]);
+  }, [
+    selectedCredit,
+    paymentData,
+    selectedOperator,
+    calculatePaymentDistribution,
+    loadCredits,
+    loadEcheances,
+    nextEcheance
+  ]);
 
   const handlePaymentValidation = useCallback((paymentRef: string, operator?: string) => {
     processPayment(paymentRef, operator);
   }, [processPayment]);
 
-  const handlePrint = useCallback(() => {
-    if (!selectedCredit) return;
-    
-    print({
+  const buildReceiptData = useCallback(() => {
+    if (!selectedCredit) return null;
+
+    const soldeAvant =
+      lastSoldeAvant ?? (selectedCredit.solde_restant + lastPaymentAmount);
+    const nouveauSolde = Math.max(soldeAvant - lastPaymentAmount, 0);
+    const echeanceAmount =
+      lastEcheanceAmount ?? nextEcheance?.montant_total ?? selectedCredit.montant_echeance ?? lastPaymentAmount;
+
+    return {
       title: 'REÇU DE REMBOURSEMENT',
       reference: lastPaymentRef || 'N/A',
       date: new Date(),
       type: 'Remboursement Crédit',
+      transaction: {
+        id: lastPaymentRef || 'N/A',
+        date: new Date(),
+        type: 'REMBOURSEMENT',
+        amount: lastPaymentAmount,
+        cashierName: 'Agent Crédit'
+      },
       client: {
         nom: formatClientName(selectedCredit.clients.nom, selectedCredit.clients.prenom),
         email: selectedCredit.clients.email,
-        telephone: selectedCredit.clients.phone || selectedCredit.clients.telephone, // Handle potential property name diffs
+        telephone: selectedCredit.clients.phone || selectedCredit.clients.telephone,
         numeroCompte: selectedCredit.clients.numero_compte
       },
       agent: {
         nom: 'Agent',
         prenom: 'Crédit'
       },
+      details: [
+        { label: 'Montant Échéance', value: formatMoney(echeanceAmount) },
+        { label: 'Pénalités payées', value: formatMoney(lastPenaltiesPaid) },
+        { label: 'Reste à payer', value: formatMoney(nouveauSolde), isBold: true }
+      ],
       items: [{
         description: `Remboursement Crédit ${selectedCredit.numero_credit}`,
-        details: `Solde restant avant paiement: ${formatMoney(selectedCredit.solde_restant + lastPaymentAmount)}`,
+        details: `Solde avant paiement: ${formatMoney(soldeAvant)}`,
         montant: lastPaymentAmount,
         quantite: 1
       }],
       total: lastPaymentAmount,
-      modePaiement: paymentData.mode_paiement || 'Espèces'
-    });
-  }, [selectedCredit, lastPaymentRef, lastPaymentAmount, print, paymentData]);
+      modePaiement: paymentData.mode_paiement || 'Espèces',
+      devise: 'FCFA'
+    };
+  }, [
+    selectedCredit,
+    lastPaymentRef,
+    lastPaymentAmount,
+    lastSoldeAvant,
+    lastEcheanceAmount,
+    lastPenaltiesPaid,
+    nextEcheance,
+    paymentData.mode_paiement
+  ]);
+
+  const handlePrintTicket = useCallback(() => {
+    const data = buildReceiptData();
+    if (!data) return;
+    print(data);
+  }, [buildReceiptData, print]);
+
+  const handlePrintInvoice = useCallback(() => {
+    const data = buildReceiptData();
+    if (!data) return;
+    printInvoice(data);
+  }, [buildReceiptData, printInvoice]);
 
   const handleModeChange = useCallback((mode: string) => {
     setPaymentData(prev => ({ ...prev, mode_paiement: mode }));
@@ -402,6 +466,21 @@ export default function CreditRemboursement() {
           <ReceiptTemplate ref={componentRef} data={printData} />
         </div>
       )}
+      {invoicePrintData && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            width: '210mm',
+            background: 'white',
+            zIndex: -1,
+          }}
+        >
+          <InvoiceTemplate ref={invoiceRef} data={invoicePrintData} />
+        </div>
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && (
@@ -415,15 +494,25 @@ export default function CreditRemboursement() {
               Le remboursement de <strong className="text-white">{formatMoney(lastPaymentAmount)}</strong> a été validé avec succès.
             </p>
             
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                variant="secondary" 
-                onClick={handlePrint}
-                className="flex items-center justify-center gap-2"
-                disabled={isPrinting}
-              >
-                <Printer size={18} /> Imprimer Reçu
-              </Button>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <Button 
+                  variant="secondary" 
+                  onClick={handlePrintTicket}
+                  className="flex items-center justify-center gap-2"
+                  disabled={isPrinting}
+                >
+                  <Printer size={18} /> Reçu Ticket
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  onClick={handlePrintInvoice}
+                  className="flex items-center justify-center gap-2"
+                  disabled={isInvoicePrinting}
+                >
+                  <Printer size={18} /> Facture A4
+                </Button>
+              </div>
               <Button 
                 variant="primary" 
                 onClick={() => setShowSuccessModal(false)}

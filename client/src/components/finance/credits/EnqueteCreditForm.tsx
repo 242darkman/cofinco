@@ -7,6 +7,7 @@ import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
 import { LocationDisplay } from '../../common/LocationDisplay';
 import { formatClientName } from '../../../lib/format';
+import { clientApi } from '../../../lib/api-client';
 import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
 interface Client {
   id: string;
@@ -188,14 +189,8 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
   const loadClients = async () => {
     try {
-      const res = await fetch('/api/clients?status=Actif', {
-        credentials: 'include'
-      });
-
-      if (!res.ok) throw new Error('Erreur chargement clients');
-
-      const data = await res.json();
-      setClients(data);
+      const data = await clientApi.getAllList();
+      setClients(data.filter((client: any) => client.status === 'Actif'));
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     }

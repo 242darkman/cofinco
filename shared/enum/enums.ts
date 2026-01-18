@@ -114,12 +114,6 @@ export const statutTransactionEnum = pgEnum("statut_transaction_enum", [
   "Reversé",
 ]);
 
-export const statutSessionCaisseEnum = pgEnum("statut_session_caisse_enum", [
-  "Ouverte",
-  "Fermée",
-  "Suspendue",
-]);
-
 export const typeOperationCaisseEnum = pgEnum("type_operation_caisse", [
   "Dépôt épargne",
   "Retrait épargne",

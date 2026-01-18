@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Users, MapPin, CreditCard, PiggyBank, ChevronLeft } from 'lucide-react';
 import { formatClientName } from '../../lib/format';
+import { requestAllPages } from '../../lib/api-client';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -85,25 +86,22 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
 
   const fetchClients = async () => {
     try {
-      const response = await fetch('/api/clients', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        const clientsWithLocation = data
-          .filter((c: any) => c.latitude && c.longitude)
-          .map((c: any) => ({
-            id: c.id,
-            nom: c.nom,
-            prenom: c.prenom,
-            telephone: c.telephone,
-            ville: c.ville,
-            segment: c.segment || 'Standard',
-            latitude: parseFloat(c.latitude),
-            longitude: parseFloat(c.longitude),
-            creditTotal: parseFloat(c.creditTotal || '0'),
-            epargneTotal: parseFloat(c.epargneTotal || '0'),
-          }));
-        setClients(clientsWithLocation);
-      }
+      const data = await requestAllPages<any>('/clients/with-location');
+      const clientsWithLocation = (data || [])
+        .filter((c: any) => c.latitude && c.longitude)
+        .map((c: any) => ({
+          id: c.id,
+          nom: c.nom,
+          prenom: c.prenom,
+          telephone: c.telephone,
+          ville: c.ville,
+          segment: c.segment || 'Standard',
+          latitude: parseFloat(c.latitude),
+          longitude: parseFloat(c.longitude),
+          creditTotal: parseFloat(c.creditTotal || '0'),
+          epargneTotal: parseFloat(c.epargneTotal || '0'),
+        }));
+      setClients(clientsWithLocation);
     } catch (error) {
       console.error('Error fetching clients:', error);
     } finally {

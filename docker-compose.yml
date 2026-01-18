@@ -3,7 +3,7 @@ version: "3.9"
 services:
   db:
     image: postgres:16-alpine
-    container_name: asset-tracker-postgres
+    container_name: cofinco-postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -17,7 +17,7 @@ services:
       - cofin_network
 
   pgadmin:
-    container_name: pgadmin
+    container_name: cofinco-pgadmin
     image: dpage/pgadmin4:8.9
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@cofinco.com

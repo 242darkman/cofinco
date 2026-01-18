@@ -1,13 +1,80 @@
 import type { Express } from "express";
-import { insertUserSchema, users, userPermissions, modules, permissions } from "@shared/schema";
+import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences } from "@shared/schema";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
 import { loginUser, registerUser, requireAuth, requireRole, hashPassword, comparePasswords } from "../auth";
-import { logAudit, logLoginAttempt, isAccountLocked, validatePassword, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
+import { logAudit, logLoginAttempt, isAccountLocked, validatePassword, getPasswordRequirements, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
 import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions } from "../session-tracker";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { db } from "../db";
+
+const normalizeUserPayload = (payload: any) => {
+  if (!payload || typeof payload !== "object") return payload;
+  const data: any = { ...payload };
+
+  if (typeof data.name === "string" && data.name.trim()) {
+    const parts = data.name.trim().split(/\s+/).filter(Boolean);
+    if (!data.prenom && parts.length > 0) {
+      data.prenom = parts[0];
+    }
+    if (!data.nom && parts.length > 1) {
+      data.nom = parts.slice(1).join(" ");
+    }
+    if (!data.nom && parts.length === 1) {
+      data.nom = parts[0];
+    }
+  }
+
+  if (typeof data.phone === "string" && !data.telephone) {
+    data.telephone = data.phone;
+  }
+
+  if (typeof data.photo_profile === "string" && !data.photoProfile) {
+    data.photoProfile = data.photo_profile;
+  }
+
+  delete data.name;
+  delete data.phone;
+  delete data.photo_profile;
+
+  return data;
+};
+
+async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string; agenceNom: string } | null> {
+  const [primaryAgence] = await db
+    .select({
+      agenceId: userAgences.agenceId,
+      agenceNom: agences.nom,
+    })
+    .from(userAgences)
+    .leftJoin(agences, eq(userAgences.agenceId, agences.id))
+    .where(and(
+      eq(userAgences.userId, userId),
+      eq(userAgences.isPrimary, true),
+      eq(userAgences.actif, true)
+    ))
+    .limit(1);
+
+  if (primaryAgence) {
+    return primaryAgence;
+  }
+
+  const [anyAgence] = await db
+    .select({
+      agenceId: userAgences.agenceId,
+      agenceNom: agences.nom,
+    })
+    .from(userAgences)
+    .leftJoin(agences, eq(userAgences.agenceId, agences.id))
+    .where(and(
+      eq(userAgences.userId, userId),
+      eq(userAgences.actif, true)
+    ))
+    .limit(1);
+
+  return anyAgence || null;
+}
 
 export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/login", async (req, res) => {
@@ -39,6 +106,8 @@ export function registerAuthRoutes(app: Express) {
       await clearLoginAttemptsOnSuccess(username);
       await logLoginAttempt(username, req, true);
       
+      const primaryAgence = await resolvePrimaryAgence(user.id);
+
       // Notify Admins
       // Notify Admins
       try {
@@ -59,7 +128,7 @@ export function registerAuthRoutes(app: Express) {
              type: "LIVE_ACTIVITY",
              payload: {
                action: `Connexion: ${user.prenom || ''} ${user.nom}`.trim(),
-               user: user.agence || 'Siège',
+               user: primaryAgence?.agenceNom || 'Siège',
                type: 'login',
                timestamp: new Date().toISOString()
              }
@@ -78,28 +147,12 @@ export function registerAuthRoutes(app: Express) {
           nom: user.nom,
           prenom: user.prenom,
           role: normalizedRole,
-          agence: user.agence,
+          agence: primaryAgence?.agenceNom || null,
+          agenceId: primaryAgence?.agenceId,
           email: user.email || undefined,
           telephone: user.telephone || undefined,
           mustChangePassword: user.mustChangePassword || false
       };
-
-      // Try to get employee ID and agency ID
-      try {
-        const employe = await storage.getEmployeByUserId(user.id);
-        if (employe) {
-             req.session.user.agenceId = employe.agenceId || undefined;
-        } else if (user.agence) {
-             // Fallback: If no employee record (e.g. Admin), try to find Agence by name
-             const agences = await storage.getAllAgences();
-             const agence = agences.find(a => a.nom === user.agence);
-             if (agence) {
-                  req.session.user.agenceId = agence.id;
-             }
-        }
-      } catch (e) {
-        console.error("Error fetching employee data for login:", e);
-      }
 
       // Save session and wait for it to complete before responding
       try {
@@ -177,20 +230,13 @@ export function registerAuthRoutes(app: Express) {
     if (!req.session.user) return res.sendStatus(401);
 
     // Auto-repair session if agenceId is missing
-    if (!req.session.user.agenceId && req.session.user.agence) {
+    if (!req.session.user.agenceId) {
        try {
-          const employe = await storage.getEmployeByUserId(req.session.user.id);
-          if (employe) {
-               req.session.user.agenceId = employe.agenceId || undefined;
-               await new Promise<void>((resolve) => req.session.save(() => resolve()));
-          } else {
-             // Fallback lookup by name
-             const agences = await storage.getAllAgences();
-             const agence = agences.find(a => a.nom === req.session.user?.agence);
-             if (agence && req.session.user) {
-                req.session.user.agenceId = agence.id;
-                await new Promise<void>((resolve) => req.session.save(() => resolve()));
-             }
+          const primaryAgence = await resolvePrimaryAgence(req.session.user.id);
+          if (primaryAgence) {
+            req.session.user.agenceId = primaryAgence.agenceId;
+            req.session.user.agence = primaryAgence.agenceNom;
+            await new Promise<void>((resolve) => req.session.save(() => resolve()));
           }
        } catch (e) {
          console.error("Session repair failed:", e);
@@ -244,7 +290,8 @@ export function registerAuthRoutes(app: Express) {
       const user = await storage.getUser(req.session.user!.id);
       if (!user) return res.status(404).json({ message: "User not found" });
 
-      const { nom, prenom, email, telephone, username } = req.body;
+      const normalizedBody = normalizeUserPayload(req.body);
+      const { nom, prenom, email, telephone, username, photoProfile } = normalizedBody;
       
       // If username is being changed, check for duplicates
       if (username && username !== user.username) {
@@ -264,6 +311,10 @@ export function registerAuthRoutes(app: Express) {
       // Add username if provided and changed
       if (username && username !== user.username) {
         updateData.username = username;
+      }
+
+      if (photoProfile !== undefined) {
+        updateData.photoProfile = photoProfile;
       }
       
       const [updated] = await db.update(users)
@@ -311,7 +362,8 @@ export function registerAuthRoutes(app: Express) {
     }
 
     // Validate new password complexity
-    const validation = validatePassword(newPassword);
+    const requirements = await getPasswordRequirements();
+    const validation = validatePassword(newPassword, requirements);
     if (!validation.valid) {
         return res.status(400).json({ message: "Password does not meet requirements", details: validation.errors });
     }
@@ -345,13 +397,16 @@ export function registerAuthRoutes(app: Express) {
 
   app.post("/api/auth/register", requireRole("admin"), async (req, res) => {
     try {
+      const normalizedBody = normalizeUserPayload(req.body);
+
       // Validate complexity first
-      if (req.body.password) {
-          const validation = validatePassword(req.body.password);
+      if (normalizedBody.password) {
+          const requirements = await getPasswordRequirements();
+          const validation = validatePassword(normalizedBody.password, requirements);
           if (!validation.valid) return res.status(400).json(validation);
       }
 
-      const parsed = insertUserSchema.safeParse(req.body);
+      const parsed = insertUserSchema.safeParse(normalizedBody);
       if (!parsed.success) {
         return res.status(400).json(parsed.error);
       }
@@ -388,7 +443,7 @@ export function registerAuthRoutes(app: Express) {
   app.patch("/api/users/:id", requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const updateData = req.body;
+      const updateData = normalizeUserPayload(req.body);
       
       const updatedUser = await storage.updateUser(id, updateData);
       if (!updatedUser) {
@@ -415,7 +470,8 @@ export function registerAuthRoutes(app: Express) {
   app.patch("/api/users/:id", requireRole("admin"), async (req, res) => {
     try {
       const userId = req.params.id;
-      const [updated] = await db.update(users).set(req.body).where(eq(users.id, userId)).returning();
+      const updateData = normalizeUserPayload(req.body);
+      const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
       
       if (updated) {
          await logAudit(
@@ -423,7 +479,7 @@ export function registerAuthRoutes(app: Express) {
             "UPDATE_USER",
             "user",
             userId,
-            req.body,
+            updateData,
             "success",
             "medium"
          );
@@ -437,6 +493,8 @@ export function registerAuthRoutes(app: Express) {
 
   app.delete("/api/users/:id", requireRole("admin"), async (req, res) => {
     try {
+      const userToDelete = await storage.getUser(req.params.id);
+
       await db.update(users)
         .set({ deletedAt: new Date(), statut: 'Inactif' })
         .where(eq(users.id, req.params.id));
@@ -446,7 +504,16 @@ export function registerAuthRoutes(app: Express) {
         "DELETE_USER",
         "user",
         req.params.id,
-        undefined,
+        userToDelete ? {
+          deletedUser: {
+            id: userToDelete.id,
+            username: userToDelete.username,
+            email: userToDelete.email,
+            nom: userToDelete.nom,
+            prenom: userToDelete.prenom,
+            role: userToDelete.role
+          }
+        } : undefined,
         "success",
         "high"
       );

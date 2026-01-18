@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, bigint, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, jsonb, bigint, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
@@ -145,7 +145,22 @@ export const prospections = pgTable("prospections", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertProspectionSchema = createInsertSchema(prospections).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export const insertProspectionSchema = createInsertSchema(prospections, {
+  // Validate Congo phone format: +242XXXXXXXX or 06/05/04XXXXXXX
+  telephoneProspect: z.string().regex(
+    /^(\+242|0)[456]\d{7}$/,
+    "Format téléphone invalide (ex: 06XXXXXXX ou +242XXXXXXXX)"
+  ),
+  // Validate GPS coordinates if provided
+  latitude: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined) ? undefined : Number(val),
+    z.number().min(-90, "Latitude invalide").max(90, "Latitude invalide").optional()
+  ),
+  longitude: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined) ? undefined : Number(val),
+    z.number().min(-180, "Longitude invalide").max(180, "Longitude invalide").optional()
+  ),
+}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertProspection = z.infer<typeof insertProspectionSchema>;
 export type Prospection = typeof prospections.$inferSelect;
 
@@ -181,6 +196,7 @@ export const paiementsTerrain = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
 
     agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id, { onDelete: "restrict" }),
+    agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "set null" }),
     clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "restrict" }),
 
     typePaiement: typePaiementTerrainEnum("type_paiement").notNull(),
@@ -334,22 +350,33 @@ export const codeGenerationPermissions = pgTable("code_generation_permissions", 
 // POS Devices
 export const posDevices = pgTable("pos_devices", {
   id: uuid("id").primaryKey().defaultRandom(),
-  agentId: uuid("agent_id").notNull().references(() => users.id),
-  caisseId: uuid("caisse_id").references(() => caisses.id), // Renamed from caisseAgentId
-  deviceId: text("device_id").notNull().unique(), 
-  nom: text("nom").notNull(),
-  modele: text("modele"),
-  numeroSerie: text("numero_serie"),
-  dateEnregistrement: timestamp("date_enregistrement").defaultNow(),
-  derniereSynchronisation: timestamp("derniere_synchronisation"),
-  versionApp: text("version_app"),
-  statut: text("statut").notNull().default("actif"), 
+  serial: text("serial").notNull().unique(),
+  model: text("model"),
+  agenceId: uuid("agence_id").notNull().references(() => agences.id, { onDelete: "restrict" }),
+  assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  lastSyncAt: timestamp("last_sync_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
-export const insertPosDeviceSchema = createInsertSchema(posDevices).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPosDeviceSchema = createInsertSchema(posDevices).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertPosDevice = z.infer<typeof insertPosDeviceSchema>;
 export type PosDevice = typeof posDevices.$inferSelect;
+
+export const posDeviceLogs = pgTable("pos_device_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceId: uuid("device_id").notNull().references(() => posDevices.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  message: text("message"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertPosDeviceLogSchema = createInsertSchema(posDeviceLogs).omit({ id: true, createdAt: true });
+export type InsertPosDeviceLog = z.infer<typeof insertPosDeviceLogSchema>;
+export type PosDeviceLog = typeof posDeviceLogs.$inferSelect;
 
 // Modeles Factures
 export const modelesFactures = pgTable("modeles_factures", {

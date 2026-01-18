@@ -23,7 +23,8 @@ interface Caisse {
   solde: string;
   assignments?: string[];
   lastSession?: {
-    date_fermeture?: string;
+    closedAt?: string;
+    closed_at?: string;
     solde_reel?: number;
     caissier_nom?: string;
   };
@@ -431,7 +432,7 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
                         <div className="grid grid-cols-1 gap-2">
                             {caisses.map(caisse => {
                                 const isSelected = selectedCaisseId === caisse.id;
-                                const hasLastSession = caisse.lastSession?.date_fermeture;
+                                const hasLastSession = caisse.lastSession?.closedAt || caisse.lastSession?.closed_at;
 
                                 return (
                                     <button
@@ -487,7 +488,7 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
                                                       <div className="flex-1">
                                                         <div className="flex items-center gap-1.5 text-[10px] text-content-muted mb-0.5">
                                                           <Clock size={10} />
-                                                          <span>Dernière fermeture: {formatLastClosure(caisse.lastSession?.date_fermeture)}</span>
+                                                          <span>Dernière fermeture: {formatLastClosure(caisse.lastSession?.closedAt || caisse.lastSession?.closed_at)}</span>
                                                         </div>
                                                         <div className="flex items-center gap-1.5">
                                                           <Wallet size={10} className="text-emerald-500" />

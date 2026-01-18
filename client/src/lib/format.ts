@@ -78,6 +78,39 @@ export function formatMoneyShort(amount: number | string | null | undefined): st
   return formatMoney(num);
 }
 
+export type SessionComputedStatus = 'OPEN' | 'CLOSED' | 'TIMED_OUT';
+
+export function computeSessionStatus(session: {
+  openedAt?: string | Date | null;
+  closedAt?: string | Date | null;
+  timeoutAt?: string | Date | null;
+}, now: Date = new Date()): SessionComputedStatus {
+  if (session.closedAt) {
+    return 'CLOSED';
+  }
+
+  const openedAt = session.openedAt ? new Date(session.openedAt) : null;
+  const timeoutAt = session.timeoutAt ? new Date(session.timeoutAt) : null;
+
+  if (openedAt && timeoutAt && timeoutAt.getTime() <= now.getTime()) {
+    return 'TIMED_OUT';
+  }
+
+  return 'OPEN';
+}
+
+export function getSessionStatusLabel(status: SessionComputedStatus): string {
+  switch (status) {
+    case 'OPEN':
+      return 'Ouverte';
+    case 'TIMED_OUT':
+      return 'Expirée';
+    case 'CLOSED':
+    default:
+      return 'Fermée';
+  }
+}
+
 // Date formatting
 export function formatDate(
   date: string | Date | null | undefined,
@@ -278,4 +311,33 @@ export function formatFileSize(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+/**
+ * Resolves the full URL for a client's profile photo.
+ * Handles different URL formats (data URI, relative path, raw filename).
+ */
+export function resolveClientPhotoUrl(url: string | null | undefined): string {
+  const raw = url || '';
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('/api/')) return raw;
+  if (raw.startsWith('/')) return raw;
+  if (raw.startsWith('http')) {
+    try {
+      const urlObj = new URL(raw);
+      const pathParts = urlObj.pathname.split('/').filter(Boolean);
+      // Logic copied from ClientModule.tsx to handle internal/minio URLs
+      // Rewrite http://minio/bucket/key -> /api/uploads/files/key
+      if (pathParts.length >= 2) {
+           const key = pathParts.slice(1).join('/');
+           return `/api/uploads/files/${key}`;
+      }
+      return raw;
+    } catch {
+       return raw;
+    }
+  }
+  // Default case: it's a raw filename, append the API path
+  return `/api/uploads/files/${raw}`;
 }

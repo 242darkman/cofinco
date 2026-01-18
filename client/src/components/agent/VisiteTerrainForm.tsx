@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Calendar, FileText, DollarSign, Clock, CheckCircle, Info, AlertTriangle } from 'lucide-react';
-import { clientsApi } from '../../lib/api';
+import { agentTerrainApi, clientApi } from '../../lib/api-client';
 import { Modal, Button, FormField, SelectField, TextareaField } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 
@@ -38,11 +38,8 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
 
   const loadAgents = async () => {
     try {
-      const response = await fetch('/api/agents-terrain', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setAgents(data.filter((a: any) => a.statut === 'Actif'));
-      }
+      const data = await agentTerrainApi.getAllList();
+      setAgents(data.filter((a: any) => a.statut === 'Actif'));
     } catch (error) {
       console.error('Erreur chargement agents:', error);
     }
@@ -50,11 +47,8 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
 
   const loadClients = async () => {
     try {
-      const response = await fetch('/api/clients', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setClients(data.filter((c: any) => c.statut === 'Actif' || c.status === 'Actif').slice(0, 100));
-      }
+      const data = await clientApi.getAllList();
+      setClients(data.filter((c: any) => c.statut === 'Actif' || c.status === 'Actif').slice(0, 100));
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     }

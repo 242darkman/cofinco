@@ -316,11 +316,23 @@ export default function TransfertInterCoffresModule({
         toast.success(confirmAction.type === 'dispatch' ? 'Transfert dispatché' : 'Transfert annulé');
         await loadTransferts();
       } else {
-        toast.error(result.error || 'Erreur lors de l\'opération');
+        // Gérer les erreurs de conflit (déjà traité par un autre processus)
+        if (result.errorCode === 'TIC_CONFLICT' || result.errorCode === 'TIC_024') {
+          toast.info('Ce transfert a déjà été traité par un autre processus.');
+          await loadTransferts(); // Rafraîchir pour voir le nouvel état
+        } else {
+          toast.error(result.error || 'Erreur lors de l\'opération');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       toast.dismiss(loadingId);
-      toast.error('Erreur lors de l\'opération');
+      // Gérer HTTP 409 côté fetch
+      if (error?.response?.status === 409 || error?.status === 409) {
+        toast.info('Ce transfert a déjà été traité par un autre processus.');
+        await loadTransferts();
+      } else {
+        toast.error('Erreur lors de l\'opération');
+      }
     } finally {
       setConfirmAction(null);
       setCancelReason('');

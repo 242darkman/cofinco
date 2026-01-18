@@ -3,6 +3,7 @@ import { tontines, membresTontine, contributionsTontine, tontineDistributions, c
 import { eq, and, sql, desc } from "drizzle-orm";
 import { createContributionTontineWithLedger } from "../storage/tontines";
 import { updateTontineSolde, executeWithLedger, updateCompteSolde, generateReference } from "./ledger";
+import { isTourFullyPaid } from "./tontine-logic";
 
 export async function processAutomaticTontineContributions() {
   const now = new Date();
@@ -36,26 +37,32 @@ export async function processAutomaticTontineContributions() {
       ));
 
       for (const membre of eligibleMembers) {
-        // Check if already contributed for this tour
-        const existingContrib = await db.query.contributionsTontine.findFirst({
-          where: and(
-            eq(contributionsTontine.tontineId, tontine.id),
-            eq(contributionsTontine.clientId, membre.clientId),
-            eq(contributionsTontine.tourNumero, currentTour),
-            eq(contributionsTontine.statutTransaction, 'Posté') // Only count posted/valid contributions
-          )
-        });
+        // Vérifier si le tour est déjà payé (complètement ou partiellement via avance)
+        const tourStatus = await isTourFullyPaid(membre.clientId, tontine.id, currentTour);
 
-        if (!existingContrib) {
-          results.processed++;
-          try {
-            await executeAutomaticContribution(tontine, membre, currentTour);
-            results.success++;
-          } catch (error) {
-             console.error(`Error processing auto-contribution for tontine ${tontine.id} member ${membre.id}:`, error);
-             results.failed++;
-             results.errors.push({ tontineId: tontine.id, membreId: membre.id, error });
-          }
+        if (tourStatus.isPaid) {
+          // Tour déjà payé via avance - sauter silencieusement
+          console.log(`[Auto-Tontine] Tour ${currentTour} déjà payé via avance pour membre ${membre.id} (${membre.clientId})`);
+          continue;
+        }
+
+        // Calculer le montant restant à prélever (gestion des paiements partiels)
+        const montantAPrevelever = tourStatus.montantRestant;
+
+        if (montantAPrevelever <= 0) {
+          console.log(`[Auto-Tontine] Rien à prélever pour membre ${membre.id} tour ${currentTour}`);
+          continue;
+        }
+
+        results.processed++;
+        try {
+          await executeAutomaticContribution(tontine, membre, currentTour, montantAPrevelever);
+          results.success++;
+          console.log(`[Auto-Tontine] Prélèvement réussi: ${montantAPrevelever} FCFA pour membre ${membre.id} tour ${currentTour}`);
+        } catch (error) {
+           console.error(`Error processing auto-contribution for tontine ${tontine.id} member ${membre.id}:`, error);
+           results.failed++;
+           results.errors.push({ tontineId: tontine.id, membreId: membre.id, error });
         }
       }
     } catch (e) {
@@ -66,29 +73,30 @@ export async function processAutomaticTontineContributions() {
   return results;
 }
 
-async function executeAutomaticContribution(tontine: any, membre: any, tourNumero: number) {
+async function executeAutomaticContribution(tontine: any, membre: any, tourNumero: number, montantAPrevelever?: number) {
   // Determine source account
   const sourceAccountId = membre.cotisationCompteId;
   
   if (!sourceAccountId) {
-     // Check for default account logic ? 
+     // Check for default account logic ?
      // For now require explicit account or find 'Courant'
       const accounts = await db.select().from(comptes).where(and(eq(comptes.clientId, membre.clientId), eq(comptes.typeCompte, 'Courant')));
       if (accounts.length === 0) throw new Error("No source account found for automatic contribution");
      // Use first one
      const account = accounts[0];
-     await processPayment(tontine, membre, tourNumero, account);
+     await processPayment(tontine, membre, tourNumero, account, montantAPrevelever);
      return;
   }
 
   const [compte] = await db.select().from(comptes).where(eq(comptes.id, sourceAccountId));
   if (!compte) throw new Error(`Source account ${sourceAccountId} not found`);
-  
-  await processPayment(tontine, membre, tourNumero, compte);
+
+  await processPayment(tontine, membre, tourNumero, compte, montantAPrevelever);
 }
 
-async function processPayment(tontine: any, membre: any, tourNumero: number, compte: any) {
-    const amount = parseFloat(tontine.montantCotisation);
+async function processPayment(tontine: any, membre: any, tourNumero: number, compte: any, montantAPrevelever?: number) {
+    // Utiliser le montant spécifié ou le montant de cotisation complet
+    const amount = montantAPrevelever ?? parseFloat(tontine.montantCotisation);
     const balance = parseFloat(compte.soldeCourant || "0");
 
     if (balance < amount) {
@@ -154,9 +162,12 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
           methodePaiement: "Virement",
           referenceExterne: `AUTO-TON-${generateReference("TONTINE")}`,
           metadata: {
-              description: `Contribution automatique Tour ${tourNumero}`,
+              description: montantAPrevelever
+                ? `Contribution automatique Tour ${tourNumero} (Complément: ${amount} FCFA)`
+                : `Contribution automatique Tour ${tourNumero}`,
               tourNumero,
-              compteSourceId: compte.id
+              compteSourceId: compte.id,
+              isPartialPayment: !!montantAPrevelever
           }
         },
         async (tx, mouvement) => {

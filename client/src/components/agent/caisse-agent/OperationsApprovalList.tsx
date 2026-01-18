@@ -80,7 +80,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
 
     try {
       // Charger les agents
-      const agentsData = await agentTerrainApi.getAll();
+      const agentsData = await agentTerrainApi.getAllList();
       setAgents(agentsData || []);
 
       // Construire les filtres

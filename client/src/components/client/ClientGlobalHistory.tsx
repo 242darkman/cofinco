@@ -55,6 +55,47 @@ function getIcon(iconName: string) {
     return icons[iconName] || icons['activity'];
 }
 
+function normalizeHistoryResponse(payload: any): HistoryResponse {
+    if (payload?.meta?.pagination) {
+        const { page, per_page, total_items, total_pages } = payload.meta.pagination;
+        return {
+            data: Array.isArray(payload.data) ? payload.data : [],
+            pagination: {
+                page: Number(page) || 1,
+                limit: Number(per_page) || 0,
+                total: Number(total_items) || 0,
+                totalPages: Number(total_pages) || 1
+            }
+        };
+    }
+
+    if (payload?.pagination) {
+        return payload as HistoryResponse;
+    }
+
+    if (Array.isArray(payload)) {
+        return {
+            data: payload,
+            pagination: {
+                page: 1,
+                limit: payload.length,
+                total: payload.length,
+                totalPages: 1
+            }
+        };
+    }
+
+    return {
+        data: [],
+        pagination: {
+            page: 1,
+            limit: 0,
+            total: 0,
+            totalPages: 1
+        }
+    };
+}
+
 export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryProps) {
     const {
         data,
@@ -66,11 +107,12 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
     } = useInfiniteQuery<HistoryResponse>({
         queryKey: ['client-global-history', clientId],
         queryFn: async ({ pageParam = 1 }) => {
-            const res = await fetch(`/api/clients/${clientId}/global-history?page=${pageParam}&limit=20`, {
+            const res = await fetch(`/api/clients/${clientId}/global-history?page=${pageParam}&per_page=20&limit=20`, {
                 credentials: 'include'
             });
             if (!res.ok) throw new Error('Failed to fetch history');
-            return res.json();
+            const payload = await res.json();
+            return normalizeHistoryResponse(payload);
         },
         initialPageParam: 1,
         getNextPageParam: (lastPage) => {

@@ -1,12 +1,13 @@
 import type { Client, InsertClient } from '@shared/schema';
-import React, { useState, useEffect } from 'react';
-import { Save, User, Mail, Phone, MapPin, Award, Upload, FileText, Trash2, Store, Video, Camera, Lock, KeyRound } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
-import CameraCapture from '../shared/CameraCapture';
 import Modal from '../ui/Modal';
 import FormField from '../ui/FormField';
 import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
+import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole } from '@shared/types/roles';
 import { agenceApi } from '../../lib/api-client';
@@ -18,10 +19,21 @@ interface ClientFormProps {
   onSave: (client: InsertClient | Partial<Client>) => void;
 }
 
+// Extended form data to include structured documents
+interface ClientFormData extends InsertClient {
+  documents?: UploadedDocument[];
+}
+
+// ID Type options with icons
+const ID_TYPE_OPTIONS = [
+  { value: 'CNI', label: 'CNI', icon: CreditCard },
+  { value: 'PASSPORT', label: 'Passeport', icon: BookUser },
+  { value: 'OTHER', label: 'Autre', icon: FileQuestion },
+] as const;
+
 export default function ClientForm({ client, onClose, onSave }: ClientFormProps) {
   // Camera State
   const [isLivenessOpen, setIsLivenessOpen] = useState(false);
-  const [isDocCameraOpen, setIsDocCameraOpen] = useState(false);
 
   // User and Agency Data
   const { user } = useUserProfile();
@@ -29,7 +41,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
   const isAdmin = isAdminRole(user?.role);
 
   // Form State
-  const [formData, setFormData] = useState<InsertClient>({
+  const [formData, setFormData] = useState<ClientFormData>({
     nom: '',
     prenom: '',
     email: '',
@@ -37,7 +49,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     adresse: '',
     adresseDomicile: '',
     lieuActivite: '',
-    photoUrl: '', // Stores documents array JSON
+    photoUrl: '',
     photoProfile: '',
     status: 'Actif',
     segment: 'Standard',
@@ -50,36 +62,127 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     typePiece: 'CNI',
     numeroPiece: '',
     typeMarcheId: null,
-    agenceId: null, // Ensure agenceId is handled
+    agenceId: null,
+    documents: [],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [pieceIdentite, setPieceIdentite] = useState<string[]>([]);
   const [typesMarches, setTypesMarches] = useState<{id: string; nom: string}[]>([]);
-  
-  // Future client portal access (locked for now)
-  const [portalAccessEnabled, setPortalAccessEnabled] = useState(false);
-  const [generatedUsername, setGeneratedUsername] = useState('');
+
+  // Uploaded documents state (structured)
+  const [uploadedDocs, setUploadedDocs] = useState<Record<DocumentType, UploadedDocument | null>>({
+    ID_CARD_FRONT: null,
+    ID_CARD_BACK: null,
+    PROOF_OF_ADDRESS: null,
+    AVATAR: null,
+    OTHER: null,
+  });
 
   // Helper function to generate username from name (format: p.nom)
   const generateClientUsername = (nom: string, prenom: string): string => {
     if (!nom) return '';
-    // Remove accents and special characters
     const normalizedNom = nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const normalizedPrenom = (prenom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    
     if (normalizedPrenom) {
       return `${normalizedPrenom.charAt(0)}.${normalizedNom}`;
     }
     return normalizedNom;
   };
 
+  // Helper to get display URL for uploaded files
+  const getFileDisplayUrl = (path: string | null | undefined): string => {
+    if (!path) return '';
+    if (path.startsWith('data:')) return path;
+    if (path.startsWith('/api/')) return path;
+    if (path.startsWith('/')) return path;
+    if (path.startsWith('http')) {
+      try {
+        const url = new URL(path);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2) {
+          const key = pathParts.slice(1).join('/');
+          return `/api/uploads/files/${key}`;
+        }
+        return path;
+      } catch {
+        return path;
+      }
+    }
+    return `/api/uploads/files/${path}`;
+  };
+
+  // Parse existing documents when editing
+  const parseExistingDocuments = useCallback((clientData: any) => {
+    const docs: Record<DocumentType, UploadedDocument | null> = {
+      ID_CARD_FRONT: null,
+      ID_CARD_BACK: null,
+      PROOF_OF_ADDRESS: null,
+      AVATAR: null,
+      OTHER: null,
+    };
+
+    // Try to parse from documents JSONB first
+    if (clientData.documents && Array.isArray(clientData.documents)) {
+      clientData.documents.forEach((doc: any) => {
+        const docType = doc.documentType || doc.document_type;
+        if (docType && docs.hasOwnProperty(docType)) {
+          docs[docType as DocumentType] = {
+            id: doc.id || crypto.randomUUID(),
+            documentType: docType,
+            documentName: doc.documentName || doc.document_name || 'Document',
+            documentUrl: doc.documentUrl || doc.document_url || '',
+            status: doc.status || 'pending',
+            createdAt: doc.createdAt || doc.created_at || new Date().toISOString(),
+            isPrivate: doc.isPrivate !== false,
+          };
+        }
+      });
+    }
+
+    // Fallback: parse legacy photoUrl (JSON array of URLs)
+    if (!docs.ID_CARD_FRONT && clientData.photoUrl) {
+      try {
+        const pieces = JSON.parse(clientData.photoUrl);
+        if (Array.isArray(pieces)) {
+          pieces.forEach((url: string, index: number) => {
+            const docType: DocumentType = index === 0 ? 'ID_CARD_FRONT' : index === 1 ? 'ID_CARD_BACK' : 'OTHER';
+            if (!docs[docType]) {
+              docs[docType] = {
+                id: crypto.randomUUID(),
+                documentType: docType,
+                documentName: `Document ${index + 1}`,
+                documentUrl: url,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                isPrivate: true,
+              };
+            }
+          });
+        }
+      } catch {
+        // Single URL
+        if (clientData.photoUrl) {
+          docs.ID_CARD_FRONT = {
+            id: crypto.randomUUID(),
+            documentType: 'ID_CARD_FRONT',
+            documentName: 'Pièce d\'identité',
+            documentUrl: clientData.photoUrl,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            isPrivate: true,
+          };
+        }
+      }
+    }
+
+    return docs;
+  }, []);
+
   // Load Client Data
   useEffect(() => {
     if (client) {
       const c = client as any;
-      const photoUrl = c.photoUrl || '';
-      
+
       setFormData({
         nom: c.nom,
         prenom: c.prenom || '',
@@ -88,7 +191,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         adresse: c.adresse || '',
         adresseDomicile: c.adresseDomicile || '',
         lieuActivite: c.lieuActivite || '',
-        photoUrl: photoUrl,
+        photoUrl: c.photoUrl || '',
         photoProfile: c.photoProfile || '',
         status: c.status,
         segment: c.segment,
@@ -102,20 +205,14 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         numeroPiece: c.numeroPiece || '',
         typeMarcheId: c.typeMarcheId || null,
         agenceId: c.agenceId || null,
+        documents: c.documents || [],
       });
 
-      // Parse documents from photoUrl
-      if (photoUrl) {
-        try {
-          const pieces = JSON.parse(photoUrl);
-          if (Array.isArray(pieces)) setPieceIdentite(pieces);
-          else setPieceIdentite([photoUrl]);
-        } catch {
-          setPieceIdentite([photoUrl]);
-        }
-      }
+      // Parse existing documents
+      const parsedDocs = parseExistingDocuments(c);
+      setUploadedDocs(parsedDocs);
     }
-  }, [client]);
+  }, [client, parseExistingDocuments]);
 
   // Load Markets
   useEffect(() => {
@@ -146,8 +243,6 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ... (inside component)
-
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!(formData.nom || '').trim()) newErrors.nom = 'Le nom est requis';
@@ -155,31 +250,36 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email invalide';
     if (isAdmin && !formData.agenceId && !client) newErrors.agenceId = "L'agence est requise pour les admins";
     
+    // Require ID number for CNI and Passport
+    if ((formData.typePiece === 'CNI' || formData.typePiece === 'PASSPORT') && !(formData.numeroPiece || '').trim()) {
+      newErrors.numeroPiece = formData.typePiece === 'CNI' ? 'Le N° CNI est requis' : 'Le N° Passeport est requis';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const checkUniqueness = async (): Promise<boolean> => {
     try {
-        const res = await fetch('/api/clients/check-uniqueness', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                telephone: formData.telephone,
-                email: formData.email,
-                numeroPiece: formData.numeroPiece,
-                excludeClientId: client?.id
-            })
-        });
-        const data = await res.json();
-        if (!data.available) {
-            setErrors(prev => ({ ...prev, [data.field]: data.message }));
-            return false;
-        }
-        return true;
+      const res = await fetch('/api/clients/check-uniqueness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telephone: formData.telephone,
+          email: formData.email,
+          numeroPiece: formData.numeroPiece,
+          excludeClientId: client?.id
+        })
+      });
+      const data = await res.json();
+      if (!data.available) {
+        setErrors(prev => ({ ...prev, [data.field]: data.message }));
+        return false;
+      }
+      return true;
     } catch (err) {
-        console.error("Check uniqueness failed", err);
-        return true; // Optionally allow if check fails? Or block? Safe to allow usually if API down.
+      console.error("Check uniqueness failed", err);
+      return true;
     }
   };
 
@@ -188,46 +288,55 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     if (isSubmitting) return;
 
     if (validateForm()) {
-       setIsSubmitting(true);
-       
-       // Debounce/Delay slightly to prevent double clicks if not caught by state immediately
-       const isUnique = await checkUniqueness();
-       if (!isUnique) {
-           setIsSubmitting(false);
-           return;
-       }
+      setIsSubmitting(true);
 
-       try {
-           await onSave(formData);
-           // onSave usually handles closing, but if we are here and component unmounts, fine.
-           // If we stay mounted, we should enable button? 
-           // Usually onSave is fire and forget or triggers parents.
-           // We'll reset submitting after a timeout just in case it fails silently 
-           // or if onSave is not async (though it likely triggers an API call in parent).
-           setTimeout(() => setIsSubmitting(false), 2000); 
-       } catch (error) {
-           console.error("Save failed", error);
-           setIsSubmitting(false);
-       }
+      const isUnique = await checkUniqueness();
+      if (!isUnique) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      try {
+        // Build documents array from uploadedDocs
+        const documentsArray = Object.values(uploadedDocs).filter((doc): doc is UploadedDocument => doc !== null);
+
+        // Create final form data with structured documents
+        const finalData: ClientFormData = {
+          ...formData,
+          documents: documentsArray,
+          // Also keep legacy photoUrl for backwards compatibility
+          photoUrl: documentsArray.length > 0
+            ? JSON.stringify(documentsArray.map(d => d.documentUrl))
+            : '',
+        };
+
+        await onSave(finalData as any);
+        setTimeout(() => setIsSubmitting(false), 2000);
+      } catch (error) {
+        console.error("Save failed", error);
+        setIsSubmitting(false);
+      }
     }
   };
 
-  const handleChange = (field: keyof InsertClient, value: any) => {
+  const handleChange = (field: keyof ClientFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
-  // MinIO Hooks
-  const { uploadFile: uploadProfile, isUploading: isUploadingProfile } = useMinIOUpload({
+  // Handle document upload completion
+  const handleDocumentChange = useCallback((type: DocumentType, doc: UploadedDocument | null) => {
+    setUploadedDocs(prev => ({
+      ...prev,
+      [type]: doc,
+    }));
+  }, []);
+
+  // MinIO Hook for profile photo
+  const { uploadFile: uploadProfile } = useMinIOUpload({
     path: 'profiles',
     isPublic: true,
     onError: (err) => console.error("Profile upload error", err)
-  });
-
-  const { uploadFile: uploadDoc, isUploading: isUploadingDoc } = useMinIOUpload({
-    path: 'kyc',
-    isPublic: false,
-    onError: (err) => console.error("Doc upload error", err)
   });
 
   const handleProfileCapture = async (imageDataUrl: string) => {
@@ -242,56 +351,16 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     }
   };
 
-  const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-        const url = await uploadProfile(file);
-        if (url) handleChange('photoProfile', url);
-    }
-  };
+  // Handle avatar upload via SmartDocumentUpload
+  const handleAvatarUpload = useCallback((doc: UploadedDocument) => {
+    // Store in photoProfile for quick access in lists
+    handleChange('photoProfile', doc.documentUrl);
+    // Also track in documents
+    handleDocumentChange('AVATAR', doc);
+  }, [handleDocumentChange]);
 
-  const handleDocCapture = async (imageDataUrl: string) => {
-      try {
-        const res = await fetch(imageDataUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `doc_capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        const url = await uploadDoc(file);
-        if (url) {
-            setPieceIdentite(prev => {
-                const newPieces = [...prev, url]; // URL now, not base64
-                // Update both legacy photoUrl (if needed for compatibility) and documents
-                // Ideally we switch to 'documents' but let's see if InsertClient has it.
-                // Assuming we use 'documents' in formData.
-                // Since schema has it, InsertClient should have it.
-                // handleChange('documents' as any, newPieces); 
-                handleChange('photoUrl', JSON.stringify(newPieces)); // Keep legacy behavior for now but with MinIO URLs
-                return newPieces;
-            });
-        }
-      } catch (e) {
-          console.error("Doc capture upload failed", e);
-      }
-  };
-
-  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(async (file) => {
-        try {
-            const url = await uploadDoc(file);
-            if (url) {
-                setPieceIdentite(prev => {
-                    const newPieces = [...prev, url];
-                    handleChange('photoUrl', JSON.stringify(newPieces));
-                    return newPieces;
-                });
-            }
-        } catch (e) {
-            console.error("Doc upload failed", e);
-        }
-      });
-    }
-  };
+  // Check if showing back document (not for passport)
+  const showBackDocument = formData.typePiece !== 'PASSPORT';
 
   return (
     <Modal
@@ -314,7 +383,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             required
             className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
-          
+
           <FormField
             label="Prénom"
             name="prenom"
@@ -372,7 +441,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             )}
           </div>
 
-           <FormField
+          <FormField
             label="Adresse Domicile"
             name="adresseDomicile"
             icon={MapPin}
@@ -396,48 +465,35 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             value={formData.typeMarcheId || ''}
             onChange={(e) => handleChange('typeMarcheId', e.target.value === '' ? null : e.target.value)}
             options={[
-                { value: '', label: 'Sélectionner un secteur' },
-                ...(typesMarches || []).map(tm => ({ value: tm.id, label: tm.nom }))
+              { value: '', label: 'Sélectionner un secteur' },
+              ...(typesMarches || []).map(tm => ({ value: tm.id, label: tm.nom }))
             ]}
           />
 
           {isAdmin && (
-             <SelectField
-               label="Agence *"
-               name="agenceId"
-               value={formData.agenceId || ''}
-               onChange={(e) => handleChange('agenceId', e.target.value)}
-               error={errors.agenceId}
-               options={[
-                   { value: '', label: "Sélectionner l'agence" },
-                   ...agences.map(a => ({ value: a.id, label: a.nom }))
-               ]}
-               // icon={Store}  // Building isn't directly imported but Store is available
-             />
+            <SelectField
+              label="Agence *"
+              name="agenceId"
+              value={formData.agenceId || ''}
+              onChange={(e) => handleChange('agenceId', e.target.value)}
+              error={errors.agenceId}
+              options={[
+                { value: '', label: "Sélectionner l'agence" },
+                ...agences.map(a => ({ value: a.id, label: a.nom }))
+              ]}
+            />
           )}
 
           <SelectField
-             label="Statut"
-             name="status"
-             value={formData.status}
-             onChange={(e) => handleChange('status', e.target.value)}
-             options={[
-                 { value: 'Actif', label: 'Actif' },
-                 { value: 'Suspendu', label: 'Suspendu' },
-                 { value: 'Inactif', label: 'Inactif' }
-             ]}
-          />
-
-          <SelectField
-             label="Segment"
-             name="segment"
-             value={formData.segment}
-             onChange={(e) => handleChange('segment', e.target.value)}
-             options={[
-                 { value: 'Nouveau', label: 'Nouveau' },
-                 { value: 'Standard', label: 'Standard' },
-                 { value: 'VIP', label: 'VIP' }
-             ]}
+            label="Segment"
+            name="segment"
+            value={formData.segment}
+            onChange={(e) => handleChange('segment', e.target.value)}
+            options={[
+              { value: 'Nouveau', label: 'Nouveau' },
+              { value: 'Standard', label: 'Standard' },
+              { value: 'VIP', label: 'VIP' }
+            ]}
           />
         </div>
 
@@ -475,166 +531,263 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           </div>
         </div>
 
-        {/* Documents */}
-        <div className="grid md:grid-cols-2 gap-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-             <div className="space-y-4">
-               <h4 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                   <User className="w-5 h-5" /> Photo de Profil
-               </h4>
-               
-               <div className="flex gap-4 items-start">
-                  {formData.photoProfile ? (
-                      <div className="relative group">
-                          <img 
-                              src={formData.photoProfile} 
-                              className="w-32 h-32 object-cover rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-sm" 
-                              alt="Profil" 
-                          />
-                          <button
-                              type="button"
-                              onClick={() => handleChange('photoProfile', '')}
-                              className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md transition-transform hover:scale-110"
-                          >
-                              <Trash2 size={14} />
-                          </button>
-                      </div>
-                  ) : (
-                      <div className="flex gap-3 w-full">
-                          <button 
-                              type="button" 
-                              onClick={() => setIsLivenessOpen(true)}
-                              className="flex-1 h-32 rounded-xl flex flex-col items-center justify-center p-0 border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-cyan-500 dark:hover:border-cyan-400 bg-slate-50 dark:bg-slate-800/50 hover:bg-cyan-50/50 dark:hover:bg-cyan-900/10 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all group"
-                          >
-                              <div className="p-3 bg-slate-200 dark:bg-slate-700 rounded-full mb-2 group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/30 transition-colors">
-                                <Video size={24} className="text-slate-500 dark:text-slate-300 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
-                              </div>
-                              <span className="text-sm font-semibold">Caméra</span>
-                          </button>
-                          
-                          <label className="flex-1 cursor-pointer h-32 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-cyan-500 dark:hover:border-cyan-400 bg-slate-50 dark:bg-slate-800/50 hover:bg-cyan-50/50 dark:hover:bg-cyan-900/10 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all group">
-                              <div className="p-3 bg-slate-200 dark:bg-slate-700 rounded-full mb-2 group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/30 transition-colors">
-                                <Upload size={24} className="text-slate-500 dark:text-slate-300 group-hover:text-cyan-600 dark:group-hover:text-cyan-400" />
-                              </div>
-                              <span className="text-sm font-semibold">Uploader</span>
-                              <input type="file" accept="image/*" onChange={handleProfileUpload} className="hidden" />
-                          </label>
-                      </div>
-                  )}
-               </div>
-             </div>
+        {/* Photo & Identity Section - REDESIGNED */}
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="grid md:grid-cols-2 gap-8">
 
-             <div className="space-y-4">
-                <h4 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-5 h-5" /> Pièces d'identité
-                </h4>
-                
-                <div className="grid grid-cols-12 gap-3 items-end">
-                   <div className="col-span-4">
-                        <SelectField
-                            label="Type"
-                            name="typePiece"
-                            value={formData.typePiece || 'CNI'}
-                            onChange={(e) => handleChange('typePiece', e.target.value)}
-                            options={[
-                                { value: 'CNI', label: 'CNI' },
-                                { value: 'Passeport', label: 'Passeport' },
-                                { value: 'Permis', label: 'Permis' },
-                            ]}
-                            className="mb-0"
-                        />
-                   </div>
-                   <div className="col-span-8">
-                       <FormField
-                           label="Numéro"
-                           name="numeroPiece"
-                           value={formData.numeroPiece || ''}
-                           onChange={(e) => handleChange('numeroPiece', e.target.value)}
-                           placeholder="Numéro de pièce"
-                           error={errors.numeroPiece}
-                           className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500 mb-0"
-                       />
-                   </div>
-                </div>
+            {/* ========== AVATAR SECTION (Centered) ========== */}
+            <div className="flex flex-col items-center space-y-4">
+              <h4 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 self-start">
+                <User className="w-5 h-5" /> Photo de Profil
+              </h4>
 
-                <div className="grid grid-cols-2 gap-3">
-                     <Button 
-                         type="button" 
-                         variant="secondary"
-                         onClick={() => setIsDocCameraOpen(true)} 
-                         icon={Camera}
-                         className="w-full justify-center"
-                      >
-                         Scanner
-                     </Button>
-                     <label className="cursor-pointer">
-                         <div className="w-full h-10 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-white rounded-lg flex items-center justify-center gap-2 font-medium transition-colors text-sm">
-                            <Upload size={18} />
-                            Importer
-                         </div>
-                         {/* ACCEPT PDF */}
-                         <input type="file" multiple accept="image/*,application/pdf" onChange={handleDocUpload} className="hidden" />
-                     </label>
-                </div>
+              <div className="relative">
+                {formData.photoProfile ? (
+                  // Has photo - Show avatar with edit/delete buttons
+                  <div className="relative">
+                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-700 shadow-xl">
+                      <img
+                        src={getFileDisplayUrl(formData.photoProfile)}
+                        className="w-full h-full object-cover"
+                        alt="Profil"
+                        onError={(e) => {
+                          const nameFallback = `${formData.prenom || ''} ${formData.nom || ''}`.trim();
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameFallback || 'Client')}&size=128&background=1e293b&color=94a3b8`;
+                        }}
+                      />
+                    </div>
 
-                {pieceIdentite.length > 0 && (
-                     <div className="grid grid-cols-3 gap-2 mt-2">
-                        {pieceIdentite.map((doc, idx) => {
-                            const isPdf = doc.startsWith('data:application/pdf');
-                            return (
-                                <div key={idx} className="relative group">
-                                    {isPdf ? (
-                                        <div className="w-full h-20 bg-red-500/10 border border-red-500/30 rounded-lg flex flex-col items-center justify-center p-2">
-                                            <FileText className="text-red-500 mb-1" size={24} />
-                                            <span className="text-[10px] text-red-500 font-medium">PDF</span>
-                                        </div>
-                                    ) : (
-                                        <img src={doc} className="w-full h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm" />
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const newPieces = pieceIdentite.filter((_, i) => i !== idx);
-                                            setPieceIdentite(newPieces);
-                                            handleChange('photoUrl', JSON.stringify(newPieces));
-                                        }}
-                                        className="absolute -top-1.5 -right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
-                                </div>
-                            );
-                        })}
-                     </div>
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleChange('photoProfile', '');
+                        handleDocumentChange('AVATAR', null);
+                      }}
+                      className="absolute -top-1 -right-1 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-transform hover:scale-110"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+
+                    {/* Camera edit button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsLivenessOpen(true)}
+                      className="absolute bottom-0 right-0 p-3 bg-cyan-500 hover:bg-cyan-400 text-white rounded-full shadow-lg transition-all hover:scale-110"
+                    >
+                      <Camera size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  // No photo - Show Avatar upload component
+                  <div className="relative">
+                    <SmartDocumentUpload
+                      label="Photo"
+                      documentType="AVATAR"
+                      variant="avatar"
+                      isPrivate={false}
+                      onUploadComplete={handleAvatarUpload}
+                      onRemove={() => {
+                        handleChange('photoProfile', '');
+                        handleDocumentChange('AVATAR', null);
+                      }}
+                    />
+
+                    {/* Alternative: Camera/Liveness capture button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsLivenessOpen(true)}
+                      className="absolute -bottom-2 -left-2 p-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-full shadow-lg transition-all hover:scale-110 border-2 border-slate-800"
+                      title="Prendre une photo"
+                    >
+                      <Video size={16} />
+                    </button>
+                  </div>
                 )}
-             </div>
+              </div>
+
+              <p className="text-xs text-slate-500 text-center max-w-[200px]">
+                Photo de profil visible sur la fiche client et les documents
+              </p>
+            </div>
+
+            {/* ========== IDENTITY DOCUMENTS SECTION ========== */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileText className="w-5 h-5" /> Pièces d'identité
+              </h4>
+
+              {/* ID Type Selector - Radio Cards */}
+              <div className="grid grid-cols-3 gap-2">
+                {ID_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleChange('typePiece', value)}
+                    className={`
+                      flex flex-col items-center gap-1.5 p-3 rounded-xl font-medium transition-all duration-200
+                      ${formData.typePiece === value
+                        ? 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/25 scale-[1.02]'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+                      }
+                    `}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-xs">{label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* ID Number - Floating Label Style */}
+              <div className="relative mt-4">
+                <input
+                  id="numeroPiece"
+                  type="text"
+                  value={formData.numeroPiece || ''}
+                  onChange={(e) => handleChange('numeroPiece', e.target.value)}
+                  placeholder=" "
+                  className={`
+                    peer w-full pt-5 pb-2 px-4 
+                    bg-slate-800 border-2 rounded-xl
+                    text-white text-sm
+                    placeholder-transparent
+                    focus:outline-none focus:ring-0
+                    transition-colors duration-200
+                    ${errors.numeroPiece
+                      ? 'border-red-500 focus:border-red-500'
+                      : 'border-slate-700 focus:border-cyan-500'
+                    }
+                  `}
+                />
+                <label
+                  htmlFor="numeroPiece"
+                  className={`
+                    absolute left-4 transition-all duration-200 pointer-events-none
+                    peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-sm
+                    peer-focus:top-2 peer-focus:text-xs peer-focus:-translate-y-0
+                    top-2 text-xs -translate-y-0
+                    ${errors.numeroPiece ? 'text-red-400' : 'text-slate-400 peer-focus:text-cyan-400'}
+                  `}
+                >
+                  {formData.typePiece === 'CNI' ? 'N° CNI' : formData.typePiece === 'PASSPORT' ? 'N° Passeport' : 'Numéro de pièce'}
+                </label>
+                {errors.numeroPiece && (
+                  <p className="mt-1 text-xs text-red-400">{errors.numeroPiece}</p>
+                )}
+              </div>
+
+              {/* Document Upload Grid - Layout changes based on ID type */}
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                {/* Front document - Always visible */}
+                <SmartDocumentUpload
+                  label={formData.typePiece === 'PASSPORT' ? 'Page Principale' : 'Recto'}
+                  documentType="ID_CARD_FRONT"
+                  existingDocument={uploadedDocs.ID_CARD_FRONT}
+                  isPrivate={true}
+                  aspectRatio="card"
+                  watermarkIcon="front"
+                  accept="image/png,image/jpeg,image/jpg,application/pdf"
+                  ctaText={formData.typePiece === 'PASSPORT' ? 'Scanner la Page' : 'Scanner le Recto'}
+                  onUploadComplete={(doc) => handleDocumentChange('ID_CARD_FRONT', doc)}
+                  onRemove={() => handleDocumentChange('ID_CARD_FRONT', null)}
+                />
+
+                {/* Back document - Hidden for Passport, replaced by Proof of Address */}
+                <AnimatePresence mode="wait">
+                  {showBackDocument ? (
+                    <motion.div
+                      key="back-document"
+                      initial={{ opacity: 0, scale: 0.9, x: 20 }}
+                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, x: -20 }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                    >
+                      <SmartDocumentUpload
+                        label="Verso"
+                        documentType="ID_CARD_BACK"
+                        existingDocument={uploadedDocs.ID_CARD_BACK}
+                        isPrivate={true}
+                        aspectRatio="card"
+                        watermarkIcon="back"
+                        accept="image/png,image/jpeg,image/jpg,application/pdf"
+                        ctaText="Scanner le Verso"
+                        onUploadComplete={(doc) => handleDocumentChange('ID_CARD_BACK', doc)}
+                        onRemove={() => handleDocumentChange('ID_CARD_BACK', null)}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="proof-address-inline"
+                      initial={{ opacity: 0, scale: 0.9, x: 20 }}
+                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, x: -20 }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                    >
+                      <SmartDocumentUpload
+                        label="Justificatif de Domicile"
+                        documentType="PROOF_OF_ADDRESS"
+                        existingDocument={uploadedDocs.PROOF_OF_ADDRESS}
+                        isPrivate={true}
+                        aspectRatio="card"
+                        watermarkIcon="scan"
+                        accept="image/png,image/jpeg,image/jpg,application/pdf"
+                        ctaText="Ajouter un justificatif"
+                        onUploadComplete={(doc) => handleDocumentChange('PROOF_OF_ADDRESS', doc)}
+                        onRemove={() => handleDocumentChange('PROOF_OF_ADDRESS', null)}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Proof of Address - Only shown below for CNI/Other */}
+              <AnimatePresence>
+                {showBackDocument && (
+                  <motion.div 
+                    className="mt-3"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <SmartDocumentUpload
+                      label="Justificatif de Domicile"
+                      documentType="PROOF_OF_ADDRESS"
+                      existingDocument={uploadedDocs.PROOF_OF_ADDRESS}
+                      isPrivate={true}
+                      aspectRatio="video"
+                      watermarkIcon="scan"
+                      accept="image/png,image/jpeg,image/jpg,application/pdf"
+                      ctaText="Ajouter un justificatif"
+                      onUploadComplete={(doc) => handleDocumentChange('PROOF_OF_ADDRESS', doc)}
+                      onRemove={() => handleDocumentChange('PROOF_OF_ADDRESS', null)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700 mt-6">
-             <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Annuler</Button>
-             <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting}>
-                 {isSubmitting ? (
-                     <span className="flex items-center gap-2">
-                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                         Traitement...
-                     </span>
-                 ) : client ? 'Mettre à jour' : 'Enregistrer'}
-             </Button>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Annuler</Button>
+          <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting}>
+            {isSubmitting ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Traitement...
+              </span>
+            ) : client ? 'Mettre à jour' : 'Enregistrer'}
+          </Button>
         </div>
       </form>
 
-      {/* Security Modals */}
+      {/* Security Modal */}
       <FaceLivenessCapture
         isOpen={isLivenessOpen}
         onClose={() => setIsLivenessOpen(false)}
         onCapture={handleProfileCapture}
         title="Photo de Profil"
-      />
-
-      <CameraCapture
-        isOpen={isDocCameraOpen}
-        onClose={() => setIsDocCameraOpen(false)}
-        onCapture={handleDocCapture}
-        title="Scanner un document"
       />
     </Modal>
   );

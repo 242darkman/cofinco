@@ -7,6 +7,7 @@ interface AppShellProps {
   sidebar: React.ReactNode;
   header: React.ReactNode;
   children: React.ReactNode;
+  bottomNav?: React.ReactNode;
   sidebarWidthOpen?: string;
   sidebarWidthClosed?: string;
   contentOffsetOpen?: string;
@@ -20,6 +21,7 @@ export default function AppShell({
   sidebar,
   header,
   children,
+  bottomNav,
   sidebarWidthOpen = 'w-64',
   sidebarWidthClosed = 'w-16',
   contentOffsetOpen = 'lg:ml-64',
@@ -27,6 +29,7 @@ export default function AppShell({
 }: AppShellProps) {
   const sidebarWidth = sidebarOpen ? sidebarWidthOpen : sidebarWidthClosed;
   const contentOffset = sidebarOpen ? contentOffsetOpen : contentOffsetClosed;
+  const hasBottomNav = Boolean(bottomNav);
 
   // UX: close with Escape on mobile overlay
   useEffect(() => {
@@ -97,7 +100,12 @@ export default function AppShell({
         </header>
 
         {/* Scroll container */}
-        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-surface">
+        <main
+          className={[
+            'flex-1 min-h-0 overflow-y-auto overscroll-contain bg-surface',
+            isMobile && hasBottomNav ? 'pb-24' : ''
+          ].join(' ')}
+        >
           {/* Content padding */}
           <div className="px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
             {children}
@@ -107,6 +115,12 @@ export default function AppShell({
           <div className="h-[env(safe-area-inset-bottom)]" />
         </main>
       </div>
+
+      {hasBottomNav && (
+        <div className="lg:hidden">
+          {bottomNav}
+        </div>
+      )}
     </div>
   );
 }

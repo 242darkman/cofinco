@@ -3,8 +3,52 @@ import {
     comptes, transactionsCompte, plansEpargne, objectifsEpargne,
     sessionsCaisse, operationsCaisse, shiftsCaisse, caisseSecurityCodes, caisseCodeUsages, comptageBillets,
     factures, lignesFactures, modelesFactures, caisses, clients, agences, caisseAssignations, users,
-    dureesSuggerees, mouvementsFinanciers, evenementsOutbox, coffresForts
+    dureesSuggerees, mouvementsFinanciers, evenementsOutbox, coffresForts, produitsCompte
   } from "@shared/schema";
+
+// ============================================================================
+// ERREUR TYPÉE : SOLDE INSUFFISANT POUR DÉCAISSEMENT
+// ============================================================================
+
+export interface InsufficientFundsErrorData {
+  code: "INSUFFICIENT_FUNDS";
+  message: string;
+  required: number;
+  current: number;
+  deficit: number;
+  coffreId: string;
+  coffreCode: string;
+  coffreName?: string;
+}
+
+export class DecaissementInsufficientFundsError extends Error {
+  public readonly code = "INSUFFICIENT_FUNDS" as const;
+  public readonly httpStatus = 400;
+  public readonly data: InsufficientFundsErrorData;
+
+  constructor(
+    required: number,
+    current: number,
+    coffreId: string,
+    coffreCode: string,
+    coffreName?: string
+  ) {
+    const deficit = required - current;
+    const message = `Solde du coffre insuffisant pour cette opération`;
+    super(message);
+    this.name = "DecaissementInsufficientFundsError";
+    this.data = {
+      code: "INSUFFICIENT_FUNDS",
+      message,
+      required,
+      current,
+      deficit,
+      coffreId,
+      coffreCode,
+      coffreName,
+    };
+  }
+}
   import {
     type Credit, type InsertCredit, type DemandeCredit, type InsertDemandeCredit,
     type EnqueteCredit, type InsertEnqueteCredit, type Remboursement, type InsertRemboursement,
@@ -21,8 +65,9 @@ import {
     creditRefundRequests, type CreditRefundRequest, type InsertCreditRefundRequest
   } from "@shared/schema";
   import { db } from "../db";
-import { eq, desc, and, or, gte, lte, gt, count, inArray, sql, getTableColumns, aliasedTable } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, lt, gt, count, inArray, sql, getTableColumns, aliasedTable, isNull, isNotNull } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
+import { computeSessionStatus } from "../services/caisse/session-status";
 
 
   
@@ -411,8 +456,31 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 
   // Comptes
   export async function getCompte(id: string): Promise<Compte | undefined> {
-    const [compte] = await db.select().from(comptes).where(eq(comptes.id, id));
-    return compte ? enrichCompteData(compte) : undefined;
+    const [result] = await db
+      .select({ compte: comptes, produit: produitsCompte })
+      .from(comptes)
+      .leftJoin(produitsCompte, eq(comptes.produitId, produitsCompte.id))
+      .where(eq(comptes.id, id))
+      .limit(1);
+
+    if (!result?.compte) return undefined;
+
+    const produitInfo = result.produit
+      ? {
+          id: result.produit.id,
+          code: result.produit.code,
+          nom: result.produit.nom,
+          typeCompte: result.produit.typeCompte,
+          tauxInteret: Number(result.produit.tauxInteret || 0),
+          taux_interet: Number(result.produit.tauxInteret || 0),
+        }
+      : null;
+
+    return {
+      ...enrichCompteData(result.compte),
+      produit: produitInfo,
+      taux_interet: produitInfo?.tauxInteret ?? undefined,
+    } as any;
   }
   
   export async function getComptesByClient(clientId: string): Promise<Compte[]> {
@@ -497,11 +565,13 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     let dataQuery = db.select({
       compte: comptes,
       client: clients,
-      user: users
+      user: users,
+      produit: produitsCompte,
     })
     .from(comptes)
     .leftJoin(clients, eq(comptes.clientId, clients.id))
     .leftJoin(users, eq(clients.userId, users.id))
+    .leftJoin(produitsCompte, eq(comptes.produitId, produitsCompte.id))
     .orderBy(desc(comptes.createdAt))
     .limit(limit)
     .offset(offset);
@@ -511,8 +581,22 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
       : await dataQuery;
 
     // Transform data with client info embedded
-    const data = results.map(({ compte, client, user }) => ({
-      ...enrichCompteData(compte),
+    const data = results.map(({ compte, client, user, produit }) => {
+      const produitInfo = produit
+        ? {
+            id: produit.id,
+            code: produit.code,
+            nom: produit.nom,
+            typeCompte: produit.typeCompte,
+            tauxInteret: Number(produit.tauxInteret || 0),
+            taux_interet: Number(produit.tauxInteret || 0),
+          }
+        : null;
+
+      return {
+        ...enrichCompteData(compte),
+        produit: produitInfo,
+        taux_interet: produitInfo?.tauxInteret ?? undefined,
       // Embedded client info
       clients: client ? {
         id: client.id,
@@ -524,7 +608,8 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
         agence: client.agence,
         photo_url: user?.photoProfile || client.photoProfile
       } : null
-    }));
+      };
+    });
 
     return {
       data,
@@ -673,6 +758,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     const r = results[0];
     return {
       ...r.session,
+      computedStatus: computeSessionStatus(r.session),
       caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu'
     };
   }
@@ -689,7 +775,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
     .where(and(
       eq(sessionsCaisse.caissierId, userId),
-      eq(sessionsCaisse.statut, 'Ouverte')
+      isNull(sessionsCaisse.closedAt)
     ));
 
     if (results.length === 0) return undefined;
@@ -697,13 +783,14 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     const r = results[0];
     return {
       ...r.session,
+      computedStatus: computeSessionStatus(r.session),
       caisse_nom: r.caisse_nom || 'Caisse Inconnue',
       caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Moi'
     };
   }
 
   export async function getActiveSessions(): Promise<SessionCaisse[]> {
-    return db.select().from(sessionsCaisse).where(eq(sessionsCaisse.statut, 'Ouverte'));
+    return db.select().from(sessionsCaisse).where(isNull(sessionsCaisse.closedAt));
   }
 
   export async function getAllSessionsCaisse(filter: { agence?: string; statut?: string } = {}): Promise<any[]> {
@@ -727,17 +814,31 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     }
 
     if (filter.statut) {
-      conditions.push(eq(sessionsCaisse.statut, filter.statut as any));
+      const normalized = filter.statut.toUpperCase();
+      const now = new Date();
+      if (normalized === "OPEN" || normalized === "OUVERTE") {
+        conditions.push(
+          and(
+            isNull(sessionsCaisse.closedAt),
+            or(isNull(sessionsCaisse.timeoutAt), gte(sessionsCaisse.timeoutAt, now))
+          )
+        );
+      } else if (normalized === "TIMED_OUT" || normalized === "TIMEOUT") {
+        conditions.push(and(isNull(sessionsCaisse.closedAt), lt(sessionsCaisse.timeoutAt, now)));
+      } else if (normalized === "CLOSED" || normalized === "FERMEE" || normalized === "FERMÉE") {
+        conditions.push(isNotNull(sessionsCaisse.closedAt));
+      }
     }
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
 
-    const results = await query.orderBy(desc(sessionsCaisse.dateOuverture));
+    const results = await query.orderBy(desc(sessionsCaisse.openedAt));
 
     return results.map(r => ({
       ...r.session,
+      computedStatus: computeSessionStatus(r.session),
       caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim() || 'Caissier Inconnu',
       caisse_nom: r.caisse_nom,
       agence_nom: r.agence_nom || 'Agence Inconnue',
@@ -759,8 +860,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     const [session] = await db.update(sessionsCaisse)
       .set({
         ...closeData,
-        statut: 'Fermée',
-        dateFermeture: new Date(),
+        closedAt: new Date(),
         soldeReel: closeData.soldeReel,
         ecart: closeData.ecart
       })
@@ -775,7 +875,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
   }
 
   export async function getSessionsByCaissier(caissierId: string): Promise<SessionCaisse[]> {
-    return db.select().from(sessionsCaisse).where(eq(sessionsCaisse.caissierId, caissierId)).orderBy(desc(sessionsCaisse.dateOuverture));
+    return db.select().from(sessionsCaisse).where(eq(sessionsCaisse.caissierId, caissierId)).orderBy(desc(sessionsCaisse.openedAt));
   }
 
   export async function getAllOperationsCaisse(): Promise<OperationCaisse[]> {
@@ -900,7 +1000,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
     .from(caisses)
     .leftJoin(sessionsCaisse, and(
       eq(caisses.id, sessionsCaisse.caisseId),
-      eq(sessionsCaisse.statut, 'Ouverte')
+      isNull(sessionsCaisse.closedAt)
     ))
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id));
 
@@ -913,6 +1013,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
       ...r.caisse,
       active_session: r.session ? {
         ...r.session,
+        computedStatus: computeSessionStatus(r.session),
         caissier_nom: `${r.caissier_nom || ''} ${r.caissier_prenom || ''}`.trim()
       } : null
     }));
@@ -2057,12 +2158,19 @@ export async function createDecaissementWithLedger(data: {
 
     if (!targetCoffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
 
-    // 3. Check Balance
+    // 3. Check Balance AVANT la transaction
     const montant = parseFloat(data.montant);
     const soldeCoffre = parseFloat(targetCoffre.solde || "0");
 
     if (soldeCoffre < montant) {
-        throw new Error(`Solde du coffre insuffisant (${soldeCoffre.toLocaleString()} < ${montant.toLocaleString()})`);
+        // Erreur typée avec toutes les informations nécessaires pour le workflow de réapprovisionnement
+        throw new DecaissementInsufficientFundsError(
+            montant,
+            soldeCoffre,
+            targetCoffre.id,
+            targetCoffre.code,
+            targetCoffre.nom
+        );
     }
 
     return executeWithLedger(
@@ -2075,6 +2183,7 @@ export async function createDecaissementWithLedger(data: {
             compteId: data.compteId, // Target Account
             methodePaiement: "Virement", // Internal Transfer
             typePaiement: "Décaissement Crédit",
+            agenceId: credit.agenceId, // Pass the agency ID for history filtering
             referenceExterne: data.numeroCredit,
             metadata: { 
                 description: `Décaissement crédit ${data.numeroCredit}`,
@@ -2204,9 +2313,16 @@ export async function getClientPortfolio(clientId: string): Promise<{
  * Create a unified Cash Transaction with full ledger flow.
  * - Updates Account (if applicable)
  * - Updates Session
+ * - Updates Caisse balance (real-time tracking)
  * - Creates Ledger Entry
  * - Creates Transaction Record (if applicable)
  * - Creates Operation Record
+ *
+ * IMPORTANT: Cette fonction est le point d'entrée principal pour toutes
+ * les opérations de caisse client. Elle garantit:
+ * - Double-entry bookkeeping (mouvementsFinanciers)
+ * - Mise à jour atomique de tous les soldes
+ * - Traçabilité complète
  */
 export async function createCashTransactionWithLedger(data: {
   sessionId: string;
@@ -2217,127 +2333,162 @@ export async function createCashTransactionWithLedger(data: {
   compteId?: string;
   description?: string;
   idempotencyKey?: string;
-}, userId?: string): Promise<{ 
-  operation: OperationCaisse; 
-  transaction?: TransactionCompte; 
-  mouvement: MouvementFinancier 
+}, userId?: string): Promise<{
+  operation: OperationCaisse;
+  transaction?: TransactionCompte;
+  mouvement: MouvementFinancier;
+  soldes?: {
+    sessionApres: string;
+    compteApres?: string;
+    caisseApres?: string;
+  };
 }> {
+  // Import centralized config
+  const {
+    isIncomingOperation,
+    isOutgoingOperation,
+    getSensMouvement,
+    getVersementOperation,
+    getRetraitOperation
+  } = await import("@shared/config/caisse-operations");
 
-  // 1. Determine direction and validation
-  const opType = data.typeOperation.toLowerCase();
-  
-  // Define IN/OUT based on business logic
-  // IN: Money comes INTO the cash box (Deposit, etc.)
-  // OUT: Money goes OUT of the cash box (Withdrawal, etc.)
-  const IN_TYPES = ['versement', 'dépôt', 'depot', 'depôt', 'dépôt épargne', 'encaissement', 'remboursement crédit'];
-  const OUT_TYPES = ['retrait', 'retrait épargne', 'décaissement', 'décaissement crédit', 'frais'];
+  const montantNum = parseFloat(data.montant);
+  if (!Number.isFinite(montantNum) || montantNum <= 0) {
+    throw new Error("Le montant doit être un nombre positif");
+  }
+
+  // Determine direction using centralized config
+  const isIncoming = isIncomingOperation(data.typeOperation);
+  const isOutgoing = isOutgoingOperation(data.typeOperation);
 
   let sens: SensMouvement;
-  let cashDelta: number; // Impact on Cash Session
-  let accountDelta: number = 0; // Impact on Client Account
+  let cashDelta: number; // Impact on Cash Session (+ = entrée, - = sortie)
+  let accountDelta: number = 0; // Impact on Client Account (+ = crédit, - = débit)
 
-  // Robust direction detection
-  const isDebit = opType.startsWith('retrait') || 
-                  opType.startsWith('décaissement') || 
-                  opType.startsWith('frais') ||
-                  OUT_TYPES.some(t => opType.includes(t));
-
-  const isCredit = opType.startsWith('versement') || 
-                   opType.startsWith('dépôt') || 
-                   opType.startsWith('depot') || 
-                   opType.startsWith('encaissement') || 
-                   opType.startsWith('remboursement') ||
-                   IN_TYPES.some(t => opType.includes(t));
-
-  if (isCredit) {
-      sens = "Crédit"; // Credit to the system (Cash in) or Account?
-      // WAIT. "Versement" means + on Account (Credit) BUT + on Cash (Debit? No, Cash In is DEBIT for Caisse asset? Standard banking: Client Credit = Liability for bank. Caisse In = Asset increase.)
-      // In this system:
-      // "Crédit" usually means Money IN to the system/caisse?
-      // Let's check sessionDelta in previous function. Debit = -, Credit = +. So Credit = Cash In.
-      // Account Delta: Deposit -> + Balance.
-      cashDelta = parseFloat(data.montant);
-      accountDelta = parseFloat(data.montant); 
-  } else if (isDebit) {
-      sens = "Débit"; // Debit from system (Cash out)
-      cashDelta = -parseFloat(data.montant);
-      accountDelta = -parseFloat(data.montant); 
+  if (isIncoming) {
+    sens = "Crédit"; // Argent entrant dans l'institution
+    cashDelta = montantNum;
+    accountDelta = montantNum; // Compte client crédité (sa créance augmente)
+  } else if (isOutgoing) {
+    sens = "Débit"; // Argent sortant de l'institution
+    cashDelta = -montantNum;
+    accountDelta = -montantNum; // Compte client débité (sa créance diminue)
   } else {
-      // Default or Neutral - Assume no cash impact unless specified? 
-      // safer to require explicit types, but for now fallback to Neutral/Info
-      sens = "Crédit"; 
-      cashDelta = 0; 
+    // Opération neutre ou inconnue - erreur
+    throw new Error(`Type d'opération non reconnu: ${data.typeOperation}. Utiliser un type valide (Versement, Retrait, etc.)`);
   }
 
-  // Double check Account CompteId if provided
-  let compte: any; 
+  // Vérifier le compte si fourni
+  let compte: any;
   if (data.compteId) {
-      const [foundCompte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
-      if (!foundCompte) throw new Error(`Compte ${data.compteId} not found`);
-      compte = foundCompte;
+    const [foundCompte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
+    if (!foundCompte) throw new Error(`Compte ${data.compteId} non trouvé`);
+
+    // Validation du solde pour les retraits
+    if (isOutgoing) {
+      const soldeActuel = parseFloat(foundCompte.soldeCourant || "0");
+      if (soldeActuel < montantNum) {
+        throw new Error(`Solde insuffisant. Disponible: ${soldeActuel.toLocaleString()} FCFA, Demandé: ${montantNum.toLocaleString()} FCFA`);
+      }
+
+      // Vérifier si le compte n'est pas bloqué
+      if (foundCompte.blocageActif) {
+        throw new Error(`Compte bloqué. Motif: ${foundCompte.blocageMotif || "Non spécifié"}`);
+      }
+    }
+
+    compte = foundCompte;
   }
 
-  // Get session
-  const [session] = await db.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, data.sessionId));
-  if (!session) throw new Error(`Session ${data.sessionId} not found`);
+  // Récupérer la session avec la caisse associée
+  const [session] = await db
+    .select({
+      session: sessionsCaisse,
+      caisse: caisses
+    })
+    .from(sessionsCaisse)
+    .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
+    .where(eq(sessionsCaisse.id, data.sessionId));
 
-  // Generate References
+  if (!session?.session) throw new Error(`Session ${data.sessionId} non trouvée`);
+  if (session.session.closedAt) throw new Error("La session de caisse est fermée");
+
+  // Vérifier le solde de caisse pour les retraits
+  if (isOutgoing && session.caisse) {
+    const soldeCaisse = parseFloat(session.caisse.solde || "0");
+    if (soldeCaisse < montantNum) {
+      throw new Error(`Solde caisse insuffisant. Disponible: ${soldeCaisse.toLocaleString()} FCFA`);
+    }
+  }
+
+  // Générer la référence unique
   const timestamp = Date.now().toString().slice(-8);
-  const refRandom = Math.floor(Math.random() * 1000);
+  const refRandom = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
   const opReference = `OP-${timestamp}-${refRandom}`;
-  
-  // Ledger Execution
+
+  // Exécution atomique via le ledger
   return executeWithLedger(
-    "CAISSE", // Source Module
+    "CAISSE",
     {
       montant: data.montant,
       sens,
       clientId: data.clientId,
-      compteId: data.compteId, // Link to account if present
+      compteId: data.compteId,
       sessionCaisseId: data.sessionId,
-      agenceId: session.agenceId || undefined,
+      agenceId: session.session.agenceId || undefined,
       methodePaiement: data.methodePaiement,
-      typePaiement: data.typeOperation as any, // Map to Enum if needed, but string allowed usually
+      typePaiement: data.typeOperation as any,
       idempotencyKey: data.idempotencyKey,
-      referenceExterne: opReference
+      referenceExterne: opReference,
+      metadata: {
+        caisseId: session.session.caisseId,
+        typeOperation: data.typeOperation,
+        description: data.description,
+      },
     },
     async (tx, mouvement) => {
-      // 1. Update Session Balance (Atomic)
+      // 1. Mettre à jour le solde de la session (théorique)
       const nouveauSoldeSession = await updateSessionSolde(tx, data.sessionId, cashDelta);
 
-      // 2. Update Account Balance (Atomic) - ONLY if account implicated
+      // 2. Mettre à jour le solde de la caisse physique (réel en temps réel)
+      let nouveauSoldeCaisse: string | undefined;
+      if (session.session.caisseId) {
+        nouveauSoldeCaisse = await updateCaisseSolde(tx, session.session.caisseId, cashDelta);
+      }
+
+      // 3. Mettre à jour le compte client si applicable
       let nouveauSoldeCompte: string | undefined;
       let transaction: TransactionCompte | undefined;
 
       if (data.compteId && compte) {
-          nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, accountDelta);
-          
-          // Map Transaction Type
-          const transType = (accountDelta > 0) 
-            ? (compte.typeCompte === 'Courant' ? 'Dépôt Courant' : 'Dépôt Épargne')
-            : (compte.typeCompte === 'Courant' ? 'Retrait Courant' : 'Retrait Épargne');
+        nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, accountDelta);
 
-          // Validate userId
-          const validatedUserIdForTx = await validateUserId(tx, userId);
+        // Déterminer le type de transaction selon le type de compte
+        const transType = (accountDelta > 0)
+          ? (compte.typeCompte === 'Courant' ? 'Dépôt Courant' :
+             compte.typeCompte === 'Bloqué' ? 'Dépôt Bloqué' : 'Dépôt Épargne')
+          : (compte.typeCompte === 'Courant' ? 'Retrait Courant' :
+             compte.typeCompte === 'Bloqué' ? 'Retrait Bloqué' : 'Retrait Épargne');
 
-          // Create Transaction Record
-          const [createdTx] = await tx.insert(transactionsCompte).values({
-              compteId: data.compteId,
-              mouvementId: mouvement.id,
-              typePaiement: transType as any,
-              montant: data.montant,
-              soldeApres: nouveauSoldeCompte,
-              methodePaiement: data.methodePaiement as any,
-              observations: data.description || `Opération Caisse: ${data.typeOperation}`,
-              createdBy: validatedUserIdForTx
-          }).returning();
-          transaction = createdTx;
+        const validatedUserIdForTx = await validateUserId(tx, userId);
+
+        // Créer l'enregistrement de transaction compte
+        const [createdTx] = await tx.insert(transactionsCompte).values({
+          compteId: data.compteId,
+          mouvementId: mouvement.id,
+          typePaiement: transType as any,
+          montant: data.montant,
+          soldeApres: nouveauSoldeCompte,
+          methodePaiement: data.methodePaiement as any,
+          observations: data.description || `Opération Caisse: ${data.typeOperation}`,
+          createdBy: validatedUserIdForTx,
+        }).returning();
+        transaction = createdTx;
       }
 
-      // 3. Validate userId for operation
+      // 4. Créer l'opération de caisse
       const validatedUserIdForOp = await validateUserId(tx, userId);
 
-      // 4. Create Operation Caisse Record
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionId,
         mouvementId: mouvement.id,
@@ -2349,18 +2500,32 @@ export async function createCashTransactionWithLedger(data: {
         clientId: data.clientId,
         createdBy: validatedUserIdForOp,
         idempotencyKey: data.idempotencyKey,
+        statut: "Posté",
       }).returning();
 
       return {
-        result: { operation, transaction },
+        result: {
+          operation,
+          transaction,
+          soldes: {
+            sessionApres: nouveauSoldeSession,
+            compteApres: nouveauSoldeCompte,
+            caisseApres: nouveauSoldeCaisse,
+          },
+        },
         additionalEventData: {
           nouveauSoldeSession,
-          nouveauSoldeCompte
-        }
+          nouveauSoldeCompte,
+        },
       };
     },
     userId
-  ).then(({ result, mouvement }) => ({ ...result, mouvement }));
+  ).then(({ result, mouvement }) => ({
+    operation: result.operation,
+    transaction: result.transaction,
+    mouvement,
+    soldes: result.soldes,
+  }));
 }
 
 /**
@@ -2383,7 +2548,7 @@ export async function validateTransfertWithLedger(
 
     if (!sessionSource) throw new Error("Session source introuvable (archivée ou supprimée?)");
     if (!sessionDest) throw new Error("Session destination introuvable");
-    if (sessionDest.statut !== 'Ouverte') throw new Error("La session de destination doit être ouverte");
+    if (sessionDest.closedAt) throw new Error("La session de destination doit être ouverte");
 
     // Check Sufficient Funds
     const currentSolde = Number(sessionSource.soldeTheorique || sessionSource.soldeInitial || 0);

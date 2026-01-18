@@ -152,8 +152,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
 
     setSearchLoading(true);
     try {
-      const clients = await clientSearchApi.search(trimmedSearch);
-      const data = clients.length > 0 ? clients[0] : null;
+      const response = await clientSearchApi.search(trimmedSearch, { page: 1, perPage: 10 });
+      const data = response.data?.length ? response.data[0] : null;
 
       if (data) {
         setSelectedClient(data);

@@ -1,56 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, MapPin, Phone, TrendingUp, Calendar, Eye, Users, CheckCircle, Clock, FileText, DollarSign, UserPlus, Layers, Satellite, Filter, ArrowRightCircle, History } from 'lucide-react';
-import { agentTerrainApi, visiteTerrainApi } from '../../lib/api-client';
-import AgentTerrainForm from './AgentTerrainForm';
-import AgentTerrainProfile from './AgentTerrainProfile';
-import VisiteTerrainForm from './VisiteTerrainForm';
+import { DollarSign, ArrowRightCircle, Clock, CheckCircle, User, Wifi, WifiOff, History, RefreshCw, UserPlus, Shield } from 'lucide-react';
+import { agentTerrainApi, requestAllPages, caisseAgentApi } from '../../lib/api-client';
+import { authService } from '../../lib/auth';
 import AgentTerrainPaiement from './AgentTerrainPaiement';
-import ProspectionForm from './ProspectionForm';
-import AgentTerrainExtended from './AgentTerrainExtended';
-import AgentTerrainMap from './AgentTerrainMap';
 import SettlementModal from './SettlementModal';
-import AgentHistory from './AgentHistory';
+import ProspectionFormModal from './ProspectionFormModal';
+import AgentSelector from './AgentSelector';
 import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
-
-import Card from '../ui/Card';
-import Button from '../ui/Button';
-import StatCard from '../ui/StatCard';
-import Badge from '../ui/Badge';
-import TabGroup from '../ui/TabGroup';
-import ResponsiveTable, { TableColumn } from '../ui/ResponsiveTable';
-import FormField from '../ui/FormField';
-import SelectField from '../ui/SelectField';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 
 interface Agent {
   id: string;
   nom: string;
   prenom: string;
   telephone: string;
-  email: string;
   zone_affectation: string;
   statut: string;
-  nombre_clients: number;
-  collectes_jour: number;
-  objectif_mensuel: number;
-  performance: number;
-  date_embauche: string;
   photo_url?: string;
 }
 
-interface Visite {
+interface Transaction {
   id: string;
-  agent_id: string;
-  client_id: string;
-  date_visite: string;
-  type_visite: string;
+  type: string;
+  montant: number;
+  clientNom?: string;
+  date: string;
   statut: string;
-  notes: string;
-  montant_collecte?: number;
-  clients?: {
-    nom: string;
-    phone: string;
-  };
 }
 
 interface AgentTerrainProps {
@@ -58,348 +34,396 @@ interface AgentTerrainProps {
 }
 
 export default function AgentTerrain({ activeView }: AgentTerrainProps) {
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [visites, setVisites] = useState<Visite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('agents');
+  const [allAgents, setAllAgents] = useState<Agent[]>([]);
+  const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [agentSummary, setAgentSummary] = useState<{ disponible: number; valide: number } | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+
+  // Auth & Role
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = authService.isAdmin();
   
-  // Modals state
-  const [showAgentForm, setShowAgentForm] = useState(false);
-  const [showVisiteForm, setShowVisiteForm] = useState(false);
-  const [showAgentProfile, setShowAgentProfile] = useState(false);
+  // Target agent: admin uses selected agent, normal agent uses themselves
+  const targetAgentId = isAdmin ? selectedAgentId : currentAgent?.id;
+  
+  // Modals
   const [showPaiementForm, setShowPaiementForm] = useState(false);
-  const [showProspectionForm, setShowProspectionForm] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
-  
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [filterStatut, setFilterStatut] = useState<string>('all');
+  const [showProspectionForm, setShowProspectionForm] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | undefined>();
 
-  // History Receipt State
-  const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
-  const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
+  // Offline queue
+  const { isOnline, pendingCount, queue } = useOfflineQueue();
 
   useEffect(() => {
-    if (activeView) {
-      switch (activeView) {
-        case 'terrain-agents':
-          setActiveTab('agents');
-          break;
-        case 'terrain-visites':
-          setActiveTab('visites');
-          break;
-        case 'terrain-zones':
-          setActiveTab('carte'); // Zones mapped to carte as per discussion or default
-          break;
-        default:
-          setActiveTab('agents');
-      }
-    }
-  }, [activeView]);
-
-  useEffect(() => {
-    loadData();
+    loadAgents();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    await Promise.all([loadAgents(), loadVisites()]);
-    setLoading(false);
-  };
+  // Reload data when target agent changes
+  useEffect(() => {
+    if (targetAgentId) {
+      loadAgentData(targetAgentId);
+    }
+  }, [targetAgentId]);
 
   const loadAgents = async () => {
     try {
-      const data = await agentTerrainApi.getAll();
-      setAgents(Array.isArray(data) ? data : []);
+      const agents = await agentTerrainApi.getAllList();
+      setAllAgents(agents);
+      
+      // For non-admin, set current agent automatically
+      if (!isAdmin) {
+        const activeAgent = agents.find((a: Agent) => a.statut === 'Actif') || agents[0];
+        setCurrentAgent(activeAgent);
+      }
     } catch (error) {
       console.error('Error loading agents:', error);
     }
   };
 
-  const loadVisites = async () => {
+  const loadAgentData = async (agentId: string) => {
+    setLoading(true);
     try {
-      const data = await visiteTerrainApi.getAll();
-      setVisites(Array.isArray(data) ? data : []);
+      // Find agent in list
+      const agent = allAgents.find(a => a.id === agentId);
+      if (agent) {
+        setCurrentAgent(agent);
+      }
+
+      // Load agent balance summary
+      const summary = await caisseAgentApi.getCaisseSummary(agentId);
+      setAgentSummary({
+        disponible: parseFloat(summary.disponible || '0'),
+        valide: parseFloat(summary.soldeValide || '0')
+      });
+
+      // Load recent transactions (last 5)
+      const ops = await caisseAgentApi.listOperations({ agentId, limit: 5 });
+      const opsData = Array.isArray(ops) ? ops : ops.data || [];
+      setRecentTransactions(opsData.slice(0, 5).map((op: any) => ({
+        id: op.id,
+        type: op.type === 'COLLECT_CASH' ? 'Collecte' : 'Remise',
+        montant: parseFloat(op.montant),
+        clientNom: op.client?.nom || 'N/A',
+        date: op.submittedAt || op.createdAt,
+        statut: op.statut
+      })));
     } catch (error) {
-      console.error('Error loading visites:', error);
+      console.error('Error loading agent data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const toNumber = (value: unknown) => {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
+  const loadData = () => {
+    if (targetAgentId) {
+      loadAgentData(targetAgentId);
+    }
   };
 
-  const filteredAgents = agents.filter(agent => {
-    const phone = agent.telephone || '';
-    const zone = agent.zone_affectation || '';
-    const matchSearch = agent.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       phone.includes(searchTerm) ||
-                       zone.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchStatut = filterStatut === 'all' || agent.statut === filterStatut;
-    return matchSearch && matchStatut;
-  });
-
-  const stats = {
-    totalAgents: agents.length,
-    agentsActifs: agents.filter(a => a.statut === 'Actif').length,
-    visitesJour: visites.filter(v =>
-      new Date(v.date_visite).toDateString() === new Date().toDateString()
-    ).length,
-    collecteJour: visites
-      .filter(v => new Date(v.date_visite).toDateString() === new Date().toDateString())
-      .reduce((sum, v) => sum + toNumber(v.montant_collecte), 0)
+  const handlePaymentSuccess = () => {
+    setShowPaiementForm(false);
+    loadData();
   };
 
-  const averagePerformance = agents.length > 0
-    ? Math.round(agents.reduce((sum, a) => sum + toNumber(a.performance), 0) / agents.length)
-    : 0;
+  const handleSettlementSuccess = () => {
+    setShowSettlementModal(false);
+    loadData();
+  };
 
-  // VISITE COLUMNS for ResponsiveTable
-  const visiteColumns: TableColumn<Visite>[] = [
-    { key: 'clients.nom', label: 'Client', primary: true, format: (_, v) => v.clients?.nom || 'Inconnu' },
-    { key: 'type_visite', label: 'Type', badge: true }, // badge rendering handled by table? not fully custom but supported
-    { key: 'date_visite', label: 'Date', format: (val) => new Date(String(val)).toLocaleDateString('fr-FR') },
-    { key: 'montant_collecte', label: 'Montant', format: (val) => val ? `${Number(val).toLocaleString()} FCFA` : '-' },
-    { key: 'statut', label: 'Statut', badge: true }
-  ];
-
-  const handleShowHistoryReceipt = (visite: Visite) => {
-      if (!visite.montant_collecte) return;
-      
-      const rData: ReceiptData = {
-          title: `Reçu ${visite.type_visite}`,
-          reference: `VIS-${visite.id.substring(0, 8)}`,
-          date: new Date(visite.date_visite),
-          type: visite.type_visite,
-          client: {
-              nom: visite.clients?.nom || 'Client',
-              prenom: '',
-              telephone: visite.clients?.phone
-          },
-          items: [{
-              description: visite.notes || visite.type_visite,
-              montant: toNumber(visite.montant_collecte),
-              quantite: 1
-          }],
-          total: toNumber(visite.montant_collecte),
-          modePaiement: 'Espèces', 
-          notes: 'Duplicata historique visite',
-          agent: {
-              nom: agents.find(a => a.id === visite.agent_id)?.nom || 'Agent',
-              prenom: agents.find(a => a.id === visite.agent_id)?.prenom || ''
-          }
-      };
-      
-      setHistoryReceiptData(rData);
-      setShowHistoryReceipt(true);
+  const formatMoney = (amount: number) => amount.toLocaleString('fr-FR');
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white mb-1 sm:mb-2">Agent Terrain</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Gestion des agents de terrain et visites clients</p>
+    <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-6">
+      {/* ═══════════════════════════════════════════════════════════════════
+          HEADER - Agent Info & Balance Hero
+      ═══════════════════════════════════════════════════════════════════ */}
+      <header className="mb-6">
+        {/* Status Bar */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            {isOnline ? (
+              <div className="flex items-center gap-1.5 text-emerald-400 text-xs">
+                <Wifi size={14} />
+                <span>En ligne</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-amber-400 text-xs">
+                <WifiOff size={14} />
+                <span>Hors ligne</span>
+                {pendingCount > 0 && (
+                  <span className="px-1.5 py-0.5 bg-amber-500/20 rounded-full text-[10px] font-bold">
+                    {pendingCount} en attente
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <button 
+            onClick={loadData}
+            disabled={loading}
+            className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button onClick={() => setShowPaiementForm(true)} variant="success" icon={DollarSign} className="flex-1 sm:flex-none justify-center">
-            Paiement
-          </Button>
-          <Button onClick={() => setShowSettlementModal(true)} variant="outline" icon={ArrowRightCircle} className="flex-1 sm:flex-none justify-center text-cyan-500 border-cyan-500/30 hover:bg-cyan-500/10">
-            Remise
-          </Button>
-          <Button onClick={() => setShowAgentForm(true)} variant="primary" icon={Plus} className="flex-1 sm:flex-none justify-center">
-            Agent
-          </Button>
+
+        {/* Admin Supervision Banner */}
+        {isAdmin && selectedAgentId && currentAgent && (
+          <div className="mb-4 px-4 py-3 bg-amber-500/15 border border-amber-500/40 rounded-xl flex items-center gap-3">
+            <Shield size={18} className="text-amber-400 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-amber-300 font-medium">
+                Mode Supervision
+              </p>
+              <p className="text-xs text-amber-400/70">
+                Vous agissez au nom de <strong>{currentAgent.nom} {currentAgent.prenom}</strong>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Agent Card */}
+        <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 border border-slate-700/50 rounded-2xl p-5">
+          {/* Admin: Agent Selector / Agent: Static Display */}
+          {isAdmin ? (
+            <div className="mb-4">
+              <label className="block text-xs text-slate-400 uppercase tracking-wider font-semibold mb-2">
+                Sélectionner un Agent
+              </label>
+              <AgentSelector
+                agents={allAgents}
+                selectedAgentId={selectedAgentId}
+                onSelect={setSelectedAgentId}
+                placeholder="Choisir un agent à superviser..."
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border-2 border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                {currentAgent?.photo_url ? (
+                  <img src={currentAgent.photo_url} alt="" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <User size={28} />
+                )}
+              </div>
+              <div className="flex-1">
+                <h1 className="text-lg font-bold text-white">
+                  {currentAgent ? `${currentAgent.nom} ${currentAgent.prenom}` : 'Agent'}
+                </h1>
+                <p className="text-xs text-slate-400">
+                  {currentAgent?.zone_affectation || 'Zone non assignée'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Balance Hero */}
+          <div className="bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/30 rounded-xl p-4 text-center">
+            <p className="text-xs text-emerald-400/80 uppercase tracking-wider font-semibold mb-1">
+              {isAdmin && !selectedAgentId ? 'Sélectionnez un agent' : 'Solde Disponible'}
+            </p>
+            <p className="text-4xl sm:text-5xl font-black text-emerald-400 tabular-nums">
+              {loading ? (
+                <span className="animate-pulse">---</span>
+              ) : !targetAgentId ? (
+                <span className="text-slate-500">---</span>
+              ) : (
+                formatMoney(agentSummary?.disponible || 0)
+              )}
+            </p>
+            <p className="text-sm text-emerald-400/60 mt-1">FCFA</p>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
-        <StatCard title="Total Agents" value={stats.totalAgents} trend={`${stats.agentsActifs} actifs`} icon={Users} color="primary" className="p-2 sm:p-4" />
-        <StatCard title="Visites 24h" value={stats.visitesJour} trend="Effectuées" icon={CheckCircle} color="success" className="p-2 sm:p-4" />
-        <StatCard title="Collecte" value={`${stats.collecteJour.toLocaleString()} FCFA`} trend="Aujourd'hui" icon={DollarSign} color="warning" className="p-2 sm:p-4" />
-        <StatCard title="Performance" value={`${averagePerformance}%`} trend="Moyenne équipe" icon={TrendingUp} color="primary" className="p-2 sm:p-4" />
-      </div>
+      {/* ═══════════════════════════════════════════════════════════════════
+          HERO ACTION ZONE - Three Action Buttons (2 top + 1 full width)
+      ═══════════════════════════════════════════════════════════════════ */}
+      <section className="grid grid-cols-2 gap-4 mb-4">
+        {/* COLLECTE Button */}
+        <button
+          onClick={() => setShowPaiementForm(true)}
+          disabled={isAdmin && !targetAgentId}
+          className={`
+            h-32 sm:h-36 rounded-2xl
+            bg-gradient-to-br from-emerald-600 to-green-700
+            hover:from-emerald-500 hover:to-green-600
+            active:scale-[0.98]
+            border-2 border-emerald-500/50
+            shadow-lg shadow-emerald-500/20
+            flex flex-col items-center justify-center gap-2
+            transition-all duration-150
+            touch-manipulation
+            ${isAdmin && !targetAgentId ? 'opacity-50 cursor-not-allowed' : ''}
+          `}
+        >
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/20 flex items-center justify-center">
+            <DollarSign size={28} className="text-white" />
+          </div>
+          <span className="text-base sm:text-lg font-bold text-white tracking-wide">
+            COLLECTE
+          </span>
+        </button>
 
-      <TabGroup
-        tabs={[
-          { key: 'agents', label: 'Agents', icon: Users },
-          { key: 'visites', label: 'Visites', icon: MapPin },
-          { key: 'prospection', label: 'Prospection', icon: UserPlus },
-          { key: 'historique', label: 'Historique', icon: History },
-          { key: 'performance', label: 'Perf.', icon: TrendingUp, disabled: true },
-          { key: 'modules', label: 'Avancé', icon: Layers, disabled: true },
-          { key: 'carte', label: 'GPS', icon: Satellite, disabled: true },
-        ]}
-        activeTab={activeTab}
-        onTabChange={(key) => {
-          if (['performance', 'modules', 'carte'].includes(key)) return;
-          setActiveTab(key);
+        {/* REMISE Button */}
+        <button
+          onClick={() => setShowSettlementModal(true)}
+          disabled={isAdmin && !targetAgentId}
+          className={`
+            h-32 sm:h-36 rounded-2xl
+            bg-gradient-to-br from-cyan-600 to-blue-700
+            hover:from-cyan-500 hover:to-blue-600
+            active:scale-[0.98]
+            border-2 border-cyan-500/50
+            shadow-lg shadow-cyan-500/20
+            flex flex-col items-center justify-center gap-2
+            transition-all duration-150
+            touch-manipulation
+            ${isAdmin && !targetAgentId ? 'opacity-50 cursor-not-allowed' : ''}
+          `}
+        >
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/20 flex items-center justify-center">
+            <ArrowRightCircle size={28} className="text-white" />
+          </div>
+          <span className="text-base sm:text-lg font-bold text-white tracking-wide">
+            {isAdmin ? 'ENCAISSER' : 'REMISE'}
+          </span>
+        </button>
+      </section>
+
+      {/* PROSPECTION Button - Full Width */}
+      <section className="mb-6">
+        <button
+          onClick={() => setShowProspectionForm(true)}
+          disabled={isAdmin && !targetAgentId}
+          className={`
+            w-full h-28 sm:h-32 rounded-2xl
+            bg-gradient-to-br from-violet-600 to-purple-700
+            hover:from-violet-500 hover:to-purple-600
+            active:scale-[0.98]
+            border-2 border-violet-500/50
+            shadow-lg shadow-violet-500/20
+            flex flex-col items-center justify-center gap-2
+            transition-all duration-150
+            touch-manipulation
+            ${isAdmin && !targetAgentId ? 'opacity-50 cursor-not-allowed' : ''}
+          `}
+        >
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/20 flex items-center justify-center">
+            <UserPlus size={28} className="text-white" />
+          </div>
+          <span className="text-base sm:text-lg font-bold text-white tracking-wide">
+            PROSPECTION
+          </span>
+        </button>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          RECENT TRANSACTIONS - Simple List
+      ═══════════════════════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <History size={14} />
+            Dernières Opérations
+          </h2>
+        </div>
+
+        <div className="space-y-2">
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-16 bg-slate-800/50 rounded-xl animate-pulse" />
+            ))
+          ) : recentTransactions.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <Clock size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Aucune opération récente</p>
+            </div>
+          ) : (
+            recentTransactions.map((tx) => (
+              <div 
+                key={tx.id}
+                className="flex items-center justify-between p-3 bg-slate-800/50 border border-slate-700/50 rounded-xl"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`
+                    w-10 h-10 rounded-full flex items-center justify-center
+                    ${tx.type === 'Collecte' 
+                      ? 'bg-emerald-500/20 text-emerald-400' 
+                      : 'bg-cyan-500/20 text-cyan-400'
+                    }
+                  `}>
+                    {tx.type === 'Collecte' ? <DollarSign size={18} /> : <ArrowRightCircle size={18} />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">{tx.clientNom || tx.type}</p>
+                    <p className="text-[10px] text-slate-500">{formatTime(tx.date)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={`font-bold ${tx.type === 'Collecte' ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                    {tx.type === 'Collecte' ? '+' : '-'}{formatMoney(tx.montant)}
+                  </p>
+                  <div className="flex items-center justify-end gap-1 text-[10px]">
+                    {tx.statut === 'APPROVED' ? (
+                      <CheckCircle size={10} className="text-emerald-400" />
+                    ) : (
+                      <Clock size={10} className="text-amber-400" />
+                    )}
+                    <span className={tx.statut === 'APPROVED' ? 'text-emerald-400' : 'text-amber-400'}>
+                      {tx.statut === 'APPROVED' ? 'Validé' : 'En attente'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          MODALS
+      ═══════════════════════════════════════════════════════════════════ */}
+      {showPaiementForm && (
+        <AgentTerrainPaiement 
+          agentId={targetAgentId || ''}
+          onClose={() => setShowPaiementForm(false)} 
+          onSuccess={handlePaymentSuccess} 
+        />
+      )}
+
+      {showSettlementModal && (
+        <SettlementModal 
+          isOpen={showSettlementModal}
+          agentId={targetAgentId || ''}
+          onClose={() => setShowSettlementModal(false)} 
+          onSuccess={handleSettlementSuccess} 
+        />
+      )}
+
+      <ProspectionFormModal
+        isOpen={showProspectionForm}
+        agentId={targetAgentId || ''}
+        onClose={() => setShowProspectionForm(false)}
+        onSuccess={() => {
+          setShowProspectionForm(false);
+          loadData();
         }}
       />
 
-      {activeTab === 'agents' && (
-        <Card padding="none" className="overflow-hidden border border-slate-700 bg-slate-800/50">
-          <div className="p-3 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row gap-3 bg-slate-800/80 backdrop-blur-sm">
-            <div className="flex-1 relative">
-              <FormField 
-                label="" 
-                name="search" 
-                icon={Search} 
-                containerClassName="mb-0"
-                placeholder="Rechercher un agent..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-slate-900/50 border-slate-600 focus:border-cyan-500 transition-colors"
-              />
-            </div>
-            <div className="w-full sm:w-48">
-               <SelectField
-                  label=""
-                  name="filterStatut"
-                  value={filterStatut}
-                  onChange={(e) => setFilterStatut(e.target.value)}
-                  options={[
-                      { value: 'all', label: 'Tous les statuts' },
-                      { value: 'Actif', label: 'Actif' },
-                      { value: 'En congé', label: 'En congé' },
-                      { value: 'Suspendu', label: 'Suspendu' }
-                  ]}
-                  containerClassName="mb-0"
-                  className="bg-slate-900/50 border-slate-600 focus:border-cyan-500 transition-colors"
-               />
-            </div>
-          </div>
-
-          <ResponsiveTable<Agent>
-            data={filteredAgents}
-            columns={[
-              { key: 'nom', label: 'Nom', primary: true, format: (_, a) => (
-                  <div className="flex flex-col">
-                      <span className="font-semibold text-white">{a.nom} {a.prenom}</span>
-                      <span className="text-xs text-slate-400">{a.telephone}</span>
-                  </div>
-              )},
-              { key: 'statut', label: 'Statut', badge: true },
-              { key: 'zone_affectation', label: 'Zone', icon: MapPin },
-              { key: 'nombre_clients', label: 'Clients', icon: Users, format: (val) => `${val || 0} clt.` },
-              { key: 'performance', label: 'Perf.', icon: TrendingUp, format: (val) => (
-                  <div className="flex items-center gap-1">
-                      <span className={`font-bold ${Number(val) >= 80 ? 'text-green-400' : Number(val) >= 50 ? 'text-orange-400' : 'text-red-400'}`}>
-                          {val || 0}%
-                      </span>
-                  </div>
-              ) },
-            ]}
-            emptyMessage="Aucun agent trouvé"
-            loading={loading}
-            actions={(agent) => (
-               <div className="flex items-center gap-2 justify-end">
-                 <Button 
-                   variant="ghost" 
-                   className="!bg-emerald-500/20 !border-2 !border-emerald-500/30 !text-emerald-400 hover:!bg-emerald-500/30 hover:!border-emerald-500/50 hover:!text-emerald-300 p-2 h-9 w-9 rounded-xl flex items-center justify-center" 
-                   title="Paiement"
-                   onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowPaiementForm(true); }}
-                 >
-                   <DollarSign size={20} absoluteStrokeWidth strokeWidth={2.5} style={{ minWidth: '20px', minHeight: '20px' }} />
-                 </Button>
-                 <Button 
-                   variant="ghost" 
-                   className="!bg-cyan-500/20 !border-2 !border-cyan-500/30 !text-cyan-400 hover:!bg-cyan-500/30 hover:!border-cyan-500/50 hover:!text-cyan-300 p-2 h-9 w-9 rounded-xl flex items-center justify-center" 
-                   title="Nouvelle visite"
-                   onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowVisiteForm(true); }}
-                 >
-                   <Plus size={20} absoluteStrokeWidth strokeWidth={2.5} style={{ minWidth: '20px', minHeight: '20px' }} />
-                 </Button>
-                 <Button 
-                   variant="ghost" 
-                   className="!bg-slate-600/30 !border-2 !border-slate-500/30 !text-slate-300 hover:!bg-slate-600/50 hover:!border-slate-500/50 hover:!text-white p-2 h-9 w-9 rounded-xl flex items-center justify-center" 
-                   title="Voir profil"
-                   onClick={(e) => { e.stopPropagation(); setSelectedAgent(agent); setShowAgentProfile(true); }}
-                 >
-                   <Eye size={20} absoluteStrokeWidth strokeWidth={2.5} style={{ minWidth: '20px', minHeight: '20px' }} />
-                 </Button>
-               </div>
-            )}
-            onRowClick={(agent) => { setSelectedAgent(agent); setShowAgentProfile(true); }}
-          />
-        </Card>
-      )}
-
-      {activeTab === 'visites' && (
-         <Card>
-            <div className="p-4 flex justify-between items-center border-b border-slate-700">
-                <h3 className="text-xl font-bold text-white">Visites Récentes</h3>
-                <Button onClick={() => setShowVisiteForm(true)} variant="success" size="sm" icon={Plus}>Nouvelle</Button>
-            </div>
-            <ResponsiveTable<Visite>
-                data={visites}
-                columns={visiteColumns}
-                emptyMessage="Aucune visite"
-                loading={loading}
-                actions={(visite) => visite.montant_collecte && visite.montant_collecte > 0 ? (
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-slate-400 hover:text-white"
-                        onClick={(e) => { e.stopPropagation(); handleShowHistoryReceipt(visite); }}
-                        title="Voir le reçu"
-                    >
-                        <FileText size={16} />
-                    </Button>
-                ) : null}
-            />
-         </Card>
-      )}
-
-      {/* Other tabs simplified (Prospection, Performance, etc) would go here. 
-          For brevity in this tool call, assuming standard rendering or omitting complex sub-components for now 
-          to fit context if needed, but I will include simplified versions.
-      */}
-
-      {activeTab === 'prospection' && (
-          <div className="text-center py-12 text-slate-500 bg-slate-800 rounded-xl">
-              <UserPlus className="w-12 h-12 mx-auto mb-4 opacity-50"/>
-              <p>Module Prospection (Utiliser le bouton 'Nouveau Prospect')</p>
-              <Button onClick={() => setShowProspectionForm(true)} variant="primary" className="mt-4">Ouvrir Formulaire</Button>
-          </div>
-      )}
-
-      {activeTab === 'performance' && (
-          <div className="grid md:grid-cols-2 gap-6">
-              <Card><div className="p-6 text-center text-slate-500">Graphiques Performance</div></Card>
-              <Card><div className="p-6 text-center text-slate-500">Zones de Couverture</div></Card>
-          </div>
-      )}
-      
-      {activeTab === 'historique' && (
-          <AgentHistory agentId={selectedAgent?.id} />
-      )}
-      
-      {activeTab === 'modules' && <AgentTerrainExtended agentId={selectedAgent?.id} />}
-      
-      {activeTab === 'carte' && (
-         <div className="h-[600px] bg-slate-800 rounded-xl overflow-hidden relative">
-             <AgentTerrainMap />
-         </div>
-      )}
-
-      {/* Modals */}
-      {showAgentForm && <AgentTerrainForm agent={editingAgent} onClose={() => { setShowAgentForm(false); setEditingAgent(null); }} onSuccess={() => { setShowAgentForm(false); setEditingAgent(null); loadAgents(); }} />}
-      {showVisiteForm && <VisiteTerrainForm agentId={selectedAgent?.id} onClose={() => { setShowVisiteForm(false); setSelectedAgent(null); }} onSuccess={() => { setShowVisiteForm(false); setSelectedAgent(null); loadVisites(); }} />}
-      {showAgentProfile && selectedAgent && <AgentTerrainProfile agentId={selectedAgent.id} onClose={() => { setShowAgentProfile(false); setSelectedAgent(null); }} onEdit={() => { setEditingAgent(selectedAgent); setShowAgentProfile(false); setShowAgentForm(true); }} />}
-      {showPaiementForm && <AgentTerrainPaiement agentId={selectedAgent?.id} onClose={() => { setShowPaiementForm(false); setSelectedAgent(null); }} onSuccess={() => { setShowPaiementForm(false); setSelectedAgent(null); loadData(); }} />}
-      {showProspectionForm && <ProspectionForm agentId={selectedAgent?.id} onClose={() => { setShowProspectionForm(false); setSelectedAgent(null); }} onSuccess={() => { setShowProspectionForm(false); setSelectedAgent(null); loadData(); }} />}
-      {showSettlementModal && <SettlementModal isOpen={showSettlementModal} agentId={selectedAgent?.id || ''} onClose={() => setShowSettlementModal(false)} onSuccess={() => { loadData(); }} />}
-    
       <UniversalPaymentSuccessModal 
-        isOpen={showHistoryReceipt}
-        onClose={() => setShowHistoryReceipt(false)}
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
         term="Fermer"
-        data={historyReceiptData}
+        data={receiptData}
       />
     </div>
   );

@@ -4,16 +4,21 @@ import { Button, Card, StatCard, Pagination } from '../../ui';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { computeSessionStatus, getSessionStatusLabel } from '../../../lib/format';
 
 interface SessionCaisse {
   id: string;
-  date_ouverture: string;
-  date_fermeture?: string;
+  openedAt?: string;
+  opened_at?: string;
+  closedAt?: string;
+  closed_at?: string;
+  timeoutAt?: string;
+  timeout_at?: string;
   solde_initial: number;
   solde_theorique: number;
   solde_reel?: number;
   ecart?: number;
-  statut: string;
+  computedStatus?: string;
 }
 
 export default function CaisseEtats({ onBack }: { onBack: () => void }) {
@@ -58,6 +63,10 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(amount);
   };
 
+  const resolveSessionStatus = (session: SessionCaisse) =>
+    session.computedStatus || computeSessionStatus(session);
+  const resolveOpenedAt = (session: SessionCaisse) => session.openedAt || session.opened_at || '';
+
   const exporterPDF = () => {
     try {
       const doc = new jsPDF();
@@ -87,14 +96,14 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
         const sorties = diff < 0 ? Math.abs(diff) : 0;
 
         return [
-          new Date(session.date_ouverture).toLocaleDateString('fr-FR'),
+          new Date(resolveOpenedAt(session)).toLocaleDateString('fr-FR'),
           Number(session.solde_initial).toLocaleString('fr-FR'),
           entrees > 0 ? `+${entrees.toLocaleString('fr-FR')}` : '-',
           sorties > 0 ? `-${sorties.toLocaleString('fr-FR')}` : '-',
           Number(session.solde_theorique).toLocaleString('fr-FR'),
           session.solde_reel ? Number(session.solde_reel).toLocaleString('fr-FR') : '-',
           Number(session.ecart || 0).toLocaleString('fr-FR'),
-          session.statut
+          getSessionStatusLabel(resolveSessionStatus(session) as any)
         ];
       });
 
@@ -168,14 +177,14 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
         const sorties = diff < 0 ? Math.abs(diff) : 0;
 
         return {
-          Date: new Date(session.date_ouverture).toLocaleDateString('fr-FR'),
+          Date: new Date(resolveOpenedAt(session)).toLocaleDateString('fr-FR'),
           'Solde Initial': Number(session.solde_initial),
           'Entrées': entrees,
           'Sorties': sorties,
           'Solde Théorique': Number(session.solde_theorique),
           'Solde Réel': session.solde_reel ? Number(session.solde_reel) : 0,
           'Écart': Number(session.ecart || 0),
-          'Statut': session.statut
+          'Statut': getSessionStatusLabel(resolveSessionStatus(session) as any)
         };
       });
 
@@ -330,7 +339,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                   return (
                     <tr key={session.id} className="hover:bg-slate-800/50 transition-colors group">
                       <td className="px-6 py-4 font-medium text-white group-hover:text-cyan-400 transition-colors">
-                        {new Date(session.date_ouverture).toLocaleDateString('fr-FR')}
+                        {new Date(resolveOpenedAt(session)).toLocaleDateString('fr-FR')}
                       </td>
                       <td className="px-6 py-4 text-right text-slate-400 font-medium font-mono">
                         {Number(session.solde_initial).toLocaleString()}
@@ -357,11 +366,13 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                          session.statut === 'Fermée' 
-                            ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20' 
-                            : 'bg-blue-500/5 text-blue-400 border-blue-500/20'
+                          resolveSessionStatus(session) === 'CLOSED'
+                            ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20'
+                            : resolveSessionStatus(session) === 'TIMED_OUT'
+                              ? 'bg-amber-500/5 text-amber-400 border-amber-500/20'
+                              : 'bg-blue-500/5 text-blue-400 border-blue-500/20'
                         }`}>
-                          {session.statut}
+                          {getSessionStatusLabel(resolveSessionStatus(session) as any)}
                         </span>
                       </td>
                     </tr>
@@ -427,7 +438,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
                            </div>
                            <div className="flex justify-between items-center">
                                <span className="text-slate-400 text-sm">Sessions Fermées</span>
-                               <span className="text-xl font-bold text-emerald-400">{sessions.filter(s => s.statut === 'Fermée').length}</span>
+                              <span className="text-xl font-bold text-emerald-400">{sessions.filter(s => resolveSessionStatus(s) === 'CLOSED').length}</span>
                            </div>
                            <div className="flex justify-between items-center">
                                <span className="text-slate-400 text-sm">Moyenne / Session</span>

@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, User, CreditCard, Coins, Users, CheckCircle, XCircle, Loader, ArrowLeft, ArrowUpRight, ArrowDownLeft, Wallet, ShieldCheck, Banknote } from 'lucide-react';
 import { Card, Button, SearchInput, Badge, FormField, SelectField } from '../../ui';
 import { clientSearchApi, clientApi, creditApi, tontineApi, operationCaisseApi, systemSettingsApi, factureApi, validationOtpApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, parseMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
-import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
+import { ReceiptData, ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
+import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
 
 // Types and Interfaces
@@ -58,25 +60,40 @@ interface CompteEpargne {
 type DirectionOperation = 'Dépôt' | 'Retrait';
 type DestinationType = 'Compte' | 'Credit' | 'Tontine';
 
+const maskAccountNumber = (value?: string) => {
+  if (!value) return undefined;
+  if (value.includes('*')) return value;
+  const compact = value.replace(/\s+/g, '');
+  const last4 = compact.slice(-4);
+  if (!last4) return value;
+  return `**** ${last4}`;
+};
+
+const resolveTontineStatus = (amount: number, miseParTour: number) => {
+  if (miseParTour <= 0) return 'Indéfini';
+  if (amount < miseParTour) return 'Retard';
+  const reste = amount % miseParTour;
+  if (reste === 0 && amount === miseParTour) return 'À jour';
+  if (reste === 0 && amount > miseParTour) return 'Avance';
+  return 'Avance partielle';
+};
+
 interface CaisseOperationsProps {
   sessionId?: string;
   onBack?: () => void;
 }
 
 export default function CaisseOperations({ sessionId, onBack }: CaisseOperationsProps) {
+  const queryClient = useQueryClient();
+
   // Global State
-  const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   
   // Selection State
   const [searchTerm, setSearchTerm] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  
-  // Data State
-  const [clientComptes, setClientComptes] = useState<CompteEpargne[]>([]);
-  const [credits, setCredits] = useState<Credit[]>([]);
-  const [tontines, setTontines] = useState<Tontine[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClientInitialData, setSelectedClientInitialData] = useState<Client | null>(null);
   
   // Operation State
   const [direction, setDirection] = useState<DirectionOperation>('Dépôt');
@@ -89,30 +106,47 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   const [lastOperationReference, setLastOperationReference] = useState<string | null>(null);
 
   const { componentRef, printData, print, isPrinting } = usePrinter();
+  const {
+    componentRef: invoiceRef,
+    printData: invoicePrintData,
+    print: printInvoice,
+    isPrinting: isInvoicePrinting
+  } = usePrinter();
   
-  // Real-time Update Listener
-  const refreshClientData = useCallback(async (clientId: string) => {
-      try {
-          const updatedClient = await clientApi.getById(clientId);
-          if (updatedClient) {
-              setSelectedClient(prev => ({ ...prev, ...updatedClient }));
-              await chargerDonneesClient(clientId); // Re-fetch all accounts/credits
-          }
-      } catch (err) {
-          console.error("Failed to refresh client data:", err);
-      }
-  }, []);
+  // Real-time Data fetching with React Query
+  const { data: selectedClient, isLoading: loadingClient } = useQuery({
+    queryKey: ['client', selectedClientId],
+    queryFn: () => selectedClientId ? clientApi.getById(selectedClientId) : null,
+    enabled: !!selectedClientId,
+    initialData: selectedClientInitialData
+  });
 
-  useEffect(() => {
-      const handleClientUpdate = (event: CustomEvent) => {
-          const { clientId } = event.detail || {};
-          if (clientId && selectedClient && selectedClient.id === clientId) {
-               refreshClientData(clientId);
-          }
-      };
-      window.addEventListener('client-update', handleClientUpdate as EventListener);
-      return () => window.removeEventListener('client-update', handleClientUpdate as EventListener);
-  }, [selectedClient, refreshClientData]);
+  const { data: clientComptes = [], isLoading: loadingComptes } = useQuery({
+    queryKey: ['comptes-epargne', selectedClientId],
+    queryFn: () => selectedClientId ? compteEpargneApi.getByClient(selectedClientId) : [],
+    enabled: !!selectedClientId
+  });
+
+  const { data: credits = [], isLoading: loadingCredits } = useQuery({
+    queryKey: ['credits', selectedClientId],
+    queryFn: () => selectedClientId ? creditApi.getAll({ clientId: selectedClientId, statut: 'Approuvé,En cours,Actif' }) : [],
+    enabled: !!selectedClientId
+  });
+
+  const { data: rawTontines = [], isLoading: loadingTontines } = useQuery({
+    queryKey: ['tontines', selectedClientId],
+    queryFn: () => selectedClientId ? tontineApi.getByClient(selectedClientId) : [],
+    enabled: !!selectedClientId
+  });
+
+  // Map tontine membership to tontine object
+  const tontines = useMemo(() => {
+    return rawTontines?.map((m: any) => m.tontine || m) || [];
+  }, [rawTontines]);
+
+  const isDataLoading = loadingClient || loadingComptes || loadingCredits || loadingTontines;
+  const [loading, setLoading] = useState(false); // Submission loading state
+
 
   // Client Search & Data Loading
   const rechercherClient = useCallback(async () => {
@@ -121,13 +155,14 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
 
     setSearchLoading(true);
     try {
-      const results = await clientSearchApi.search(trimmedSearch);
-      const data = results[0] || null;
+      const response = await clientSearchApi.search(trimmedSearch, { page: 1, perPage: 10 });
+      const data = response.data?.[0] || null;
 
       if (data) {
-        setSelectedClient(data);
-        await chargerDonneesClient(data.id);
+        setSelectedClientInitialData(data);
+        setSelectedClientId(data.id);
         toast.success(`Client ${data.nom} sélectionné`);
+        setSearchTerm('');
       } else {
         toast.warning('Aucun client trouvé');
       }
@@ -138,24 +173,6 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     }
   }, [searchTerm]);
 
-  const chargerDonneesClient = useCallback(async (clientId: string) => {
-    try {
-      const [creditsData, tontinesData, comptesData] = await Promise.all([
-        creditApi.getAll({ clientId, statut: 'Approuvé,En cours,Actif' }),
-        tontineApi.getByClient(clientId),
-        compteEpargneApi.getByClient(clientId)
-      ]);
-
-      setCredits(creditsData || []);
-      // Map the result to extract the tontine objects from the membership data
-      setTontines(tontinesData?.map((m: any) => m.tontine || m) || []);
-      setClientComptes(comptesData || []);
-    } catch (error) {
-      console.error('Erreur chargement données:', error);
-    }
-  }, []);
-
-  // Validation
   const validateMontant = useCallback((value: string): boolean => {
     const numValue = parseFloat(value);
     if (isNaN(numValue) || numValue <= 0) {
@@ -168,17 +185,15 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
 
   // Form Reset
   const reinitialiserFormulaire = useCallback(() => {
-    setSelectedClient(null);
+    setSelectedClientId(null);
+    setSelectedClientInitialData(null);
     setDirection('Dépôt');
     setSelectedDestination(null);
     setMontant('');
     setSearchTerm('');
-    setSuccessMessage('');
     setMontantError(null);
+    setSuccessMessage('');
     setLastOperationReference(null);
-    setClientComptes([]);
-    setCredits([]);
-    setTontines([]);
   }, []);
 
   // Operation Preparation
@@ -279,23 +294,101 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     // TODO: Create Facture logic here if needed or keep existing logic
   };
 
-  const handlePrintReceipt = useCallback(() => {
-     if (!selectedClient || !montant) return;
-     let typeOp = selectedDestination?.type === 'Compte' ? (direction === 'Dépôt' ? 'Versement' : 'Retrait') : (selectedDestination?.type === 'Credit' ? 'Remboursement' : 'Cotisation');
-     
-     print({
-       title: 'Reçu de Transaction',
-       reference: lastOperationReference || `OP-${Date.now()}`,
-       date: new Date(),
-       type: typeOp,
-       client: { nom: selectedClient.nom, prenom: selectedClient.prenom, telephone: selectedClient.telephone },
-       agent: { nom: 'Agent', prenom: 'Caisse' },
-       items: [{ description: typeOp, details: selectedDestination?.label || '', montant: parseFloat(montant), quantite: 1 }],
-       total: parseFloat(montant),
-       modePaiement: 'Espèces',
-       devise: 'FCFA'
-     });
-  }, [selectedClient, montant, selectedDestination, direction, lastOperationReference, print]);
+  const buildReceiptData = useCallback((): ReceiptData | null => {
+    if (!selectedClient || !montant || !selectedDestination) return null;
+
+    const amountValue = parseMoney(montant);
+    const typeOp =
+      selectedDestination.type === 'Compte'
+        ? (direction === 'Dépôt' ? 'Versement' : 'Retrait')
+        : selectedDestination.type === 'Credit'
+          ? 'Remboursement Crédit'
+          : 'Cotisation Tontine';
+
+    const details: NonNullable<ReceiptData['details']> = [];
+    let numeroCompte: string | undefined;
+
+    if (selectedDestination.type === 'Compte') {
+      const compte = clientComptes.find(c => c.id === selectedDestination.id);
+      const ancienSolde = compte ? parseMoney(compte.solde) : 0;
+      const nouveauSolde =
+        direction === 'Dépôt' ? ancienSolde + amountValue : ancienSolde - amountValue;
+      numeroCompte = maskAccountNumber(compte?.numeroCompte || selectedClient.numero_compte);
+      details.push({ label: 'Ancien Solde', value: formatMoney(ancienSolde) });
+      details.push({
+        label: 'Mouvement',
+        value: `${direction === 'Dépôt' ? '+' : '-'} ${formatMoney(amountValue)}`
+      });
+      details.push({
+        label: 'Nouveau Solde',
+        value: formatMoney(nouveauSolde),
+        isBold: true
+      });
+    } else if (selectedDestination.type === 'Tontine') {
+      const tontine = tontines.find(t => t.id === selectedDestination.id);
+      const miseParTour = tontine?.montant_contribution || 0;
+      const toursRegles = miseParTour > 0 ? Math.floor(amountValue / miseParTour) : 0;
+      const statut = resolveTontineStatus(amountValue, miseParTour);
+      details.push({ label: 'Mise par tour', value: formatMoney(miseParTour) });
+      details.push({
+        label: 'Tours réglés',
+        value: `${toursRegles} ${toursRegles > 1 ? 'tours' : 'tour'}`
+      });
+      details.push({ label: 'Avance/Retard', value: statut });
+    } else {
+      details.push({ label: 'Montant', value: formatMoney(amountValue), isBold: true });
+    }
+
+    return {
+      title: 'Reçu de Transaction',
+      reference: lastOperationReference || `OP-${Date.now()}`,
+      date: new Date(),
+      type: typeOp,
+      transaction: {
+        id: lastOperationReference || `OP-${Date.now()}`,
+        date: new Date(),
+        type:
+          selectedDestination.type === 'Compte'
+            ? (direction === 'Dépôt' ? 'DEPOT' : 'RETRAIT')
+            : selectedDestination.type === 'Credit'
+              ? 'REMBOURSEMENT'
+              : 'TONTINE',
+        amount: amountValue,
+        cashierName: 'Agent Caisse'
+      },
+      client: {
+        nom: selectedClient.nom,
+        prenom: selectedClient.prenom,
+        telephone: selectedClient.telephone,
+        numeroCompte: numeroCompte
+      },
+      agent: { nom: 'Agent', prenom: 'Caisse' },
+      details,
+      items: [
+        {
+          description: typeOp,
+          details: selectedDestination.label || '',
+          montant: amountValue,
+          quantite: 1
+        }
+      ],
+      total: amountValue,
+      modePaiement: 'Espèces',
+      devise: 'FCFA'
+    };
+  }, [selectedClient, montant, selectedDestination, direction, lastOperationReference, clientComptes, tontines]);
+
+  const handlePrintTicket = useCallback(() => {
+    const data = buildReceiptData();
+    if (!data) return;
+    print(data);
+  }, [buildReceiptData, print]);
+
+  const handlePrintInvoice = useCallback(() => {
+    const data = buildReceiptData();
+    if (!data) return;
+    printInvoice(data);
+  }, [buildReceiptData, printInvoice]);
 
 
   // Derived Data for UI
@@ -357,10 +450,27 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
                 <h3 className="text-2xl font-bold text-white mb-2">Succès !</h3>
                 <p className="text-slate-400">Transaction enregistrée.</p>
              </div>
-             <div className="grid grid-cols-2 gap-3 w-full">
-                <Button variant="outline" onClick={reinitialiserFormulaire} className="h-12 rounded-xl">Fermer</Button>
-                <Button variant="primary" onClick={handlePrintReceipt} disabled={isPrinting} className="h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white">
-                    {isPrinting ? <Loader className="animate-spin" /> : 'Reçu'}
+             <div className="space-y-3 w-full">
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant="primary"
+                    onClick={handlePrintTicket}
+                    disabled={isPrinting}
+                    className="h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    {isPrinting ? <Loader className="animate-spin" /> : 'Reçu Ticket'}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handlePrintInvoice}
+                    disabled={isInvoicePrinting}
+                    className="h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    {isInvoicePrinting ? <Loader className="animate-spin" /> : 'Facture A4'}
+                  </Button>
+                </div>
+                <Button variant="outline" onClick={reinitialiserFormulaire} className="h-12 rounded-xl">
+                  Fermer
                 </Button>
              </div>
           </div>
@@ -384,6 +494,21 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
           }}
         >
           <ReceiptTemplate ref={componentRef} data={printData} />
+        </div>
+      )}
+      {invoicePrintData && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: '0',
+            width: '210mm',
+            background: 'white',
+            zIndex: -1,
+          }}
+        >
+          <InvoiceTemplate ref={invoiceRef} data={invoicePrintData} />
         </div>
       )}
       <SuccessModal />

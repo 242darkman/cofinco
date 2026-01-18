@@ -106,13 +106,7 @@ export default function AdminGestionProfils() {
     await toggleUserPermission(selectedUser.id, permId, currentStatus.granted);
   }, [selectedUser, adminPermissions, getUserPermissionStatus, toggleUserPermission]);
 
-  // Wrapper to cast source type
-  const handleGetUserPermissionStatus = useCallback((permCode: string) => {
-    const status = getUserPermissionStatus(permCode);
-    // Map 'custom' to 'user' which is used in the component
-    const source = (status.source === 'custom' ? 'user' : status.source) as 'role' | 'user' | 'none';
-    return { ...status, source };
-  }, [getUserPermissionStatus]);
+
 
   const permissionTypes = [
     { key: 'peut_voir', label: 'Voir', icon: '👁️' },
@@ -132,8 +126,15 @@ export default function AdminGestionProfils() {
     confirmPassword: '',
     role: SystemRole.CAISSIER,
     agenceId: '',
-    photoProfile: ''
+    photoProfile: '',
+    // Agent Terrain specific fields
+    zonesAffectation: [] as string[],
+    objectifMensuel: '100000'
   });
+
+  // Zones for agent terrain assignment
+  const [zones, setZones] = useState<Array<{id: string; nom: string; ville: string}>>([]);
+  const isAgentTerrain = formData.role === SystemRole.AGENT_TERRAIN;
 
   const roleMap: Record<SystemRole, string> = {
     [SystemRole.ADMIN]: 'admin',
@@ -173,6 +174,19 @@ export default function AdminGestionProfils() {
 
   useEffect(() => {
     loadUsers();
+    loadZones();
+  }, []);
+
+  const loadZones = useCallback(async () => {
+    try {
+      const response = await fetch('/api/zones');
+      if (response.ok) {
+        const data = await response.json();
+        setZones(data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch zones:', error);
+    }
   }, []);
 
   const loadUsers = useCallback(async () => {
@@ -212,7 +226,12 @@ export default function AdminGestionProfils() {
         photoProfile: formData.photoProfile || undefined,
         // Données employé par défaut
         typeContrat: 'CDI',
-        modeCalculPaie: 'Mensuel'
+        modeCalculPaie: 'Mensuel',
+        // Agent Terrain specific data (only used when roleSystem === 'terrain')
+        ...(systemRole === 'terrain' && {
+          zonesAffectation: formData.zonesAffectation.length > 0 ? formData.zonesAffectation : undefined,
+          objectifMensuel: formData.objectifMensuel || '100000'
+        })
       } as any);
 
       toast.success(`Profil ${formData.nom} ${formData.prenom} créé avec succès`);
@@ -224,9 +243,11 @@ export default function AdminGestionProfils() {
         phone: '',
         password: '',
         confirmPassword: '',
-        role: 'Caissier',
+        role: SystemRole.CAISSIER,
         agenceId: '',
-        photoProfile: ''
+        photoProfile: '',
+        zonesAffectation: [],
+        objectifMensuel: '100000'
       });
       setShowCreateForm(false);
       loadUsers();
@@ -429,7 +450,9 @@ export default function AdminGestionProfils() {
                   setFormData({
                     nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '', role: SystemRole.CAISSIER,
                     agenceId: (contextAgence && contextAgence.id !== 'all') ? contextAgence.id : '',
-                    photoProfile: ''
+                    photoProfile: '',
+                    zonesAffectation: [],
+                    objectifMensuel: '100000'
                   });
                   setShowCreateForm(true);
                 }}
@@ -529,10 +552,10 @@ export default function AdminGestionProfils() {
                     key: 'roleSystem',
                     label: 'Rôle',
                     format: (role, emp) => {
-                      const uiRole = Object.keys(roleMap).find(key => roleMap[key] === role) || role || (emp.user && emp.user.role);
+                      const uiRole = Object.keys(roleMap).find(key => roleMap[key as SystemRole] === role) || role || (emp.user && emp.user.role);
                       const style = getRoleBadgeStyle(uiRole);
                       return (
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap min-w-[100px] text-center transition-colors ${style.classes}`}>
+                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap w-[160px] text-center transition-colors ${style.classes}`}>
                           {style.label}
                         </span>
                       );
@@ -546,8 +569,8 @@ export default function AdminGestionProfils() {
                       const style = getStatusBadgeStyle(status);
                       const isActif = (status || '').toLowerCase().includes('actif');
                       return (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium border min-w-[80px] justify-center transition-colors ${style.classes}`}>
-                          {isActif ? <CheckCircle size={10} /> : <XCircle size={10} />}
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium border min-w-[90px] justify-center transition-colors ${style.classes}`}>
+                          {isActif ? <CheckCircle size={12} /> : <XCircle size={12} />}
                           {style.label}
                         </span>
                       );
@@ -839,6 +862,70 @@ export default function AdminGestionProfils() {
                 <p className="text-[10px] text-content-muted">L'employé sera rattaché à cette agence pour ses opérations.</p>
               </div>
 
+              {/* Agent Terrain Specific Fields - Conditional */}
+              {isAgentTerrain && (
+                <div className="space-y-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-6 h-6 bg-blue-500/20 rounded flex items-center justify-center">
+                      <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <span className="text-xs font-semibold text-blue-400">Configuration Agent Terrain</span>
+                  </div>
+
+                  {/* Zones d'Affectation - Multi-select */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-content-secondary">Zones d'Affectation (optionnel)</label>
+                    <div className="max-h-32 overflow-y-auto bg-surface-base border border-edge rounded-lg p-2 space-y-1">
+                      {zones.length === 0 ? (
+                        <p className="text-xs text-content-muted italic">Aucune zone disponible</p>
+                      ) : (
+                        zones.map((zone) => {
+                          const zoneKey = `${zone.ville}/${zone.nom}`;
+                          const isSelected = formData.zonesAffectation.includes(zoneKey);
+                          return (
+                            <label key={zone.id} className="flex items-center gap-2 cursor-pointer hover:bg-surface-muted p-1 rounded">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  const newZones = e.target.checked
+                                    ? [...formData.zonesAffectation, zoneKey]
+                                    : formData.zonesAffectation.filter(z => z !== zoneKey);
+                                  setFormData({...formData, zonesAffectation: newZones});
+                                }}
+                                className="w-3.5 h-3.5 rounded border-edge text-primary focus:ring-primary"
+                              />
+                              <span className="text-xs text-content-primary">{zone.ville} / {zone.nom}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                    {formData.zonesAffectation.length > 0 && (
+                      <p className="text-[10px] text-blue-400">{formData.zonesAffectation.length} zone(s) sélectionnée(s)</p>
+                    )}
+                  </div>
+
+                  {/* Objectif Mensuel */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-content-secondary">Objectif Mensuel (FCFA)</label>
+                    <input
+                      type="number"
+                      value={formData.objectifMensuel}
+                      onChange={(e) => setFormData({...formData, objectifMensuel: e.target.value})}
+                      className="w-full px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
+                      placeholder="100000"
+                      min={0}
+                      step={10000}
+                    />
+                    <p className="text-[10px] text-content-muted">Objectif de collecte mensuel pour cet agent</p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-content-secondary">Mot de passe *</label>
@@ -952,7 +1039,7 @@ export default function AdminGestionProfils() {
                 preselectedUserId={selectedUser.id}
                 userPermissions={userPermissions}
                 getUserDisplayName={() => `${selectedUser.nom} ${selectedUser.prenom}`}
-                getUserPermissionStatus={handleGetUserPermissionStatus}
+                getUserPermissionStatus={getUserPermissionStatus}
                 toggleUserPermission={handleToggleUserPermission}
                 onActivateAll={async () => { await activateAllPermissions(selectedUser.id, adminPermissions); }}
                 onBlockAll={async () => { await blockAllPermissions(selectedUser.id, adminPermissions); }}

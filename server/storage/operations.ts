@@ -1,16 +1,40 @@
-import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels, clients, users } from "@shared/schema";
+import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels, clients, users, userAgences } from "@shared/schema";
 import { type AgentTerrain, type InsertAgentTerrain, type Prospection, type InsertProspection, type VisiteTerrain, type InsertVisiteTerrain, type PaiementTerrain, type InsertPaiementTerrain, type Employe, type InsertEmploye, type PosDevice, type InsertPosDevice, type Notification, type InsertNotification, type OtpValidation, type InsertOtpValidation, type Zone, type InsertZone, type ObjectifMensuel, type InsertObjectifMensuel } from "@shared/schema";
 import { db } from "../db";
+import { notDeleted } from "./query-helpers";
 import { eq, desc, and, or, sql, gte } from "drizzle-orm";
+
+async function resolveAgentPrimaryAgenceId(agentId: string): Promise<string | undefined> {
+  const [row] = await db
+    .select({ agenceId: userAgences.agenceId })
+    .from(agentsTerrain)
+    .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .innerJoin(userAgences, and(
+      eq(userAgences.userId, employes.userId),
+      eq(userAgences.isPrimary, true),
+      eq(userAgences.actif, true)
+    ))
+    .where(eq(agentsTerrain.id, agentId))
+    .limit(1);
+
+  return row?.agenceId;
+}
 
 // Agents Terrain
 export async function getAgentTerrain(id: string): Promise<AgentTerrain | undefined> {
-  const [agent] = await db.select().from(agentsTerrain).where(eq(agentsTerrain.id, id));
+  const [agent] = await db
+    .select()
+    .from(agentsTerrain)
+    .where(and(eq(agentsTerrain.id, id), notDeleted(agentsTerrain)));
   return agent || undefined;
 }
 
 export async function getAllAgentsTerrain(): Promise<any[]> {
-  const agents = await db.select().from(agentsTerrain).orderBy(desc(agentsTerrain.createdAt));
+  const agents = await db
+    .select()
+    .from(agentsTerrain)
+    .where(notDeleted(agentsTerrain))
+    .orderBy(desc(agentsTerrain.createdAt));
   
   const enrichedAgents = await Promise.all(agents.map(async (agent) => {
     // 1. Nombre de clients (distinct clients visited or having paid)
@@ -55,6 +79,60 @@ export async function getAllAgentsTerrain(): Promise<any[]> {
   return enrichedAgents;
 }
 
+export async function getAgentsTerrainPaginated(
+  page: number = 1,
+  perPage: number = 25
+): Promise<{ data: any[]; total: number }> {
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(agentsTerrain)
+    .where(notDeleted(agentsTerrain));
+  const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
+
+  const agents = await db
+    .select()
+    .from(agentsTerrain)
+    .where(notDeleted(agentsTerrain))
+    .orderBy(desc(agentsTerrain.createdAt))
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+
+  const enrichedAgents = await Promise.all(agents.map(async (agent) => {
+    const clientsCount = await db
+      .select({ count: sql<number>`count(distinct ${visitesTerrain.clientId})` })
+      .from(visitesTerrain)
+      .where(eq(visitesTerrain.agentId, agent.id));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const collectesCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(paiementsTerrain)
+      .where(and(
+        eq(paiementsTerrain.agentId, agent.id),
+        gte(paiementsTerrain.createdAt, today)
+      ));
+
+    let perf = 0;
+    const obj = Number(agent.objectifMensuel) || 5000000;
+    const realized = Number(agent.totalPaiements) || 0;
+    if (obj > 0) {
+      perf = Math.round((realized / obj) * 100);
+    }
+
+    return {
+      ...agent,
+      nombreClients: clientsCount[0]?.count || 0,
+      collectesJour: collectesCount[0]?.count || 0,
+      performance: perf,
+      nombre_clients: clientsCount[0]?.count || 0,
+      collectes_jour: collectesCount[0]?.count || 0,
+    };
+  }));
+
+  return { data: enrichedAgents, total };
+}
+
 export async function createAgentTerrain(insertAgent: InsertAgentTerrain): Promise<AgentTerrain> {
   const [agent] = await db.insert(agentsTerrain).values(insertAgent).returning();
   return agent;
@@ -71,16 +149,48 @@ export async function updateAgentTerrain(id: string, updateData: Partial<InsertA
 
 // Prospections
 export async function getProspection(id: string): Promise<Prospection | undefined> {
-  const [prospection] = await db.select().from(prospections).where(eq(prospections.id, id));
+  const [prospection] = await db
+    .select()
+    .from(prospections)
+    .where(and(eq(prospections.id, id), notDeleted(prospections)));
   return prospection || undefined;
 }
 
 export async function getProspectionsByAgent(agentId: string): Promise<Prospection[]> {
-  return db.select().from(prospections).where(eq(prospections.agentId, agentId)).orderBy(desc(prospections.dateProspection));
+  return db
+    .select()
+    .from(prospections)
+    .where(and(eq(prospections.agentId, agentId), notDeleted(prospections)))
+    .orderBy(desc(prospections.dateProspection));
 }
 
 export async function getAllProspections(): Promise<Prospection[]> {
-  return db.select().from(prospections).orderBy(desc(prospections.dateProspection));
+  return db
+    .select()
+    .from(prospections)
+    .where(notDeleted(prospections))
+    .orderBy(desc(prospections.dateProspection));
+}
+
+export async function getProspectionsPaginated(
+  page: number = 1,
+  perPage: number = 25
+): Promise<{ data: Prospection[]; total: number }> {
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(prospections)
+    .where(notDeleted(prospections));
+  const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
+
+  const data = await db
+    .select()
+    .from(prospections)
+    .where(notDeleted(prospections))
+    .orderBy(desc(prospections.dateProspection))
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+
+  return { data, total };
 }
 
 export async function createProspection(insertProspection: InsertProspection): Promise<Prospection> {
@@ -99,16 +209,48 @@ export async function updateProspection(id: string, updateData: Partial<InsertPr
 
 // Visites
 export async function getVisiteTerrain(id: string): Promise<VisiteTerrain | undefined> {
-  const [visite] = await db.select().from(visitesTerrain).where(eq(visitesTerrain.id, id));
+  const [visite] = await db
+    .select()
+    .from(visitesTerrain)
+    .where(and(eq(visitesTerrain.id, id), notDeleted(visitesTerrain)));
   return visite || undefined;
 }
 
 export async function getVisitesByAgent(agentId: string): Promise<VisiteTerrain[]> {
-  return db.select().from(visitesTerrain).where(eq(visitesTerrain.agentId, agentId)).orderBy(desc(visitesTerrain.dateVisite));
+  return db
+    .select()
+    .from(visitesTerrain)
+    .where(and(eq(visitesTerrain.agentId, agentId), notDeleted(visitesTerrain)))
+    .orderBy(desc(visitesTerrain.dateVisite));
 }
 
 export async function getAllVisitesTerrain(): Promise<VisiteTerrain[]> {
-  return db.select().from(visitesTerrain).orderBy(desc(visitesTerrain.dateVisite));
+  return db
+    .select()
+    .from(visitesTerrain)
+    .where(notDeleted(visitesTerrain))
+    .orderBy(desc(visitesTerrain.dateVisite));
+}
+
+export async function getVisitesTerrainPaginated(
+  page: number = 1,
+  perPage: number = 25
+): Promise<{ data: VisiteTerrain[]; total: number }> {
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(visitesTerrain)
+    .where(notDeleted(visitesTerrain));
+  const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
+
+  const data = await db
+    .select()
+    .from(visitesTerrain)
+    .where(notDeleted(visitesTerrain))
+    .orderBy(desc(visitesTerrain.dateVisite))
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+
+  return { data, total };
 }
 
 export async function createVisiteTerrain(insertVisite: InsertVisiteTerrain): Promise<VisiteTerrain> {
@@ -127,12 +269,19 @@ export async function updateVisiteTerrain(id: string, updateData: Partial<Insert
 
 // Paiements Terrain
 export async function getPaiementTerrain(id: string): Promise<PaiementTerrain | undefined> {
-  const [paiement] = await db.select().from(paiementsTerrain).where(eq(paiementsTerrain.id, id));
+  const [paiement] = await db
+    .select()
+    .from(paiementsTerrain)
+    .where(and(eq(paiementsTerrain.id, id), notDeleted(paiementsTerrain)));
   return paiement || undefined;
 }
 
 export async function getPaiementsByAgent(agentId: string): Promise<PaiementTerrain[]> {
-  return db.select().from(paiementsTerrain).where(eq(paiementsTerrain.agentId, agentId)).orderBy(desc(paiementsTerrain.createdAt));
+  return db
+    .select()
+    .from(paiementsTerrain)
+    .where(and(eq(paiementsTerrain.agentId, agentId), notDeleted(paiementsTerrain)))
+    .orderBy(desc(paiementsTerrain.createdAt));
 }
 
 export async function getAllPaiementsTerrain(): Promise<PaiementTerrain[]> {
@@ -149,6 +298,7 @@ export async function getAllPaiementsTerrain(): Promise<PaiementTerrain[]> {
     .leftJoin(agentsTerrain, eq(paiementsTerrain.agentId, agentsTerrain.id))
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
+    .where(notDeleted(paiementsTerrain))
     .orderBy(desc(paiementsTerrain.createdAt));
 
   return results.map(row => {
@@ -170,6 +320,66 @@ export async function getAllPaiementsTerrain(): Promise<PaiementTerrain[]> {
       } : undefined
     };
   });
+}
+
+export async function getPendingPaiementsByAgencePaginated(
+  agenceId: string | undefined,
+  page: number = 1,
+  perPage: number = 25
+): Promise<{ data: PaiementTerrain[]; total: number }> {
+  let query = db
+    .select({
+      paiement: paiementsTerrain,
+      client: clients,
+      agent: agentsTerrain,
+      employe: employes,
+      user: users,
+    })
+    .from(paiementsTerrain)
+    .leftJoin(clients, eq(paiementsTerrain.clientId, clients.id))
+    .leftJoin(agentsTerrain, eq(paiementsTerrain.agentId, agentsTerrain.id))
+    .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .leftJoin(users, eq(employes.userId, users.id))
+    .$dynamic();
+
+  const conditions = [eq(paiementsTerrain.statut, "Pending"), notDeleted(paiementsTerrain)];
+  if (agenceId) {
+    conditions.push(eq(paiementsTerrain.agenceId, agenceId));
+  }
+
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(paiementsTerrain)
+    .where(and(...conditions));
+  const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
+
+  query = query.where(and(...conditions));
+
+  const results = await query
+    .orderBy(desc(paiementsTerrain.createdAt))
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+
+  const data = results.map(row => {
+    const agentNom = row.user?.nom || row.agent?.nom || "Inconnu";
+    const agentPrenom = row.user?.prenom || row.agent?.prenom || "";
+
+    return {
+      ...row.paiement,
+      clients: row.client ? {
+        nom: row.client.nom,
+        prenom: row.client.prenom,
+        telephone: row.client.telephone,
+        photoProfile: row.client.photoProfile,
+      } : undefined,
+      agents_terrain: row.agent ? {
+        nom: agentNom,
+        prenom: agentPrenom,
+      } : undefined,
+    };
+  });
+
+  return { data, total };
 }
 
 /**
@@ -194,13 +404,12 @@ export async function getPendingPaiementsByAgence(agenceId?: string): Promise<Pa
 
   // Filter by pending status and optionally by agency
   const conditions = [
-    eq(paiementsTerrain.statut, "Pending")
+    eq(paiementsTerrain.statut, "Pending"),
+    notDeleted(paiementsTerrain),
   ];
 
   if (agenceId) {
-    // Only include payments where employe exists AND matches the agency
-    conditions.push(sql`${employes.agenceId} IS NOT NULL`);
-    conditions.push(eq(employes.agenceId, agenceId));
+    conditions.push(eq(paiementsTerrain.agenceId, agenceId));
   }
 
   query = query.where(and(...conditions));
@@ -229,7 +438,16 @@ export async function getPendingPaiementsByAgence(agenceId?: string): Promise<Pa
 }
 
 export async function createPaiementTerrain(insertPaiement: InsertPaiementTerrain): Promise<PaiementTerrain> {
-  const [paiement] = await db.insert(paiementsTerrain).values(insertPaiement).returning();
+  const agenceId = insertPaiement.agenceId
+    ? insertPaiement.agenceId
+    : insertPaiement.agentId
+    ? await resolveAgentPrimaryAgenceId(insertPaiement.agentId)
+    : undefined;
+
+  const [paiement] = await db
+    .insert(paiementsTerrain)
+    .values({ ...insertPaiement, agenceId: agenceId || null })
+    .returning();
   return paiement;
 }
 
@@ -265,16 +483,52 @@ export async function deleteEmploye(id: string): Promise<boolean> {
 
 // Pos Devices
 export async function getPosDevice(id: string): Promise<PosDevice | undefined> {
-    const [device] = await db.select().from(posDevices).where(eq(posDevices.id, id));
+    const [device] = await db
+      .select()
+      .from(posDevices)
+      .where(and(eq(posDevices.id, id), notDeleted(posDevices)));
     return device;
 }
 
 export async function getPosDevicesByAgent(agentId: string): Promise<PosDevice[]> {
-    return db.select().from(posDevices).where(eq(posDevices.agentId, agentId));
+    return db
+      .select()
+      .from(posDevices)
+      .where(and(eq(posDevices.assignedTo, agentId), notDeleted(posDevices)));
 }
 
 export async function getAllPosDevices(): Promise<PosDevice[]> {
-    return db.select().from(posDevices);
+    return db.select().from(posDevices).where(notDeleted(posDevices));
+}
+
+export async function getPosDevicesPaginated(
+    filter: { agenceId?: string; assignedTo?: string } = {},
+    page: number = 1,
+    perPage: number = 25
+): Promise<{ data: PosDevice[]; total: number }> {
+    const conditions = [notDeleted(posDevices)];
+    if (filter.agenceId) {
+      conditions.push(eq(posDevices.agenceId, filter.agenceId));
+    }
+    if (filter.assignedTo) {
+      conditions.push(eq(posDevices.assignedTo, filter.assignedTo));
+    }
+
+    const totalResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(posDevices)
+      .where(and(...conditions));
+    const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
+
+    const data = await db
+      .select()
+      .from(posDevices)
+      .where(and(...conditions))
+      .orderBy(desc(posDevices.createdAt))
+      .limit(perPage)
+      .offset((page - 1) * perPage);
+
+    return { data, total };
 }
 
 export async function createPosDevice(device: InsertPosDevice): Promise<PosDevice> {
@@ -481,8 +735,11 @@ export async function createPendingPaiementTerrain(data: {
     if (existing.length > 0) return existing[0];
   }
 
+  const agenceId = await resolveAgentPrimaryAgenceId(data.agentId);
+
   const [paiement] = await db.insert(paiementsTerrain).values({
     agentId: data.agentId,
+    agenceId: agenceId || null,
     clientId: data.clientId,
     creditId: data.creditId,
     compteId: data.compteId,

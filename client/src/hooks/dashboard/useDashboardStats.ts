@@ -56,7 +56,11 @@ export function useDashboardStats(userRole?: string) {
   
   const { data: stats, isLoading: loading, error, refetch } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', userRole, selectedAgence?.id],
-    queryFn: () => dashboardApi.getStats()
+    queryFn: () => dashboardApi.getStats(),
+    // Smart Polling Strategy (Performance Optimized)
+    refetchInterval: 30_000, // 30s background polling (mobile-friendly)
+    refetchOnWindowFocus: true, // Auto-refresh when returning to tab
+    staleTime: 10_000, // Don't re-fetch if data is < 10s old
   });
 
   return {

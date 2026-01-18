@@ -54,7 +54,7 @@ export default function CollectCashModal({
   useEffect(() => {
     const loadClients = async () => {
       try {
-        const data = await clientApi.getAll();
+        const data = await clientApi.getAllList();
         setClients(data || []);
       } catch (error) {
         console.error('Erreur chargement clients:', error);

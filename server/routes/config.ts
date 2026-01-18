@@ -134,16 +134,17 @@ export function registerConfigRoutes(app: Express) {
         });
       }
 
-      const erreur = validerCoherenceFrequenceDuree(
+      const resultatValidation = validerCoherenceFrequenceDuree(
         frequence as FrequenceRemboursement,
         Number(dureeValeur),
         dureeUnite as DureeUnite
       );
 
-      if (erreur) {
+      if (!resultatValidation.isValid) {
         return res.json({
           valide: false,
-          message: erreur
+          message: resultatValidation.debugMessage || "Durée invalide",
+          code: resultatValidation.errorCode
         });
       }
 

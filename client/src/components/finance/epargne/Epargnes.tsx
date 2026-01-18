@@ -14,6 +14,7 @@ import ResponsiveTable, { TableColumn } from '../../ui/ResponsiveTable';
 import Badge from '../../ui/Badge';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
 import { formatClientName } from '../../../lib/format';
+import { getAccountBalance, getAccountUiConfig, getMonthlyInterestEstimate } from '../../../lib/account-config';
 
 
 interface Compte {
@@ -139,10 +140,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   };
 
   // Helper to get solde value from various property names
-  const getSolde = (c: Compte): number => {
-    const value = c.solde ?? c.soldeCourant ?? c.solde_courant ?? 0;
-    return Number(value) || 0;
-  };
+  const getSolde = (c: Compte): number => getAccountBalance(c);
 
   // Helper to get client display name
   const getClientName = (c: Compte): string => {
@@ -166,7 +164,17 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     }
   };
 
-  const [accountStats, setAccountStats] = useState({ total: 0, epargne: 0, courant: 0, bloque: 0, totalSolde: 0 });
+  const [accountStats, setAccountStats] = useState({
+    total: 0,
+    epargne: 0,
+    courant: 0,
+    bloque: 0,
+    totalSolde: 0,
+    tauxMoyenGlobal: 0,
+    tauxMoyenEpargne: 0,
+    tauxMoyenCourant: 0,
+    tauxMoyenBloque: 0,
+  });
   
   // Load stats separately
   const loadStats = useCallback(async () => {
@@ -190,17 +198,21 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   const stats = useMemo(() => {
     let activeTotal = accountStats.total;
     let activeLabel = 'actifs';
+    let tauxMoyen = accountStats.tauxMoyenGlobal;
 
     // Context-aware total based on active tab
     if (activeTab === 'courant') {
       activeTotal = accountStats.courant;
       activeLabel = 'courants';
+      tauxMoyen = accountStats.tauxMoyenCourant;
     } else if (activeTab === 'epargne') {
       activeTotal = accountStats.epargne;
       activeLabel = 'épargnes';
+      tauxMoyen = accountStats.tauxMoyenEpargne;
     } else if (activeTab === 'bloques') {
       activeTotal = accountStats.bloque;
       activeLabel = 'bloqués';
+      tauxMoyen = accountStats.tauxMoyenBloque;
     }
     
     return {
@@ -210,7 +222,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       soldeTotal: accountStats.totalSolde,
       comptesEpargne: accountStats.epargne,
       comptesCourant: accountStats.courant,
-      tauxMoyen: 0
+      tauxMoyen
     };
   }, [accountStats, activeTab]);
 
@@ -246,12 +258,57 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         <div>
           <div className="font-mono font-bold text-cyan-400">{row.numero_compte || row.numeroCompte}</div>
           <div className="text-xs text-slate-400">{row.type_compte || row.typeCompte}</div>
+          {(() => {
+            const uiConfig = getAccountUiConfig(row, 'staff');
+            const monthlyEstimate = getMonthlyInterestEstimate(getSolde(row), uiConfig.interestRate);
+            if (!uiConfig.interestRate || monthlyEstimate <= 0) return null;
+            return (
+              <div className="text-[11px] text-amber-300 font-semibold mt-1">
+                Profits estimés: +{monthlyEstimate.toLocaleString('fr-FR')} FCFA/mois
+              </div>
+            );
+          })()}
         </div>
-      )
+      ),
+      mobileFormat: (_value: any, row: Compte) => {
+        const uiConfig = getAccountUiConfig(row, 'staff');
+        const Icon = uiConfig.icon;
+        const balance = getSolde(row);
+        const monthlyEstimate = getMonthlyInterestEstimate(balance, uiConfig.interestRate);
+
+        return (
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-base font-semibold text-white truncate">{getClientName(row)}</div>
+                <div className="text-xs text-slate-400 font-mono">{row.numero_compte || row.numeroCompte}</div>
+              </div>
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold ${uiConfig.badgeClassName}`}>
+                <Icon size={12} />
+                {uiConfig.type}
+              </span>
+            </div>
+            <div className="text-2xl font-bold text-white">{balance.toLocaleString('fr-FR')} FCFA</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                value={uiConfig.statusLabel}
+                size="sm"
+                icon={uiConfig.isLocked ? <Lock size={12} /> : undefined}
+              />
+              {uiConfig.interestRate > 0 && monthlyEstimate > 0 && (
+                <span className="text-[11px] font-semibold text-amber-300">
+                  Profits estimés: +{monthlyEstimate.toLocaleString('fr-FR')} FCFA/mois
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      }
     },
     {
       label: 'Client',
       key: 'clients',
+      hideOnMobile: true,
       format: (_value: any, row: Compte) => (
         <div>
           <div className="font-medium text-white">{getClientName(row)}</div>
@@ -262,6 +319,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     {
       label: 'Ouverture',
       key: 'created_at',
+      hideOnMobile: true,
       format: (_value: any, row: Compte) => (
         <div className="text-sm text-slate-300">{formatDate(row)}</div>
       )
@@ -269,57 +327,61 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     {
       label: 'Solde',
       key: 'solde',
+      hideOnMobile: true,
       format: (_value: any, row: Compte) => (
-        <span className="font-bold text-emerald-400">{getSolde(row).toLocaleString('fr-FR')} FCFA</span>
+        <span className={`font-bold ${getAccountUiConfig(row, 'staff').accentClassName}`}>
+          {getSolde(row).toLocaleString('fr-FR')} FCFA
+        </span>
       )
     },
     {
       label: 'Statut',
       key: 'statut',
-      format: (value: any) => {
-         const color = value === 'Actif' ? 'success' : 
-                       value === 'Suspendu' ? 'warning' : 
-                       value === 'EN_ATTENTE_PAIEMENT' ? 'warning' : 
-                       'neutral';
-         const label = value === 'EN_ATTENTE_PAIEMENT' ? 'En attente paiement' : value;
-         return <Badge variant={color} value={label} />;
+      hideOnMobile: true,
+      format: (_value: any, row: Compte) => {
+         const uiConfig = getAccountUiConfig(row, 'staff');
+         return <Badge value={uiConfig.statusLabel} icon={uiConfig.isLocked ? <Lock size={12} /> : undefined} />;
       }
     }
   ];
 
   const canEditEpargnes = hasPermission('epargnes', 'edit');
 
-  const handleActions = (row: Compte) => (
-    <div className="flex gap-2">
-      {canEditEpargnes && (
-        <>
-          <button
-             onClick={(e) => { e.stopPropagation(); handleTransaction(row, 'Dépôt'); }}
-             className="p-1.5 hover:bg-emerald-500/20 text-emerald-400 rounded transition"
-             title="Dépôt"
-             disabled={row.statut !== 'Actif'}
-          >
-            <TrendingUp size={16} />
-          </button>
-          <button
-             onClick={(e) => { e.stopPropagation(); handleTransaction(row, 'Retrait'); }}
-             className="p-1.5 hover:bg-blue-500/20 text-blue-400 rounded transition"
-             title="Retrait"
-             disabled={row.statut !== 'Actif'}
-          >
-            <TrendingDown size={16} />
-          </button>
-        </>
-      )}
-      <button
-         onClick={(e) => { e.stopPropagation(); setDetailCompteId(row.id); }}
-         className="p-1.5 hover:bg-slate-500/20 text-slate-400 rounded transition"
-         title="Détails"
-      >
-        <Eye size={16} />
-      </button>
-    </div>
-  );
+  const handleActions = (row: Compte) => {
+    const uiConfig = getAccountUiConfig(row, 'staff');
+
+    return (
+      <div className="flex gap-2">
+        {canEditEpargnes && (
+          <>
+            <button
+               onClick={(e) => { e.stopPropagation(); handleTransaction(row, 'Dépôt'); }}
+               className="p-1.5 hover:bg-emerald-500/20 text-emerald-400 rounded transition"
+               title="Dépôt"
+               disabled={!uiConfig.canReceive}
+            >
+              <TrendingUp size={16} />
+            </button>
+            <button
+               onClick={(e) => { e.stopPropagation(); handleTransaction(row, 'Retrait'); }}
+               className="p-1.5 hover:bg-blue-500/20 text-blue-400 rounded transition"
+               title="Retrait"
+               disabled={!uiConfig.canTransferOut}
+            >
+              <TrendingDown size={16} />
+            </button>
+          </>
+        )}
+        <button
+           onClick={(e) => { e.stopPropagation(); setDetailCompteId(row.id); }}
+           className="p-1.5 hover:bg-slate-500/20 text-slate-400 rounded transition"
+           title="Détails"
+        >
+          <Eye size={16} />
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4 md:space-y-6 pb-20 md:pb-0">

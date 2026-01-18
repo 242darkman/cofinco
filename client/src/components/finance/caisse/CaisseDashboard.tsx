@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet,
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
@@ -9,6 +10,7 @@ import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { Button, Card, StatCard, TabGroup } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compteEpargneApi } from '../../../lib/api-client';
+import { computeSessionStatus } from '../../../lib/format';
 import { CaisseQuickActions } from './CaisseQuickActions';
 import CaisseOuverture from './CaisseOuverture';
 import CaisseOperations from './CaisseOperations';
@@ -30,18 +32,21 @@ import CaisseClientInfos from './CaisseClientInfos';
 interface SessionCaisse {
   id: string;
   caissier_id: string;
-  date_ouverture: string;
-  date_fermeture?: string;
+  openedAt?: string;
+  opened_at?: string;
+  closedAt?: string;
+  closed_at?: string;
   solde_initial: number;
   solde_theorique: number;
   solde_reel?: number;
   ecart?: number;
-  statut: string;
+  computedStatus?: string;
   observations: string;
   caissier_nom?: string;
   caisse_nom?: string;
   caisse_id?: string;
   agence_id?: string;
+  timeoutAt?: string;
 }
 
 interface Transaction {
@@ -91,9 +96,7 @@ export default function CaisseDashboard({
 
   const { mobileMoneyEnabled } = useFeatureFlags();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [sessionActive, setSessionActive] = useState<SessionCaisse | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+
   const [showOuverture, setShowOuverture] = useState(false);
   const [showPaiement, setShowPaiement] = useState(false);
   const [initialPaymentType, setInitialPaymentType] = useState<string | undefined>(undefined);
@@ -117,6 +120,26 @@ export default function CaisseDashboard({
   const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [historyFactureId, setHistoryFactureId] = useState<string | undefined>(undefined);
 
+  // React Query for Real-time Data
+  const { 
+    data: sessionActive, 
+    isLoading: loadingSession,
+    refetch: refetchSession 
+  } = useQuery({
+    queryKey: ['session-caisse', 'active'],
+    queryFn: async () => {
+      // If supervised, use that
+      if (supervisedSession) return supervisedSession;
+      
+      const data = await sessionCaisseApi.getActive();
+      const status = data ? (data.computedStatus || computeSessionStatus(data)) : null;
+      if (data && status === 'OPEN') {
+        return data as SessionCaisse;
+      }
+      return null;
+    }
+  });
+
   // Actual session being used (own or supervised)
   const currentSession = supervisedSession || sessionActive;
 
@@ -137,48 +160,35 @@ export default function CaisseDashboard({
     }
   }, [initialShowPaiement]);
 
-  useEffect(() => {
-    loadSessionActive();
-    loadTransactionsJour();
-    loadCaissesSeparees();
-    loadComptesEnAttente();
-  }, []);
+  const { 
+    data: transactions = [], 
+    isLoading: loadingTransactions 
+  } = useQuery({
+    queryKey: ['operations-caisse', 'today'], 
+    queryFn: caisseOperationApi.getToday,
+    initialData: []
+  });
 
+  const loading = loadingSession || loadingTransactions;
+
+  // Manual refresh logic replaced by React Query's automatic background refetching
+  // But we keep manual refetch capability for specific actions
   useEffect(() => {
+    // If we have a supervised session update, we might need to manually set it?
+    // Actually, forcing a refetch is better.
     if (initialState?.supervisedSession) {
-      setSupervisedSession(initialState.supervisedSession);
-      toast.success(`Supervision de la caisse ${initialState.supervisedSession.caisse_nom || ''} activée`);
+       setSupervisedSession(initialState.supervisedSession);
+       // We don't refetch sessionActive here because sessionActive query handles the "supervisedSession" logic
     }
   }, [initialState]);
 
   const loadSessionActive = async () => {
-    try {
-      // If we are in supervised mode, we already have the session data
-      if (supervisedSession) {
-        // Refresh it from API just in case? 
-        // For simplicity, we just check if it's still active or use the supervised one
-      }
-
-      const data = await sessionCaisseApi.getActive();
-      if (data && data.statut === 'Ouverte') {
-        setSessionActive(data);
-      } else {
-        setSessionActive(null);
-      }
-    } catch (error) {
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
+    await refetchSession();
   };
 
   const loadTransactionsJour = async () => {
-    try {
-      const data = await caisseOperationApi.getToday();
-      setTransactions(data || []);
-    } catch (error) {
-      console.error('Erreur:', error);
-    }
+    // queryClient.invalidateQueries({ queryKey: ['operations-caisse', 'today'] });
+    // Handled automatically via websocket ideally, or we can force refetch
   };
 
   const loadCaissesSeparees = async () => {
@@ -204,14 +214,21 @@ export default function CaisseDashboard({
   };
 
   useEffect(() => {
-    if (currentSession?.id) {
-      loadCaissesSeparees();
-    }
-  }, [currentSession]);
+    loadCaissesSeparees();
+    loadComptesEnAttente();
+  }, [currentSession?.id]);
+
+  // Sync sessionActive query result to currentSession logic
+  // sessionActive from useQuery is the source of truth for "active session"
+  // supervisedSession overrides it if set.
+
+
+
 
   // Heartbeat - envoie un signal au serveur toutes les 5 minutes pour éviter le timeout de session
   useEffect(() => {
-    if (!currentSession?.id || currentSession.statut !== 'Ouverte') return;
+    const status = currentSession ? (currentSession.computedStatus || computeSessionStatus(currentSession)) : null;
+    if (!currentSession?.id || status !== 'OPEN') return;
 
     // Envoyer un heartbeat immédiatement à l'ouverture
     const sendHeartbeat = async () => {
@@ -229,7 +246,7 @@ export default function CaisseDashboard({
     const interval = setInterval(sendHeartbeat, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [currentSession?.id, currentSession?.statut]);
+  }, [currentSession?.id, currentSession?.computedStatus, currentSession?.openedAt, currentSession?.closedAt, currentSession?.timeoutAt]);
 
   // Supervision timer - counts elapsed time since supervision started
   useEffect(() => {

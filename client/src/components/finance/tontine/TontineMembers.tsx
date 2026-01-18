@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Pagination } from '../../ui/Pagination';
@@ -60,6 +60,37 @@ interface TontineMembersProps {
 
 const ITEMS_PER_PAGE = 10;
 
+// Composant Status Badge Mobile-First
+const MemberStatusBadge = ({ membre, tourActuel }: { membre: TontineMembre; tourActuel: number }) => {
+  const toursPayes = membre.toursPayes || 0;
+
+  if (toursPayes > tourActuel) {
+    // En avance
+    const avance = toursPayes - tourActuel;
+    return (
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold whitespace-nowrap">
+        <CheckCheck size={12} /> +{avance} tour{avance > 1 ? 's' : ''}
+      </span>
+    );
+  } else if (toursPayes >= tourActuel) {
+    // À jour
+    return (
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold whitespace-nowrap">
+        <Check size={12} /> À jour
+      </span>
+    );
+  } else {
+    // En retard
+    const retard = tourActuel - toursPayes;
+    const dette = retard * (membre.montantCotisation || 0);
+    return (
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold whitespace-nowrap">
+        <AlertTriangle size={12} /> -{retard} ({dette.toLocaleString('fr-FR')} F)
+      </span>
+    );
+  }
+};
+
 export default function TontineMembers({ tontineId, maxMembres, onUpdate }: TontineMembersProps) {
   const [membres, setMembres] = useState<TontineMembre[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -111,7 +142,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
 
   const fetchClients = useCallback(async () => {
     try {
-      const data = await clientApi.getAll();
+      const data = await clientApi.getAllList();
       setClients(data?.filter((c: Client) => c.status === 'Actif') || []);
     } catch (error) {
       console.error('Erreur chargement clients:', error);
@@ -355,20 +386,8 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                           <span className="text-slate-500">
                             {new Date(membre.date_adhesion || membre.dateAdhesion || '').toLocaleDateString('fr-FR')}
                           </span>
-                          {/* Indicateur à jour / en retard */}
-                          {membre.estAJour !== undefined && (
-                            membre.estAJour ? (
-                              <span className="flex items-center gap-0.5 text-green-400">
-                                <CheckCircle size={10} />
-                                À jour
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-0.5 text-amber-400">
-                                <AlertCircle size={10} />
-                                En retard
-                              </span>
-                            )
-                          )}
+                          {/* Status Badge Mobile-First */}
+                          <MemberStatusBadge membre={membre} tourActuel={membre.tourActuel || 1} />
                         </div>
                       </div>
 

@@ -1,20 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Camera, Eye, EyeOff, Key, Upload, X, Users, Shield, User as UserIcon, Mail, Phone, Loader2 } from 'lucide-react';
-import { Button, Modal, FormField, SelectField, IconButton } from '../../ui';
+import { Button, Modal, FormField, SelectField } from '../../ui';
 import CameraCapture from '../../shared/CameraCapture';
 import { toast } from '../../../lib/toast';
 import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
 import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
+import PasswordStrengthIndicator from '../../auth/PasswordStrengthIndicator';
+import { useSecuritySettings } from '../../../hooks/settings/useSecuritySettings';
 
 interface User {
   id?: string;
+  nom?: string;
+  prenom?: string;
   username: string;
   password?: string;
-  name: string;
-  email: string;
-  phone: string;
+  name?: string;
+  email?: string;
+  telephone?: string;
+  phone?: string;
   role: SystemRole;
   statut: string;
+  photoProfile?: string;
   photo_profile?: string;
 }
 
@@ -27,6 +33,16 @@ interface UserFormModalProps {
 }
 
 const roles = getRoleOptions().filter((role) => role.value !== SystemRole.CLIENT);
+const statusOptions = ['Actif', 'Inactif', 'Suspendu'];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[+]?[\d\s().-]{6,20}$/;
+const DEFAULT_PASSWORD_RULES = {
+  minLength: 8,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumbers: true,
+  requireSpecialChars: true,
+};
 
 const normalizeRoleValue = (role?: string) => {
   return normalizeRole(role) || SystemRole.CAISSIER;
@@ -36,18 +52,32 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
   const [formData, setFormData] = useState<any>({
     username: '',
     password: '',
-    name: '',
+    nom: '',
+    prenom: '',
     email: '',
-    phone: '',
+    telephone: '',
     role: SystemRole.CAISSIER,
     statut: 'Actif',
-    photo_profile: ''
+    photoProfile: ''
   });
   
   const [showPassword, setShowPassword] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { settings: securitySettings } = useSecuritySettings();
+
+  const passwordRequirements = useMemo(() => {
+    if (!securitySettings) return DEFAULT_PASSWORD_RULES;
+    return {
+      minLength: securitySettings.password_min_length ?? DEFAULT_PASSWORD_RULES.minLength,
+      requireUppercase: securitySettings.password_require_uppercase ?? DEFAULT_PASSWORD_RULES.requireUppercase,
+      requireLowercase: securitySettings.password_require_lowercase ?? DEFAULT_PASSWORD_RULES.requireLowercase,
+      requireNumbers: securitySettings.password_require_numbers ?? DEFAULT_PASSWORD_RULES.requireNumbers,
+      requireSpecialChars: securitySettings.password_require_special ?? DEFAULT_PASSWORD_RULES.requireSpecialChars,
+    };
+  }, [securitySettings]);
 
   const { uploadFile, isUploading } = useMinIOUpload({
     path: 'profiles',
@@ -55,18 +85,68 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     onError: (err: any) => toast.error(`Erreur upload: ${err.message}`)
   });
 
+  const splitFullName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+      return { prenom: '', nom: '' };
+    }
+    if (parts.length === 1) {
+      return { prenom: '', nom: parts[0] };
+    }
+    return {
+      prenom: parts[0],
+      nom: parts.slice(1).join(' ')
+    };
+  };
+
+  const resolveInitialNames = (data?: User | null) => {
+    const nom = data?.nom || '';
+    const prenom = data?.prenom || '';
+    if (nom || prenom) {
+      return { nom, prenom };
+    }
+    if (data?.name) {
+      return splitFullName(data.name);
+    }
+    return { nom: '', prenom: '' };
+  };
+
+  const resolveProfileUrl = (value?: string) => {
+    if (!value) return '';
+    if (value.startsWith('data:')) return value;
+    if (value.startsWith('/api/')) return value;
+    if (value.startsWith('/')) return value;
+    if (value.startsWith('http')) {
+      try {
+        const url = new URL(value);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2) {
+          const key = pathParts.slice(1).join('/');
+          return `/api/uploads/files/${key}`;
+        }
+        return value;
+      } catch {
+        return value;
+      }
+    }
+    return `/api/uploads/files/${value}`;
+  };
+
   useEffect(() => {
     if (initialData) {
+      const resolvedNames = resolveInitialNames(initialData);
       setFormData({
         username: initialData.username || '',
         password: '',
-        name: initialData.name || '',
+        nom: resolvedNames.nom,
+        prenom: resolvedNames.prenom,
         email: initialData.email || '',
-        phone: initialData.phone || '',
+        telephone: initialData.telephone || initialData.phone || '',
         role: normalizeRoleValue(initialData.role),
         statut: initialData.statut || 'Actif',
-        photo_profile: initialData.photo_profile || ''
+        photoProfile: initialData.photoProfile || initialData.photo_profile || ''
       });
+      setErrors({});
     } else {
       resetForm();
     }
@@ -76,37 +156,66 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     setFormData({
       username: '',
       password: '',
-      name: '',
+      nom: '',
+      prenom: '',
       email: '',
-      phone: '',
+      telephone: '',
       role: SystemRole.CAISSIER,
       statut: 'Actif',
-      photo_profile: ''
+      photoProfile: ''
     });
     setShowPassword(false);
+    setErrors({});
   };
 
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
 
-  // Helper function to generate username from name (format: p.nom) - fallback local
-  const generateUsernameLocal = (fullName: string): string => {
-    // Remove accents and special characters
-    const normalized = fullName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const parts = normalized.trim().split(/\s+/).filter(Boolean);
-
-    if (parts.length < 2) {
-      // If only one word, use it as-is
-      return parts[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+  const validatePasswordValue = (value: string) => {
+    const validationErrors: string[] = [];
+    if (value.length < passwordRequirements.minLength) {
+      validationErrors.push(`Le mot de passe doit contenir au moins ${passwordRequirements.minLength} caractères`);
     }
+    if (passwordRequirements.requireUppercase && !/[A-Z]/.test(value)) {
+      validationErrors.push('Le mot de passe doit contenir au moins une majuscule');
+    }
+    if (passwordRequirements.requireLowercase && !/[a-z]/.test(value)) {
+      validationErrors.push('Le mot de passe doit contenir au moins une minuscule');
+    }
+    if (passwordRequirements.requireNumbers && !/[0-9]/.test(value)) {
+      validationErrors.push('Le mot de passe doit contenir au moins un chiffre');
+    }
+    if (passwordRequirements.requireSpecialChars && !/[@$!%*?&]/.test(value)) {
+      validationErrors.push('Le mot de passe doit contenir au moins un caractère spécial (@$!%*?&)');
+    }
+    return validationErrors;
+  };
 
-    const prenom = parts[0];
-    const nom = parts[parts.length - 1];
-    return `${prenom.charAt(0).toLowerCase()}.${nom.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  const updateField = (field: string, value: any) => {
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
+  // Helper function to generate username from name (format: p.nom) - fallback local
+  const generateUsernameLocal = (nom: string, prenom: string): string => {
+    // Remove accents and special characters
+    const normalizedNom = nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normalizedPrenom = prenom.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const cleanNom = normalizedNom.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanPrenom = normalizedPrenom.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!cleanNom) return '';
+    if (!cleanPrenom) return cleanNom;
+    return `${cleanPrenom.charAt(0)}.${cleanNom}`;
   };
 
   // Generate unique username via backend API
-  const generateUniqueUsername = async (fullName: string): Promise<string> => {
+  const generateUniqueUsername = async (fullName: string, fallbackNom: string, fallbackPrenom: string): Promise<string> => {
     try {
       setUsernameChecking(true);
       const response = await fetch(`/api/employes/check-username?fullName=${encodeURIComponent(fullName)}`, {
@@ -123,22 +232,24 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
       setUsernameChecking(false);
     }
     // Fallback to local generation
-    return generateUsernameLocal(fullName);
+    return generateUsernameLocal(fallbackNom, fallbackPrenom);
   };
 
   // Auto-generate unique username when name changes (for new users only)
   useEffect(() => {
-    if (!initialData && formData.name && formData.name.includes(' ')) {
+    if (!initialData && (formData.nom || formData.prenom)) {
+      const fullName = `${formData.prenom || ''} ${formData.nom || ''}`.trim();
+      if (!fullName) return;
       // Debounce the API call
       const timer = setTimeout(async () => {
-        const suggested = await generateUniqueUsername(formData.name);
+        const suggested = await generateUniqueUsername(fullName, formData.nom, formData.prenom);
         if (suggested && suggested !== formData.username) {
-          setFormData((prev: any) => ({ ...prev, username: suggested }));
+          updateField('username', suggested);
         }
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [formData.name, initialData]);
+  }, [formData.nom, formData.prenom, initialData]);
 
   const generatePassword = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
@@ -146,7 +257,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    setFormData({ ...formData, password });
+    updateField('password', password);
     setShowPassword(true);
   };
 
@@ -162,7 +273,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     try {
       const url = await uploadFile(file);
       if (url) {
-        setFormData({ ...formData, photo_profile: url });
+        updateField('photoProfile', url);
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -178,7 +289,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
       
       const url = await uploadFile(file);
       if (url) {
-        setFormData({ ...formData, photo_profile: url });
+        updateField('photoProfile', url);
         setShowCamera(false);
       }
     } catch (error) {
@@ -189,9 +300,53 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    const nextErrors: Record<string, string> = {};
+    if (!formData.nom?.trim()) {
+      nextErrors.nom = 'Le nom est requis';
+    }
+    if (!formData.username?.trim()) {
+      nextErrors.username = 'L\'identifiant est requis';
+    }
+    if (formData.email && !EMAIL_REGEX.test(formData.email)) {
+      nextErrors.email = 'Email invalide';
+    }
+    if (formData.telephone && !PHONE_REGEX.test(formData.telephone)) {
+      nextErrors.telephone = 'Numero de telephone invalide';
+    }
+    if (!initialData && !formData.password) {
+      nextErrors.password = 'Le mot de passe est requis';
+    }
+    if (formData.password) {
+      const passwordErrors = validatePasswordValue(formData.password);
+      if (passwordErrors.length > 0) {
+        nextErrors.password = passwordErrors[0];
+      }
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      toast.error('Veuillez corriger les erreurs du formulaire');
+      return;
+    }
+
     setSaving(true);
     try {
-      await onSubmit(formData);
+      const payload: any = {
+        username: formData.username.trim(),
+        nom: formData.nom.trim(),
+        prenom: formData.prenom?.trim() || '',
+        email: formData.email?.trim() || '',
+        telephone: formData.telephone?.trim() || '',
+        role: formData.role,
+        statut: formData.statut,
+        photoProfile: formData.photoProfile || ''
+      };
+
+      if (formData.password && formData.password.trim()) {
+        payload.password = formData.password;
+      }
+
+      await onSubmit(payload);
       onClose();
     } finally {
       setSaving(false);
@@ -213,14 +368,15 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-surface-muted overflow-hidden shadow-lg bg-surface-muted flex items-center justify-center">
                 {isUploading ? (
                   <Loader2 className="animate-spin text-primary" size={32} />
-                ) : formData.photo_profile ? (
+                ) : formData.photoProfile ? (
                    <img
-                     src={formData.photo_profile.startsWith('http') ? formData.photo_profile : `/api/uploads/files/${formData.photo_profile}`}
+                     src={resolveProfileUrl(formData.photoProfile)}
                      onError={(e) => {
                        // Fallback if URL fails (e.g. key only)
                        // If we stored just the key, we need to construct the public URL or use a proxy endpoint
                        // But the new service returns full URL if isPublic=true
-                       (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + formData.name;
+                       const nameFallback = `${formData.prenom || ''} ${formData.nom || ''}`.trim();
+                       (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameFallback || formData.username || 'User')}`;
                      }}
                      alt="Profil"
                      className="w-full h-full object-cover"
@@ -250,10 +406,10 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                  >
                    <Upload size={16} />
                  </button>
-                 {formData.photo_profile && !isUploading && (
+                 {formData.photoProfile && !isUploading && (
                     <button 
                      type="button"
-                     onClick={() => setFormData({ ...formData, photo_profile: '' })}
+                     onClick={() => updateField('photoProfile', '')}
                      className="text-white hover:text-danger transition-colors p-1"
                      title="Supprimer"
                    >
@@ -289,25 +445,34 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                  <FormField
-                   label="Nom complet"
-                   name="name"
-                   value={formData.name}
-                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                   label="Prenom"
+                   name="prenom"
+                   value={formData.prenom}
+                   onChange={(e) => updateField('prenom', e.target.value)}
+                   className="bg-surface-base"
+                 />
+                 <FormField
+                   label="Nom"
+                   name="nom"
+                   value={formData.nom}
+                   onChange={(e) => updateField('nom', e.target.value)}
                    required
+                   error={errors.nom}
                    className="bg-surface-base"
                  />
                  <div className="relative">
                    <FormField
                      label="Identifiant"
-                     name="username"
-                     value={formData.username}
-                     onChange={(e) => {
-                       setFormData({ ...formData, username: e.target.value });
+                   name="username"
+                   value={formData.username}
+                   onChange={(e) => {
+                       updateField('username', e.target.value);
                        setUsernameAvailable(null); // Reset on manual edit
-                     }}
-                     className="bg-surface-base font-mono"
-                     required
-                   />
+                    }}
+                    className="bg-surface-base font-mono"
+                    required
+                    error={errors.username}
+                  />
                    {usernameChecking && (
                      <div className="absolute right-2 top-8 text-xs text-slate-400">
                        Vérification...
@@ -327,16 +492,18 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                    name="email"
                    type="email"
                    value={formData.email}
-                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                   onChange={(e) => updateField('email', e.target.value)}
+                   error={errors.email}
                    className="bg-surface-base"
                    icon={Mail}
                  />
                   <FormField
                    label="Téléphone"
-                   name="phone"
+                   name="telephone"
                    type="tel"
-                   value={formData.phone}
-                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                   value={formData.telephone}
+                   onChange={(e) => updateField('telephone', e.target.value)}
+                   error={errors.telephone}
                    className="bg-surface-base"
                    icon={Phone}
                  />
@@ -365,7 +532,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                     name="statut"
                     value={formData.statut}
                     onChange={(e) => setFormData({ ...formData, statut: e.target.value })}
-                    options={['Actif', 'Inactif', 'Suspendu']}
+                    options={statusOptions}
                     containerClassName="mt-0"
                     className="bg-slate-800 border-slate-700 text-white focus:border-primary focus:ring-primary/20"
                  />
@@ -376,15 +543,16 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                      <FormField
                        label={!initialData ? 'Mot de passe' : 'Nouveau mot de passe'}
                        name="password"
-                       type={showPassword ? 'text' : 'password'}
-                       value={formData.password}
-                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                       containerClassName="mt-0"
-                       rightIcon={showPassword ? EyeOff : Eye}
-                       onRightIconClick={() => setShowPassword(!showPassword)}
-                       required={!initialData}
-                       className="bg-surface-base"
-                     />
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => updateField('password', e.target.value)}
+                    error={errors.password}
+                    containerClassName="mt-0"
+                    rightIcon={showPassword ? EyeOff : Eye}
+                    onRightIconClick={() => setShowPassword(!showPassword)}
+                    required={!initialData}
+                    className="bg-surface-base"
+                  />
                    </div>
                    <Button 
                       variant="secondary" 
@@ -397,6 +565,20 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                      Générer
                    </Button>
                 </div>
+                {formData.password && (
+                  <div className="mt-3">
+                    <PasswordStrengthIndicator
+                      password={formData.password}
+                      requirements={{
+                        min_length: passwordRequirements.minLength,
+                        require_uppercase: passwordRequirements.requireUppercase,
+                        require_lowercase: passwordRequirements.requireLowercase,
+                        require_numbers: passwordRequirements.requireNumbers,
+                        require_special_chars: passwordRequirements.requireSpecialChars,
+                      }}
+                    />
+                  </div>
+                )}
              </div>
           </div>
 

@@ -6,9 +6,8 @@ import {
   FileText, Phone, Mail, User, ChevronRight, RefreshCw, Landmark, 
   DollarSign, Euro, Coins, Earth, AlertTriangle
 } from 'lucide-react';
-import { useLanguage } from '../../../contexts/LanguageContext';
-import { useFeatureFlags, UnavailableBadge } from '../../../contexts/FeatureFlagsContext';
 import { Button, Card, Badge, TabGroup, StatCard, Modal, ResponsiveTable, FormField, SelectField } from '../../ui';
+import TransactionFlow from './TransactionFlow';
 
 import airtelMoneyLogo from '../../../assets/logos/airtel-money.png';
 import mtnMomoLogo from '../../../assets/logos/mtn-momo.png';
@@ -472,8 +471,6 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
 }
 
 export default function TransfertArgent() {
-  const { t } = useLanguage();
-  const { mobileMoneyEnabled, mobileMoneyMessage, internationalTransferEnabled, internationalTransferMessage } = useFeatureFlags();
   const [showCalculator, setShowCalculator] = useState(false);
   const [showNewTransfer, setShowNewTransfer] = useState<'local' | 'international' | null>(null);
   const [activeTab, setActiveTab] = useState<'send' | 'history' | 'rates'>('send');
@@ -493,45 +490,15 @@ export default function TransfertArgent() {
     { name: 'Wave', logo: waveLogo, coverage: 'Sénégal, Côte d\'Ivoire', speed: 'Instantané' }
   ];
 
-  // Vérifier si les fonctionnalités sont désactivées
-  const isTransferDisabled = !mobileMoneyEnabled || !internationalTransferEnabled;
-
   return (
     <div className="space-y-6 relative min-h-[600px]" data-testid="module-transfert">
-      {/* Coming Soon Overlay */}
-      <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800">
-        <div className="text-center p-8 max-w-md">
-           <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-              <Clock className="text-amber-500" size={32} />
-           </div>
-           <h2 className="text-2xl font-bold text-white mb-3">Bientôt Disponible</h2>
-           <p className="text-slate-400 mb-6">Le module de transfert est en cours de finalisation. Cette fonctionnalité sera bientôt activée.</p>
-        </div>
-      </div>
-      
-      <div className="filter blur-[2px] opacity-50 pointer-events-none select-none">
-      {/* Bannière de fonctionnalité non disponible */}
-      {isTransferDisabled && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-          <AlertTriangle className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-amber-400 font-semibold">Fonctionnalité en cours de déploiement</h3>
-            <p className="text-amber-300/80 text-sm mt-1">
-              Les services de transfert d'argent et Mobile Money ne sont pas encore disponibles. 
-              Cette fonctionnalité sera activée prochainement.
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-white flex items-center gap-2">
             <Send className="text-emerald-400" size={24} />
-            Transfert d'Argent
-            {isTransferDisabled && <UnavailableBadge feature="mobileMoney" />}
+            Virements
           </h1>
-          <p className="text-slate-400 text-xs mt-1">Envoyez de l'argent rapidement à tarifs réduits</p>
+          <p className="text-slate-400 text-xs mt-1">Transferts internes et vers beneficiaires en temps reel</p>
         </div>
           <Button
             size="sm"
@@ -556,77 +523,7 @@ export default function TransfertArgent() {
         size="sm"
       />
 
-      {activeTab === 'send' && (
-        <>
-          <div className="grid grid-cols-2 gap-3">
-            <Card 
-              padding="sm"
-              onClick={() => setShowNewTransfer('local')}
-              className="bg-gradient-to-br from-emerald-600/10 to-teal-600/10 border-emerald-500/20 hover:border-emerald-500/60 cursor-pointer group transition-all relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition">
-                 <ArrowRight size={14} className="text-emerald-400 -rotate-45 group-hover:rotate-0 transition-transform duration-300" />
-              </div>
-              <div className="flex flex-col items-center text-center gap-2 mb-2 pt-2">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center group-hover:scale-110 transition">
-                  <MapPin className="text-emerald-400" size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-white leading-tight">National</h2>
-                  <p className="text-emerald-400/80 text-[10px]">Congo (Brazza)</p>
-                </div>
-              </div>
-              <div className="space-y-1 bg-slate-900/40 rounded-lg p-1.5 text-center">
-                <p className="text-[10px] text-slate-300">Dès 200 FCFA</p>
-                <p className="text-[10px] text-emerald-400 font-medium">Instantané</p>
-              </div>
-            </Card>
-
-            <Card 
-              padding="sm"
-              onClick={() => setShowNewTransfer('international')}
-              className="bg-gradient-to-br from-blue-600/10 to-indigo-600/10 border-blue-500/20 hover:border-blue-500/60 cursor-pointer group transition-all relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition">
-                 <ArrowRight size={14} className="text-blue-400 -rotate-45 group-hover:rotate-0 transition-transform duration-300" />
-              </div>
-              <div className="flex flex-col items-center text-center gap-2 mb-2 pt-2">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center group-hover:scale-110 transition">
-                  <Globe className="text-blue-400" size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-white leading-tight">International</h2>
-                  <p className="text-blue-400/80 text-[10px]">20+ Pays</p>
-                </div>
-              </div>
-              <div className="space-y-1 bg-slate-900/40 rounded-lg p-1.5 text-center">
-                 <p className="text-[10px] text-slate-300">-40% vs Agence</p>
-                 <p className="text-[10px] text-blue-400 font-medium">Sécurisé</p>
-              </div>
-            </Card>
-          </div>
-
-          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Smartphone className="text-cyan-400" size={20} />
-              Partenaires Mobile Money
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {partners.map((partner, idx) => (
-                <div key={idx} className="bg-slate-700/50 rounded-xl p-3 text-center hover:bg-slate-700 transition">
-                  <div className="w-12 h-12 mx-auto mb-2 rounded-xl overflow-hidden bg-white flex items-center justify-center">
-                    <img src={partner.logo} alt={partner.name} className="w-full h-full object-cover" />
-                  </div>
-                  <p className="text-white font-medium text-sm">{partner.name}</p>
-                  <p className="text-slate-500 text-xs">{partner.speed}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-4" />
-        </>
-      )}
+      {activeTab === 'send' && <TransactionFlow />}
 
       {activeTab === 'history' && (
         <Card padding="none" className="overflow-hidden bg-transparent sm:bg-slate-800 border-none sm:border border-slate-700">
@@ -768,7 +665,6 @@ export default function TransfertArgent() {
 
       {showCalculator && <TransferCalculator onClose={() => setShowCalculator(false)} />}
       {showNewTransfer && <NewTransferModal type={showNewTransfer} onClose={() => setShowNewTransfer(null)} />}
-      </div>
     </div>
   );
 }

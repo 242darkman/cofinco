@@ -13,13 +13,18 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 interface User {
   id: string;
   username: string;
-  name: string;
-  email: string;
-  phone: string;
+  nom?: string;
+  prenom?: string;
+  name?: string;
+  email?: string;
+  telephone?: string;
+  phone?: string;
   role: string;
   statut: string;
+  photoProfile?: string;
   photo_profile?: string;
-  created_at: string;
+  createdAt?: string;
+  created_at?: string;
 }
 
 export default function AdminGestionUtilisateurs() {
@@ -58,6 +63,33 @@ export default function AdminGestionUtilisateurs() {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  const getDisplayName = (user: User) => {
+    const fullName = `${user.prenom || ''} ${user.nom || ''}`.trim();
+    return fullName || user.name || user.username || 'Utilisateur';
+  };
+
+  const getPhotoUrl = (user: User) => {
+    const raw = user.photoProfile || user.photo_profile || '';
+    if (!raw) return '';
+    if (raw.startsWith('data:')) return raw;
+    if (raw.startsWith('/api/')) return raw;
+    if (raw.startsWith('/')) return raw;
+    if (raw.startsWith('http')) {
+      try {
+        const url = new URL(raw);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2) {
+          const key = pathParts.slice(1).join('/');
+          return `/api/uploads/files/${key}`;
+        }
+        return raw;
+      } catch {
+        return raw;
+      }
+    }
+    return `/api/uploads/files/${raw}`;
+  };
 
   const handleFormSubmit = useCallback(async (formData: any) => {
     try {
@@ -106,7 +138,7 @@ export default function AdminGestionUtilisateurs() {
 
   const searchQuery = searchTerm.toLowerCase();
   const filteredUsers = users.filter(Boolean).filter((user) => {
-    const name = String(user.name || '').toLowerCase();
+    const name = String(getDisplayName(user) || '').toLowerCase();
     const username = String(user.username || '').toLowerCase();
     return name.includes(searchQuery) || username.includes(searchQuery);
   });
@@ -178,15 +210,15 @@ export default function AdminGestionUtilisateurs() {
                     primary: true,
                     format: (_: any, user: User) => (
                       <div className="flex items-center gap-3 py-1">
-                        {user.photo_profile ? (
-                          <img src={user.photo_profile} alt={user.name} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-edge shadow-sm" />
+                        {getPhotoUrl(user) ? (
+                          <img src={getPhotoUrl(user)} alt={getDisplayName(user)} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-edge shadow-sm" />
                         ) : (
                           <div className="w-9 h-9 sm:w-10 sm:h-10 bg-surface-muted rounded-full flex items-center justify-center border border-edge">
                             <Users size={18} className="text-content-muted" />
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-content-primary truncate max-w-[120px] sm:max-w-xs">{user.name}</p>
+                          <p className="text-sm font-semibold text-content-primary truncate max-w-[120px] sm:max-w-xs">{getDisplayName(user)}</p>
                           <p className="text-[10px] text-content-muted truncate">@{user.username}</p>
                         </div>
                       </div>
@@ -198,7 +230,7 @@ export default function AdminGestionUtilisateurs() {
                     format: (role: string) => {
                       const style = getRoleBadgeStyle(role);
                       return (
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap min-w-[100px] text-center transition-colors ${style.classes}`}>
+                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap w-[160px] text-center transition-colors ${style.classes}`}>
                           {style.label}
                         </span>
                       );
@@ -211,8 +243,8 @@ export default function AdminGestionUtilisateurs() {
                       const style = getStatusBadgeStyle(status);
                       const isActif = (status || '').toLowerCase().includes('actif');
                       return (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium border min-w-[80px] justify-center transition-colors ${style.classes}`}>
-                          {isActif ? <CheckCircle size={10} /> : <XCircle size={10} />}
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium border min-w-[90px] justify-center transition-colors ${style.classes}`}>
+                          {isActif ? <CheckCircle size={12} /> : <XCircle size={12} />}
                           {style.label}
                         </span>
                       );

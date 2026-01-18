@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useServerHealth } from '../contexts/ServerHealthContext';
 
 interface VersionResponse {
   version: string;
@@ -20,8 +21,10 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
   const [initialVersion, setInitialVersion] = useState<string | null>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const { isServerReachable } = useServerHealth();
 
   const checkVersion = useCallback(async () => {
+    if (!isServerReachable) return;
     try {
       const response = await fetch('/api/version');
       if (!response.ok) return;
@@ -43,10 +46,11 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
     } catch (error) {
       console.error('Failed to check version:', error);
     }
-  }, [initialVersion]);
+  }, [initialVersion, isServerReachable]);
 
   // Vérification initiale et périodique
   useEffect(() => {
+    if (!isServerReachable) return;
     checkVersion();
 
     const interval = setInterval(checkVersion, CHECK_INTERVAL);
@@ -64,7 +68,7 @@ export function useAutoUpdate(): UseAutoUpdateReturn {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [checkVersion]);
+  }, [checkVersion, isServerReachable]);
 
   const reloadPage = () => {
     window.location.reload();

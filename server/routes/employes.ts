@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { users, employes, insertEmployeSchema } from "@shared/schema";
+import { users, employes, insertEmployeSchema, agentsTerrain } from "@shared/schema";
 import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
 import { requireAuth, requireRole, hashPassword } from "../auth";
@@ -35,6 +35,9 @@ const createEmployeWithUserSchema = z.object({
   tauxHoraire: z.number().optional(),
   tauxJournalier: z.number().optional(),
   modeCalculPaie: z.enum(['Mensuel', 'Horaire', 'Journalier']).optional(),
+  // Agent Terrain specific fields (optional, used when roleSystem === 'terrain')
+  zonesAffectation: z.array(z.string()).optional(),
+  objectifMensuel: z.string().optional(),
 });
 
 // Schéma pour mise à jour
@@ -253,6 +256,17 @@ export function registerEmployesRoutes(app: Express) {
 
         return { user, employe };
       });
+
+      // 3. If role is terrain, create agent terrain entry
+      if (data.roleSystem === 'terrain' && result.employe.id) {
+        await db.insert(agentsTerrain).values({
+          employeId: result.employe.id,
+          // Store first zone if multiple provided (legacy field is single zone)
+          zoneAffectation: data.zonesAffectation?.length ? data.zonesAffectation.join(', ') : null,
+          objectifMensuel: data.objectifMensuel || '100000',
+          statut: 'Actif',
+        });
+      }
 
       await logAudit(
         req,

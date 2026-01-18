@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, Printer } from 'lucide-react';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
 import { Modal, Button, FormField, SelectField, TextareaField } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -7,7 +7,9 @@ import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
-import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi } from '../../lib/api-client';
+import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi, clientApi, agentTerrainApi } from '../../lib/api-client';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { usePOSPrint } from '@/hooks/usePOSPrint';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <img src={airtelLogo} alt="Airtel Money" className={className} />
@@ -16,6 +18,39 @@ const AirtelLogo = ({ className = '' }: { className?: string }) => (
 const MTNLogo = ({ className = '' }: { className?: string }) => (
   <img src={mtnLogo} alt="MTN MoMo" className={className} />
 );
+
+const formatReceiptAmount = (amount: number) => {
+  const formatted = new Intl.NumberFormat('fr-FR')
+    .format(amount)
+    .replace(/[\u00A0\u202F]/g, ' ');
+  return `${formatted} FCFA`;
+};
+
+const maskAccountNumber = (value?: string) => {
+  if (!value) return undefined;
+  if (value.includes('*')) return value;
+  const compact = value.replace(/\s+/g, '');
+  const last4 = compact.slice(-4);
+  if (!last4) return value;
+  return `**** ${last4}`;
+};
+
+const resolveTontineStatus = (amount: number, miseParTour: number) => {
+  if (miseParTour <= 0) return 'Indéfini';
+  if (amount < miseParTour) return 'Retard';
+  const reste = amount % miseParTour;
+  if (reste === 0 && amount === miseParTour) return 'À jour';
+  if (reste === 0 && amount > miseParTour) return 'Avance';
+  return 'Avance partielle';
+};
+
+const mapTransactionType = (typePaiement: string) => {
+  const lower = typePaiement.toLowerCase();
+  if (lower.includes('tontine')) return 'TONTINE';
+  if (lower.includes('remboursement')) return 'REMBOURSEMENT';
+  if (lower.includes('retrait')) return 'RETRAIT';
+  return 'DEPOT';
+};
 
 interface ClientTontine {
   id: string;
@@ -84,11 +119,44 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const isCreditPayment = formData.type_paiement === 'Remboursement Crédit';
   const isComptePayment = ['Dépôt Épargne', 'Dépôt Courant', 'Dépôt Bloqué'].includes(formData.type_paiement);
 
+  // Auth context for auto-select agent
+  const { user } = useUserProfile();
+  
+  // POS Print service
+  const { autoPrint, isPrinting } = usePOSPrint();
+  
+  // Auto-select agent from auth context
+  const isAgentAutoSelected = useMemo(() => {
+    // If agentId prop provided, use it. Otherwise try to match user to agent.
+    return !!agentId;
+  }, [agentId]);
+
+  // Sync formData with agentId prop
+  useEffect(() => {
+    if (agentId) {
+      setFormData(prev => ({ ...prev, agent_id: agentId }));
+    }
+  }, [agentId]);
+
   useEffect(() => {
     loadAgents();
     loadClients();
     loadSecurityConfig();
   }, []);
+  
+  // Auto-select agent when agents are loaded and user is logged in
+  useEffect(() => {
+    if (agents.length > 0 && user && !formData.agent_id) {
+      // Try to find agent matching current user by name or ID
+      const matchedAgent = agents.find(
+        (a: any) => a.userId === user.id || 
+                    (a.nom === user.nom && a.prenom === user.prenom)
+      );
+      if (matchedAgent) {
+        setFormData(prev => ({ ...prev, agent_id: matchedAgent.id }));
+      }
+    }
+  }, [agents, user, formData.agent_id]);
 
   useEffect(() => {
     if (formData.client_id) {
@@ -129,11 +197,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
   const loadAgents = async () => {
     try {
-      const response = await fetch('/api/agents-terrain', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setAgents(data.filter((a: any) => a.statut === 'Actif'));
-      }
+      const data = await agentTerrainApi.getAllList();
+      setAgents(data.filter((a: any) => a.statut === 'Actif'));
     } catch (error) {
       console.error('Error loading agents:', error);
     }
@@ -141,11 +206,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
   const loadClients = async () => {
     try {
-      const response = await fetch('/api/clients', { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setClients(data.filter((c: any) => c.status === 'Actif'));
-      }
+      const data = await clientApi.getAllList();
+      setClients(data.filter((c: any) => c.status === 'Actif'));
     } catch (error) {
       console.error('Error loading clients:', error);
     }
@@ -153,9 +215,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
   const loadClientDetails = async () => {
     try {
-      const response = await fetch(`/api/clients/${formData.client_id}`, { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
+      const data = await clientApi.getById(formData.client_id);
+      if (data) {
         setSelectedClient(data);
         if (formData.methode_paiement !== 'Espèces' && !formData.numero_telephone) {
           setFormData(prev => ({ ...prev, numero_telephone: data.phone }));
@@ -349,29 +410,60 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       const agent = agents.find(a => a.id === paiementData.agent_id);
       const agentName = agent ? `${agent.nom} ${agent.prenom}` : 'Agent Terrain';
 
+      const montant = Number(paiementData.montant);
+      const details: NonNullable<ReceiptData['details']> = [];
+      const compteSelectionne = paiementData.compteId
+        ? clientComptes.find((compte: any) => compte.id === paiementData.compteId)
+        : null;
+      const numeroCompte = maskAccountNumber(
+        compteSelectionne?.numeroCompte || selectedClient?.numero_compte
+      );
+
+      if (paiementData.type_paiement === 'Versement Tontine' && selectedTontine) {
+        const miseParTour = Number(selectedTontine.tontine.montantCotisation || 0);
+        const toursRegles = miseParTour > 0 ? Math.floor(montant / miseParTour) : 0;
+        const statut = resolveTontineStatus(montant, miseParTour);
+        details.push({ label: 'Mise par tour', value: formatReceiptAmount(miseParTour) });
+        details.push({
+          label: 'Tours réglés',
+          value: `${toursRegles} ${toursRegles > 1 ? 'tours' : 'tour'}`
+        });
+        details.push({ label: 'Avance/Retard', value: statut });
+      } else {
+        details.push({ label: 'Montant', value: formatReceiptAmount(montant), isBold: true });
+      }
+
       const rData: ReceiptData = {
         title: 'REÇU PROVISOIRE',
         reference: paiementData.reference || `PAY-${Date.now()}`,
         date: new Date(),
         type: paiementData.type_paiement,
+        transaction: {
+          id: paiementData.reference || `PAY-${Date.now()}`,
+          date: new Date(),
+          type: mapTransactionType(paiementData.type_paiement),
+          amount: montant,
+          cashierName: agentName
+        },
         client: {
           nom: selectedClient.nom,
           prenom: selectedClient.prenom,
           email: selectedClient.email,
           telephone: selectedClient.phone || selectedClient.telephone,
-          numeroCompte: selectedClient.numero_compte
+          numeroCompte: numeroCompte || selectedClient.numero_compte
         },
         agent: {
           nom: agentName,
           prenom: ''
         },
+        details,
         items: [{
           description: `Collecte ${paiementData.type_paiement} (En attente)`,
           details: paiementData.notes || 'Collecte terrain',
-          montant: parseFloat(paiementData.montant),
+          montant: montant,
           quantite: 1
         }],
-        total: parseFloat(paiementData.montant),
+        total: montant,
         modePaiement: paiementData.methode_paiement,
         devise: 'FCFA',
         notes: `${validationMethod} - En attente de validation agence`
@@ -380,6 +472,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       setReceiptData(rData);
       setLastPaymentInfo(paiementData);
       setShowSuccessModal(true);
+      
+      // Auto-print receipt on POS devices
+      autoPrint(rData).catch(err => console.warn('[AutoPrint]', err.message));
       
     } catch (error: any) {
       console.error('Erreur:', error);
@@ -508,19 +603,73 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 { value: 'Dépôt Bloqué', label: 'Compte Bloqué' }
               ]}
             />
-
-            <FormField
-              label="Montant (FCFA) *"
-              name="montant"
-              type="number"
-              value={formData.montant}
-              onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
-              error={errors.montant}
-              icon={DollarSign}
-              placeholder="50000"
-              min="0"
-              step="100"
-            />
+            {/* Amount Input with Quick Buttons - POS Optimized */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-300">
+                Montant (FCFA) *
+              </label>
+              <div className="relative">
+                <DollarSign size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  name="montant"
+                  value={formData.montant}
+                  onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
+                  placeholder="0"
+                  min="0"
+                  step="100"
+                  className={`
+                    w-full h-14 pl-12 pr-4 rounded-xl text-xl font-bold
+                    bg-slate-800 border-2 
+                    ${errors.montant ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'}
+                    text-white placeholder-slate-500
+                    focus:outline-none focus:ring-4 focus:ring-cyan-500/10
+                    transition-all
+                    [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
+                  `}
+                />
+              </div>
+              {errors.montant && (
+                <p className="text-sm text-red-500">{errors.montant}</p>
+              )}
+              
+              {/* Quick Amount Buttons */}
+              <div className="flex gap-2 flex-wrap">
+                {[1000, 2000, 5000, 10000].map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => {
+                      const current = parseFloat(formData.montant) || 0;
+                      setFormData({ ...formData, montant: (current + amount).toString() });
+                    }}
+                    className="
+                      px-3 py-2 rounded-lg text-sm font-bold
+                      bg-cyan-500/20 border border-cyan-500/30 text-cyan-400
+                      hover:bg-cyan-500/30 hover:border-cyan-500/50
+                      active:scale-95
+                      transition-all touch-manipulation
+                    "
+                  >
+                    +{amount.toLocaleString()}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, montant: '' })}
+                  className="
+                    px-3 py-2 rounded-lg text-sm font-bold
+                    bg-slate-700/50 border border-slate-600 text-slate-400
+                    hover:bg-slate-700 hover:text-white
+                    active:scale-95
+                    transition-all touch-manipulation
+                  "
+                >
+                  Effacer
+                </button>
+              </div>
+            </div>
           </div>
 
           {isCreditPayment && (

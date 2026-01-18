@@ -411,6 +411,17 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                 </button>
               </div>
             </div>
+
+            {activeTab === 'ticket' && (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">
+                  Prévisualisation Ticket
+                </p>
+                <div className="bg-white rounded-lg p-2">
+                  <ReceiptTemplate data={data} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

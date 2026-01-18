@@ -6,7 +6,7 @@ import {
   transactionsCompte, operationsCaisse, remboursements, agentsTerrain, employes
 } from "@shared/schema";
 import { storage } from "../storage";
-import { count, sql, and, gte, eq, desc, sum, ilike, or } from "drizzle-orm";
+import { count, sql, and, gte, eq, desc, sum, ilike, or, isNull } from "drizzle-orm";
 
 export function registerDashboardRoutes(app: Express) {
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
@@ -83,10 +83,10 @@ export function registerDashboardRoutes(app: Express) {
           enAttente: sql<number>`COUNT(CASE WHEN ${credits.statut} IN ('En attente', 'en attente', 'En_attente') THEN 1 END)`,
           enRetard: sql<number>`COUNT(CASE WHEN ${credits.statut} IN ('En retard', 'en retard', 'En_retard') THEN 1 END)`,
           montantTotal: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} NOT IN ('Rejeté', 'rejeté', 'Annulé', 'annulé') THEN ${credits.montant} ELSE 0 END), 0)`,
-          montantDecaisse: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN ('actif', 'Actif', 'en_cours', 'En_cours', 'En cours', 'En Cours', 'Soldé', 'soldé', 'En retard', 'en retard') THEN ${credits.montant} ELSE 0 END), 0)`,
+          montantDecaisse: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN ('actif', 'Actif', 'en_cours', 'En_cours', 'En cours', 'En Cours', 'Soldé', 'soldé', 'En retard', 'en retard') THEN ${credits.montant} * (1 + COALESCE(${credits.taux}, 0) / 100) ELSE 0 END), 0)`,
           montantRecouvre: sql<number>`COALESCE(SUM(
             CASE WHEN ${credits.statut} IN ('actif', 'Actif', 'en_cours', 'En_cours', 'En cours', 'En Cours', 'Soldé', 'soldé', 'En retard', 'en retard') 
-            THEN (${credits.montant} - COALESCE(${credits.soldeRestant}, 0)) 
+            THEN (${credits.montant} * (1 + COALESCE(${credits.taux}, 0) / 100) - COALESCE(CAST(${credits.soldeRestant} AS NUMERIC), 0)) 
             ELSE 0 END
           ), 0)`,
           montantEnAttente: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN ('En attente', 'en attente', 'En_attente') THEN ${credits.montant} ELSE 0 END), 0)`
@@ -117,7 +117,7 @@ export function registerDashboardRoutes(app: Express) {
         // 6. Caisse sessions ouvertes
         db.select({
           ouvertes: count()
-        }).from(sessionsCaisse).where(withAgence(sessionsCaisse, eq(sessionsCaisse.statut, 'ouvert'))),
+        }).from(sessionsCaisse).where(withAgence(sessionsCaisse, isNull(sessionsCaisse.closedAt))),
 
         // 7. Weekly clients (last 7 days) - for trends
         db.select({
@@ -325,6 +325,9 @@ export function registerDashboardRoutes(app: Express) {
       // Calculate taux recouvrement
       const montantDecaisse = Number(creditsData.montantDecaisse) || 0;
       const montantRecouvre = Number(creditsData.montantRecouvre) || 0;
+      
+      // CORRECTION: Calculer le montant total avec intérêts
+      // solde_restant inclut les intérêts, donc on doit comparer avec montant_avec_interets
       const tauxRecouvrement = montantDecaisse > 0 
         ? Math.round((montantRecouvre / montantDecaisse) * 100) 
         : 0;

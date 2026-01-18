@@ -9,7 +9,13 @@ export function usePrinter() {
 
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
-    documentTitle: printData ? (printData.title ? `Print-${printData.title}` : `Document-${Date.now()}`) : 'Print-Document',
+    documentTitle: printData
+      ? (printData.title
+          ? `Print-${printData.title}`
+          : printData.transaction?.id
+            ? `Document-${printData.transaction.id}`
+            : `Document-${Date.now()}`)
+      : 'Print-Document',
     onAfterPrint: () => {
       setIsPrinting(false);
     },

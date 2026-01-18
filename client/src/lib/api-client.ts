@@ -4,6 +4,34 @@
 
 const API_BASE = '/api';
 
+export interface PaginationParams {
+  page?: number;
+  perPage?: number;
+}
+
+export interface PaginationMeta {
+  pagination: {
+    page: number;
+    per_page: number;
+    total_items: number;
+    total_pages: number;
+  };
+  filters?: Record<string, unknown>;
+}
+
+export interface PaginationLinks {
+  self: string;
+  next: string | null;
+  prev: string | null;
+}
+
+export interface PaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  meta: PaginationMeta;
+  links: PaginationLinks;
+}
+
 // Callback pour session expirée (injecté depuis authService)
 let onUnauthorizedCallback: (() => void) | null = null;
 
@@ -51,9 +79,28 @@ function convertKeysToCamelCase(obj: any): any {
   return newObj;
 }
 
+function buildQuery(params?: Record<string, unknown>): string {
+  if (!params) return '';
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    const normalizedKey = key === 'perPage' ? 'per_page' : key;
+
+    if (Array.isArray(value)) {
+      value.forEach((entry) => search.append(normalizedKey, String(entry)));
+    } else {
+      search.set(normalizedKey, String(value));
+    }
+  }
+
+  return search.toString();
+}
+
 /**
  * Gestion centralisée des réponses HTTP
  * Détecte les 401 et déclenche la déconnexion automatique
+ * Utilise ApiError pour préserver les données structurées des erreurs business
  */
 async function handleResponse<T>(response: Response, endpoint: string): Promise<T> {
   // Détection session expirée (401 Unauthorized)
@@ -65,26 +112,27 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
         onUnauthorizedCallback();
       }
     }
-    throw new Error('Session expirée - veuillez vous reconnecter');
+    throw new ApiError('Session expirée - veuillez vous reconnecter', 401);
   }
 
   // Détection compte bloqué/désactivé (403 Forbidden)
   if (response.status === 403) {
-    const error = await response.json().catch(() => ({ message: 'Accès refusé' }));
-    throw new Error(error.message || 'Accès refusé');
+    const errorData = await response.json().catch(() => ({ message: 'Accès refusé' }));
+    throw new ApiError(errorData.message || 'Accès refusé', 403, errorData);
   }
 
-  // Autres erreurs
+  // Autres erreurs - préserver les données structurées pour les erreurs business
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || error.message || `HTTP ${response.status}: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+    const message = errorData.error?.message || errorData.message || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+    throw new ApiError(message, response.status, errorData);
   }
-  
+
   // No content
   if (response.status === 204) {
     return {} as T;
   }
-  
+
   return response.json();
 }
 
@@ -114,6 +162,57 @@ async function request<T>(
   });
 
   return handleResponse<T>(response, endpoint);
+}
+
+async function requestPaginated<T>(
+  endpoint: string,
+  params?: Record<string, unknown>,
+  options?: RequestInit
+): Promise<PaginatedResponse<T>> {
+  const query = buildQuery(params);
+  const path = query ? `${endpoint}?${query}` : endpoint;
+  return request<PaginatedResponse<T>>(path, options);
+}
+
+export async function requestAllPages<T>(
+  endpoint: string,
+  params?: Record<string, unknown>,
+  options?: RequestInit
+): Promise<T[]> {
+  const perPage = typeof params?.perPage === 'number' ? params.perPage : 200;
+  let page = 1;
+  let totalPages = 1;
+  const results: T[] = [];
+
+  do {
+    const response = await requestPaginated<T>(endpoint, { ...params, page, perPage }, options);
+    results.push(...(response.data || []));
+    totalPages = response.meta?.pagination?.total_pages ?? 1;
+    page += 1;
+  } while (page <= totalPages);
+
+  return results;
+}
+
+export async function requestListAll<T>(
+  endpoint: string,
+  params?: Record<string, unknown>,
+  options?: RequestInit
+): Promise<T[]> {
+  const query = buildQuery(params);
+  const path = query ? `${endpoint}?${query}` : endpoint;
+  const payload = await request<any>(path, options);
+
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload?.data && Array.isArray(payload.data)) {
+    const totalPages = Number(payload.meta?.pagination?.total_pages ?? 1);
+    if (!Number.isFinite(totalPages) || totalPages <= 1) {
+      return payload.data as T[];
+    }
+    return requestAllPages<T>(endpoint, params, options);
+  }
+
+  return [];
 }
 
 // Auth User type
@@ -196,10 +295,16 @@ export const caisseApi = {
 
 // Client API
 export const clientApi = {
-  getAll: () => request<any[]>('/clients'),
+  getAll: (params?: { page?: number; perPage?: number; statut?: string; segment?: string; search?: string }) =>
+    requestPaginated<any>('/clients', params),
+  getAllList: (params?: { perPage?: number; statut?: string; segment?: string; search?: string }) =>
+    requestAllPages<any>('/clients', params),
   getById: (id: string) => request<any>(`/clients/${id}`),
   // Clients éligibles au crédit (avec compte courant actif dans l'agence)
-  getEligibleForCredit: () => request<any[]>('/clients/eligible-credit'),
+  getEligibleForCredit: (params?: { page?: number; perPage?: number }) =>
+    requestPaginated<any>('/clients/eligible-credit', params),
+  getEligibleForCreditList: (params?: { perPage?: number }) =>
+    requestAllPages<any>('/clients/eligible-credit', params),
   create: (data: any) => request<any>('/clients', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -208,11 +313,79 @@ export const clientApi = {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
-  search: (query: string) => request<any[]>(`/clients/search?q=${encodeURIComponent(query)}`),
+  search: (query: string, params?: { page?: number; perPage?: number }) =>
+    requestPaginated<any>('/clients/search', { q: query, ...params }),
+  getWithLocation: (params?: { page?: number; perPage?: number }) =>
+    requestPaginated<any>('/clients/with-location', params),
   delete: (id: string) => request<void>(`/clients/${id}`, {
     method: 'DELETE',
   }),
 };
+
+// ============================================================================
+// TYPES D'ERREURS STRUCTURÉES
+// ============================================================================
+
+/**
+ * Erreur de solde insuffisant pour décaissement crédit
+ * Utilisé pour le workflow de réapprovisionnement intelligent
+ */
+export interface InsufficientFundsErrorData {
+  code: "INSUFFICIENT_FUNDS";
+  message: string;
+  required: number;
+  current: number;
+  deficit: number;
+  coffreId: string;
+  coffreCode: string;
+  coffreName?: string;
+}
+
+/**
+ * Classe d'erreur API qui préserve les données structurées
+ * Permet de propager les erreurs business avec leur contexte complet
+ */
+export class ApiError extends Error {
+  public readonly status: number;
+  public readonly data: any;
+
+  constructor(message: string, status: number, data?: any) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+  }
+}
+
+/**
+ * Type guard pour vérifier si une erreur est une ApiError avec données de solde insuffisant
+ */
+export function isInsufficientFundsError(error: unknown): error is ApiError & { data: { error: InsufficientFundsErrorData } } {
+  if (error instanceof ApiError && error.data?.error?.code === "INSUFFICIENT_FUNDS") {
+    return true;
+  }
+  // Fallback pour les objets simples
+  if (typeof error === "object" && error !== null) {
+    const e = error as any;
+    return e?.error?.code === "INSUFFICIENT_FUNDS" || e?.data?.error?.code === "INSUFFICIENT_FUNDS";
+  }
+  return false;
+}
+
+/**
+ * Extraire les données d'erreur de solde insuffisant d'une erreur
+ */
+export function extractInsufficientFundsData(error: unknown): InsufficientFundsErrorData | null {
+  if (error instanceof ApiError && error.data?.error?.code === "INSUFFICIENT_FUNDS") {
+    return error.data.error;
+  }
+  if (typeof error === "object" && error !== null) {
+    const e = error as any;
+    if (e?.error?.code === "INSUFFICIENT_FUNDS") return e.error;
+    if (e?.data?.error?.code === "INSUFFICIENT_FUNDS") return e.data.error;
+  }
+  return null;
+}
 
 // Credit API
 export const creditApi = {
@@ -333,7 +506,28 @@ export const compteEpargneApi = {
       `/comptes${query ? `?${query}` : ''}`
     );
   },
-  getStats: () => request<{ total: number; epargne: number; courant: number; bloque: number; totalSolde: number }>('/comptes/stats'),
+  getStats: () =>
+    request<{
+      total: number;
+      epargne: number;
+      courant: number;
+      bloque: number;
+      totalSolde: number;
+      tauxMoyenGlobal: number;
+      tauxMoyenEpargne: number;
+      tauxMoyenCourant: number;
+      tauxMoyenBloque: number;
+    }>('/comptes/stats'),
+  getProduits: (params?: { typeCompte?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.typeCompte) queryParams.append('typeCompte', params.typeCompte);
+    const query = queryParams.toString();
+    return request<any[]>(`/produits-compte${query ? `?${query}` : ''}`);
+  },
+  checkAccountNumber: (accountNumber: string) =>
+    request<{ found: boolean; ownerName?: string }>(
+      `/accounts/check/${encodeURIComponent(accountNumber)}`
+    ),
   getByClient: (clientId: string) => request<any[]>(`/clients/${clientId}/comptes`),
   getById: (id: string) => request<any>(`/comptes/${id}`),
   create: (data: any) => request<any>('/comptes', {
@@ -356,6 +550,53 @@ export const compteEpargneApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  debloquer: (id: string, data?: { motif?: string }) => request<any>(`/comptes/${id}/debloquer`, {
+    method: 'POST',
+    body: JSON.stringify(data || {}),
+  }),
+  createTransfer: (data: {
+    sourceCompteId: string;
+    destinationCompteId?: string;
+    destinationAccountNumber?: string;
+    montant: number;
+    scheduled?: boolean;
+    frequence?: 'once' | 'daily' | 'weekly' | 'monthly';
+  }) =>
+    request<any>('/comptes/transferts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getScheduledTransfers: (params?: { search?: string; page?: number; limit?: number; actif?: boolean }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
+    if (params?.actif !== undefined) queryParams.append('actif', String(params.actif));
+    const query = queryParams.toString();
+    return request<{
+      data: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/comptes/transferts-programmes${query ? `?${query}` : ''}`);
+  },
+  updateScheduledTransfer: (
+    id: string,
+    data: { montant?: number; frequence?: 'once' | 'daily' | 'weekly' | 'monthly'; prochaineExecution?: string | null; actif?: boolean }
+  ) =>
+    request<any>(`/comptes/transferts-programmes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  getScheduledTransferStats: () =>
+    request<{
+      totalCount: number;
+      activeCount: number;
+      pausedCount: number;
+      failedCount: number;
+      totalVolume: number;
+      nextExecution: string | null;
+      trend?: number;
+      trendUp?: boolean;
+    }>('/comptes/transferts-programmes/stats'),
 };
 
 // Transaction Epargne API
@@ -428,9 +669,9 @@ export const tontinePlanApi = {
 
 // Session Caisse API
 export const sessionCaisseApi = {
-  getAll: () => request<any[]>('/sessions-caisse'),
+  getAll: () => requestListAll<any>('/sessions-caisse'),
   get: (id: string) => request<any>(`/sessions-caisse/${id}`),
-  getByCaissier: (caissierId: string) => request<any[]>(`/sessions-caisse/caissier/${caissierId}`),
+  getByCaissier: (caissierId: string) => requestListAll<any>(`/sessions-caisse/caissier/${caissierId}`),
   getActive: () => request<any>('/sessions-caisse/active'),
   create: (data: any) => request<any>('/sessions-caisse', {
     method: 'POST',
@@ -440,7 +681,7 @@ export const sessionCaisseApi = {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
-  getOperations: (sessionId: string) => request<any[]>(`/sessions-caisse/${sessionId}/operations`),
+  getOperations: (sessionId: string) => requestListAll<any>(`/sessions-caisse/${sessionId}/operations`),
   addOperation: (data: any) => request<any>('/operations-caisse', {
     method: 'POST',
     body: JSON.stringify({
@@ -457,8 +698,8 @@ export const sessionCaisseApi = {
     method: 'POST',
   }),
   // Routes de monitoring (admin)
-  getRisky: () => request<any[]>('/sessions-caisse/risky'),
-  getEcarts: (threshold?: number) => request<any[]>(`/sessions-caisse/ecarts${threshold ? `?threshold=${threshold}` : ''}`),
+  getRisky: () => requestListAll<any>('/sessions-caisse/risky'),
+  getEcarts: (threshold?: number) => requestListAll<any>(`/sessions-caisse/ecarts${threshold ? `?threshold=${threshold}` : ''}`),
   closeExpired: (timeoutHours?: number) => request<any>('/sessions-caisse/close-expired', {
     method: 'POST',
     body: JSON.stringify({ timeoutHours }),
@@ -471,8 +712,8 @@ export const sessionCaisseApi = {
 
 // Operations Caisse API
 export const caisseOperationApi = {
-  getAll: () => request<any[]>('/operations-caisse'),
-  getToday: () => request<any[]>('/operations-caisse/today'),
+  getAll: () => requestListAll<any>('/operations-caisse'),
+  getToday: () => requestListAll<any>('/operations-caisse/today'),
   create: (data: any) => request<any>('/operations-caisse', {
     method: 'POST',
     body: JSON.stringify({
@@ -496,7 +737,10 @@ export const caisseSepareeApi = {
 
 // Agent Terrain API
 export const agentTerrainApi = {
-  getAll: () => request<any[]>('/agents-terrain'),
+  getAll: (params?: { page?: number; perPage?: number; statut?: string }) =>
+    requestPaginated<any>('/agents-terrain', params),
+  getAllList: (params?: { perPage?: number; statut?: string }) =>
+    requestAllPages<any>('/agents-terrain', params),
   getById: (id: string) => request<any>(`/agents-terrain/${id}`),
   create: (data: any) => request<any>('/agents-terrain', {
     method: 'POST',
@@ -513,7 +757,8 @@ export const agentTerrainApi = {
 
 // Prospection API
 export const prospectionApi = {
-  getAll: () => request<any[]>('/prospections'),
+  getAll: (params?: { page?: number; perPage?: number }) =>
+    requestPaginated<any>('/prospections', params),
   create: (data: any) => request<any>('/prospections', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -526,7 +771,8 @@ export const prospectionApi = {
 
 // Visite Terrain API
 export const visiteTerrainApi = {
-  getAll: () => request<any[]>('/visites-terrain'),
+  getAll: (params?: { page?: number; perPage?: number }) =>
+    requestPaginated<any>('/visites-terrain', params),
   create: (data: any) => request<any>('/visites-terrain', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -539,7 +785,8 @@ export const visiteTerrainApi = {
 
 // Paiement Terrain API
 export const paiementTerrainApi = {
-  getAll: () => request<any[]>('/paiements-terrain'),
+  getAll: (params?: { page?: number; perPage?: number; agenceId?: string }) =>
+    requestPaginated<any>('/paiements-terrain', params),
   create: (data: any) => request<any>('/paiements-terrain', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -810,7 +1057,8 @@ export const systemSettingsApi = {
 
 // Client Search API
 export const clientSearchApi = {
-  search: (query: string) => request<any[]>(`/clients/search?q=${encodeURIComponent(query)}`),
+  search: (query: string, params?: { page?: number; perPage?: number }) =>
+    requestPaginated<any>('/clients/search', { q: query, ...params }),
   getLimits: (clientId: string) => request<any>(`/clients/${clientId}/limits`),
   getTontines: (clientId: string) => request<any[]>(`/clients/${clientId}/tontines`),
   getCredits: (clientId: string, params?: { statut?: string }) => {
@@ -1430,4 +1678,16 @@ export interface Agence {
 
 export const agencesApi = {
   getAgences: () => request<Agence[]>('/agences'),
+};
+
+/**
+ * Credit Refunds API - Restitutions de frais
+ */
+export const creditRefundsApi = {
+  /**
+   * Compter les restitutions en attente (SUBMITTED + APPROVED)
+   * Utilisé pour le badge de notification dans la sidebar
+   */
+  countPending: () =>
+    request<{ count: number }>('/finance/credit-refunds/pending/count'),
 };

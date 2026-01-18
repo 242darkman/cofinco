@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MapPin, Users, Navigation, RefreshCw, Crosshair, Filter, Clock, Activity, Layers } from 'lucide-react';
 import SatelliteMap from '../maps/SatelliteMap';
 import useGeolocation from '../../hooks/useGeolocation';
+import { requestAllPages } from '../../lib/api-client';
 import { Card, Button, Badge } from '../ui';
 import type { Client } from '@shared/schema';
 
@@ -57,7 +58,7 @@ export default function AgentTerrainMap() {
     try {
       const [agentsRes, clientsRes] = await Promise.all([
         fetch('/api/agent-locations/latest', { credentials: 'include' }),
-        fetch('/api/clients/with-location', { credentials: 'include' }),
+        requestAllPages<Client>('/clients/with-location'),
       ]);
 
       if (agentsRes.ok) {
@@ -65,10 +66,7 @@ export default function AgentTerrainMap() {
         setAgents(Array.isArray(agentsData) ? agentsData : []);
       }
 
-      if (clientsRes.ok) {
-        const clientsData = await clientsRes.json();
-        setClients(Array.isArray(clientsData) ? clientsData : []);
-      }
+      setClients(Array.isArray(clientsRes) ? clientsRes : []);
 
       setLastUpdate(new Date());
     } catch (error) {

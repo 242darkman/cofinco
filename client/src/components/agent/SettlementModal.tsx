@@ -9,11 +9,15 @@ import {
   Banknote,
   Clock,
   X,
+  WifiOff,
+  CloudOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { caisseAgentApi, caisseApi } from '@/lib/api-client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { v4 as uuidv4 } from 'uuid';
 
 interface SettlementModalProps {
   isOpen: boolean;
@@ -64,9 +68,13 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
     }
   };
 
-  const validate = () => {
+  const validate = (allowQueue = false) => {
     const newErrors: Record<string, string> = {};
-    if (!formData.destinationCaisseId) newErrors.destinationCaisseId = "Sélectionnez une caisse de réception";
+    
+    // Only require caisse selection if not allowing queue mode
+    if (!formData.destinationCaisseId && !allowQueue) {
+      newErrors.destinationCaisseId = "Sélectionnez une caisse de réception";
+    }
     
     const montantNum = parseFloat(formData.montant);
     if (!formData.montant || isNaN(montantNum) || montantNum <= 0) {
@@ -79,17 +87,29 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
     return Object.keys(newErrors).length === 0;
   };
 
+  // Offline queue hook
+  const { isOnline, addToQueue, pendingCount } = useOfflineQueue();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // If no caisses available or offline, offer queue mode
+    if (!hasCaisses || !isOnline) {
+      handleQueueSubmit();
+      return;
+    }
+    
     if (!validate()) return;
 
     setSubmitting(true);
     try {
+      const idempotencyKey = uuidv4();
       await caisseAgentApi.createSettlementCash({
         agentId,
         destinationCaisseId: formData.destinationCaisseId,
         montant: parseFloat(formData.montant),
-        observations: formData.observations
+        observations: formData.observations,
+        idempotencyKey
       });
 
       toast({
@@ -110,6 +130,31 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
     }
   };
 
+  // Queue submission for offline/no-caisse scenario
+  const handleQueueSubmit = () => {
+    if (!validate(true)) return; // Allow queue mode validation (skip caisse requirement)
+
+    const idempotencyKey = uuidv4();
+    addToQueue('SETTLEMENT_CASH', {
+      agentId,
+      destinationCaisseId: formData.destinationCaisseId || null, // May be null if queued
+      montant: parseFloat(formData.montant),
+      observations: formData.observations,
+      idempotencyKey,
+      queuedAt: new Date().toISOString()
+    });
+
+    toast({
+      title: "Remise mise en file d'attente",
+      description: isOnline
+        ? "Aucune caisse disponible. Cette remise sera soumise dès qu'une caisse sera ouverte."
+        : "Vous êtes hors ligne. Cette remise sera synchronisée automatiquement.",
+    });
+
+    onSuccess();
+    onClose();
+  };
+
   // Don't render if not open
   if (!isOpen) return null;
 
@@ -117,6 +162,7 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
   const valide = agentSummary ? parseFloat(agentSummary.valide) : 0;
   const pendingOut = agentSummary ? parseFloat(agentSummary.pendingOut || 0) : 0;
   const hasCaisses = caisses.length > 0;
+  const canSubmitNormally = hasCaisses && isOnline;
 
   const handleMaxClick = () => {
     if (agentSummary && disponible > 0) {
@@ -287,20 +333,31 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
                     </div>
                   </div>
                 ) : (
-                  /* No Caisse Alert */
-                  <div className="bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-500/30 rounded-xl p-4">
+                  /* No Caisse - Queue Mode Enabled */
+                  <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-2 border-amber-500/30 rounded-xl p-4">
                     <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-500/20">
-                        <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400" />
+                      <div className="p-2 rounded-lg bg-amber-500/20">
+                        {isOnline ? (
+                          <CloudOff size={20} className="text-amber-400" />
+                        ) : (
+                          <WifiOff size={20} className="text-amber-400" />
+                        )}
                       </div>
-                      <div>
-                        <p className="font-semibold text-amber-700 dark:text-amber-300">
-                          Aucune caisse disponible
+                      <div className="flex-1">
+                        <p className="font-semibold text-amber-300">
+                          {isOnline ? 'Aucune caisse ouverte' : 'Mode hors ligne'}
                         </p>
-                        <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1">
-                          Aucune caisse n'est actuellement ouverte dans votre agence.
-                          Veuillez demander l'ouverture d'une caisse à votre responsable.
+                        <p className="text-sm text-amber-400/80 mt-1">
+                          {isOnline 
+                            ? "Votre remise sera mise en file d'attente et traitée dès qu'une caisse sera disponible."
+                            : "Votre remise sera synchronisée automatiquement au retour du réseau."
+                          }
                         </p>
+                        {pendingCount > 0 && (
+                          <p className="text-xs text-amber-400/60 mt-2">
+                            📋 {pendingCount} opération(s) en attente de synchronisation
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -428,11 +485,15 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
                 variant="primary"
                 onClick={handleSubmit}
                 isLoading={submitting}
-                disabled={!hasCaisses || disponible <= 0 || submitting}
-                icon={CheckCircle}
-                className="flex-1 h-12 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 shadow-lg shadow-cyan-500/20"
+                disabled={disponible <= 0 || submitting}
+                icon={canSubmitNormally ? CheckCircle : CloudOff}
+                className={`flex-1 h-12 shadow-lg ${
+                  canSubmitNormally 
+                    ? 'bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 shadow-cyan-500/20'
+                    : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-amber-500/20'
+                }`}
               >
-                Confirmer la Remise
+                {canSubmitNormally ? 'Confirmer la Remise' : "Mettre en File d'Attente"}
               </Button>
             </div>
           </div>

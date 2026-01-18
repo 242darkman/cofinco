@@ -44,7 +44,6 @@ export const users = pgTable("users", {
   // Ces champs sont conservés temporairement pour la rétro-compatibilité
   // Ils seront supprimés après migration complète
   role: roleEnum("role").notNull().default(SystemRole.CAISSIER), // LEGACY: Remplacé par employes.roleSystem
-  agence: text("agence"), // LEGACY: Remplacé par employes.agenceId
   lastLatitude: text("last_latitude"), // LEGACY: Déplacé vers agents_terrain
   lastLongitude: text("last_longitude"), // LEGACY: Déplacé vers agents_terrain
   matricule: varchar("matricule"), // LEGACY: Déplacé vers employes

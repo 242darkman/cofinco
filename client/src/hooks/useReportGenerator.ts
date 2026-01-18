@@ -3,6 +3,7 @@ import { Users, Wallet, PiggyBank, UsersRound, ArrowRightLeft, Briefcase, Trendi
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { requestListAll } from '../lib/api-client';
 
 export interface ReportType {
   id: string;
@@ -43,27 +44,42 @@ export function useReportGenerator() {
   };
 
   const buildQueryParams = useCallback(() => {
-    const params = new URLSearchParams();
-    if (dateRange.start) params.append('startDate', dateRange.start);
-    if (dateRange.end) params.append('endDate', dateRange.end);
-    if (filters.status !== 'all') params.append('status', filters.status);
-    if (filters.segment !== 'all') params.append('segment', filters.segment);
-    return params.toString();
+    const params: Record<string, string> = {};
+    if (dateRange.start) params.startDate = dateRange.start;
+    if (dateRange.end) params.endDate = dateRange.end;
+    if (filters.status !== 'all') params.status = filters.status;
+    if (filters.segment !== 'all') params.segment = filters.segment;
+    return params;
   }, [dateRange, filters]);
+
+  const applyClientFilters = (data: any[]) => {
+    let filtered = data;
+    if (filters.status !== 'all') {
+      filtered = filtered.filter((client) => client.status === filters.status);
+    }
+    if (filters.segment !== 'all') {
+      filtered = filtered.filter((client) => client.segment === filters.segment);
+    }
+    return filtered;
+  };
+
+  const normalizeApiPath = (endpoint: string) =>
+    endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
 
   const loadPreview = async (type: string) => {
     setLoadingPreview(true);
     setReportType(type);
     try {
-      const queryString = buildQueryParams();
-      const url = `${endpoints[type]}${queryString ? `?${queryString}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setPreviewData(Array.isArray(data) ? data : [data]);
-      } else {
+      const endpoint = endpoints[type];
+      if (!endpoint) {
         setPreviewData([]);
+        return;
       }
+      const data = await requestListAll<any>(
+        normalizeApiPath(endpoint),
+        buildQueryParams()
+      );
+      setPreviewData(type === 'clients' ? applyClientFilters(data) : data);
     } catch (error) {
       console.error('Erreur chargement aperçu:', error);
       setPreviewData([]);
@@ -76,17 +92,15 @@ export function useReportGenerator() {
     const endpoint = endpoints[reportType];
     if (!endpoint) return [];
     try {
-      const queryString = buildQueryParams();
-      const url = `${endpoint}${queryString ? `?${queryString}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        return Array.isArray(data) ? data : [data];
-      }
+      const data = await requestListAll<any>(
+        normalizeApiPath(endpoint),
+        buildQueryParams()
+      );
+      return reportType === 'clients' ? applyClientFilters(data) : data;
     } catch (error) {
       console.error('Erreur récupération données:', error);
+      return [];
     }
-    return [];
   };
 
   const getReportConfig = () => {

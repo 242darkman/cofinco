@@ -97,7 +97,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
 
   const fetchClients = async () => {
     try {
-      const data = await clientApi.getAll();
+      const data = await clientApi.getAllList();
       setClients(data || []);
     } catch (error) {
       console.error('Erreur:', error);

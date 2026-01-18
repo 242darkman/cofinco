@@ -49,7 +49,12 @@ export interface IStorage {
 
     // Clients
     getClient(id: string): Promise<Client | undefined>;
-    getAllClients(filter?: { agence?: string }): Promise<Client[]>;
+    getAllClients(filter?: { agence?: string; agenceId?: string }): Promise<(Client & { type_marche_nom?: string | null; agence_nom?: string | null })[]>;
+    getClientsPaginated(
+      filter?: { agence?: string; agenceId?: string },
+      page?: number,
+      perPage?: number
+    ): Promise<{ data: (Client & { type_marche_nom?: string | null; agence_nom?: string | null })[]; total: number }>;
     createClient(client: InsertClient): Promise<Client>;
     updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
     deleteClient(id: string): Promise<boolean>;
@@ -302,6 +307,7 @@ export interface IStorage {
     // Agents Terrain
     getAgentTerrain(id: string): Promise<AgentTerrain | undefined>;
     getAllAgentsTerrain(): Promise<any[]>;
+    getAgentsTerrainPaginated(page?: number, perPage?: number): Promise<{ data: any[]; total: number }>;
     createAgentTerrain(agent: InsertAgentTerrain): Promise<AgentTerrain>;
     updateAgentTerrain(id: string, agent: Partial<InsertAgentTerrain>): Promise<AgentTerrain | undefined>;
     getAgentStats(agentId: string, options?: { dateFrom?: Date; dateTo?: Date }): Promise<{
@@ -316,6 +322,7 @@ export interface IStorage {
     getProspection(id: string): Promise<Prospection | undefined>;
     getProspectionsByAgent(agentId: string): Promise<Prospection[]>;
     getAllProspections(): Promise<Prospection[]>;
+    getProspectionsPaginated(page?: number, perPage?: number): Promise<{ data: Prospection[]; total: number }>;
     createProspection(prospection: InsertProspection): Promise<Prospection>;
     updateProspection(id: string, prospection: Partial<InsertProspection>): Promise<Prospection | undefined>;
 
@@ -330,6 +337,7 @@ export interface IStorage {
     getVisiteTerrain(id: string): Promise<VisiteTerrain | undefined>;
     getVisitesByAgent(agentId: string): Promise<VisiteTerrain[]>;
     getAllVisitesTerrain(): Promise<VisiteTerrain[]>;
+    getVisitesTerrainPaginated(page?: number, perPage?: number): Promise<{ data: VisiteTerrain[]; total: number }>;
     createVisiteTerrain(visite: InsertVisiteTerrain): Promise<VisiteTerrain>;
     updateVisiteTerrain(id: string, visite: Partial<InsertVisiteTerrain>): Promise<VisiteTerrain | undefined>;
 
@@ -338,6 +346,7 @@ export interface IStorage {
     getPaiementsByAgent(agentId: string): Promise<PaiementTerrain[]>;
     getAllPaiementsTerrain(): Promise<PaiementTerrain[]>;
     getPendingPaiementsByAgence(agenceId?: string): Promise<PaiementTerrain[]>;
+    getPendingPaiementsByAgencePaginated(agenceId: string | undefined, page?: number, perPage?: number): Promise<{ data: PaiementTerrain[]; total: number }>;
     createPaiementTerrain(paiement: InsertPaiementTerrain): Promise<PaiementTerrain>;
     createPaiementTerrainWithLedger(data: {
       agentId: string;
@@ -473,6 +482,7 @@ export interface IStorage {
     getPosDevice(id: string): Promise<PosDevice | undefined>;
     getPosDevicesByAgent(agentId: string): Promise<PosDevice[]>;
     getAllPosDevices(): Promise<PosDevice[]>;
+    getPosDevicesPaginated(filter?: { agenceId?: string; assignedTo?: string }, page?: number, perPage?: number): Promise<{ data: PosDevice[]; total: number }>;
     createPosDevice(device: InsertPosDevice): Promise<PosDevice>;
     updatePosDevice(id: string, device: Partial<InsertPosDevice>): Promise<PosDevice | undefined>;
 

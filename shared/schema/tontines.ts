@@ -117,6 +117,9 @@ export const contributionsTontine = pgTable(
     referenceExterne: text("reference_externe"),
     idempotencyKey: text("idempotency_key"),
 
+    // Statut de la contribution : FULL = cotisation complète, PARTIAL = paiement partiel
+    statutContribution: text("statut_contribution").default("FULL"), // 'FULL' | 'PARTIAL'
+
     observations: text("observations"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),

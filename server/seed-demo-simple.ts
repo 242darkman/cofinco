@@ -22,7 +22,7 @@ import {
   uiCustomization,
   smsTemplates,
   smsProviderSettings,
-  // maintenanceModules, // Assuming this is new and not in older schema
+  maintenanceModules,
   dureesSuggerees,
   planComptable,
   journaux,
@@ -122,6 +122,14 @@ import {
   avantagesEmployes,
   presences,
   horairesTravail,
+  userAgences,
+  // New financial tables
+  produitsCompte,
+  versementsAutomatiques,
+  virementsProgrammes,
+  decaissementsProgrammes,
+  configTransfertInterCoffres,
+  activeSessions,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 import { eq } from 'drizzle-orm';
@@ -248,11 +256,11 @@ const TAGS_DATA = [
 ];
 
 async function seedDemoSimple() {
-  console.log('🏭 Starting SIMPLE DEMO seed...');
-  console.log('⚠️  This will overwrite configuration and identity tables!');
+  console.log('🏭 Starting ROBUST DEMO seed...');
+  console.log('⚠️  This will overwrite configuration and identity tables with STRICT INTEGRITY!');
 
   try {
-    // 1. CLEAN TABLES (Ordered to respect Foreign Keys)
+    // 1. CLEAN TABLES (Ordered to respect Foreign Keys - Reverse Dependency)
     console.log('\n🧹 Cleaning tables (robust 10-level hierarchy)...');
 
     // -- Level 10: Highest Dependency Leafs (Audit, Logs, Leafs)
@@ -272,13 +280,14 @@ async function seedDemoSimple() {
     await db.delete(watchlistBourse);
     await db.delete(pushNotificationLogs);
     await db.delete(smsNotifications);
+    await db.delete(activeSessions); // Clear user login sessions
 
     // -- Level 9: Notification, Migration & Bourse Masters
     await db.delete(portefeuillesBourse); // ref clients
     await db.delete(pushSubscriptions); // ref users
     await db.delete(notificationPreferences); // ref users
     await db.delete(agencyMigrations); // ref agences
-    await db.delete(documents); // ref users (maybe)
+    await db.delete(documents); // ref users
     await db.delete(logeSettings);
     await db.delete(formationParticipants); // ref employes, formations
     await db.delete(avantagesEmployes); // ref employes
@@ -336,6 +345,10 @@ async function seedDemoSimple() {
     // -- Level 4: Central Transaction Hubs
     await db.delete(operationsCaisse);
     await db.delete(transactionsCompte);
+    // NEW: Financial automation tables (ref mouvementsFinanciers, comptes)
+    await db.delete(versementsAutomatiques);
+    await db.delete(virementsProgrammes);
+    await db.delete(decaissementsProgrammes);
     await db.delete(mouvementsFinanciers);
     await db.delete(contributionsTontine);
     await db.delete(ecritures);
@@ -346,7 +359,11 @@ async function seedDemoSimple() {
     await db.delete(credits);
     await db.delete(demandesCredit);
     await db.delete(tontines);
-    await db.delete(comptes);
+    await db.delete(comptes); // Must be deleted BEFORE produitsCompte
+    
+    // -- Level 2.5: Product Catalog (Dependence for Comptes)
+    await db.delete(produitsCompte); // <--- CRITICAL: Deleted AFTER comptes
+
     await db.delete(caissesAgent);
     await db.delete(shiftsCaisse);
     await db.delete(sessionsCaisse);
@@ -362,9 +379,10 @@ async function seedDemoSimple() {
     await db.delete(codeGenerationPermissions);
     await db.delete(comptesLiaison);
     await db.delete(configCoffreFort);
-    // await db.delete(configTransfertInterCoffres); // Removed constant/config
+    await db.delete(configTransfertInterCoffres); // Inter-vault config
     await db.delete(coffresForts);
     await db.delete(kycLevels);
+    await db.delete(userAgences); // <--- CRITICAL: Deleted BEFORE users & agences
 
     // -- Level 1: Geography & Base Identity
     await db.delete(modelesFactures); // ref users (created_by)
@@ -395,14 +413,16 @@ async function seedDemoSimple() {
     await db.delete(formations);
     await db.delete(avantages);
     await db.delete(candidatures);
+    await db.delete(maintenanceModules); // Module lock status
 
     console.log('   ✅ Robust cleanup complete');
 
-    // 2. SEED GEOGRAPHY
-    console.log('\n🏢 Seeding Geography...');
+    // 2. SEED GEOGRAPHY & BUILD AGENCY MAP (Source of Truth)
+    console.log('\n🏢 Seeding Geography & Agencies...');
     await db.insert(zones).values(ZONES_DATA);
     
-    const insertedAgences: Record<string, string> = {};
+    const agencyMap: Record<string, string> = {}; // The Source of Truth for IDs
+    
     for (const a of AGENCES_DATA) {
       const [inserted] = await db.insert(agences).values({
         nom: a.nom,
@@ -418,23 +438,29 @@ async function seedDemoSimple() {
         email: a.email,
         dateOuverture: a.dateOuverture,
       }).returning();
-      insertedAgences[a.nom] = inserted.id;
+      
+      agencyMap[a.nom] = inserted.id; // Store ID for strict referencing
+      console.log(`   -> Created Agency: ${a.nom} (ID: ${inserted.id})`);
     }
 
-    // 3. SEED COFFRES-FORTS (VAULTS) & CAISSES
+    // 3. SEED COFFRES-FORTS (VAULTS) & CAISSES Using AgencyMap
     console.log('   🔐 Seeding Vaults & Cashboxes...');
     const vaultBalances: Record<string, string> = {
       'Siège': '500000000',     // 500 Millions XAF
       'Agence Nord': '100000000', // 100 Millions XAF
     };
 
-    for (const [name, id] of Object.entries(insertedAgences)) {
+    const siegeCaisseIds: Record<string, string> = {};
+
+    for (const [name, agencyId] of Object.entries(agencyMap)) {
       const balance = vaultBalances[name] || '0';
+      
+      // Vault
       const [vault] = await db.insert(coffresForts).values({
         code: `CF-${name.split(' ').pop()?.toUpperCase() || 'GEN'}`,
         nom: `Coffre-Fort ${name}`,
         ownerType: name === 'Siège' ? 'SIEGE' : 'AGENCE',
-        ownerId: id,
+        ownerId: agencyId, // Strict ID usage
         devise: 'XAF',
         solde: balance,
         plafondEncaisse: name === 'Siège' ? '1000000000' : '200000000',
@@ -443,85 +469,170 @@ async function seedDemoSimple() {
         description: `Coffre-fort ${name} (Pré-crédité pour la démo)`,
       }).returning();
 
+      // Liaison Account
       await db.insert(comptesLiaison).values({
         code: `LIAISON-${name.split(' ').pop()?.toUpperCase() || 'GEN'}`,
         intitule: `Compte de liaison - ${name}`,
         numeroComptable: `581${name === 'Siège' ? '000' : '001'}`,
         entiteType: name === 'Siège' ? 'SIEGE' : 'AGENCE',
-        entiteId: id,
+        entiteId: agencyId,
         soldeCourant: '0',
         actif: true,
       });
 
+      // Config
       await db.insert(configCoffreFort).values({
-        agenceId: id,
+        agenceId: agencyId,
         seuilDoubleValidation: '10000000',
         separationInitiateurValideur: true,
         actif: true,
       });
 
-      // 4. SEED CAISSES (CASHBOXES)
+      // Cashbox (Caisse)
       const [caisse] = await db.insert(caisses).values({
         nom: `Caisse Principal ${name}`,
-        agenceId: id,
+        agenceId: agencyId, // Strict ID usage
         type: 'Physique',
         solde: '1000000', // 1M initial cash
         statut: 'Fermée',
       }).returning();
 
-      // We'll store the Siège caisse for admin assignment later
       if (name === 'Siège') {
-          (global as any).siegeCaisse = caisse;
+          siegeCaisseIds['Siège'] = caisse.id;
       }
     }
 
-    const siegeCaisse = (global as any).siegeCaisse;
-
-    // 5. RBAC & PERMISSIONS
+    // 4. RBAC & PERMISSIONS
     console.log('\n🛡️ Seeding RBAC...');
     await seedRBAC();
 
-    // 6. BUSINESS CONFIG
+    // 5. BANKING PRODUCTS CATALOG (CRITICAL: Before Accounts)
+    console.log('\n🏦 Seeding Banking Products Catalog...');
+    // We store product Ids for potential usage in demo account creation
+    const productMap: Record<string, string> = {};
+
+    const [produitCourant] = await db.insert(produitsCompte).values({
+      code: 'COURANT_STD',
+      nom: 'Compte Courant Standard',
+      typeCompte: 'Courant',
+      tauxInteret: '0',
+      frais: { ouverture: 5000, tenue: 1500 },
+      actif: true,
+    }).returning();
+    productMap['COURANT'] = produitCourant.id;
+
+    const [produitEpargne] = await db.insert(produitsCompte).values({
+      code: 'EPARGNE_STD',
+      nom: 'Compte Épargne Classique',
+      typeCompte: 'Épargne',
+      tauxInteret: '3.5',
+      frais: { ouverture: 2500 },
+      actif: true,
+    }).returning();
+    productMap['EPARGNE'] = produitEpargne.id;
+
+    const [produitTontine] = await db.insert(produitsCompte).values({
+      code: 'TONTINE_STD',
+      nom: 'Compte Tontine',
+      typeCompte: 'Bloqué',
+      tauxInteret: '0',
+      actif: true,
+    }).returning();
+    productMap['TONTINE'] = produitTontine.id;
+
+    console.log(`   ✅ Products created: ${produitCourant.code}, ${produitEpargne.code}, ${produitTontine.code}`);
+
+    // 6. MAINTENANCE MODULES (Unlock All)
+    console.log('\n🔧 Seeding Maintenance Modules (Unlocking)...');
+    const modulesList = [
+      'Dashboard', 'Caisse', 'Crédits', 'Remboursements', 'Clients', 'Comptes', 
+      'Tontines', 'Comptabilité', 'Agent Terrain', 'CaisseAgent', 'Transferts', 
+      'Virements Programmes', 'Rapports', 'RH', 'Communications', 'Bourse', 
+      'Loge', 'Paramètres', 'Administration', 'Audit', 'Messages', 'Coffre-Fort', 
+      'Incidents', 'Visites', 'Prospection', 'Paiements Agent', 'PLATFORM'
+    ];
+    await db.insert(maintenanceModules).values(modulesList.map(m => ({
+        moduleName: m,
+        isLocked: false
+    })));
+
+    // 7. GLOBAL FINANCIAL CONFIG
+    console.log('   ⚙️ Seeding Config Transferts Inter-Coffres...');
+    await db.insert(configTransfertInterCoffres).values({
+      agenceId: null, // Global config
+      montantMinTransfert: '50000',
+      montantMaxTransfert: '500000000',
+      seuilAlertePlafond: '80',
+      approbationDoubleNiveau: true,
+      nombreAgentsTransportMin: '2',
+      scelleObligatoireSiMontantSuperieur: '500000',
+      separationCreateurApprobateurN1: true,
+      separationApprobateurN1N2: false, 
+      separationApprobateurRecepteur: true,
+      delaiMaxReconciliation: '3',
+      alerteReconciliationActive: true,
+      actif: true,
+    });
+
+    // 8. BUSINESS CONFIG
     console.log('🏷️ Seeding Business Config...');
     await db.insert(typesMarches).values(TYPES_MARCHES_DATA);
     await db.insert(tags).values(TAGS_DATA);
     
-    // 7. CREATE STANDARD ADMIN USER
-    console.log('\n👤 Creating Standard Admin...');
+    // 9. CREATE STANDARD ADMIN USER WITH STRICT AGENCY LINKING
+    console.log('\n👤 Creating Standard Admin with Strict Agency Link...');
     const hashedPassword = await hashPassword('password123');
-    
+    const siegeId = agencyMap['Siège'];
+
+    if (!siegeId) {
+        throw new Error("❌ CRITICAL: 'Siège' ID is missing from agencyMap. Seed failed.");
+    }
+
+    // A. Create User
     const [adminUser] = await db.insert(users).values({
       username: 's.administrateur',
       password: hashedPassword,
       nom: 'Administrateur',
       prenom: 'Super',
       email: 'admin@cofin.com',
-      role: SystemRole.ADMIN,
-      agence: 'Siège',
+      role: SystemRole.ADMIN, // Legacy role, but good for compat
       statut: 'Actif',
     }).returning();
 
-    // Assign admin to the caisse
-    await db.insert(caisseAssignations).values({
-      caisseId: siegeCaisse.id,
+    // B. Link User to Agency (Strict)
+    await db.insert(userAgences).values({
       userId: adminUser.id,
-      assignedBy: adminUser.id,
+      agenceId: siegeId, // Using the sourced ID
+      isPrimary: true,
+      role: SystemRole.ADMIN,
+      actif: true,
+      dateAffectation: new Date().toISOString().split('T')[0],
     });
+    console.log(`   -> Admin linked to Agency: ${siegeId} (Siège)`);
 
-    // Create a closed session for history
-    await db.insert(sessionsCaisse).values({
-      caissierId: adminUser.id,
-      caisseId: siegeCaisse.id,
-      agenceId: insertedAgences['Siège'],
-      soldeInitial: '1000000',
-      soldeTheorique: '1000000',
-      soldeReel: '1000000',
-      statut: 'Fermée',
-      dateOuverture: new Date(Date.now() - 86400000),
-      dateFermeture: new Date(Date.now() - 86400000),
-    });
+    // C. Assign Admin to Caisse
+    if (siegeCaisseIds['Siège']) {
+        await db.insert(caisseAssignations).values({
+            caisseId: siegeCaisseIds['Siège'],
+            userId: adminUser.id,
+            assignedBy: adminUser.id,
+        });
 
-    // 8. OTHER SETTINGS (Minimum required for UI)
+        // D. Create a closed session for history
+        await db.insert(sessionsCaisse).values({
+            caissierId: adminUser.id,
+            caisseId: siegeCaisseIds['Siège'],
+            agenceId: siegeId,
+            soldeInitial: '1000000',
+            soldeTheorique: '1000000',
+            soldeReel: '1000000',
+            openedAt: new Date(Date.now() - 86400000),
+            closedAt: new Date(Date.now() - 86400000),
+        });
+        console.log(`   -> Admin assigned to Caisse: ${siegeCaisseIds['Siège']}`);
+    }
+
+    // 10. OTHER SETTINGS
     await db.insert(systemSettings).values({
       agenceName: 'COFIN - Demo',
       agenceCode: 'COF-DEMO',
@@ -561,13 +672,12 @@ async function seedDemoSimple() {
       { code: 'OD', intitule: 'Opérations Diverses', typeJournal: 'Opérations Diverses' },
     ] as any);
 
-    console.log('\n✅ SIMPLE DEMO SEED COMPLETE');
+    console.log('\n✅ SIMPLE DEMO SEED COMPLETE (Robust v2)');
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('👤 Login: s.administrateur / password123');
-    console.log('🔐 Vaults:');
-    console.log('   CF-SIEGE : 500,000,000 XAF');
-    console.log('   CF-NORD  : 100,000,000 XAF');
-    console.log('🏧 Caisses: 1,000,000 XAF par agence (Fermées)');
+    console.log(`🏢 Agence: Siège (ID: ${siegeId})`);
+    console.log('🔐 Vaults initialized for Siège and Nord');
+    console.log('🏦 Products initialized: COURANT, EPARGNE, TONTINE');
     console.log('═══════════════════════════════════════════════════════════════');
 
   } catch (error) {

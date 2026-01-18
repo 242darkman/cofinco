@@ -333,7 +333,13 @@ export default function Dashboard({
               { icon: Users, label: t('activeClients') || 'Clients actifs', value: g.clientsActifs?.toString() || '0', trend: `+${w.nouveauxClients || 0}`, up: true },
               { icon: CreditCard, label: t('creditsActifs') || 'Crédits actifs', value: g.creditsEnCours?.toString() || '0', trend: `+${w.nouveauxCredits || 0}`, up: true },
               { icon: Wallet, label: t('epargnes') || 'Épargnes', value: (g.montantEpargneTotal ? (g.montantEpargneTotal / 1000000).toFixed(1) + 'M' : '0'), trend: '+0%', up: true },
-              { icon: Activity, label: t('transactions') || 'Tontines', value: g.tontinesActives?.toString() || '0', trend: '+0%', up: true }
+              { 
+                icon: Activity, 
+                label: 'Tontines', 
+                value: g.tontinesActives > 0 ? g.tontinesActives.toString() : '—', 
+                trend: g.tontinesActives > 0 ? `${g.tontinesActives}/${g.totalTontines}` : 'Aucune', 
+                up: g.tontinesActives > 0 
+              }
             ]} />
           </div>
 

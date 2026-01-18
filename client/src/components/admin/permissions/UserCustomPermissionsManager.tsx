@@ -16,7 +16,7 @@ interface UserCustomPermissionsManagerProps {
   onUserChange: (userId: string) => void;
   userPermissions: UserPermission[];
   getUserDisplayName: (userId: string) => string;
-  getUserPermissionStatus: (permCode: string) => { granted: boolean; source: 'role' | 'user' | 'none' };
+  getUserPermissionStatus: (permCode: string) => { granted: boolean; source: 'role' | 'custom' | 'none' };
   toggleUserPermission: (permId: string) => Promise<void>;
   onActivateAll: () => Promise<void>;
   onBlockAll: () => Promise<void>;
@@ -87,7 +87,7 @@ export default function UserCustomPermissionsManager({
     let perms = permissions;
     
     if (showOnlyCustom) {
-      perms = perms.filter(p => getUserPermissionStatus(p.code).source === 'user');
+      perms = perms.filter(p => getUserPermissionStatus(p.code).source === 'custom');
     }
 
     if (permSearchTerm) {
@@ -314,7 +314,7 @@ export default function UserCustomPermissionsManager({
           {filteredPermissionGroups.map(([moduleName, modulePerms]) => {
               const isExpanded = expandedModules.includes(moduleName) || permSearchTerm.length > 0;
               const activeCount = modulePerms.filter(p => getUserPermissionStatus(p.code).granted).length;
-              const hasCustom = modulePerms.some(p => getUserPermissionStatus(p.code).source === 'user');
+              const hasCustom = modulePerms.some(p => getUserPermissionStatus(p.code).source === 'custom');
 
               return (
                   <div key={moduleName} className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
@@ -345,7 +345,7 @@ export default function UserCustomPermissionsManager({
                               {modulePerms.map(perm => {
                                   // Find current status
                                   const status = getUserPermissionStatus(perm.code);
-                                  const isCustom = status.source === 'user';
+                                  const isCustom = status.source === 'custom';
                                   
                                   return (
                                       <div key={perm.id} className="flex items-center justify-between p-3 sm:px-4 hover:bg-white/5 transition-colors group">

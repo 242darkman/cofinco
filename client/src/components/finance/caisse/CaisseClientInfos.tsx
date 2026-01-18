@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
 import { formatClientName } from '@/lib/format';
+import { clientSearchApi } from '@/lib/api-client';
 
 interface SecurityLimits {
   daily: { limit: number, used: number, remaining: number };
@@ -151,16 +152,14 @@ export default function CaisseClientInfos() {
     if (!searchTerm) return;
     setSearching(true);
     try {
-      const res = await fetch(`/api/clients/search?q=${encodeURIComponent(searchTerm)}`);
-      if (res.ok) {
-        const results = await res.json();
-        if (results && results.length > 0) {
-          setSelectedClientId(results[0].id);
-          setSearchTerm(''); // Clear search or keep it? Keep it maybe better UX or clear to show partial
-        } else {
-          toast.error("Aucun client trouvé");
-          setSelectedClientId(null);
-        }
+      const response = await clientSearchApi.search(searchTerm, { page: 1, perPage: 10 });
+      const results = response.data || [];
+      if (results.length > 0) {
+        setSelectedClientId(results[0].id);
+        setSearchTerm('');
+      } else {
+        toast.error("Aucun client trouvé");
+        setSelectedClientId(null);
       }
     } catch (e) {
       console.error(e);

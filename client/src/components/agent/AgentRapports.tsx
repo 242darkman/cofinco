@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { requestAllPages } from '../../lib/api-client';
 import { FileText, Download, Calendar, TrendingUp, Users, DollarSign, Activity, BarChart3, Filter } from 'lucide-react';
 
 interface Rapport {
@@ -60,13 +61,10 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
     setLoading(true);
     try {
-      const [visitesRes, paiementsRes] = await Promise.all([
-        fetch(`/api/visites-terrain?agent_id=${selectedAgent}&date_debut=${periodeDu}&date_fin=${periodeAu}`),
-        fetch(`/api/paiements-terrain?agent_id=${selectedAgent}&date_debut=${periodeDu}&date_fin=${periodeAu}`)
+      const [visites, paiements] = await Promise.all([
+        requestAllPages('/visites-terrain', { agent_id: selectedAgent, date_debut: periodeDu, date_fin: periodeAu }),
+        requestAllPages('/paiements-terrain', { agent_id: selectedAgent, date_debut: periodeDu, date_fin: periodeAu })
       ]);
-
-      const visites = visitesRes.ok ? await visitesRes.json() : [];
-      const paiements = paiementsRes.ok ? await paiementsRes.json() : [];
 
       const nombre_visites = visites?.length || 0;
       const nombre_collectes = paiements?.length || 0;

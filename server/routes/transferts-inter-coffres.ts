@@ -397,12 +397,24 @@ transfertsInterCoffresRouter.post("/transferts/:id/dispatch", async (req, res) =
     });
 
     if (!result.success) {
+      // Retourner 409 Conflict pour les erreurs de concurrence
+      if (result.errorCode === "TIC_CONFLICT" || result.errorCode === "TIC_024") {
+        return res.status(409).json(result);
+      }
       return res.status(400).json(result);
     }
 
     res.json(result);
   } catch (error: any) {
     console.error("Erreur POST /transferts/:id/dispatch:", error);
+    // Gérer les erreurs de verrouillage PostgreSQL (lock_not_available)
+    if (error.code === "55P03") {
+      return res.status(409).json({ 
+        success: false, 
+        errorCode: "TIC_CONFLICT",
+        error: "Ce transfert est en cours de traitement par un autre utilisateur." 
+      });
+    }
     res.status(400).json({ success: false, error: error.message });
   }
 });
@@ -438,12 +450,24 @@ transfertsInterCoffresRouter.post("/transferts/:id/receive", async (req, res) =>
     });
 
     if (!result.success) {
+      // Retourner 409 Conflict pour les erreurs de concurrence
+      if (result.errorCode === "TIC_CONFLICT") {
+        return res.status(409).json(result);
+      }
       return res.status(400).json(result);
     }
 
     res.json(result);
   } catch (error: any) {
     console.error("Erreur POST /transferts/:id/receive:", error);
+    // Gérer les erreurs de verrouillage PostgreSQL (lock_not_available)
+    if (error.code === "55P03") {
+      return res.status(409).json({ 
+        success: false, 
+        errorCode: "TIC_CONFLICT",
+        error: "Ce transfert est en cours de traitement par un autre utilisateur." 
+      });
+    }
     res.status(400).json({ success: false, error: error.message });
   }
 });

@@ -1078,8 +1078,17 @@ async function seedDemo() {
     ];
 
     const insertedUsers: Record<string, any> = {};
+    const userAgenceByUsername: Record<string, string | undefined> = {};
 
-    const insertedCoreUsers = await db.insert(users).values(coreUsers).returning();
+    const coreUsersForInsert = coreUsers.map((user) => {
+      if (user.username) {
+        userAgenceByUsername[user.username] = user.agence;
+      }
+      const { agence, ...userData } = user;
+      return userData;
+    });
+
+    const insertedCoreUsers = await db.insert(users).values(coreUsersForInsert).returning();
     for (const user of insertedCoreUsers) {
       if (user.username) {
         insertedUsers[user.username] = user;
@@ -1108,6 +1117,8 @@ async function seedDemo() {
           const telephone = `+24206${String(phoneCounter).padStart(7, '0')}`;
           phoneCounter += 1;
 
+          userAgenceByUsername[username] = agenceName;
+
           const [user] = await db.insert(users).values({
             username,
             password: hashedDefault,
@@ -1116,7 +1127,6 @@ async function seedDemo() {
             prenom: 'Staff',
             email: `${username}@cofin.com`,
             telephone,
-            agence: agenceName,
             statut: 'Actif',
             matricule,
             poste: roleConfig.poste,
@@ -1149,8 +1159,9 @@ async function seedDemo() {
 
     const userAgencesData: Array<{ userId: string; agenceId: string; isPrimary: boolean; role?: string }> = [];
 
-    for (const user of Object.values(insertedUsers)) {
-      const agenceId = user.agence ? insertedAgences[user.agence] : undefined;
+    for (const [username, user] of Object.entries(insertedUsers)) {
+      const agenceName = userAgenceByUsername[username];
+      const agenceId = agenceName ? insertedAgences[agenceName] : undefined;
       if (agenceId) {
         userAgencesData.push({ userId: user.id, agenceId, isPrimary: true, role: user.role });
       }
@@ -3081,10 +3092,9 @@ async function seedDemo() {
         soldeTheorique: shift.soldeOuverture, // Sera mis à jour
         soldeReel: null,
         ecart: null,
-        statut: shift.statut === 'ferme' ? 'Fermée' : 'Ouverte',
         agenceId,
-        dateOuverture: shift.dateOuverture,
-        dateFermeture: shift.dateFermeture,
+        openedAt: shift.dateOuverture,
+        closedAt: shift.dateFermeture,
       });
     }
 
@@ -3138,7 +3148,7 @@ async function seedDemo() {
         const delta = opType.sens === 'Crédit' ? montant : -montant;
         sessionData.totalDelta += delta;
 
-        const opDate = session.dateOuverture || new Date();
+        const opDate = session.openedAt || new Date();
         const reference = `CAI-${opDate.toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
         const methodePaiement = randomFromArray(PAYMENT_METHODS);
         const client = insertedClients[randomBetween(0, insertedClients.length - 1)];
@@ -3320,44 +3330,40 @@ async function seedDemo() {
     // Terminaux POS
     await db.insert(posDevices).values([
       {
-        agentId: staffGroups.Caissiers[0]?.id,
-        caisseId: caisseByName['Caisse Siège 1'].id,
-        deviceId: 'POS-SIEGE-001',
-        nom: 'POS Siège Principal',
-        modele: 'Sunmi V2',
-        numeroSerie: 'SN-2024-0001',
-        versionApp: '2.1.0',
-        statut: 'actif',
+        serial: 'POS-SIEGE-001',
+        model: 'Sunmi V2',
+        agenceId: caisseByName['Caisse Siège 1'].agenceId,
+        assignedTo: staffGroups.Caissiers[0]?.id,
+        lastSyncAt: daysAgo(1),
+        isActive: true,
+        metadata: { label: 'POS Siège Principal', versionApp: '2.1.0' },
       },
       {
-        agentId: staffGroups.Caissiers[1]?.id,
-        caisseId: caisseByName['Caisse Siège 2'].id,
-        deviceId: 'POS-SIEGE-002',
-        nom: 'POS Siège Secondaire',
-        modele: 'Sunmi V2',
-        numeroSerie: 'SN-2024-0002',
-        versionApp: '2.1.0',
-        statut: 'actif',
+        serial: 'POS-SIEGE-002',
+        model: 'Sunmi V2',
+        agenceId: caisseByName['Caisse Siège 2'].agenceId,
+        assignedTo: staffGroups.Caissiers[1]?.id,
+        lastSyncAt: daysAgo(2),
+        isActive: true,
+        metadata: { label: 'POS Siège Secondaire', versionApp: '2.1.0' },
       },
       {
-        agentId: staffGroups.Caissiers[2]?.id,
-        caisseId: caisseByName['Caisse Nord 1'].id,
-        deviceId: 'POS-NORD-001',
-        nom: 'POS Nord',
-        modele: 'PAX A930',
-        numeroSerie: 'SN-2024-0003',
-        versionApp: '2.0.5',
-        statut: 'actif',
+        serial: 'POS-NORD-001',
+        model: 'PAX A930',
+        agenceId: caisseByName['Caisse Nord 1'].agenceId,
+        assignedTo: staffGroups.Caissiers[2]?.id,
+        lastSyncAt: daysAgo(1),
+        isActive: true,
+        metadata: { label: 'POS Nord', versionApp: '2.0.5' },
       },
       {
-        agentId: staffGroups.Caissiers[4]?.id,
-        caisseId: caisseByName['Caisse Est 1'].id,
-        deviceId: 'POS-EST-001',
-        nom: 'POS Est',
-        modele: 'Ingenico Move5000',
-        numeroSerie: 'SN-2024-0004',
-        versionApp: '1.8.2',
-        statut: 'maintenance',
+        serial: 'POS-EST-001',
+        model: 'Ingenico Move5000',
+        agenceId: caisseByName['Caisse Est 1'].agenceId,
+        assignedTo: staffGroups.Caissiers[4]?.id,
+        lastSyncAt: daysAgo(5),
+        isActive: false,
+        metadata: { label: 'POS Est', versionApp: '1.8.2', status: 'maintenance' },
       },
     ]);
 
@@ -4140,10 +4146,13 @@ async function seedDemo() {
 
     const femalePrenoms = new Set(['Claudine', 'Lise', 'Aya', 'Flora']);
 
-    const employesSeed = Object.values(insertedUsers)
-      .filter((user: any) => user?.agence)
-      .map((user: any, index: number) => {
-        const agenceInfo = agenceMeta[user.agence] || { ville: user.agence, adresse: user.agence };
+    const employesSeed = Object.entries(insertedUsers)
+      .map(([username, user], index: number) => {
+        const agenceName = userAgenceByUsername[username];
+        if (!agenceName) {
+          return null;
+        }
+        const agenceInfo = agenceMeta[agenceName] || { ville: agenceName, adresse: agenceName };
         const matricule = user.matricule || `EMP-${String(index + 1).padStart(3, '0')}`;
         const dateEmbauche = user.dateEmbauche
           ? (user.dateEmbauche instanceof Date ? dateOnly(user.dateEmbauche) : String(user.dateEmbauche))
@@ -4160,7 +4169,7 @@ async function seedDemo() {
 
         return {
           userId: user.id,
-          agenceId: insertedAgences[user.agence] || null, // Link to real agence ID
+          agenceId: insertedAgences[agenceName] || null, // Link to real agence ID
           roleSystem,
           matricule,
           poste: user.poste || 'Employé',
@@ -4169,7 +4178,8 @@ async function seedDemo() {
           typeContrat: user.typeContrat || 'CDI',
           salaireBase: user.salaireBase ? parseInt(user.salaireBase) : 300000,
         };
-      });
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry);
 
     await db.insert(employes).values(employesSeed);
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, AlertCircle, CheckCircle, X, Wallet, ArrowRight, Shield, Building, User } from 'lucide-react';
 import { Modal, Button, FormField, SelectField, Badge } from '../../ui';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
-import { formatMoney } from '../../../lib/format';
+import { computeSessionStatus, formatMoney } from '../../../lib/format';
 import { toast } from 'sonner';
 import { sessionCaisseApi, authApi } from '../../../lib/api-client';
 import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
@@ -19,8 +19,10 @@ interface CreditFeesPaymentModalProps {
 export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, onNavigate }: CreditFeesPaymentModalProps) {
   const { payerFrais } = useDemandes();
   
-  // 10% Fees Calculation (Auto-filled)
-  const calculatedFee = (demande.montant_demande || 0) * 0.10;
+  // Utiliser les frais du plan s'ils sont définis, sinon 10% du montant
+  const calculatedFee = demande.montant_frais_engagement 
+    ? parseFloat(demande.montant_frais_engagement) 
+    : (demande.montant_demande || 0) * 0.10;
 
   const [amount, setAmount] = useState(calculatedFee.toString()); 
   const [method, setMethod] = useState('Espèces');
@@ -35,10 +37,12 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
   // Sync amount when demande is available
   useEffect(() => {
     if (demande?.montant_demande) {
-      const calculatedFee = (demande.montant_demande || 0) * 0.10;
+      const calculatedFee = demande.montant_frais_engagement 
+        ? parseFloat(demande.montant_frais_engagement) 
+        : (demande.montant_demande || 0) * 0.10;
       setAmount(calculatedFee.toString());
     }
-  }, [demande?.montant_demande]);
+  }, [demande?.montant_demande, demande?.montant_frais_engagement]);
 
   // Session State
   const [checkingSession, setCheckingSession] = useState(true);
@@ -68,7 +72,8 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
         authApi.getMe()
       ]);
       
-      setUserSession(session && session.statut === 'Ouverte' ? session : null);
+      const status = session ? (session.computedStatus || computeSessionStatus(session)) : null;
+      setUserSession(status === 'OPEN' ? session : null);
       setUserRole(normalizeRole(user?.role) || SystemRole.CLIENT);
     } catch (e) {
       console.error("Error checking session", e);

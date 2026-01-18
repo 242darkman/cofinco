@@ -6,11 +6,19 @@
  * - Transactions atomiques avec isolation
  * - Heartbeat et détection de sessions orphelines
  * - Monitoring et alertes pour écarts significatifs
+ * - Synchronisation automatique du solde caisse physique
  */
 
 import { db } from "../../db";
-import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users } from "@shared/schema";
-import { eq, and, sql, desc, lt, gte, or } from "drizzle-orm";
+import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers } from "@shared/schema";
+import { eq, and, sql, desc, lt, gte, or, isNull, isNotNull } from "drizzle-orm";
+import { ForcedCloseReason, SessionComputedStatus } from "@shared/enums";
+import {
+  getOperationDelta,
+  CAISSE_THRESHOLDS,
+  isIncomingOperation,
+  isOutgoingOperation,
+} from "@shared/config/caisse-operations";
 
 // ============================================================================
 // TYPES & CONSTANTES
@@ -37,36 +45,25 @@ const BILLETAGE_VALUES: Record<string, number> = {
   pieces_1: 1,
 };
 
-/** Types d'opérations qui augmentent le solde */
+/** Configuration extraite du fichier centralisé */
+const DEFAULT_SESSION_TIMEOUT_HOURS = CAISSE_THRESHOLDS.TIMEOUT_AUTO_CLOSE_HOURS;
+const WARNING_INACTIVE_HOURS = CAISSE_THRESHOLDS.INACTIVITE_WARNING_HOURS;
+const CRITICAL_INACTIVE_HOURS = CAISSE_THRESHOLDS.INACTIVITE_CRITICAL_HOURS;
+const MAX_ECART_THRESHOLD = CAISSE_THRESHOLDS.MAX_ECART_SANS_ALERTE;
+
+/** Types d'opérations pour compatibilité - utiliser les fonctions centralisées */
 const IN_TYPES = [
-  "Versement",
-  "Depot",
-  "Dépôt",
-  "Encaissement",
-  "Dépôt épargne",
-  "Remboursement crédit",
-  "Remboursement Crédit",
-  "Approvisionnement coffre",
-  "Cotisation Tontine",
+  "Versement", "Dépôt", "Encaissement", "Remboursement", "Cotisation",
+  "Approvisionnement coffre", "Dépôt épargne", "Versement Épargne",
+  "Versement Courant", "Versement Bloqué", "Remboursement crédit",
+  "Frais Engagement", "Cotisation Tontine"
 ];
 
-/** Types d'opérations qui diminuent le solde */
 const OUT_TYPES = [
-  "Retrait",
-  "Decaissement",
-  "Décaissement",
-  "Retrait épargne",
-  "Décaissement crédit",
-  "Frais",
-  "Versement coffre",
-  "Prêt",
+  "Retrait", "Décaissement", "Frais", "Sortie", "Versement coffre",
+  "Retrait épargne", "Retrait Épargne", "Retrait Courant", "Retrait Bloqué",
+  "Décaissement crédit", "Décaissement Prêt", "Retrait Tontine"
 ];
-
-/** Configuration par défaut */
-const DEFAULT_SESSION_TIMEOUT_HOURS = 12;
-const WARNING_INACTIVE_HOURS = 6;
-const CRITICAL_INACTIVE_HOURS = 10;
-const MAX_ECART_THRESHOLD = 50000; // 50k FCFA
 
 // ============================================================================
 // VALIDATION DU BILLETAGE
@@ -80,37 +77,29 @@ interface BilletageValidationResult {
   errors: string[];
 }
 
-/**
- * Valide et recalcule le billetage côté serveur
- * Empêche la manipulation du solde initial par le client
- */
-export function validateBilletage(
-  billetage: Record<string, number> | null | undefined,
-  providedTotal: number
-): BilletageValidationResult {
+interface BilletageCalculationResult {
+  total: number;
+  errors: string[];
+}
+
+function calculateBilletage(billetage: Record<string, number> | null | undefined): BilletageCalculationResult {
   const errors: string[] = [];
   let calculatedTotal = 0;
 
   if (!billetage || typeof billetage !== "object") {
-    return {
-      isValid: providedTotal === 0,
-      calculatedTotal: 0,
-      providedTotal,
-      difference: providedTotal,
-      errors: providedTotal !== 0 ? ["Billetage requis pour un solde initial non nul"] : [],
-    };
+    return { total: 0, errors };
   }
 
   // Calculer le total depuis le billetage
   for (const [key, count] of Object.entries(billetage)) {
     // Normalisation des clés pour supporter le camelCase généré par normalizeKeysDeep
     // Ex: billets_10000 (backend) vs billets10000 (frontend normalized)
-    const normalizedKey = key.replace(/_/g, '');
+    const normalizedKey = key.replace(/_/g, "");
     let value = BILLETAGE_VALUES[key];
     
     // Si pas trouvé avec la clé exacte, essayer de trouver une correspondance dans BILLETAGE_VALUES
     if (value === undefined) {
-       const foundKey = Object.keys(BILLETAGE_VALUES).find(k => k.replace(/_/g, '') === normalizedKey);
+       const foundKey = Object.keys(BILLETAGE_VALUES).find((k) => k.replace(/_/g, "") === normalizedKey);
        if (foundKey) {
            value = BILLETAGE_VALUES[foundKey];
        } else {
@@ -138,6 +127,54 @@ export function validateBilletage(
 
     calculatedTotal += countNum * value;
   }
+
+  return { total: calculatedTotal, errors };
+}
+
+export function calculateBilletageTotal(
+  billetage: Record<string, number> | null | undefined
+): number {
+  return calculateBilletage(billetage).total;
+}
+
+/**
+ * Calcule le delta de solde pour une opération de caisse
+ * Utilise la configuration centralisée pour la classification
+ */
+function calculateOperationDelta(op: {
+  typeOperation: string;
+  montant: string;
+  reference?: string | null;
+  description?: string | null;
+}): number {
+  // Utiliser la fonction centralisée avec contexte
+  return getOperationDelta(op.typeOperation, op.montant, {
+    reference: op.reference,
+    description: op.description,
+  });
+}
+
+/**
+ * Valide et recalcule le billetage côté serveur
+ * Empêche la manipulation du solde initial par le client
+ */
+export function validateBilletage(
+  billetage: Record<string, number> | null | undefined,
+  providedTotal: number
+): BilletageValidationResult {
+  if (!billetage || typeof billetage !== "object") {
+    return {
+      isValid: providedTotal === 0,
+      calculatedTotal: 0,
+      providedTotal,
+      difference: providedTotal,
+      errors: providedTotal !== 0 ? ["Billetage requis pour un solde initial non nul"] : [],
+    };
+  }
+
+  const calculation = calculateBilletage(billetage);
+  const calculatedTotal = calculation.total;
+  const errors: string[] = [...calculation.errors];
 
   const difference = Math.abs(calculatedTotal - providedTotal);
 
@@ -177,7 +214,7 @@ interface OpenSessionResult {
   success: boolean;
   session?: any;
   error?: string;
-  errorCode?: "CAISSE_OCCUPIED" | "USER_HAS_SESSION" | "INVALID_BILLETAGE" | "DB_ERROR";
+  errorCode?: "CAISSE_OCCUPIED" | "USER_HAS_SESSION" | "INVALID_BILLETAGE" | "CAISSE_NOT_FOUND" | "CAISSE_AGENCE_MISMATCH" | "DB_ERROR";
 }
 
 /**
@@ -209,7 +246,7 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
         const [existingCaisseSession] = await tx
           .select()
           .from(sessionsCaisse)
-          .where(and(eq(sessionsCaisse.caisseId, caisseId), eq(sessionsCaisse.statut, "Ouverte")));
+          .where(and(eq(sessionsCaisse.caisseId, caisseId), isNull(sessionsCaisse.closedAt)));
 
         if (existingCaisseSession) {
           throw new Error("CAISSE_OCCUPIED:Cette caisse est déjà occupée par une autre session");
@@ -219,11 +256,24 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
         const [existingUserSession] = await tx
           .select()
           .from(sessionsCaisse)
-          .where(and(eq(sessionsCaisse.caissierId, caissierId), eq(sessionsCaisse.statut, "Ouverte")));
+          .where(and(eq(sessionsCaisse.caissierId, caissierId), isNull(sessionsCaisse.closedAt)));
 
         if (existingUserSession) {
           throw new Error("USER_HAS_SESSION:Vous avez déjà une session ouverte sur une autre caisse");
         }
+
+        const [caisse] = await tx.select().from(caisses).where(eq(caisses.id, caisseId));
+        if (!caisse) {
+          throw new Error("CAISSE_NOT_FOUND:Caisse introuvable");
+        }
+
+        if (agenceId && caisse.agenceId && caisse.agenceId !== agenceId) {
+          throw new Error("CAISSE_AGENCE_MISMATCH:La caisse ne correspond pas à l'agence sélectionnée");
+        }
+
+        const sessionAgenceId = caisse.agenceId || agenceId;
+        const caisseSoldeAvant = Number(caisse.solde || 0);
+        const openingEcart = billetageValidation.calculatedTotal - caisseSoldeAvant;
 
         // Calculer le timeout (12h par défaut)
         const timeoutAt = new Date();
@@ -235,14 +285,13 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
           .values({
             caissierId,
             caisseId,
-            agenceId,
+            agenceId: sessionAgenceId,
             soldeInitial: billetageValidation.calculatedTotal.toString(),
             soldeTheorique: billetageValidation.calculatedTotal.toString(),
             billetageOuverture,
-            statut: "Ouverte",
+            openedAt: new Date(),
             lastActivity: new Date(),
             timeoutAt,
-            closedReason: null,
           })
           .returning();
 
@@ -250,14 +299,16 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
         await tx.insert(sessionsCaisseAuditLogs).values({
           sessionId: newSession.id,
           action: "OPENED",
-          statutApres: "Ouverte",
+          statutApres: SessionComputedStatus.OPEN,
           details: {
             soldeInitial: billetageValidation.calculatedTotal,
             soldeInitialFourni: Number(soldeInitial),
             billetageOuverture,
             caisseId,
-            agenceId,
+            agenceId: sessionAgenceId,
             validationBilletage: billetageValidation,
+            caisseSoldeAvant,
+            openingEcart,
           },
           userId: caissierId,
           ipAddress,
@@ -289,6 +340,20 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
         success: false,
         error: error.message.replace("USER_HAS_SESSION:", ""),
         errorCode: "USER_HAS_SESSION",
+      };
+    }
+    if (error.message?.startsWith("CAISSE_NOT_FOUND:")) {
+      return {
+        success: false,
+        error: error.message.replace("CAISSE_NOT_FOUND:", ""),
+        errorCode: "CAISSE_NOT_FOUND",
+      };
+    }
+    if (error.message?.startsWith("CAISSE_AGENCE_MISMATCH:")) {
+      return {
+        success: false,
+        error: error.message.replace("CAISSE_AGENCE_MISMATCH:", ""),
+        errorCode: "CAISSE_AGENCE_MISMATCH",
       };
     }
 
@@ -331,6 +396,8 @@ interface CloseSessionParams {
   observations?: string;
   closedBy: string;
   closedReason?: "manual" | "admin" | "timeout";
+  fundsKeptInCaisse?: boolean;
+  transferToCoffreId?: string | null;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -348,6 +415,8 @@ interface CloseSessionResult {
  * - Recalcule le solde théorique depuis les opérations
  * - Valide le billetage de fermeture
  * - Calcule l'écart et génère une alerte si nécessaire
+ * - Met à jour le solde de la caisse physique
+ * - Crée un mouvement d'ajustement si écart détecté
  */
 export async function closeSessionAtomic(params: CloseSessionParams): Promise<CloseSessionResult> {
   const {
@@ -357,9 +426,18 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
     observations,
     closedBy,
     closedReason = "manual",
+    fundsKeptInCaisse = true,
+    transferToCoffreId,
     ipAddress,
     userAgent,
   } = params;
+
+  const forcedCloseReason =
+    closedReason === "timeout"
+      ? ForcedCloseReason.TIMEOUT_AUTO
+      : closedReason === "admin"
+      ? ForcedCloseReason.ADMIN_FORCE
+      : null;
 
   // Validation du billetage de fermeture
   const billetageValidation = validateBilletage(billetageFermeture, Number(soldeReel));
@@ -374,18 +452,33 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
   try {
     const result = await db.transaction(
       async (tx) => {
-        // 1. Récupérer la session
-        const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionId));
+        // 1. Récupérer la session avec lock
+        const [session] = await tx
+          .select()
+          .from(sessionsCaisse)
+          .where(eq(sessionsCaisse.id, sessionId))
+          .for("update");
 
         if (!session) {
           throw new Error("Session introuvable");
         }
 
-        if (session.statut !== "Ouverte") {
-          throw new Error(`Session déjà fermée (statut: ${session.statut})`);
+        if (session.closedAt) {
+          throw new Error("Session déjà fermée");
         }
 
-        // 2. Récupérer toutes les opérations et recalculer le solde théorique
+        // 2. Récupérer la caisse associée
+        const [caisse] = await tx
+          .select()
+          .from(caisses)
+          .where(eq(caisses.id, session.caisseId))
+          .for("update");
+
+        if (!caisse) {
+          throw new Error("Caisse associée introuvable");
+        }
+
+        // 3. Récupérer toutes les opérations et recalculer le solde théorique
         const operations = await tx
           .select()
           .from(operationsCaisse)
@@ -394,59 +487,118 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
         let soldeTheorique = Number(session.soldeInitial);
 
         for (const op of operations) {
-          const montant = Number(op.montant);
-
-          if (IN_TYPES.includes(op.typeOperation)) {
-            soldeTheorique += montant;
-          } else if (OUT_TYPES.includes(op.typeOperation)) {
-            soldeTheorique -= montant;
-          } else if (op.typeOperation === "Transfert caisse") {
-            // Déterminer la direction du transfert
-            if (op.reference?.includes("TRF-IN") || op.description?.includes("Réception")) {
-              soldeTheorique += montant;
-            } else {
-              soldeTheorique -= montant;
-            }
-          }
+          // Utiliser la fonction centralisée pour le calcul du delta
+          const delta = calculateOperationDelta({
+            typeOperation: op.typeOperation,
+            montant: op.montant,
+            reference: op.reference,
+            description: op.description,
+          });
+          soldeTheorique += delta;
         }
 
-        // 3. Calculer l'écart
+        // 4. Calculer l'écart
         const soldeReelNum = billetageValidation.calculatedTotal;
         const ecart = soldeReelNum - soldeTheorique;
         const ecartAlert = Math.abs(ecart) > MAX_ECART_THRESHOLD;
+        const ecartJustificationRequise = Math.abs(ecart) > CAISSE_THRESHOLDS.ECART_JUSTIFICATION_REQUISE;
 
-        // 4. Mettre à jour la session
+        // 5. Créer un mouvement d'ajustement si écart significatif
+        let mouvementAjustementId: string | null = null;
+        if (Math.abs(ecart) > 0) {
+          const sensAjustement = ecart > 0 ? "Crédit" as const : "Débit" as const;
+          const [mouvementAjustement] = await tx.insert(mouvementsFinanciers).values({
+            montant: Math.abs(ecart).toString(),
+            sens: sensAjustement,
+            sourceModule: "CAISSE" as const,
+            agenceId: session.agenceId,
+            sessionCaisseId: sessionId,
+            typePaiement: "Ajustement" as any,
+            methodePaiement: "Espèces" as const,
+            reference: `ADJ-${sessionId.substring(0, 8)}-${Date.now()}`,
+            idempotencyKey: `adj-close-${sessionId}`,
+            statut: "Posté" as const,
+            dateOperation: new Date(),
+            metadata: {
+              type: "ECART_FERMETURE",
+              soldeTheorique,
+              soldeReel: soldeReelNum,
+              ecart,
+              ecartAlert,
+              sessionId,
+              caisseId: caisse.id,
+              closedBy,
+              observations,
+            },
+          }).returning();
+          mouvementAjustementId = mouvementAjustement.id;
+
+          // Créer l'opération d'ajustement
+          await tx.insert(operationsCaisse).values({
+            sessionId,
+            mouvementId: mouvementAjustement.id,
+            typeOperation: "Ajustement",
+            montant: Math.abs(ecart).toString(),
+            methodePaiement: "Espèces",
+            reference: mouvementAjustement.reference,
+            description: `Ajustement écart de ${ecart > 0 ? "+" : ""}${ecart} FCFA à la fermeture`,
+            statut: "Posté",
+          });
+        }
+
+        // 6. Mettre à jour le solde de la caisse physique avec le solde réel compté
+        const caisseSoldeAvant = Number(caisse.solde || 0);
+        await tx
+          .update(caisses)
+          .set({
+            solde: soldeReelNum.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(caisses.id, caisse.id));
+
+        // 7. Mettre à jour la session
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
-            statut: "Fermée",
-            dateFermeture: new Date(),
+            closedAt: new Date(),
             soldeTheorique: soldeTheorique.toString(),
             soldeReel: soldeReelNum.toString(),
             ecart: ecart.toString(),
             billetageFermeture,
             observations,
-            closedReason,
+            forcedCloseReason,
+            forceClosedBy: forcedCloseReason ? closedBy : null,
+            forceClosedAt: forcedCloseReason ? new Date() : null,
+            fundsKeptInCaisse,
+            transferToCoffreId: transferToCoffreId || null,
           })
           .where(eq(sessionsCaisse.id, sessionId))
           .returning();
 
-        // 5. Log d'audit
+        // 8. Log d'audit détaillé
         await tx.insert(sessionsCaisseAuditLogs).values({
           sessionId,
           action: closedReason === "timeout" ? "TIMEOUT" : closedReason === "admin" ? "ADMIN_CLOSED" : "CLOSED",
-          statutAvant: "Ouverte",
-          statutApres: "Fermée",
+          statutAvant: SessionComputedStatus.OPEN,
+          statutApres: SessionComputedStatus.CLOSED,
           details: {
             soldeInitial: Number(session.soldeInitial),
             soldeTheorique,
             soldeReel: soldeReelNum,
             ecart,
             ecartAlert,
+            ecartJustificationRequise,
             nbOperations: operations.length,
             billetageFermeture,
             validationBilletage: billetageValidation,
             observations,
+            // Traçabilité caisse
+            caisseId: caisse.id,
+            caisseSoldeAvant,
+            caisseSoldeApres: soldeReelNum,
+            mouvementAjustementId,
+            fundsKeptInCaisse,
+            transferToCoffreId,
           },
           userId: closedBy,
           ipAddress,
@@ -457,10 +609,14 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
           session: updatedSession,
           ecart,
           ecartAlert,
+          ecartJustificationRequise,
+          caisseSoldeAvant,
+          caisseSoldeApres: soldeReelNum,
+          mouvementAjustementId,
         };
       },
       {
-        isolationLevel: "read committed",
+        isolationLevel: "serializable", // Niveau plus strict pour éviter les race conditions
       }
     );
 
@@ -491,7 +647,7 @@ export async function updateSessionHeartbeat(sessionId: string): Promise<boolean
     const [updated] = await db
       .update(sessionsCaisse)
       .set({ lastActivity: new Date() })
-      .where(and(eq(sessionsCaisse.id, sessionId), eq(sessionsCaisse.statut, "Ouverte")))
+      .where(and(eq(sessionsCaisse.id, sessionId), isNull(sessionsCaisse.closedAt)))
       .returning();
 
     return !!updated;
@@ -527,12 +683,18 @@ export async function getRiskySessions(): Promise<
     .from(sessionsCaisse)
     .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
-    .where(and(eq(sessionsCaisse.statut, "Ouverte"), lt(sessionsCaisse.lastActivity, warningThreshold)));
+    .where(
+      and(
+        isNotNull(sessionsCaisse.openedAt),
+        isNull(sessionsCaisse.closedAt),
+        lt(sessionsCaisse.lastActivity, warningThreshold)
+      )
+    );
 
   const results = [];
 
   for (const row of sessions) {
-    const lastActivity = row.session.lastActivity || row.session.dateOuverture;
+    const lastActivity = row.session.lastActivity || row.session.openedAt;
     const hoursInactive = (Date.now() - new Date(lastActivity!).getTime()) / (1000 * 60 * 60);
 
     // Calculer le solde actuel
@@ -577,13 +739,22 @@ export async function closeExpiredSessions(
     hoursInactive: number;
   }>
 > {
-  const threshold = new Date();
+  const now = new Date();
+  const threshold = new Date(now);
   threshold.setHours(threshold.getHours() - timeoutHours);
 
   const expiredSessions = await db
     .select()
     .from(sessionsCaisse)
-    .where(and(eq(sessionsCaisse.statut, "Ouverte"), lt(sessionsCaisse.lastActivity, threshold)));
+    .where(
+      and(
+        isNull(sessionsCaisse.closedAt),
+        or(
+          lt(sessionsCaisse.timeoutAt, now),
+          and(isNull(sessionsCaisse.timeoutAt), lt(sessionsCaisse.lastActivity, threshold))
+        )
+      )
+    );
 
   const closedSessions = [];
 
@@ -608,10 +779,11 @@ export async function closeExpiredSessions(
     await db
       .update(sessionsCaisse)
       .set({
-        statut: "Fermée",
-        dateFermeture: new Date(),
+        closedAt: now,
         soldeTheorique: soldeTheorique.toString(),
-        closedReason: "timeout",
+        forcedCloseReason: ForcedCloseReason.TIMEOUT_AUTO,
+        forceClosedAt: now,
+        forceClosedBy: null,
         observations: `${session.observations || ""}\n[AUTO-FERMETURE] Session expirée après ${timeoutHours}h d'inactivité.`.trim(),
       })
       .where(eq(sessionsCaisse.id, session.id));
@@ -620,8 +792,8 @@ export async function closeExpiredSessions(
     await db.insert(sessionsCaisseAuditLogs).values({
       sessionId: session.id,
       action: "TIMEOUT",
-      statutAvant: "Ouverte",
-      statutApres: "Fermée",
+      statutAvant: SessionComputedStatus.OPEN,
+      statutApres: SessionComputedStatus.CLOSED,
       details: {
         timeoutHours,
         soldeInitial: Number(session.soldeInitial),
@@ -631,7 +803,7 @@ export async function closeExpiredSessions(
       },
     });
 
-    const lastActivity = session.lastActivity || session.dateOuverture;
+    const lastActivity = session.lastActivity || session.openedAt;
     closedSessions.push({
       sessionId: session.id,
       caisseId: session.caisseId,
@@ -654,7 +826,7 @@ export async function getSessionsWithSignificantEcarts(
     caisseNom: string;
     caissierNom: string;
     ecart: number;
-    dateFermeture: Date;
+    closedAt: Date;
     severity: "HIGH" | "MEDIUM";
   }>
 > {
@@ -668,8 +840,13 @@ export async function getSessionsWithSignificantEcarts(
     .from(sessionsCaisse)
     .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
-    .where(and(eq(sessionsCaisse.statut, "Fermée"), sql`ABS(CAST(${sessionsCaisse.ecart} AS NUMERIC)) > ${threshold}`))
-    .orderBy(desc(sessionsCaisse.dateFermeture))
+    .where(
+      and(
+        isNotNull(sessionsCaisse.closedAt),
+        sql`ABS(CAST(${sessionsCaisse.ecart} AS NUMERIC)) > ${threshold}`
+      )
+    )
+    .orderBy(desc(sessionsCaisse.closedAt))
     .limit(50);
 
   return sessions.map((row) => {
@@ -679,7 +856,7 @@ export async function getSessionsWithSignificantEcarts(
       caisseNom: row.caisseNom || "Caisse inconnue",
       caissierNom: `${row.caissierNom || ""} ${row.caissierPrenom || ""}`.trim() || "Utilisateur inconnu",
       ecart,
-      dateFermeture: row.session.dateFermeture!,
+      closedAt: row.session.closedAt!,
       severity: Math.abs(ecart) > threshold * 2 ? ("HIGH" as const) : ("MEDIUM" as const),
     };
   });

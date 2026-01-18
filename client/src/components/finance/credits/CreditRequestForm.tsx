@@ -5,6 +5,8 @@ import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../u
 import { formatClientName } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
+import useSmartDuration from '../../../hooks/credits/useSmartDuration';
+import DurationSelector from './DurationSelector';
 
 interface Client {
   id: string;
@@ -23,17 +25,7 @@ interface Client {
   compteCourantSolde?: number;
 }
 
-interface DureeSuggeree {
-  id: string;
-  frequence: string;
-  dureeValeur: number;
-  duree_valeur?: number;
-  dureeUnite: string;
-  duree_unite?: string;
-  estRecommandee: number;
-  est_recommandee?: number;
-  label: string;
-}
+
 
 interface CreditRequestFormProps {
   onClose: () => void;
@@ -50,10 +42,10 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   const [rateOverrideEnabled, setRateOverrideEnabled] = useState(false);
   const [rateOverrideReason, setRateOverrideReason] = useState('');
 
-  // Durees suggerees state
-  const [dureesSuggerees, setDureesSuggerees] = useState<DureeSuggeree[]>([]);
-  const [loadingDurees, setLoadingDurees] = useState(false);
-  const [showDureesSuggestions, setShowDureesSuggestions] = useState(false);
+  // Durees suggerees state (Legacy removed)
+  // const [dureesSuggerees, setDureesSuggerees] = useState<DureeSuggeree[]>([]);
+  // const [loadingDurees, setLoadingDurees] = useState(false);
+  // const [showDureesSuggestions, setShowDureesSuggestions] = useState(false);
 
   // Credit Plans state
   const [creditPlans, setCreditPlans] = useState<any[]>([]);
@@ -73,6 +65,27 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     revenu_journalier: '',
     charges_mensuelles: ''
   });
+
+  // Calculate selected plan early for hook
+  const selectedPlan = useMemo(() => 
+    creditPlans.find(p => p.id === formData.credit_plan_id), 
+    [creditPlans, formData.credit_plan_id]
+  );
+  
+  // Smart Duration Hook
+  const { suggestedDurations, calculateInstallment, validateDuration } = useSmartDuration({
+    selectedPlan,
+    amount: parseFloat(formData.montant_demande) || 0,
+    frequence: formData.frequence_remboursement
+  });
+
+  // Duration Validation State
+  const durationValidation = useMemo(() => {
+    return validateDuration(
+      parseInt(formData.duree_valeur) || 0, 
+      formData.duree_unite
+    );
+  }, [validateDuration, formData.duree_valeur, formData.duree_unite]);
 
   const RATE_BASE = 20;
   const RATE_MIN = 10;
@@ -94,6 +107,28 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     capaciteRemboursement: 0,
     tauxEndettement: 0
   });
+
+  // Helper to normalize photo URLs (same logic as ClientModule)
+  const getPhotoUrl = (rawUrl: string | undefined | null): string => {
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('data:')) return rawUrl;
+    if (rawUrl.startsWith('/api/')) return rawUrl;
+    if (rawUrl.startsWith('/')) return rawUrl;
+    if (rawUrl.startsWith('http')) {
+      try {
+        const url = new URL(rawUrl);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2) {
+          const key = pathParts.slice(1).join('/');
+          return `/api/uploads/files/${key}`;
+        }
+        return rawUrl;
+      } catch {
+        return rawUrl;
+      }
+    }
+    return `/api/uploads/files/${rawUrl}`;
+  };
 
   useEffect(() => {
     // Initial load: fetch some clients or at least verify initial clientId
@@ -148,54 +183,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     }));
   };
 
-  // Charger les durees suggerees quand la frequence change
-  useEffect(() => {
-    if (formData.frequence_remboursement) {
-      loadDureesSuggerees(formData.frequence_remboursement);
-      setShowDureesSuggestions(true);
-    } else {
-      setDureesSuggerees([]);
-      setShowDureesSuggestions(false);
-    }
-  }, [formData.frequence_remboursement]);
 
-  const loadDureesSuggerees = async (frequence: string) => {
-    setLoadingDurees(true);
-    try {
-      const response = await fetch(`/api/config/durees-suggerees?frequence=${frequence}`, {
-        credentials: 'include'
-      });
-      const data = await response.json();
-
-      if (data.durees) {
-        setDureesSuggerees(data.durees);
-
-        // Auto-select recommended duration if no duration selected
-        if (!formData.duree_valeur && data.recommandee) {
-          const rec = data.recommandee;
-          setFormData(prev => ({
-            ...prev,
-            duree_valeur: String(rec.dureeValeur || rec.duree_valeur),
-            duree_unite: rec.dureeUnite || rec.duree_unite
-          }));
-        }
-      }
-    } catch (error) {
-      console.error('Erreur chargement durees suggerees:', error);
-    } finally {
-      setLoadingDurees(false);
-    }
-  };
-
-  const handleSelectDureeSuggeree = (duree: DureeSuggeree) => {
-    const valeur = duree.dureeValeur || duree.duree_valeur;
-    const unite = duree.dureeUnite || duree.duree_unite;
-    setFormData(prev => ({
-      ...prev,
-      duree_valeur: String(valeur),
-      duree_unite: unite as 'Jour' | 'Semaine' | 'Mois'
-    }));
-  };
 
   // Convertir duree en jours pour les calculs
   const convertirDureeEnJours = useCallback((valeur: number, unite: string): number => {
@@ -240,11 +228,13 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     setSearchLoading(true);
     try {
       // Si la requête est vide, on charge les clients éligibles par défaut pour aider l'UI
-      let data;
+      let data: any[] = [];
       if (!query || query.trim() === "") {
-        data = await clientApi.getEligibleForCredit();
+        const response = await clientApi.getEligibleForCredit({ page: 1, perPage: 25 });
+        data = response.data || [];
       } else {
-        data = await clientSearchApi.search(query);
+        const response = await clientSearchApi.search(query, { page: 1, perPage: 25 });
+        data = response.data || [];
       }
 
       const enrichedClients = data.map((c: any) => ({
@@ -360,9 +350,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       newErrors.revenus_mensuels = 'Revenus requis';
     }
 
-    if (calculatedData.tauxEndettement > 50) {
-      newErrors.general = 'Taux d\'endettement trop eleve (> 50%)';
-    }
+
 
     if (rateOverrideEnabled) {
       const overrideValue = parseFloat(formData.taux_interet);
@@ -375,6 +363,13 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     }
 
     setErrors(newErrors);
+    
+    // Afficher un toast pour chaque erreur
+    if (Object.keys(newErrors).length > 0) {
+      const firstError = Object.values(newErrors)[0];
+      toast.error(firstError);
+    }
+    
     return Object.keys(newErrors).length === 0;
   };
 
@@ -395,10 +390,21 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
       const dureeValeur = parseInt(formData.duree_valeur, 10);
 
+      // Utiliser le taux du plan sélectionné s'il existe, sinon le taux proposé
+      const tauxFinal = selectedPlan 
+        ? String(selectedPlan.tauxInteret || selectedPlan.taux_interet)
+        : formData.taux_interet || suggestedRate.toFixed(1);
+      
+      // Utiliser les frais de dossier du plan s'ils sont définis
+      const fraisDossierPlan = selectedPlan?.fraisDossier || selectedPlan?.frais_dossier;
+      const montantFraisEngagement = fraisDossierPlan 
+        ? String(fraisDossierPlan)
+        : null;
+
       await demandeCreditApi.create({
         clientId: formData.client_id,
         montantDemande: formData.montant_demande,
-        tauxInteret: suggestedRate.toFixed(1),
+        tauxInteret: tauxFinal,
         frequenceRemboursement: formData.frequence_remboursement,
         dureeValeur: dureeValeur,
         dureeUnite: formData.duree_unite,
@@ -410,6 +416,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         revenuJournalier: formData.revenu_journalier,
         chargesMensuelles: formData.charges_mensuelles,
         statut: 'En attente',
+        montantFraisEngagement,
         ...overridePayload,
       });
 
@@ -428,12 +435,12 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     value: client.id,
     label: client.nom,
     subLabel: `Remb: ${client.taux_remboursement}%`,
-    image: client.photo_url,
+    image: getPhotoUrl(client.photo_url),
     disabled: client.isEligible === false,
     disabledReason: client.ineligibilityReason
   })), [clients]);
 
-  const selectedPlan = creditPlans.find(p => p.id === formData.credit_plan_id);
+
 
   const typeCreditOptions = [
     { value: 'Personnel', label: 'Personnel' },
@@ -481,23 +488,21 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
           <Button variant="ghost" onClick={onClose}>Annuler</Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || calculatedData.tauxEndettement > 50}
             icon={Save}
             variant="primary"
-            className="bg-green-600 hover:bg-green-700"
+            className={calculatedData.tauxEndettement > 50 
+              ? "bg-slate-600 cursor-not-allowed opacity-50" 
+              : "bg-green-600 hover:bg-green-700"
+            }
           >
-            {loading ? 'Creation...' : 'Creer la Demande'}
+            {loading ? 'Creation...' : calculatedData.tauxEndettement > 50 ? 'Taux d\'endettement trop élevé' : 'Creer la Demande'}
           </Button>
         </>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        {errors.general && (
-          <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="text-red-400" size={20} />
-            <span className="text-red-400">{errors.general}</span>
-          </div>
-        )}
+
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Client Selection */}
@@ -547,8 +552,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
             <div className="md:col-span-2 bg-slate-700/30 p-4 rounded-lg border border-slate-600 mb-2">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-slate-600 rounded-full flex items-center justify-center overflow-hidden border-2 border-slate-500">
-                  {selectedClient.photo_url ? (
-                    <img src={selectedClient.photo_url} alt={selectedClient.nom} className="w-full h-full object-cover" />
+                  {getPhotoUrl(selectedClient.photo_url) ? (
+                    <img src={getPhotoUrl(selectedClient.photo_url)} alt={selectedClient.nom} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-xl font-bold text-white">{selectedClient.nom.charAt(0)}</span>
                   )}
@@ -579,7 +584,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
               label="Montant Demande (FCFA)"
               name="montant_demande"
               type="number"
-              value={formData.montant_demande}
+              value={formData.montant_demande ?? ''}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 let val = e.target.value;
                 // Clamp Max immediately
@@ -651,87 +656,29 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
             />
           </div>
 
-          {/* DUREES SUGGEREES - Tags cliquables avec animation */}
+          {/* DUREE SELECTOR */}
           {formData.frequence_remboursement && (
-            <div className={`md:col-span-2 transition-all duration-300 ease-out ${showDureesSuggestions ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                <Calendar size={16} className="inline mr-2" />
-                Duree du credit *
-              </label>
-
-              {/* Input manuel */}
-              <div className="flex gap-3 mb-3">
-                <div className="flex-1">
-                  <input
-                    type="number"
-                    value={formData.duree_valeur}
-                    onChange={(e) => setFormData({ ...formData, duree_valeur: e.target.value })}
-                    placeholder="Ex: 30"
-                    className={`w-full bg-slate-700/50 border ${errors.duree_valeur ? 'border-red-500' : 'border-slate-600'} rounded-lg py-2 px-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
-                  />
-                </div>
-                <select
-                  value={formData.duree_unite}
-                  onChange={(e) => setFormData({ ...formData, duree_unite: e.target.value as 'Jour' | 'Semaine' | 'Mois' })}
-                  className="bg-slate-700 border border-slate-600 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Jour">Jours</option>
-                  <option value="Semaine">Semaines</option>
-                  <option value="Mois">Mois</option>
-                </select>
-              </div>
-
-              {errors.duree_valeur && <p className="text-red-400 text-xs mb-2">{errors.duree_valeur}</p>}
-
-              {/* Tags de durees suggerees */}
-              <div className="flex flex-wrap gap-2">
-                {loadingDurees ? (
-                  <div className="flex items-center gap-2 text-slate-400 text-sm">
-                    <RefreshCw size={14} className="animate-spin" />
-                    Chargement...
-                  </div>
-                ) : dureesSuggerees.length > 0 ? (
-                  <>
-                    <span className="text-xs text-slate-500 w-full mb-1">Durees suggerees :</span>
-                    {dureesSuggerees.map((duree) => {
-                      const valeur = duree.dureeValeur || duree.duree_valeur;
-                      const unite = duree.dureeUnite || duree.duree_unite;
-                      const isRecommandee = (duree.estRecommandee || duree.est_recommandee) === 1;
-                      const isSelected = formData.duree_valeur === String(valeur) && formData.duree_unite === unite;
-
-                      return (
-                        <button
-                          key={duree.id}
-                          type="button"
-                          onClick={() => handleSelectDureeSuggeree(duree)}
-                          className={`
-                            px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200
-                            ${isSelected
-                              ? 'bg-blue-600 text-white shadow-lg scale-105'
-                              : isRecommandee
-                                ? 'bg-green-600/20 text-green-400 border border-green-500/50 hover:bg-green-600/30'
-                                : 'bg-slate-700/50 text-slate-300 border border-slate-600 hover:bg-slate-600/50 hover:border-slate-500'
-                            }
-                          `}
-                        >
-                          {duree.label}
-                          {isRecommandee && !isSelected && (
-                            <span className="ml-1 text-xs opacity-75">*</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                    <span className="text-xs text-slate-500 w-full mt-1">* Recommande</span>
-                  </>
-                ) : null}
-              </div>
-
-              {/* Apercu nombre d'echeances */}
-              {formData.duree_valeur && (
-                <div className="mt-3 text-sm text-blue-400 bg-blue-500/10 px-3 py-2 rounded-lg">
-                  {calculatedData.nombreEcheances} paiement{calculatedData.nombreEcheances > 1 ? 's' : ''} ({formData.duree_valeur} {getUniteLabel(formData.duree_unite)})
-                </div>
-              )}
+            <div className="md:col-span-2">
+              <DurationSelector
+                options={suggestedDurations}
+                selectedDuration={parseInt(formData.duree_valeur) || 0}
+                selectedUnit={formData.duree_unite}
+                amount={parseFloat(formData.montant_demande) || 0}
+                interestRate={parseFloat(formData.taux_interet) || suggestedRate}
+                frequence={formData.frequence_remboursement}
+                onSelect={(val, unit) => setFormData(prev => ({ 
+                  ...prev, 
+                  duree_valeur: String(val), 
+                  duree_unite: unit as 'Jour' | 'Semaine' | 'Mois' 
+                }))}
+                manualValue={formData.duree_valeur}
+                onManualChange={(val) => setFormData(prev => ({ ...prev, duree_valeur: val }))}
+                manualUnit={formData.duree_unite}
+                onUnitChange={(unit) => setFormData(prev => ({ ...prev, duree_unite: unit as 'Jour' | 'Semaine' | 'Mois' }))}
+                validationResult={durationValidation}
+                calculateInstallment={calculateInstallment}
+                planColor={selectedPlan ? 'border-teal-500 bg-teal-600' : undefined}
+              />
             </div>
           )}
 
@@ -740,11 +687,42 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
             <label className="block text-sm font-semibold text-slate-300 mb-2">
               <TrendingUp size={16} className="inline mr-2" />
               Taux propose (%) *
+              {selectedPlan && (
+                <span className="text-teal-400 text-xs ml-2 font-normal">
+                  (Plan: {selectedPlan.nom})
+                </span>
+              )}
             </label>
-            <div className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white h-11 flex items-center">
-              {suggestedRate.toFixed(1)} %
+            <div className={`w-full border rounded-lg px-4 py-2 text-white h-11 flex items-center ${
+              selectedPlan 
+                ? 'bg-teal-500/20 border-teal-500/50' 
+                : 'bg-slate-700 border-slate-600'
+            }`}>
+              {selectedPlan 
+                ? `${selectedPlan.tauxInteret || selectedPlan.taux_interet} %`
+                : `${suggestedRate.toFixed(1)} %`
+              }
             </div>
           </div>
+
+          {/* Frais de dossier du plan - Affiché uniquement si un plan avec frais est sélectionné */}
+          {selectedPlan && (selectedPlan.fraisDossier || selectedPlan.frais_dossier) && (
+            <div>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">
+                <DollarSign size={16} className="inline mr-2" />
+                Frais de dossier
+                <span className="text-orange-400 text-xs ml-2 font-normal">
+                  (Défini par le plan)
+                </span>
+              </label>
+              <div className="w-full bg-orange-500/20 border border-orange-500/50 rounded-lg px-4 py-2 text-orange-300 h-11 flex items-center font-semibold">
+                {Number(selectedPlan.fraisDossier || selectedPlan.frais_dossier).toLocaleString()} FCFA
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Ce montant sera demandé lors du paiement des frais d'engagement
+              </p>
+            </div>
+          )}
 
           {/* Override taux */}
           {canOverrideRate && (
@@ -768,7 +746,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 name="taux_interet"
                 type="number"
                 step="0.1"
-                value={formData.taux_interet}
+                value={formData.taux_interet ?? ''}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, taux_interet: e.target.value })}
                 error={errors.taux_interet}
                 required
@@ -779,7 +757,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 <FormField
                   label="Motif de l'ajustement"
                   name="taux_override_reason"
-                  value={rateOverrideReason}
+                  value={rateOverrideReason ?? ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRateOverrideReason(e.target.value)}
                   placeholder="Ex: dossier prioritaire, garantie solide"
                   error={errors.taux_override_reason}
@@ -885,6 +863,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
             </div>
           </div>
 
+
+
           {/* Objet du credit */}
           <div className="md:col-span-2">
             <label className="block text-sm font-semibold text-slate-300 mb-2">
@@ -941,6 +921,86 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
             </div>
 
           </div>
+        )}
+
+        {/* Analyse de Solvabilité (Detailed) */}
+        {calculatedData.montantEcheance > 0 && parseFloat(formData.revenus_mensuels) > 0 && (
+            <div className={`mt-4 rounded-xl p-4 border ${
+                calculatedData.tauxEndettement > 50 
+                  ? 'bg-red-500/10 border-red-500/30' 
+                  : calculatedData.tauxEndettement > 35 
+                    ? 'bg-amber-500/10 border-amber-500/30' 
+                    : 'bg-emerald-500/10 border-emerald-500/30'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                    <TrendingUp size={16} />
+                    Analyse de Solvabilité
+                  </h4>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    calculatedData.tauxEndettement > 50 
+                      ? 'bg-red-500/20 text-red-400' 
+                      : calculatedData.tauxEndettement > 35 
+                        ? 'bg-amber-500/20 text-amber-400' 
+                        : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {calculatedData.tauxEndettement > 50 
+                      ? '⚠️ Risque élevé' 
+                      : calculatedData.tauxEndettement > 35 
+                        ? '⚡ Risque modéré' 
+                        : '✓ Acceptable'}
+                  </span>
+                </div>
+                
+                {/* Barre de progression du taux d'endettement */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs text-slate-400 mb-1">
+                    <span>Taux d'endettement</span>
+                    <span className={`font-bold ${
+                      calculatedData.tauxEndettement > 50 
+                        ? 'text-red-400' 
+                        : calculatedData.tauxEndettement > 35 
+                          ? 'text-amber-400' 
+                          : 'text-emerald-400'
+                    }`}>
+                      {calculatedData.tauxEndettement.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-700/50 rounded-full h-2.5">
+                    <div 
+                      className={`h-2.5 rounded-full transition-all duration-500 ${
+                        calculatedData.tauxEndettement > 50 
+                          ? 'bg-red-500' 
+                          : calculatedData.tauxEndettement > 35 
+                            ? 'bg-amber-500' 
+                            : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(calculatedData.tauxEndettement, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>0%</span>
+                    <span className="text-amber-500/70">35% (Attention)</span>
+                    <span className="text-red-500/70">50% (Max)</span>
+                  </div>
+                </div>
+
+                {/* Commentaire d'analyse */}
+                <p className={`text-xs leading-relaxed ${
+                  calculatedData.tauxEndettement > 50 
+                    ? 'text-red-300' 
+                    : calculatedData.tauxEndettement > 35 
+                      ? 'text-amber-300' 
+                      : 'text-emerald-300'
+                }`}>
+                  {calculatedData.tauxEndettement > 50 
+                    ? `⛔ Le client consacrerait ${calculatedData.tauxEndettement.toFixed(1)}% de ses revenus au remboursement. Ce niveau dépasse le seuil acceptable (50%) et expose à un risque élevé de défaut. La demande ne peut pas être créée.`
+                    : calculatedData.tauxEndettement > 35 
+                      ? `⚠️ Le taux d'endettement de ${calculatedData.tauxEndettement.toFixed(1)}% est modéré. Le client dispose d'environ ${calculatedData.capaciteRemboursement.toLocaleString()} FCFA après charges. Une enquête approfondie est recommandée.`
+                      : `✅ Profil favorable. Le client conserve une marge confortable avec ${calculatedData.capaciteRemboursement.toLocaleString()} FCFA de capacité de remboursement mensuelle.`
+                  }
+                </p>
+            </div>
         )}
       </form>
     </Modal>

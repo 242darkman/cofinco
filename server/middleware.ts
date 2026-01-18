@@ -14,7 +14,8 @@ declare global {
         nom: string;
         prenom: string | null;
         role: SystemRole;
-        agence: string | null;
+        agence?: string | null;
+        agenceId?: string | null;
         email?: string;
         telephone?: string;
       };
@@ -42,6 +43,41 @@ export function getAuthUser(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string; agenceNom: string } | null> {
+  const [primaryAgence] = await db
+    .select({
+      agenceId: userAgences.agenceId,
+      agenceNom: agences.nom,
+    })
+    .from(userAgences)
+    .leftJoin(agences, eq(userAgences.agenceId, agences.id))
+    .where(and(
+      eq(userAgences.userId, userId),
+      eq(userAgences.isPrimary, true),
+      eq(userAgences.actif, true)
+    ))
+    .limit(1);
+
+  if (primaryAgence) {
+    return primaryAgence;
+  }
+
+  const [anyAgence] = await db
+    .select({
+      agenceId: userAgences.agenceId,
+      agenceNom: agences.nom,
+    })
+    .from(userAgences)
+    .leftJoin(agences, eq(userAgences.agenceId, agences.id))
+    .where(and(
+      eq(userAgences.userId, userId),
+      eq(userAgences.actif, true)
+    ))
+    .limit(1);
+
+  return anyAgence || null;
+}
+
 /**
  * Middleware pour restreindre l'accès aux données de l'agence de l'utilisateur.
  * - Les administrateurs ont accès à tout (agenceFilter = null).
@@ -50,7 +86,7 @@ export function getAuthUser(req: Request, res: Response, next: NextFunction) {
  * @param entityAgenceField Le nom du champ 'agence' dans l'entité visée (défaut: 'agence')
  */
 export function requireAgenceAccess(entityAgenceField: string = "agence") {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.session.userId || !req.session.user) {
         return res.status(401).json({ error: 'Non authentifié' });
     }
@@ -59,7 +95,6 @@ export function requireAgenceAccess(entityAgenceField: string = "agence") {
     req.user = req.session.user;
 
     const userRole = req.user.role;
-    const userAgence = req.user.agence;
 
     // 1. Administrateurs : Accès global
     if (isAdminRole(userRole)) {
@@ -68,17 +103,24 @@ export function requireAgenceAccess(entityAgenceField: string = "agence") {
     }
 
     // 2. Utilisateurs sans agence définie : Accès bloqué par sécurité
-    if (!userAgence) {
+    const primaryAgence = await resolvePrimaryAgence(req.user.id);
+    if (!primaryAgence) {
       console.warn(`[Security] User ${req.user.username} (${userRole}) has no agence assigned. Access denied.`);
-      return res.status(403).json({ 
-          error: 'Accès refusé', 
-          message: 'Aucune agence assignée à votre compte.' 
+      return res.status(403).json({
+        error: 'Accès refusé',
+        message: 'Aucune agence assignée à votre compte.'
       });
     }
 
+    // Keep session cache in sync for downstream usages
+    req.session.user.agenceId = primaryAgence.agenceId;
+    req.session.user.agence = primaryAgence.agenceNom;
+    req.selectedAgenceId = primaryAgence.agenceId;
+
     // 3. Autres rôles : Filtrage strict par agence
     // On injecte le filtre que les routes devront utiliser
-    req.agenceFilter = { [entityAgenceField]: userAgence };
+    const filterValue = entityAgenceField.endsWith("Id") ? primaryAgence.agenceId : primaryAgence.agenceNom;
+    req.agenceFilter = { [entityAgenceField]: filterValue };
     
     // console.log(`[AgenceFilter] User: ${req.user.username}, Role: ${userRole} -> Filter: ${JSON.stringify(req.agenceFilter)}`);
 
@@ -93,7 +135,7 @@ export function requireAgenceAccess(entityAgenceField: string = "agence") {
  * @param bodyAgenceField Le champ dans req.body qui contient l'agence cible (défaut: 'agence')
  */
 export function validateAgenceAction(bodyAgenceField: string = "agence") {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.session.user) return res.status(401).send("Unauthorized");
     req.user = req.session.user;
 
@@ -103,9 +145,20 @@ export function validateAgenceAction(bodyAgenceField: string = "agence") {
     }
 
     const targetAgence = req.body[bodyAgenceField];
+    const primaryAgence = await resolvePrimaryAgence(req.user.id);
 
     // Si une agence est spécifiée et différente de celle de l'utilisateur => Interdit
-    if (targetAgence && targetAgence !== req.user.agence) {
+    if (targetAgence && primaryAgence) {
+      const expected = bodyAgenceField.endsWith("Id") ? primaryAgence.agenceId : primaryAgence.agenceNom;
+      if (targetAgence !== expected) {
+        return res.status(403).json({
+          error: "Action non autorisée",
+          message: `Vous ne pouvez pas agir sur l'agence '${targetAgence}'.`
+        });
+      }
+    }
+
+    if (targetAgence && !primaryAgence) {
       return res.status(403).json({
           error: "Action non autorisée",
           message: `Vous ne pouvez pas agir sur l'agence '${targetAgence}'.`
@@ -114,8 +167,10 @@ export function validateAgenceAction(bodyAgenceField: string = "agence") {
 
     // Force l'agence du user dans le body si non spécifiée (ou pour écraser tentative malveillante si on voulait être strict)
     // Ici on complète juste si manquant pour faciliter la création
-    if (!targetAgence && req.user.agence) {
-        req.body[bodyAgenceField] = req.user.agence;
+    if (!targetAgence && primaryAgence) {
+      req.body[bodyAgenceField] = bodyAgenceField.endsWith("Id")
+        ? primaryAgence.agenceId
+        : primaryAgence.agenceNom;
     }
 
     next();

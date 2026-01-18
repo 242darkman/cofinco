@@ -13,7 +13,7 @@ import {
 // I'll assume 'evenementsOutbox' might not be there yet, so I will comment it out or look for it later.
 // Actually, looking at finance.ts view, I didn't see 'evenementsOutbox'. I will skip it for now to avoid errors.
 
-import { eq, sql, desc, and } from "drizzle-orm";
+import { eq, sql, desc, and, isNull } from "drizzle-orm";
 // import { generateReference, createMouvementFinancier } from "../ledger"; // Need to make sure this exists or I implement it.
 // I will implement helper functions here if they don't exist, to be safe.
 
@@ -180,9 +180,9 @@ export async function executeTransfertCoffre(
         .from(sessionsCaisse)
         .where(and(
           eq(sessionsCaisse.caisseId, caisseSource.id),
-          eq(sessionsCaisse.statut, "Ouverte")
+          isNull(sessionsCaisse.closedAt)
         ))
-        .orderBy(desc(sessionsCaisse.dateOuverture))
+        .orderBy(desc(sessionsCaisse.openedAt))
         .limit(1);
       
       if (activeSession) {
@@ -217,7 +217,7 @@ export async function executeTransfertCoffre(
           .where(and(
             eq(sessionsCaisse.id, sessionExecuteId),
             eq(sessionsCaisse.caisseId, caisseDest.id),
-            eq(sessionsCaisse.statut, "Ouverte")
+            isNull(sessionsCaisse.closedAt)
           ));
 
         if (sessionCheck) {
@@ -232,7 +232,7 @@ export async function executeTransfertCoffre(
           .where(and(
             eq(sessionsCaisse.id, transfert.sessionRequestId),
             eq(sessionsCaisse.caisseId, caisseDest.id),
-            eq(sessionsCaisse.statut, "Ouverte")
+            isNull(sessionsCaisse.closedAt)
           ));
 
         if (sessionCheck) {
@@ -246,9 +246,9 @@ export async function executeTransfertCoffre(
           .from(sessionsCaisse)
           .where(and(
             eq(sessionsCaisse.caisseId, caisseDest.id),
-            eq(sessionsCaisse.statut, "Ouverte")
+            isNull(sessionsCaisse.closedAt)
           ))
-          .orderBy(desc(sessionsCaisse.dateOuverture))
+          .orderBy(desc(sessionsCaisse.openedAt))
           .limit(1);
 
         if (activeSession) {
@@ -271,24 +271,47 @@ export async function executeTransfertCoffre(
       operationDest = op;
     }
 
-    // 9. Mettre à jour les soldes des caisses (atomique)
-    // Note: 'operationsCaisse' or 'mouvementsFinanciers' might trigger balance updates via DB triggers if they exist.
-    // If explicit update is needed:
-    await tx.update(caisses)
+    // 9. Mettre à jour les soldes des caisses (atomique avec FOR UPDATE)
+    const soldeDestAvant = parseFloat(caisseDest.solde || "0");
+
+    // Source: diminue
+    const [updatedCaisseSource] = await tx.update(caisses)
       .set({
         solde: sql`${caisses.solde} - ${montant}`,
         updatedAt: new Date(),
       })
-      .where(eq(caisses.id, caisseSource.id));
+      .where(eq(caisses.id, caisseSource.id))
+      .returning({ solde: caisses.solde });
 
-    await tx.update(caisses)
+    // Destination: augmente
+    const [updatedCaisseDest] = await tx.update(caisses)
       .set({
         solde: sql`${caisses.solde} + ${montant}`,
         updatedAt: new Date(),
       })
-      .where(eq(caisses.id, caisseDest.id));
+      .where(eq(caisses.id, caisseDest.id))
+      .returning({ solde: caisses.solde });
 
-    // 10. Mettre à jour le transfert
+    // 10. Mettre à jour les soldes théoriques des sessions si elles existent
+    if (sessionIdSource) {
+      await tx.update(sessionsCaisse)
+        .set({
+          soldeTheorique: sql`${sessionsCaisse.soldeTheorique} - ${montant}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(sessionsCaisse.id, sessionIdSource));
+    }
+
+    if (sessionIdDest) {
+      await tx.update(sessionsCaisse)
+        .set({
+          soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${montant}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(sessionsCaisse.id, sessionIdDest));
+    }
+
+    // 11. Mettre à jour le transfert
     const [updatedTransfert] = await tx.update(transfertsCoffreCaisse)
       .set({
         statut: "Exécuté",
@@ -306,20 +329,35 @@ export async function executeTransfertCoffre(
       .where(eq(transfertsCoffreCaisse.id, transfertId))
       .returning();
 
-    // 11. Créer l'entrée d'audit
+    // 12. Créer l'entrée d'audit complète
     await tx.insert(transfertsCoffreAuditLogs).values({
       transfertId,
       action: "EXECUTED",
       statutAvant: "Validé",
       statutApres: "Exécuté",
       details: {
+        // Mouvements financiers
         mouvementDebitId: mouvementDebit.id,
         mouvementCreditId: mouvementCredit.id,
+        groupRef,
+        // Opérations caisse
         operationSourceId: operationSource?.id,
         operationDestId: operationDest?.id,
+        sessionIdSource,
+        sessionIdDest,
+        // Soldes source
+        caisseSourceId: caisseSource.id,
+        caisseSourceNom: caisseSource.nom,
         soldeSourceAvant: soldeSource,
-        soldeSourceApres: soldeSource - montant,
+        soldeSourceApres: parseFloat(updatedCaisseSource?.solde || "0"),
+        // Soldes destination
+        caisseDestId: caisseDest.id,
+        caisseDestNom: caisseDest.nom,
+        soldeDestAvant,
+        soldeDestApres: parseFloat(updatedCaisseDest?.solde || "0"),
+        // Billetage
         billetage,
+        montant,
       },
       userId: executorId,
       ipAddress,

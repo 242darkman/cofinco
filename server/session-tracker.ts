@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
-import { activeSessions, users } from '@shared/schema';
+import { activeSessions, users, userAgences, agences } from '@shared/schema';
 import { eq, and, lt, desc, sql } from 'drizzle-orm';
 
 // Simple user agent parser without external dependencies
@@ -140,10 +140,16 @@ export async function getActiveSessions(): Promise<any[]> {
         userPrenom: users.prenom,
         userEmail: users.email,
         userRole: users.role,
-        userAgence: users.agence,
+        userAgence: agences.nom,
       })
       .from(activeSessions)
       .leftJoin(users, eq(activeSessions.userId, users.id))
+      .leftJoin(userAgences, and(
+        eq(userAgences.userId, users.id),
+        eq(userAgences.isPrimary, true),
+        eq(userAgences.actif, true)
+      ))
+      .leftJoin(agences, eq(userAgences.agenceId, agences.id))
       .where(eq(activeSessions.isActive, true))
       .orderBy(desc(activeSessions.lastActivity));
 

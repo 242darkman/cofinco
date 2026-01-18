@@ -563,6 +563,41 @@ export const versementsAutomatiques = pgTable(
 
 export type VersementAutomatique = typeof versementsAutomatiques.$inferSelect;
 
+// Virements internes programmes
+export const virementsProgrammes = pgTable(
+  "virements_programmes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    compteSourceId: uuid("compte_source_id").notNull().references(() => comptes.id, { onDelete: "cascade" }),
+    compteDestId: uuid("compte_dest_id").notNull().references(() => comptes.id, { onDelete: "cascade" }),
+
+    montant: numeric("montant").notNull(),
+    frequence: text("frequence").notNull(), // once | daily | weekly | monthly
+
+    prochaineExecution: timestamp("prochaine_execution"),
+    actif: boolean("actif").notNull().default(true),
+
+    dernierExecution: timestamp("dernier_execution"),
+    statutDernier: text("statut_dernier"),
+    erreurDerniere: text("erreur_derniere"),
+
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxExecution: index("idx_virements_prog_execution").on(t.actif, t.prochaineExecution),
+    idxSource: index("idx_virements_prog_source").on(t.compteSourceId, t.createdAt),
+    idxDest: index("idx_virements_prog_dest").on(t.compteDestId, t.createdAt),
+    chkMontantPos: sql`CONSTRAINT chk_virements_prog_montant_pos CHECK (${t.montant} > 0)`,
+  }),
+);
+
+export const insertVirementProgrammeSchema = createInsertSchema(virementsProgrammes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertVirementProgramme = z.infer<typeof insertVirementProgrammeSchema>;
+export type VirementProgramme = typeof virementsProgrammes.$inferSelect;
+
 // Historique des décaissements programmés
 export const decaissementsProgrammes = pgTable(
   "decaissements_programmes",
@@ -748,13 +783,12 @@ export type Caisse = typeof caisses.$inferSelect;
 export const sessionsCaisse = pgTable("sessions_caisse", {
   id: uuid("id").primaryKey().defaultRandom(),
   caissierId: uuid("caissier_id").notNull().references(() => users.id),
-  dateOuverture: timestamp("date_ouverture").defaultNow(),
-  dateFermeture: timestamp("date_fermeture"),
+  openedAt: timestamp("opened_at").defaultNow(),
+  closedAt: timestamp("closed_at"),
   soldeInitial: numeric("solde_initial").notNull().default("0"),
   soldeTheorique: numeric("solde_theorique").notNull().default("0"),
   soldeReel: numeric("solde_reel"),
   ecart: numeric("ecart"),
-  statut: text("statut").notNull().default("Ouverte"),
   observations: text("observations"),
   billetageOuverture: json("billetage_ouverture"),
   billetageFermeture: json("billetage_fermeture"),
@@ -763,12 +797,10 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   // Colonnes pour robustesse production
   lastActivity: timestamp("last_activity").defaultNow(), // Heartbeat - dernière activité
   timeoutAt: timestamp("timeout_at"), // Date d'expiration prévue
-  closedReason: text("closed_reason").default("manual"), // manual, timeout, admin
+  forcedCloseReason: text("forced_close_reason"),
   
   // Force close fields (admin override)
-  forcedClose: boolean("forced_close").default(false),
   forceClosedBy: uuid("force_closed_by").references(() => users.id, { onDelete: "set null" }),
-  forceCloseMotif: text("force_close_motif"),
   forceClosedAt: timestamp("force_closed_at"),
   
   // Flexible closure options

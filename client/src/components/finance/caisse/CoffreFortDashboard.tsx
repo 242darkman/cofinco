@@ -45,7 +45,7 @@ interface ConfirmAction {
 
 export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   // Fetch transferts
-  const { data: transfertsData, isLoading, refetch } = useQuery({
+  const { data: transfertsData, isLoading, refetch, isRefetching: isRefetchingTransferts } = useQuery({
     queryKey: ['transferts-coffre', agenceId],
     queryFn: () => coffreApi.listTransferts({
       agenceId,
@@ -538,9 +538,18 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                 <h3 className="font-bold text-white text-lg">Demandes de Transfert</h3>
                 <p className="text-slate-400 text-sm">Gestion des mouvements de fonds agence</p>
              </div>
-             <Button variant="outline" size="sm" onClick={() => refetch()}>
-                <Loader2 size={14} className="mr-2" />
-                Actualiser
+             <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => refetch()}
+                disabled={isRefetchingTransferts}
+                className="transition-all duration-200"
+             >
+                <Loader2 
+                    size={14} 
+                    className={`mr-2 ${isRefetchingTransferts ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
+                />
+                {isRefetchingTransferts ? 'Actualisation...' : 'Actualiser'}
              </Button>
         </div>
         
@@ -576,12 +585,14 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 }
 
 function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
-    const { data, isLoading, refetch } = useQuery({
+    const { data, isLoading, refetch, isRefetching } = useQuery({
         queryKey: ['coffre-mouvements', agenceId],
         queryFn: () => coffreApi.getMouvements({ agenceId, limit: 100 }),
     });
 
     const mouvements = data?.data || [];
+    
+    // ... columns definition ...
 
     const columns = [
         {
@@ -658,9 +669,18 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
                     <h3 className="font-bold text-white text-lg">Historique des Mouvements</h3>
                     <p className="text-slate-400 text-sm">Traçabilité complète des opérations du coffre</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
-                    <Loader2 size={14} className="mr-2" />
-                    Actualiser
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => refetch()}
+                    disabled={isRefetching}
+                    className="transition-all duration-200"
+                >
+                    <Loader2 
+                        size={14} 
+                        className={`mr-2 ${isRefetching ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
+                    />
+                    {isRefetching ? 'Actualisation...' : 'Actualiser'}
                 </Button>
             </div>
             

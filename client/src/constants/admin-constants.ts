@@ -33,22 +33,22 @@ export const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export const ADMIN_TABS = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'BarChart3' },
-  { id: 'profils', label: 'Personnel', icon: 'Award' },
-  { id: 'users', label: 'Utilisateurs', icon: 'Users' },
-  { id: 'logs', label: 'Logs', icon: 'Activity' },
-  { id: 'sessions', label: 'Sessions', icon: 'Monitor' },
-  { id: 'roles', label: 'Gestion des Accès', icon: 'Shield' },
-  { id: 'settings', label: 'Paramètres', icon: 'Settings' },
-  { id: 'maintenance', label: 'Maintenance', icon: 'Power' },
-  { id: 'caisses', label: 'Caisses', icon: 'Wallet' },
-  { id: 'credits', label: 'Crédits', icon: 'CreditCard' },
-  { id: 'tontines', label: 'Tontines', icon: 'Users' },
-  { id: 'agences', label: 'Agences', icon: 'Building2' },
-  { id: 'zones', label: 'Zones', icon: 'MapPin' },
-  { id: 'sms', label: 'SMS', icon: 'MessageSquare', disabled: true },
-  { id: 'updates', label: 'Version', icon: 'Package' },
-  { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound' }
+  { id: 'dashboard', label: 'Dashboard', icon: 'BarChart3', permission: 'dashboard.view' },
+  { id: 'profils', label: 'Personnel', icon: 'Award', permission: 'rh.view' },
+  { id: 'users', label: 'Utilisateurs', icon: 'Users', permission: 'admin.users' },
+  { id: 'logs', label: 'Logs', icon: 'Activity', permission: 'admin.logs' },
+  { id: 'sessions', label: 'Sessions', icon: 'Monitor', permission: 'admin.settings' },
+  { id: 'roles', label: 'Gestion des Accès', icon: 'Shield', permission: 'admin.roles' },
+  { id: 'settings', label: 'Paramètres', icon: 'Settings', permission: 'admin.settings' },
+  { id: 'maintenance', label: 'Maintenance', icon: 'Power', permission: 'admin.settings' },
+  { id: 'caisses', label: 'Caisses', icon: 'Wallet', permission: 'caisse.manage' },
+  { id: 'credits', label: 'Crédits', icon: 'CreditCard', permission: 'credits.view' },
+  { id: 'tontines', label: 'Tontines', icon: 'Users', permission: 'tontines.manage' },
+  { id: 'agences', label: 'Agences', icon: 'Building2', permission: 'admin.settings' },
+  { id: 'zones', label: 'Zones', icon: 'MapPin', permission: 'admin.settings' },
+  { id: 'sms', label: 'SMS', icon: 'MessageSquare', disabled: true, permission: 'admin.settings' },
+  { id: 'updates', label: 'Version', icon: 'Package', permission: 'admin.settings' },
+  { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound', permission: 'caisse.manage' }
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];

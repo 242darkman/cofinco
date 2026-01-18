@@ -5,7 +5,8 @@ import {
   DeleteObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
-  PutBucketPolicyCommand
+  PutBucketPolicyCommand,
+  DeleteBucketPolicyCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -31,6 +32,7 @@ export class StorageService {
     console.log('🗄️  Initializing MinIO buckets...');
     await this.createBucketIfNotExists(PUBLIC_BUCKET, true);
     await this.createBucketIfNotExists(PRIVATE_BUCKET, false);
+    await this.ensurePrivateBucket(PRIVATE_BUCKET);
     console.log('✅ Buckets initialized');
   }
 
@@ -74,6 +76,21 @@ export class StorageService {
       Bucket: bucket,
       Policy: JSON.stringify(policy)
     }));
+  }
+
+  private static async ensurePrivateBucket(bucket: string) {
+    try {
+      await s3Client.send(new DeleteBucketPolicyCommand({ Bucket: bucket }));
+      console.log(`   ✓ Removed bucket policy for ${bucket}`);
+    } catch (error: any) {
+      const noPolicy =
+        error?.name === 'NoSuchBucketPolicy' ||
+        error?.name === 'NoSuchBucket' ||
+        error?.Code === 'NoSuchBucketPolicy';
+      if (!noPolicy) {
+        console.error(`   ✗ Error removing policy for ${bucket}:`, error.message);
+      }
+    }
   }
 
   /**
@@ -167,6 +184,18 @@ export class StorageService {
     });
 
     return await getSignedUrl(s3Client, command, { expiresIn });
+  }
+
+  /**
+   * Get public object stream
+   */
+  static async getPublicObject(objectKey: string) {
+    const command = new GetObjectCommand({
+      Bucket: PUBLIC_BUCKET,
+      Key: objectKey,
+    });
+
+    return await s3Client.send(command);
   }
 
   /**

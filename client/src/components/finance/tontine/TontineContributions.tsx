@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search, Info } from 'lucide-react';
+import { Plus, DollarSign, Calendar, CheckCircle, X, Smartphone, Banknote, FileCheck, Building, Search, Info, Zap } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import { Pagination } from '../../ui/Pagination';
 import { SkeletonContributionCard } from '../../ui/Skeleton';
@@ -62,6 +62,113 @@ interface FormErrors {
 }
 
 const ITEMS_PER_PAGE = 10;
+
+// Composant Smart Feedback - Prévisualisation du paiement
+const PaymentPreview = ({
+  montant,
+  montantCotisation,
+  penalitesImpayees = 0,
+  selectedMembre,
+  contributions
+}: {
+  montant: number;
+  montantCotisation: number;
+  penalitesImpayees?: number;
+  selectedMembre?: TontineMembre;
+  contributions: TontineContribution[];
+}) => {
+  if (montant <= 0 || montantCotisation <= 0) return null;
+
+  let remaining = montant;
+  const breakdown: { label: string; amount: number; type: 'penalty' | 'full' | 'partial' }[] = [];
+
+  // 1. Pénalités
+  if (penalitesImpayees > 0 && remaining >= penalitesImpayees) {
+    breakdown.push({
+      label: 'Pénalités',
+      amount: penalitesImpayees,
+      type: 'penalty'
+    });
+    remaining -= penalitesImpayees;
+  }
+
+  // 2. Calculer les tours déjà payés par ce membre
+  let toursDejaPayes = 0;
+  if (selectedMembre) {
+    const memberContribs = contributions.filter(
+      c => c.client_id === selectedMembre.client_id && c.statut === 'Validée'
+    );
+    toursDejaPayes = memberContribs.reduce((max, c) => Math.max(max, c.tour_numero), 0);
+  }
+
+  // 3. Tours complets et partiels
+  if (remaining > 0) {
+    const toursComplets = Math.floor(remaining / montantCotisation);
+    const partiel = remaining % montantCotisation;
+
+    if (toursComplets > 0) {
+      const startTour = toursDejaPayes + 1;
+      const endTour = startTour + toursComplets - 1;
+      breakdown.push({
+        label: toursComplets === 1
+          ? `Tour ${startTour}`
+          : `Tours ${startTour} à ${endTour}`,
+        amount: toursComplets * montantCotisation,
+        type: 'full'
+      });
+    }
+
+    if (partiel > 0) {
+      const partialTour = toursDejaPayes + toursComplets + 1;
+      breakdown.push({
+        label: `Tour ${partialTour} (partiel)`,
+        amount: partiel,
+        type: 'partial'
+      });
+    }
+  }
+
+  if (breakdown.length === 0) return null;
+
+  return (
+    <div className="mt-3 p-3 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
+      <div className="flex items-start gap-2">
+        <div className="p-1.5 rounded-lg bg-cyan-500/20">
+          <Zap size={14} className="text-cyan-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-bold text-cyan-300 mb-2">
+            Ce montant paiera :
+          </div>
+          <div className="space-y-1.5">
+            {breakdown.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between gap-2 text-xs"
+              >
+                <span className={`flex items-center gap-1.5 ${
+                  item.type === 'penalty' ? 'text-red-400' :
+                  item.type === 'partial' ? 'text-amber-400' :
+                  'text-cyan-400'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    item.type === 'penalty' ? 'bg-red-400' :
+                    item.type === 'partial' ? 'bg-amber-400' :
+                    'bg-cyan-400'
+                  }`} />
+                  {item.label}
+                </span>
+                <span className="font-mono font-bold text-white">
+                  {item.amount.toLocaleString('fr-FR')} F
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Modal de détails de contribution
 const ContributionDetailsModal = ({ contribution, onClose }: { contribution: TontineContribution; onClose: () => void }) => {
@@ -688,14 +795,14 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     aria-invalid={!!errors.montant}
                     aria-describedby={errors.montant ? 'montant-error' : undefined}
                   />
+                  {/* Smart Payment Preview */}
                   {formData.montant > 0 && tontine && (
-                      <div className="text-[10px] text-cyan-400 mt-1 flex items-center gap-1">
-                          <Info size={10} />
-                          <span>
-                             Couvre ~{Math.floor(formData.montant / Number(tontine.montantCotisation))} tours
-                             (Unit: {formatMoney(Number(tontine.montantCotisation))})
-                          </span>
-                      </div>
+                    <PaymentPreview
+                      montant={formData.montant}
+                      montantCotisation={Number(tontine.montantCotisation)}
+                      selectedMembre={membres.find(m => m.id === formData.membre_id)}
+                      contributions={contributions}
+                    />
                   )}
                   {errors.montant && (
                     <p id="montant-error" className="text-red-400 text-xs mt-1" role="alert">

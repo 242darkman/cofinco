@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin, MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard } from 'lucide-react';
+import { Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin, MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock } from 'lucide-react';
 import { Button, Card, ConfirmDialog } from '../ui';
 
 // Hooks
@@ -12,6 +12,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 // Constants
 import { ADMIN_TABS, AdminTabId } from '../../constants/admin-constants';
+import { authService } from '../../lib/auth';
 
 // Sub-components
 import AdminGestionUtilisateurs from './AdminGestionUtilisateurs';
@@ -40,6 +41,7 @@ interface AdminModuleCompletProps {
 
 export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
   const [activeTab, setActiveTab] = useState<AdminTabId>('dashboard');
+  const [accessViewMode, setAccessViewMode] = useState<'roles' | 'modules' | 'users'>('roles');
   const [selectedRole, setSelectedRole] = useState<SystemRole>(SystemRole.ADMIN);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,6 +161,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     'MapPin': MapPin, 'KeyRound': KeyRound, 'Activity': Activity, 'Monitor': Monitor,
     'Power': Power, 'Shield': Shield, 'Key': Key, 'MessageSquare': MessageSquare,
     'Settings': Settings, 'Clock': Clock, 'Award': Award, 'Package': Package,
+    'CalendarClock': CalendarClock,
     'CreditCard': CreditCard
   };
 
@@ -184,7 +187,11 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
         <div className="p-2 sm:p-4">
           {/* Navigation Grid - Compact on Mobile */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
-            {ADMIN_TABS.map((tab) => {
+            {ADMIN_TABS.filter(tab => {
+              if (!tab.permission) return true;
+              const [module, action] = tab.permission.split('.');
+              return authService.hasPermission(module, action || 'view');
+            }).map((tab) => {
               const Icon = iconMap[tab.icon] || Shield;
               const isActive = activeTab === tab.id;
               const isDisabled = 'disabled' in tab && tab.disabled;
@@ -251,16 +258,83 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
             {activeTab === 'updates' && <AdminVersionInfo />}
 
             {activeTab === 'roles' && (
-              <RolesPermissionsManager
-                modules={modules}
-                permissions={permissions}
-                selectedRole={selectedRole}
-                onRoleChange={handleRoleChange}
-                roleHasPermission={(_role, code) => selectedRole === SystemRole.ADMIN ? true : roleHasPermission(code)}
-                toggleRolePermission={handleToggleRolePermission}
-                activePermissionsCount={selectedRole === SystemRole.ADMIN ? (permissions?.length || 0) : activeRolePermissionsCount}
-                confirmMessage={confirmMessage}
-              />
+              <div className="space-y-4">
+                {/* Access Management Sub-Navigation */}
+                <div className="flex justify-center p-1 bg-surface-muted/50 rounded-lg border border-edge/50 w-fit mx-auto mb-4">
+                  <button
+                    onClick={() => setAccessViewMode('roles')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      accessViewMode === 'roles'
+                        ? 'bg-white shadow text-primary'
+                        : 'text-content-muted hover:text-content-primary'
+                    }`}
+                  >
+                    Par Rôle
+                  </button>
+                  <button
+                    onClick={() => setAccessViewMode('modules')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      accessViewMode === 'modules'
+                        ? 'bg-white shadow text-primary'
+                        : 'text-content-muted hover:text-content-primary'
+                    }`}
+                  >
+                    Vue Globale (Modules)
+                  </button>
+                  <button
+                    onClick={() => setAccessViewMode('users')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      accessViewMode === 'users'
+                        ? 'bg-white shadow text-primary'
+                        : 'text-content-muted hover:text-content-primary'
+                    }`}
+                  >
+                    Exceptions Utilisateur
+                  </button>
+                </div>
+
+                {accessViewMode === 'roles' && (
+                  <RolesPermissionsManager
+                    modules={modules}
+                    permissions={permissions}
+                    selectedRole={selectedRole}
+                    onRoleChange={handleRoleChange}
+                    roleHasPermission={(_role, code) => selectedRole === SystemRole.ADMIN ? true : roleHasPermission(code)}
+                    toggleRolePermission={handleToggleRolePermission}
+                    activePermissionsCount={selectedRole === SystemRole.ADMIN ? (permissions?.length || 0) : activeRolePermissionsCount}
+                    confirmMessage={confirmMessage}
+                  />
+                )}
+
+                {accessViewMode === 'modules' && (
+                  <ModulePermissionsView
+                    modules={modules}
+                    permissions={permissions}
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    roleHasPermission={roleHasPermission}
+                    selectedRole={selectedRole}
+                  />
+                )}
+
+                {accessViewMode === 'users' && (
+                  <UserCustomPermissionsManager
+                    users={users}
+                    permissions={permissions}
+                    selectedUserId={selectedUserId}
+                    onUserChange={setSelectedUserId}
+                    userPermissions={userPermissions}
+                    getUserDisplayName={getUserDisplayName}
+                    getUserPermissionStatus={getUserPermissionStatus}
+                    toggleUserPermission={handleToggleUserPermission}
+                    onActivateAll={handleActivateAll}
+                    onBlockAll={handleBlockAll}
+                    onResetPermissions={handleResetPermissions}
+                    activePermissionsCount={countActivePermissions()}
+                    confirmMessage={confirmMessage}
+                  />
+                )}
+              </div>
             )}
           </div>
         </div>

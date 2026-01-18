@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
+import { useServerHealth } from './ServerHealthContext';
 
 type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE" | "REALTIME_EVENT" | "SUBSCRIBED" | "UNSUBSCRIBED" | "COMPTE_UPDATE" | "MAINTENANCE_UPDATE" | "SESSION_TIMEOUT" | "SESSION_RISK_ALERT" | "FORCE_LOGOUT";
 
@@ -26,17 +27,20 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [typingUsers, setTypingUsers] = useState<Map<string, boolean>>(new Map());
+  const { isServerReachable } = useServerHealth();
   
   const user = authService.getCurrentUser();
   const queryClient = useQueryClient();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const typingTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const serverReachableRef = useRef(isServerReachable);
+  serverReachableRef.current = isServerReachable;
 
   // Ref pour maintenir l'instance WebSocket active sans déclencher de re-renders infinis
   const wsRef = useRef<WebSocket | null>(null);
 
   const connect = useCallback(() => {
-    if (!user) return;
+    if (!user || !serverReachableRef.current) return;
 
     // Si une connexion est déjà active ou en cours sur cette ref, on ne fait rien
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
@@ -86,7 +90,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       wsRef.current = null;
 
       // Reconnect after 3s only if user is still logged in
-      if (user) {
+      if (user && serverReachableRef.current) {
           reconnectTimeoutRef.current = setTimeout(() => connect(), 3000);
       }
     };
@@ -108,7 +112,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let markIntentionalClose: (() => void) | undefined;
 
-    if (user) {
+    if (user && isServerReachable) {
       markIntentionalClose = connect();
     }
 
@@ -125,7 +129,45 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [user, connect]);
+  }, [user, isServerReachable, connect]);
+
+  // Debounce Map for query invalidations
+  const invalidationTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  const debounceInvalidate = useCallback((queryKey: string[], delay = 1000) => {
+     const keyStr = JSON.stringify(queryKey);
+     if (invalidationTimeoutRef.current.has(keyStr)) {
+       clearTimeout(invalidationTimeoutRef.current.get(keyStr));
+     }
+     
+     const timeout = setTimeout(() => {
+       queryClient.invalidateQueries({ queryKey });
+       invalidationTimeoutRef.current.delete(keyStr);
+     }, delay);
+     
+     invalidationTimeoutRef.current.set(keyStr, timeout);
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (!isServerReachable) {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      
+      // Clear all pending invalidations
+      invalidationTimeoutRef.current.forEach(timeout => clearTimeout(timeout));
+      invalidationTimeoutRef.current.clear();
+
+      setIsConnected(false);
+      setSocket(null);
+      setOnlineUsers(new Set());
+      setTypingUsers(new Map());
+    }
+  }, [isServerReachable]);
 
   const handleMessage = (message: WebSocketMessage) => {
     switch (message.type) {
@@ -206,14 +248,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "CREDIT_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["credits"] });
-         queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+         debounceInvalidate(["credits"]);
+         debounceInvalidate(["dashboard-stats"]);
          window.dispatchEvent(new CustomEvent('credit-update', { detail: message.payload }));
          break;
 
       case "CLIENT_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["clients"] });
-         queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+         debounceInvalidate(["clients"]);
+         debounceInvalidate(["dashboard-stats"]);
          window.dispatchEvent(new CustomEvent('client-update', { detail: message.payload }));
          break;
 
@@ -222,11 +264,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "DASHBOARD_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+         debounceInvalidate(["dashboard-stats"]);
          break;
 
       case "CAISSE_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["caisses"] });
+         debounceInvalidate(["caisses"]);
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
          break;
 
@@ -237,12 +279,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "TONTINE_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["/api/tontines"] });
+         debounceInvalidate(["/api/tontines"]);
          break;
 
       case "ACCOUNTING_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["/api/comptabilite"] });
-         queryClient.invalidateQueries({ queryKey: ["/api/factures"] });
+         debounceInvalidate(["/api/comptabilite"]);
+         debounceInvalidate(["/api/factures"]);
          break;
 
       case "OPERATIONS_UPDATE":
@@ -268,16 +310,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "AGENCE_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["/api/agences"] });
-         queryClient.invalidateQueries({ queryKey: ["/api/me/agences"] });
+         debounceInvalidate(["/api/agences"]);
+         debounceInvalidate(["/api/me/agences"]);
          break;
 
       case "EMPLOYE_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["/api/employes"] });
+         debounceInvalidate(["/api/employes"]);
          break;
 
       case "LOYALTY_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["/api/loyalty"] });
+         debounceInvalidate(["/api/loyalty"]);
          break;
 
       case "REALTIME_EVENT":
@@ -288,22 +330,22 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // Auto-invalidate relevant queries based on aggregate type
          const { aggregateType, aggregateId } = message.payload;
          if (aggregateType === 'compte') {
-           queryClient.invalidateQueries({ queryKey: ['compte', aggregateId] });
-           queryClient.invalidateQueries({ queryKey: ['transactions', aggregateId] });
+           debounceInvalidate(['compte', aggregateId]);
+           debounceInvalidate(['transactions', aggregateId]);
          } else if (aggregateType === 'credit') {
-           queryClient.invalidateQueries({ queryKey: ['credit', aggregateId] });
-           queryClient.invalidateQueries({ queryKey: ['remboursements', aggregateId] });
+           debounceInvalidate(['credit', aggregateId]);
+           debounceInvalidate(['remboursements', aggregateId]);
          } else if (aggregateType === 'client') {
-           queryClient.invalidateQueries({ queryKey: ['client', aggregateId] });
-           queryClient.invalidateQueries({ queryKey: ['client-portfolio', aggregateId] });
+           debounceInvalidate(['client', aggregateId]);
+           debounceInvalidate(['client-portfolio', aggregateId]);
          } else if (aggregateType === 'session_caisse') {
-           queryClient.invalidateQueries({ queryKey: ['session', aggregateId] });
-           queryClient.invalidateQueries({ queryKey: ['operations', aggregateId] });
+           debounceInvalidate(['session', aggregateId]);
+           debounceInvalidate(['operations', aggregateId]);
          }
          break;
 
       case "COMPTE_UPDATE":
-         queryClient.invalidateQueries({ queryKey: ["comptes-epargne"] });
+         debounceInvalidate(["comptes-epargne"]);
          window.dispatchEvent(new CustomEvent('compte-update', { detail: message.payload }));
          break;
 

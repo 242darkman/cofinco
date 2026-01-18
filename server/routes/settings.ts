@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { insertSystemSettingsSchema, systemSettings } from "@shared/schema";
+import { insertSystemSettingsSchema, insertSecuritySettingsSchema, systemSettings, securitySettings } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { logAudit } from "../audit";
@@ -106,6 +106,82 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
+  // ========== SECURITY SETTINGS ==========
+  app.get("/api/settings/security", requireAuth, async (_req, res) => {
+    try {
+      const result = await db.query.securitySettings.findFirst();
+      if (!result) {
+        const defaults = {
+          passwordMinLength: 8,
+          passwordRequireUppercase: true,
+          passwordRequireLowercase: true,
+          passwordRequireNumbers: true,
+          passwordRequireSpecial: true,
+          sessionTimeoutMinutes: 30,
+          maxLoginAttempts: 5,
+          lockoutDurationMinutes: 15,
+          twoFactorEnabled: false,
+          ipWhitelistEnabled: false,
+          auditLogEnabled: true,
+        };
+        return res.json(addSnakeCaseAliasesDeep(defaults));
+      }
+
+      const payload = {
+        id: result.id,
+        passwordMinLength: result.passwordMinLength,
+        passwordRequireUppercase: result.passwordRequireUppercase,
+        passwordRequireLowercase: result.passwordRequireLowercase,
+        passwordRequireNumbers: result.passwordRequireNumbers,
+        passwordRequireSpecial: result.passwordRequireSpecial,
+        sessionTimeoutMinutes: result.sessionTimeoutMinutes,
+        maxLoginAttempts: result.maxLoginAttempts,
+        lockoutDurationMinutes: result.lockoutDurationMinutes,
+        twoFactorEnabled: result.twoFactorEnabled,
+        ipWhitelistEnabled: result.ipWhitelistEnabled,
+        auditLogEnabled: result.auditLogEnabled,
+      };
+
+      res.json(addSnakeCaseAliasesDeep(payload));
+    } catch (error) {
+      console.error("Error fetching security settings:", error);
+      res.status(500).json({ error: "Failed to fetch security settings" });
+    }
+  });
+
+  app.post("/api/settings/security", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = parseWithSchema(insertSecuritySettingsSchema, req.body);
+      const [created] = await db.insert(securitySettings).values({
+        ...parsed,
+        updatedAt: new Date(),
+      }).returning();
+      res.status(201).json(addSnakeCaseAliasesDeep(created));
+    } catch (error: any) {
+      console.error("Error creating security settings:", error);
+      res.status(500).json({ error: error.message || "Failed to create security settings" });
+    }
+  });
+
+  app.put("/api/settings/security/:id", requireAuth, requireRole("admin"), async (req, res) => {
+    try {
+      const parsed = parseWithSchema(insertSecuritySettingsSchema.partial(), req.body);
+      const [updated] = await db.update(securitySettings)
+        .set({ ...parsed, updatedAt: new Date() })
+        .where(eq(securitySettings.id, req.params.id))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Security settings not found" });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(updated));
+    } catch (error: any) {
+      console.error("Error updating security settings:", error);
+      res.status(500).json({ error: error.message || "Failed to update security settings" });
+    }
+  });
+
   // ========== RÉINITIALISATION PLATEFORME (Admin Only) ==========
   app.post("/api/admin/reset-platform", requireAuth, requireRole("admin"), async (req, res) => {
     try {
@@ -155,6 +231,7 @@ export function registerSettingsRoutes(app: Express) {
         DELETE FROM audit_logs;
         DELETE FROM notifications;
         DELETE FROM agent_location_logs;
+        DELETE FROM pos_device_logs;
         DELETE FROM pos_devices;
         DELETE FROM modeles_factures;
         DELETE FROM paiements_terrain;

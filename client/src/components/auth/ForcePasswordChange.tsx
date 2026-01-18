@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Lock, Check, X, AlertCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import FormField from '../ui/FormField';
+import { useSecuritySettings } from '../../hooks/settings/useSecuritySettings';
 
 interface ForcePasswordChangeProps {
   onPasswordChanged: () => void;
 }
 
-const PASSWORD_REQUIREMENTS = {
+const DEFAULT_PASSWORD_REQUIREMENTS = {
   minLength: 8,
   requireUppercase: true,
   requireLowercase: true,
@@ -23,11 +24,24 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { settings: securitySettings } = useSecuritySettings();
+
+  const passwordRequirements = useMemo(() => {
+    if (!securitySettings) return DEFAULT_PASSWORD_REQUIREMENTS;
+    return {
+      minLength: securitySettings.password_min_length ?? DEFAULT_PASSWORD_REQUIREMENTS.minLength,
+      requireUppercase: securitySettings.password_require_uppercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireUppercase,
+      requireLowercase: securitySettings.password_require_lowercase ?? DEFAULT_PASSWORD_REQUIREMENTS.requireLowercase,
+      requireNumbers: securitySettings.password_require_numbers ?? DEFAULT_PASSWORD_REQUIREMENTS.requireNumbers,
+      requireSpecialChars: securitySettings.password_require_special ?? DEFAULT_PASSWORD_REQUIREMENTS.requireSpecialChars,
+      specialChars: DEFAULT_PASSWORD_REQUIREMENTS.specialChars
+    };
+  }, [securitySettings]);
 
   const checkRequirement = (password: string, requirement: string): boolean => {
     switch (requirement) {
       case 'length':
-        return password.length >= PASSWORD_REQUIREMENTS.minLength;
+        return password.length >= passwordRequirements.minLength;
       case 'uppercase':
         return /[A-Z]/.test(password);
       case 'lowercase':
@@ -42,12 +56,12 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
   };
 
   const requirements = [
-    { key: 'length', label: `Au moins ${PASSWORD_REQUIREMENTS.minLength} caractères` },
-    { key: 'uppercase', label: 'Une lettre majuscule (A-Z)' },
-    { key: 'lowercase', label: 'Une lettre minuscule (a-z)' },
-    { key: 'number', label: 'Un chiffre (0-9)' },
-    { key: 'special', label: `Un caractère spécial (${PASSWORD_REQUIREMENTS.specialChars})` }
-  ];
+    { key: 'length', label: `Au moins ${passwordRequirements.minLength} caractères`, enabled: true },
+    { key: 'uppercase', label: 'Une lettre majuscule (A-Z)', enabled: passwordRequirements.requireUppercase },
+    { key: 'lowercase', label: 'Une lettre minuscule (a-z)', enabled: passwordRequirements.requireLowercase },
+    { key: 'number', label: 'Un chiffre (0-9)', enabled: passwordRequirements.requireNumbers },
+    { key: 'special', label: `Un caractère spécial (${passwordRequirements.specialChars})`, enabled: passwordRequirements.requireSpecialChars }
+  ].filter((req) => req.enabled);
 
   const allRequirementsMet = requirements.every(req => 
     checkRequirement(newPassword, req.key)

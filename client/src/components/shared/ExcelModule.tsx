@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { FileSpreadsheet, Upload, Download, Plus, Trash2, RefreshCw, Users, CreditCard, PiggyBank, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useExcelSheet, ExcelRow } from '../../hooks/useExcelSheet';
 import { TabGroup, Button, Card, Modal, Badge, IconButton, PageHeader, EmptyState } from '../ui';
+import { requestListAll } from '../../lib/api-client';
 
 const DATA_TYPES = [
   { id: 'clients', label: 'Clients', icon: Users },
@@ -118,10 +119,11 @@ export default function ExcelModule() {
     else if (selectedDataType === 'credits') endpoint = '/api/credits';
     else return;
     try {
-      const res = await fetch(endpoint, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.length > 0) { setSpreadsheetData(data); setColumns(Object.keys(data[0])); }
+      const apiPath = endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
+      const data = await requestListAll<any>(apiPath);
+      if (data.length > 0) {
+        setSpreadsheetData(data);
+        setColumns(Object.keys(data[0]));
       }
     } catch (e) { console.error(e); }
   };

@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, Filter, SortAsc, Image } from 'lucide-react';
-import { Card, Badge } from '../ui';
+import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus } from 'lucide-react';
+import { Card, Badge, Skeleton } from '../ui';
 import { FileUploadZone } from '../ui/FileUploadZone';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { useSecureDocument } from '../../hooks/useSecureDocument';
 
 // Helper to detect image URLs
-const isImage = (url: string) =>
-  /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(url) || url.startsWith('data:image');
+const isImage = (url: string) => {
+  if (url.startsWith('data:image')) return true;
+  const cleanUrl = url.split('?')[0].split('#')[0];
+  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(cleanUrl);
+};
+
+const isDirectUrl = (url: string) => url.startsWith('http') || url.startsWith('data:');
+
+// Translate status to French for UI display
+const translateStatus = (status: string): string => {
+  const statusLower = status?.toLowerCase();
+  switch (statusLower) {
+    case 'pending': return 'En attente';
+    case 'verified': return 'Vérifié';
+    case 'rejected': return 'Rejeté';
+    default: return status;
+  }
+};
 
 interface ClientDocument {
   id: string;
@@ -16,8 +33,10 @@ interface ClientDocument {
   document_type: 'ID Card' | 'Passport' | 'Contract' | 'Photo' | 'Other';
   document_name: string;
   document_url: string;
+  owner_id?: string;
+  ownerId?: string;
   notes?: string;
-  status: 'Pending' | 'Verified' | 'Rejected';
+  status: 'pending' | 'verified' | 'rejected';
   verified_at?: string;
   created_at: string;
 }
@@ -27,14 +46,144 @@ interface ClientKYCProps {
   onUpdate?: () => void;
 }
 
+interface KycDocumentCardProps {
+  doc: ClientDocument;
+  canVerifyDocuments: boolean;
+  canDeleteDocuments: boolean;
+  onUpdateStatus: (docId: string, status: ClientDocument['status']) => void;
+  onDelete: (docId: string) => void;
+  getStatusIcon: (status: string) => React.JSX.Element;
+}
+
+function KycDocumentCard({
+  doc,
+  canVerifyDocuments,
+  canDeleteDocuments,
+  onUpdateStatus,
+  onDelete,
+  getStatusIcon
+}: KycDocumentCardProps) {
+  // Déterminer si l'URL est directement utilisable (http/https ou data:)
+  const hasDirectUrl = Boolean(doc.document_url && isDirectUrl(doc.document_url));
+  // Les documents legacy n'ont pas d'entrée en base, on utilise leur document_url directement
+  const isLegacyDoc = doc.id.startsWith('legacy-');
+
+  // Appeler useSecureDocument seulement si on a besoin d'une URL signée (pas d'URL directe)
+  const needsSignedUrl = !hasDirectUrl && !isLegacyDoc;
+  const { url: signedUrl, isLoading, isError, refresh } = useSecureDocument(needsSignedUrl ? doc.id : null);
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
+
+  // Résoudre l'URL finale : URL directe si disponible, sinon URL signée
+  // Ne jamais utiliser doc.document_url si c'est une clé MinIO (ne commence pas par http/data)
+  const resolvedUrl = hasDirectUrl ? doc.document_url : signedUrl;
+  const showSkeleton = needsSignedUrl && isLoading;
+
+  const handleImageError = () => {
+    if (!hasDirectUrl && !refreshAttempted) {
+      setRefreshAttempted(true);
+      refresh();
+    }
+  };
+
+  return (
+    <Card variant="default" padding="sm" className="hover:border-slate-600 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        {/* Icon & Info with Thumbnail Preview */}
+        <div className="flex items-start gap-3 overflow-hidden">
+          <div className="w-12 h-12 bg-slate-800 rounded-lg shrink-0 overflow-hidden flex items-center justify-center">
+            {showSkeleton ? (
+              <Skeleton variant="rounded" width={48} height={48} />
+            ) : resolvedUrl && isImage(resolvedUrl) ? (
+              <img
+                src={resolvedUrl}
+                alt={doc.document_name}
+                className="w-full h-full object-cover"
+                onError={handleImageError}
+              />
+            ) : (
+              <FileText size={20} className="text-blue-400" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-white text-sm truncate pr-2">{doc.document_name}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge value={doc.document_type} size="sm" variant="neutral" />
+              <span className="text-[10px] text-slate-500">
+                {new Date(doc.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Badge */}
+        <Badge
+          value={translateStatus(doc.status)}
+          size="sm"
+          variant={doc.status?.toLowerCase() === 'verified' ? 'success' : doc.status?.toLowerCase() === 'rejected' ? 'danger' : 'warning'}
+          icon={getStatusIcon(doc.status)}
+        />
+      </div>
+
+      {/* Actions Toolbar */}
+      <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-slate-700/50">
+        {doc.status?.toLowerCase() === 'pending' && canVerifyDocuments && (
+          <div className="flex items-center gap-1 mr-auto">
+            <button
+              onClick={() => onUpdateStatus(doc.id, 'verified')}
+              className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded transition"
+              title="Valider"
+            >
+              <CheckCircle size={16} />
+            </button>
+            <button
+              onClick={() => onUpdateStatus(doc.id, 'rejected')}
+              className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition"
+              title="Rejeter"
+            >
+              <XCircle size={16} />
+            </button>
+            <div className="w-px h-3 bg-slate-700 mx-1"></div>
+          </div>
+        )}
+
+        {showSkeleton ? (
+          <Skeleton variant="rounded" width={64} height={24} />
+        ) : resolvedUrl ? (
+          <a
+            href={resolvedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 hover:bg-blue-500/10 rounded transition"
+          >
+            <Eye size={14} /> Voir
+          </a>
+        ) : (
+          <span className="text-xs text-slate-500">
+            {isError ? 'Accès refusé' : 'Indisponible'}
+          </span>
+        )}
+
+        {canDeleteDocuments && (
+          <button
+            onClick={() => onDelete(doc.id)}
+            className="text-xs font-medium text-slate-400 hover:text-red-400 flex items-center gap-1 px-2 py-1 hover:bg-slate-700 rounded transition"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   // RBAC permissions
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isAdmin } = usePermissions();
   const canAddDocuments = hasPermission('clients', 'edit') || hasPermission('kyc', 'create');
-  const canVerifyDocuments = hasPermission('kyc', 'approve') || hasPermission('admin', 'manage');
+  const canVerifyDocuments = isAdmin || hasPermission('kyc', 'approve') || hasPermission('admin', 'manage');
   const canDeleteDocuments = hasPermission('clients', 'edit') || hasPermission('kyc', 'delete');
 
-  const { uploadFile, isUploading: isFileUploading } = useMinIOUpload({
+  const { uploadFile } = useMinIOUpload({
     path: 'kyc', 
     isPublic: false, 
     onError: (err: Error) => console.error("Upload error", err)
@@ -84,7 +233,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                     document_type: 'ID Card' as const,
                     document_name: `Document ${index + 1}`,
                     document_url: item,
-                    status: 'Pending' as const,
+                    status: 'pending' as const,
                     created_at: client.created_at || new Date().toISOString()
                   };
                 }
@@ -101,13 +250,19 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                 document_type: 'ID Card' as const,
                 document_name: 'Pièce d\'identité',
                 document_url: photoUrlField,
-                status: 'Pending' as const,
+                status: 'pending' as const,
                 created_at: client.created_at || new Date().toISOString()
               }];
             }
           }
         }
       }
+
+      // Filter out AVATAR documents - they don't need KYC validation
+      clientDocs = clientDocs.filter((doc: any) => {
+        const docType = doc.document_type || doc.documentType;
+        return docType !== 'AVATAR' && docType !== 'Avatar';
+      });
 
       setDocuments(clientDocs.sort((a: ClientDocument, b: ClientDocument) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -124,20 +279,22 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
 
     setUploading(true);
     try {
+      const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Erreur chargement client');
+      const client = await res.json();
+
+      const ownerId = client.user_id || client.userId || undefined;
       const newDocData: ClientDocument = {
         id: crypto.randomUUID(),
         client_id: clientId,
         document_type: newDoc.type,
         document_name: newDoc.name,
         document_url: newDoc.url,
+        owner_id: ownerId,
         notes: newDoc.notes,
-        status: 'Pending',
+        status: 'pending',
         created_at: new Date().toISOString()
       };
-
-      const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur chargement client');
-      const client = await res.json();
       
       const updatedDocs = [newDocData, ...(client.documents || [])];
       
@@ -163,11 +320,14 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
 
   const handleUpdateStatus = async (docId: string, status: ClientDocument['status']) => {
     try {
+      // Convert status to lowercase to match backend Zod schema
+      const normalizedStatus = status.toLowerCase() as ClientDocument['status'];
+      
       const updatedDocs = documents.map(doc =>
         doc.id === docId ? { 
           ...doc, 
-          status, 
-          verified_at: status === 'Verified' ? new Date().toISOString() : undefined 
+          status: normalizedStatus, 
+          verified_at: normalizedStatus === 'verified' ? new Date().toISOString() : undefined 
         } : doc
       );
 
@@ -218,18 +378,19 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Verified': return <CheckCircle size={14} className="text-green-400" />;
-      case 'Rejected': return <XCircle size={14} className="text-blue-400" />;
+    const statusLower = status?.toLowerCase();
+    switch (statusLower) {
+      case 'verified': return <CheckCircle size={14} className="text-green-400" />;
+      case 'rejected': return <XCircle size={14} className="text-red-400" />;
       default: return <Clock size={14} className="text-cyan-400" />;
     }
   };
 
   const kycStats = {
     total: documents.length,
-    verified: documents.filter(d => d.status === 'Verified').length,
-    pending: documents.filter(d => d.status === 'Pending').length,
-    rejected: documents.filter(d => d.status === 'Rejected').length
+    verified: documents.filter(d => d.status?.toLowerCase() === 'verified').length,
+    pending: documents.filter(d => d.status?.toLowerCase() === 'pending').length,
+    rejected: documents.filter(d => d.status?.toLowerCase() === 'rejected').length
   };
 
   const kycComplete = kycStats.total > 0 && kycStats.pending === 0 && kycStats.rejected === 0;
@@ -317,42 +478,16 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                   label="Glissez votre document ici"
                   hint="ou cliquez pour parcourir (PDF, JPG, PNG - max 5MB)"
                   uploadFunction={async (file) => {
-                    // Determine path based on doc type
-                    const path = newDoc.type === 'Contract' ? 'contracts' : 'kyc';
-                    // We need to use the hook's uploadFile here, but we can't easily pass the hook's returned function 
-                    // if it depends on state that changes (like path).
-                    // Actually, useMinIOUpload hook creates a stable function if props are stable.
-                    // Let's handle the upload in onFilesSelected instead to control the path dynamically if needed, 
-                    // OR just use uploadFunction if we make the hook usage dynamic.
-                    
-                    // Better approach: use onFilesSelected and call uploadFile manually to handle state updates
-                    return ""; 
-                  }}
-                  onFilesSelected={async (files: File[]) => {
-                    if (files.length > 0) {
-                      const file = files[0];
-                      try {
-                         // Determine specific path based on type
-                         const subfolder = newDoc.type === 'Contract' ? 'contracts' : 'kyc';
-                         // We'll rely on the hook initialized in the component, but we might need dynamic path support in the hook
-                         // OR we just instantiate the hook with a generic 'documents' path and handle organization backend side?
-                         // The hook uses the path passed at init. 
-                         // Let's modify the hook call or use the hook with a generic path and rely on filename or just accept 'documents' for now.
-                         // Actually, looking at useMinIOUpload (from memory), it takes path in props.
-                         // Let's assume we use one hook instance for now, maybe initialized with 'clients'.
-                         
-                         const url = await uploadFile(file); // This uses the path defined in the hook
-                         if (url) {
-                            setNewDoc(prev => ({ 
-                              ...prev, 
-                              url: url,
-                              name: prev.name || file.name 
-                            }));
-                         }
-                      } catch (e) {
-                        console.error("Upload error", e);
-                      }
+                    const url = await uploadFile(file);
+                    if (!url) {
+                      throw new Error('Upload failed');
                     }
+                    setNewDoc(prev => ({
+                      ...prev,
+                      url,
+                      name: prev.name || file.name
+                    }));
+                    return url;
                   }}
                 />
                 {newDoc.url && (
@@ -397,83 +532,15 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
         ) : (
           <div className="space-y-3">
             {documents.map((doc) => (
-              <Card key={doc.id} variant="default" padding="sm" className="hover:border-slate-600 transition-colors">
-                <div className="flex items-start justify-between gap-3">
-                    {/* Icon & Info with Thumbnail Preview */}
-                    <div className="flex items-start gap-3 overflow-hidden">
-                        <div className="w-12 h-12 bg-slate-800 rounded-lg shrink-0 overflow-hidden flex items-center justify-center">
-                            {isImage(doc.document_url) ? (
-                              <img 
-                                src={doc.document_url} 
-                                alt={doc.document_name} 
-                                className="w-full h-full object-cover" 
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                  (e.target as HTMLImageElement).parentElement!.innerHTML = '<svg class="text-blue-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
-                                }}
-                              />
-                            ) : (
-                              <FileText size={20} className="text-blue-400" />
-                            )}
-                        </div>
-                        <div className="min-w-0">
-                             <p className="font-semibold text-white text-sm truncate pr-2">{doc.document_name}</p>
-                             <div className="flex items-center gap-2 mt-1">
-                                <Badge value={doc.document_type} size="sm" variant="neutral" />
-                                <span className="text-[10px] text-slate-500">{new Date(doc.created_at).toLocaleDateString()}</span>
-                             </div>
-                        </div>
-                    </div>
-
-                    {/* Status Badge */}
-                    <Badge 
-                        value={doc.status} 
-                        size="sm" 
-                        variant={doc.status === 'Verified' ? 'success' : doc.status === 'Rejected' ? 'danger' : 'warning'}
-                        icon={getStatusIcon(doc.status)}
-                    />
-                </div>
-
-                {/* Actions Toolbar */}
-                <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-slate-700/50">
-                     {doc.status === 'Pending' && canVerifyDocuments && (
-                        <div className="flex items-center gap-1 mr-auto">
-                           <button
-                             onClick={() => handleUpdateStatus(doc.id, 'Verified')}
-                             className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded transition"
-                             title="Valider"
-                           >
-                             <CheckCircle size={16} />
-                           </button>
-                           <button
-                             onClick={() => handleUpdateStatus(doc.id, 'Rejected')}
-                             className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition"
-                             title="Rejeter"
-                           >
-                             <XCircle size={16} />
-                           </button>
-                           <div className="w-px h-3 bg-slate-700 mx-1"></div>
-                        </div>
-                     )}
-
-                     <a
-                        href={doc.document_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 hover:bg-blue-500/10 rounded transition"
-                      >
-                        <Eye size={14} /> Voir
-                      </a>
-                      {canDeleteDocuments && (
-                        <button
-                          onClick={() => handleDeleteDocument(doc.id)}
-                          className="text-xs font-medium text-slate-400 hover:text-red-400 flex items-center gap-1 px-2 py-1 hover:bg-slate-700 rounded transition"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                </div>
-              </Card>
+              <KycDocumentCard
+                key={doc.id}
+                doc={doc}
+                canVerifyDocuments={canVerifyDocuments}
+                canDeleteDocuments={canDeleteDocuments}
+                onUpdateStatus={handleUpdateStatus}
+                onDelete={handleDeleteDocument}
+                getStatusIcon={getStatusIcon}
+              />
             ))}
           </div>
         )}

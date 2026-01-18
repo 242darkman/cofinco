@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { requestAllPages } from '../../lib/api-client';
 import { FileText, Download, Calendar, Filter, TrendingUp, Users, Banknote, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ReportData {
@@ -59,7 +60,7 @@ export default function AgentReportsGenerator() {
         fetch(`/api/agent-presences?agent_id=${agentId}&date_debut=${dateStart}&date_fin=${dateEnd}`),
         fetch(`/api/agent-collectes-cash?agent_id=${agentId}&date_debut=${dateStart}&date_fin=${dateEnd}`),
         fetch(`/api/agent-recouvrements?agent_id=${agentId}`),
-        fetch(`/api/visites-terrain?agent_id=${agentId}&date_debut=${dateStart}&date_fin=${dateEnd}`),
+        requestAllPages(`/visites-terrain`, { agent_id: agentId, date_debut: dateStart, date_fin: dateEnd }),
         fetch(`/api/agent-depenses?agent_id=${agentId}&date_debut=${dateStart}&date_fin=${dateEnd}`)
       ]);
 
@@ -67,7 +68,7 @@ export default function AgentReportsGenerator() {
         presences: presencesRes.ok ? await presencesRes.json() : [],
         collectes: collectesRes.ok ? await collectesRes.json() : [],
         recouvrements: recouvrementsRes.ok ? await recouvrementsRes.json() : [],
-        visites: visitesRes.ok ? await visitesRes.json() : [],
+        visites: Array.isArray(visitesRes) ? visitesRes : [],
         depenses: depensesRes.ok ? await depensesRes.json() : []
       });
     } catch (error) {

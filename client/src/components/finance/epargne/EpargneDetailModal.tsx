@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, TrendingUp, TrendingDown, Calendar, DollarSign, Percent } from 'lucide-react';
+import { X, User, TrendingUp, TrendingDown, Calendar, DollarSign, Percent, Lock } from 'lucide-react';
 import { compteEpargneApi, transactionEpargneApi, clientApi } from '../../../lib/api-client';
 import { TransactionRowActions } from '../shared/TransactionRowActions';
 import { ReceiptViewer } from '../shared/ReceiptViewer';
 import { useReceiptActions } from '../../../hooks/finance/useReceiptActions';
+import Badge from '../../ui/Badge';
+import { getAccountBalance, getAccountUiConfig, getMonthlyInterestEstimate } from '../../../lib/account-config';
 
 interface EpargneDetailModalProps {
   compteId: string;
@@ -41,7 +43,7 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
       const [comptesResponse, transactionsData, clientsResponse] = await Promise.all([
         compteEpargneApi.getAll(),
         transactionEpargneApi.getByCompte(compteId),
-        clientApi.getAll()
+        clientApi.getAllList()
       ]);
 
       // Handle paginated response format: { data, total, page, limit, totalPages }
@@ -116,7 +118,7 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
     if (!compte) return 0;
 
     // Use default interest rate if missing
-    const tauxInteret = compte.taux_interet || compte.tauxInteret || 0;
+    const tauxInteret = getAccountUiConfig(compte, 'staff').interestRate;
     
     // Validate date
     const dateOuvertureStr = compte.date_ouverture || compte.createdAt || compte.created_at;
@@ -133,7 +135,8 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
     
     const anneeDiff = joursDiff / 365;
 
-    const interetsEstimes = compte.solde * (tauxInteret / 100) * anneeDiff;
+    const solde = getAccountBalance(compte);
+    const interetsEstimes = solde * (tauxInteret / 100) * anneeDiff;
     return interetsEstimes || 0; // Return 0 if NaN
   };
 
@@ -147,11 +150,15 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
 
   if (!compte) return null;
 
+  const uiConfig = getAccountUiConfig(compte, 'staff');
+  const balance = getAccountBalance(compte);
+  const monthlyEstimate = getMonthlyInterestEstimate(balance, uiConfig.interestRate);
+  const showInterest = uiConfig.interestRate > 0;
   const interetsEstimes = calculateInterets();
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-[9999] p-2 sm:p-4"
       onClick={(e) => {
         // Close modal when clicking on backdrop
         if (e.target === e.currentTarget) {
@@ -159,22 +166,25 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
         }
       }}
     >
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex justify-between items-center z-10">
+      <div className="bg-slate-800 rounded-t-2xl sm:rounded-xl border border-slate-700 w-full sm:max-w-4xl max-h-[90dvh] sm:max-h-[90vh] overflow-y-auto shadow-2xl pb-[env(safe-area-inset-bottom)]">
+        <div className="sm:hidden flex justify-center pt-2">
+          <div className="h-1.5 w-10 rounded-full bg-slate-600/70" />
+        </div>
+        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-5 sm:p-6 flex justify-between items-center z-10">
           <div>
-            <h2 className="text-2xl font-bold text-white">{compte.numero_compte}</h2>
-            <p className="text-slate-400 text-sm mt-1">{compte.type_compte}</p>
+            <h2 className="text-2xl font-bold text-white">{compte.numero_compte || compte.numeroCompte}</h2>
+            <p className="text-slate-400 text-sm mt-1">{compte.type_compte || compte.typeCompte}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition">
             <X size={24} />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          <div className="grid md:grid-cols-4 gap-4">
+        <div className="p-5 sm:p-6 space-y-6">
+          <div className={`grid gap-4 ${showInterest ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/50 rounded-lg p-4">
               <div className="text-green-400 text-sm mb-1">Solde Actuel</div>
-              <div className="text-2xl font-bold text-white break-words">{compte.solde.toLocaleString()} FCFA</div>
+              <div className="text-2xl font-bold text-white break-words">{balance.toLocaleString('fr-FR')} FCFA</div>
             </div>
 
             <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/50 rounded-lg p-4">
@@ -187,10 +197,12 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
               <div className="text-2xl font-bold text-white break-words">{stats.totalRetraits.toLocaleString()} FCFA</div>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/50 rounded-lg p-4">
-              <div className="text-emerald-400 text-sm mb-1">Intérêts Estimés</div>
-              <div className="text-2xl font-bold text-white break-words">{interetsEstimes.toLocaleString()} FCFA</div>
-            </div>
+            {showInterest && (
+              <div className="bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/50 rounded-lg p-4">
+                <div className="text-amber-300 text-sm mb-1">Intérêts Estimés</div>
+                <div className="text-2xl font-bold text-white break-words">{interetsEstimes.toLocaleString('fr-FR')} FCFA</div>
+              </div>
+            )}
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -227,20 +239,24 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
                     {compte.date_ouverture ? new Date(compte.date_ouverture).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Taux d'intérêt:</span>
-                  <span className="text-white font-bold">
-                    {compte.taux_interet || compte.tauxInteret || 0}% / an
-                  </span>
-                </div>
+                {showInterest && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Taux d'intérêt:</span>
+                    <span className="text-white font-bold">{uiConfig.interestRate}% / an</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-400">Statut:</span>
-                  <span className={`font-bold ${
-                    compte.statut === 'Actif' ? 'text-green-400' :
-                    compte.statut === 'Suspendu' ? 'text-cyan-400' :
-                    'text-blue-400'
-                  }`}>{compte.statut}</span>
+                  <Badge value={uiConfig.statusLabel} icon={uiConfig.isLocked ? <Lock size={12} /> : undefined} />
                 </div>
+                {showInterest && monthlyEstimate > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Profits estimés:</span>
+                    <span className="text-amber-300 font-semibold">
+                      +{monthlyEstimate.toLocaleString('fr-FR')} FCFA/mois
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-400">Transactions:</span>
                   <span className="text-white">{stats.nombreTransactions}</span>

@@ -226,6 +226,18 @@ export const PERMISSION_DESCRIPTIONS: Record<string, PermissionDescription> = {
     interface: 'Onglet "Réception" dans le module Transferts',
     details: ['Valider la réception', 'Vérifier l\'identité du bénéficiaire', 'Payer le montant']
   },
+
+  // Module Virements Programmes
+  'virements_programmes.view': {
+    action: 'Voir les virements programmés',
+    interface: 'Onglet "Virements programmés" dans le module Admin',
+    details: ['Consulter la liste des virements programmés', 'Voir la prochaine exécution', 'Consulter les derniers statuts']
+  },
+  'virements_programmes.edit': {
+    action: 'Modifier les virements programmés',
+    interface: 'Actions "Pause" et "Modifier" dans la liste des virements programmés',
+    details: ['Mettre en pause ou réactiver un virement', 'Modifier le montant ou la fréquence', 'Ajuster la prochaine exécution']
+  },
   
   // Module Rapports
   'rapports.view': {

@@ -15,6 +15,7 @@ export const APP_MODULES = [
   'Agent Terrain',
   'CaisseAgent',
   'Transferts',
+  'Virements Programmes',
   'Rapports',
   'RH',
   'Communications',
@@ -66,7 +67,8 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Incidents',
     'Visites',
     'Prospection',
-    'Paiements Agent'
+    'Paiements Agent',
+    'Virements Programmes'
   ],
   [SystemRole.CHEF_AGENCE]: [
     'Dashboard',
@@ -87,7 +89,9 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Prospection',
     'Paiements Agent',
     'RH',
-    'Administration'
+    'RH',
+    'Administration',
+    'Virements Programmes'
   ],
   [SystemRole.COMPTABLE]: [
     'Dashboard',
@@ -121,7 +125,9 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Comptes',
     'Caisse',
     'Communications',
-    'RH'
+    'Communications',
+    'RH',
+    'Virements Programmes'
   ],
   [SystemRole.AGENT_TERRAIN]: [
     'Dashboard',
@@ -187,7 +193,8 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'incidents': ['view', 'manage', 'edit'],
     'visites': ['view'],
     'prospection': ['view'],
-    'paiements': ['view']
+    'paiements': ['view'],
+    'virements_programmes': ['view', 'edit']
   },
   [SystemRole.COMPTABLE]: {
     'clients': ['view'],
@@ -217,6 +224,7 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'epargnes': ['view', 'create', 'edit'],
     'caisse': ['view', 'create', 'edit'],
     'remboursements': ['view', 'create'],
+    'virements_programmes': ['view', 'edit'],
     'rh': ['view'] // Pointage uniquement
   },
   [SystemRole.AGENT_TERRAIN]: {
@@ -289,6 +297,7 @@ export const MODULES_DATA: ModuleSeed[] = [
   { name: 'Visites', description: 'Visites clients terrain', icon: 'Map', category: 'operations', orderIndex: 22 },
   { name: 'Prospection', description: 'Prospection nouveaux clients', icon: 'UserPlus', category: 'operations', orderIndex: 23 },
   { name: 'Paiements Agent', description: 'Paiements initiés par agents', icon: 'Banknote', category: 'finance', orderIndex: 24 },
+  { name: 'Virements Programmes', description: 'Planification des virements internes', icon: 'CalendarClock', category: 'admin', orderIndex: 25 },
 ];
 
 /**
@@ -398,6 +407,10 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Envoyer un transfert', code: 'transferts.send', description: 'Initier un transfert' },
     { name: 'Recevoir un transfert', code: 'transferts.receive', description: 'Valider une réception' },
   ],
+  'Virements Programmes': [
+    { name: 'Voir les virements programmés', code: 'virements_programmes.view', description: 'Accès à la liste des virements programmés' },
+    { name: 'Modifier les virements programmés', code: 'virements_programmes.edit', description: 'Modifier ou mettre en pause un virement programmé' },
+  ],
   'Rapports': [
     { name: 'Voir les rapports', code: 'rapports.view', description: 'Accès au module Rapports' },
     { name: 'Exporter les rapports', code: 'rapports.export', description: 'Télécharger les rapports' },
@@ -469,6 +482,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
   [SystemRole.ADMIN]: ['*'],
   [SystemRole.CHEF_AGENCE]: [
     'dashboard.view',
+    'admin.users',
     'clients.view', 'clients.create', 'clients.edit', 'clients.delete',
     'credits.view', 'credits.create', 'credits.edit', 'credits.approve', 'credits.delete',
     'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
@@ -488,6 +502,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'visites.view',
     'prospection.view',
     'paiements.view',
+    'virements_programmes.view', 'virements_programmes.edit',
     'communications.view',
     'messages.view', 'messages.send',
   ],
@@ -527,6 +542,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'epargnes.view', 'epargnes.create', 'epargnes.edit',
     'caisse.view', 'caisse.create', 'caisse.edit',
     'remboursements.view', 'remboursements.create',
+    'virements_programmes.view', 'virements_programmes.edit',
     'communications.view',
     'rh.view',
   ],

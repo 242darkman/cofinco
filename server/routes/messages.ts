@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { requireAuth } from "../auth";
 import { db } from "../db";
-import { messages, users } from "@shared/schema";
+import { messages, users, userAgences, agences } from "@shared/schema";
 import { eq, or, and, desc, asc, sql, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
@@ -48,13 +48,15 @@ export function registerMessagesRoutes(app: Express) {
           u.photo_profile as partner_avatar,
           u.statut as partner_status,
           u.role as partner_role,
-          u.agence as partner_agence,
+          a.nom as partner_agence,
           (SELECT COUNT(*) FROM messages m 
            WHERE m.receiver_id = ${userId} 
            AND m.sender_id = lm.partner_id 
            AND m.read = false) as unread_count
         FROM LastMessages lm
         JOIN users u ON u.id = lm.partner_id
+        LEFT JOIN user_agences ua ON ua.user_id = u.id AND ua.is_primary = true AND ua.actif = true
+        LEFT JOIN agences a ON a.id = ua.agence_id
         ORDER BY lm.created_at DESC
       `);
 
@@ -169,10 +171,16 @@ export function registerMessagesRoutes(app: Express) {
         prenom: users.prenom,
         photoProfile: users.photoProfile,
         role: users.role,
-        agence: users.agence,
+        agence: agences.nom,
         typeCompte: users.typeCompte
       })
       .from(users)
+      .leftJoin(userAgences, and(
+        eq(userAgences.userId, users.id),
+        eq(userAgences.isPrimary, true),
+        eq(userAgences.actif, true)
+      ))
+      .leftJoin(agences, eq(userAgences.agenceId, agences.id))
       .where(
         and(
           ne(users.id, req.user.id),

@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine } from "@shared/schema";
+import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
 
 import { StorageService } from '../services/storage-service';
 import { storage } from "../storage";
@@ -9,7 +9,7 @@ import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, lo
 import { requireAuth, requireRole, hashPassword } from "../auth";
 import { requireAgenceAccess, validateAgenceAction, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
+import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
 import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
@@ -65,7 +65,16 @@ export function registerClientRoutes(app: Express) {
         }
       }
 
-      res.json(addSnakeCaseAliasesDeep(eligibleClients));
+      const { page, perPage, offset } = parsePagination(req.query);
+      const total = eligibleClients.length;
+      const paged = eligibleClients.slice(offset, offset + perPage);
+      res.json(
+        paginateResponse(addSnakeCaseAliasesDeep(paged), total, page, perPage, {
+          path: `${req.baseUrl}${req.path}`,
+          query: req.query,
+          filters: filter,
+        })
+      );
     } catch (error) {
       console.error("Error fetching eligible clients:", error);
       res.status(500).json({ message: "Erreur lors de la récupération des clients éligibles" });
@@ -80,10 +89,17 @@ export function registerClientRoutes(app: Express) {
 
       // On passe le filtre directement au storage qui l'applique en SQL
       const filter = agenceFilter || {};
-      const clients = await storage.getAllClients(filter);
+      const { page, perPage } = parsePagination(req.query);
+      const { data, total } = await storage.getClientsPaginated(filter, page, perPage);
 
-      const transformed = addSnakeCaseAliasesDeep(clients);
-      res.json(transformed);
+      const transformed = addSnakeCaseAliasesDeep(data);
+      res.json(
+        paginateResponse(transformed, total, page, perPage, {
+          path: `${req.baseUrl}${req.path}`,
+          query: req.query,
+          filters: filter,
+        })
+      );
     } catch (e) {
       console.error(e);
       res.status(500).json({ message: "Failed to fetch clients" });
@@ -199,7 +215,16 @@ export function registerClientRoutes(app: Express) {
         }
         
         console.log(`[Search] Found ${enrichedResults.length} results (Enriched)`);
-        res.json(addSnakeCaseAliasesDeep(enrichedResults));
+        const { page, perPage, offset } = parsePagination(req.query);
+        const total = enrichedResults.length;
+        const paged = enrichedResults.slice(offset, offset + perPage);
+        res.json(
+          paginateResponse(addSnakeCaseAliasesDeep(paged), total, page, perPage, {
+            path: `${req.baseUrl}${req.path}`,
+            query: req.query,
+            filters: { q: query },
+          })
+        );
     } catch (e) {
         res.status(500).json({ message: "Search failed" });
     }
@@ -212,7 +237,16 @@ export function registerClientRoutes(app: Express) {
 
       const clients = await storage.getAllClients(filter);
       const withLoc = clients.filter(c => c.latitude && c.longitude);
-      res.json(addSnakeCaseAliasesDeep(withLoc));
+      const { page, perPage, offset } = parsePagination(req.query);
+      const total = withLoc.length;
+      const paged = withLoc.slice(offset, offset + perPage);
+      res.json(
+        paginateResponse(addSnakeCaseAliasesDeep(paged), total, page, perPage, {
+          path: `${req.baseUrl}${req.path}`,
+          query: req.query,
+          filters: filter,
+        })
+      );
   });
 
 
@@ -522,12 +556,41 @@ export function registerClientRoutes(app: Express) {
   app.post("/api/clients", requireAuth, requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
+
+        // Validate documents array separately for better error messages
+        let validatedDocuments: ClientDocument[] | undefined = undefined;
+        if (data.documents && Array.isArray(data.documents)) {
+          const docsResult = clientDocumentsArraySchema.safeParse(data.documents);
+          if (!docsResult.success) {
+            console.warn("Documents validation failed:", docsResult.error);
+            // Still allow creation, just log the validation issue
+          } else {
+            validatedDocuments = docsResult.data;
+          }
+
+          // Verify that private documents use secure-docs bucket keys
+          if (validatedDocuments) {
+            validatedDocuments = validatedDocuments.map(doc => {
+              // Ensure private docs have proper path format (not full URLs)
+              if (doc.isPrivate && doc.documentUrl.startsWith('http')) {
+                console.warn(`Document ${doc.documentType} has full URL for private doc, should be object key`);
+              }
+              return doc;
+            });
+          }
+        }
+
         const parsed = insertClientSchema.parse(data);
+
+        // Use validated documents if available, otherwise use parsed
+        const clientData = validatedDocuments
+          ? { ...parsed, documents: validatedDocuments }
+          : parsed;
 
         // L'agenceId a été validée/forcée par validateAgenceIdAction
         // Si elle manquait, validateAgenceIdAction l'a ajoutée depuis req.selectedAgenceId
 
-        const client = await storage.createClient(parsed);
+        const client = await storage.createClient(clientData);
 
         // 🏦 Auto-création d'un compte courant pour chaque nouveau client
         // Règle microfinance : tout client doit avoir un compte courant dans son agence
@@ -616,29 +679,44 @@ export function registerClientRoutes(app: Express) {
         }
 
         const data = normalizeKeysDeep(req.body);
+
+        // Validate documents array if provided
+        let validatedDocuments: ClientDocument[] | undefined = undefined;
+        if (data.documents && Array.isArray(data.documents)) {
+          const docsResult = clientDocumentsArraySchema.safeParse(data.documents);
+          if (docsResult.success) {
+            validatedDocuments = docsResult.data;
+          }
+        }
+
         const parsed = insertClientSchema.partial().parse(data);
+
+        // Merge validated documents
+        const updateData = validatedDocuments !== undefined
+          ? { ...parsed, documents: validatedDocuments }
+          : parsed;
 
         // Empêcher changement d'agence si non admin
         if (agenceFilter) {
-          if (parsed.agenceId && parsed.agenceId !== agenceFilter.agenceId) {
+          if (updateData.agenceId && updateData.agenceId !== agenceFilter.agenceId) {
             return res.status(403).json({ message: "Impossible de changer l'agence du client" });
           }
-          if (parsed.agence && agenceFilter.agence && parsed.agence !== agenceFilter.agence) {
+          if (updateData.agence && agenceFilter.agence && updateData.agence !== agenceFilter.agence) {
             return res.status(403).json({ message: "Impossible de changer l'agence du client" });
           }
         }
 
         // Check for file replacement and cleanup old file
-        if (parsed.photoProfile && existing.photoProfile && parsed.photoProfile !== existing.photoProfile) {
+        if (updateData.photoProfile && existing.photoProfile && updateData.photoProfile !== existing.photoProfile) {
              // If old photo was a URL (not base64), delete it
              if (!existing.photoProfile.startsWith('data:')) {
-                 StorageService.deleteFileFromUrl(existing.photoProfile).catch((e: any) => 
+                 StorageService.deleteFileFromUrl(existing.photoProfile).catch((e: any) =>
                     console.error("Failed to delete old profile photo:", e)
                  );
              }
         }
-        
-        const client = await storage.updateClient(req.params.id, parsed);
+
+        const client = await storage.updateClient(req.params.id, updateData);
 
         // ====== BUSINESS LOGIC: Account Freezing on Client Status Change ======
         const INACTIVE_STATUSES = ['Inactif', 'Suspendu', 'Blacklisté'];

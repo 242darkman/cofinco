@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useServerHealth } from '../../contexts/ServerHealthContext';
 
 export interface Permission {
   id: string;
@@ -15,6 +16,7 @@ export function usePermissions() {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isServerReachable } = useServerHealth();
 
   const fetchPermissions = async () => {
     setLoading(true);
@@ -61,8 +63,9 @@ export function usePermissions() {
   };
 
   useEffect(() => {
+    if (!isServerReachable) return;
     fetchPermissions();
-  }, []);
+  }, [isServerReachable]);
 
   return {
     permissions,

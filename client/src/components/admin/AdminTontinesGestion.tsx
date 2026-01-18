@@ -102,7 +102,7 @@ export default function AdminTontinesGestion() {
 
   const chargerClients = useCallback(async () => {
     try {
-      const data = await clientApi.getAll();
+      const data = await clientApi.getAllList();
       // Filter active clients
       setClients((data || []).filter((c: any) => c.status === 'Actif' || c.statut === 'Actif'));
     } catch (error) {

@@ -2,7 +2,7 @@ import { clients, typesMarches, tags, clientTags, clientActivities, users, agenc
 import { SystemRole } from "@shared/types/roles";
 import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and, isNull, sql } from "drizzle-orm";
 
 // Type pour client avec données utilisateur
 export interface ClientWithUser extends Client {
@@ -23,7 +23,7 @@ export async function getClient(id: string): Promise<Client | undefined> {
   return client || undefined;
 }
 
-export async function getAllClients(filter: { agence?: string; agenceId?: string } = {}): Promise<(Client & { type_marche_nom?: string | null; agence_nom?: string | null })[]> {
+export async function getAllClients(filter: { agence?: string; agenceId?: string } = {}): Promise<(Client & { type_marche_nom?: string | null; agence_nom?: string | null; photoUrl?: string | null })[]> {
   const conditions = [];
 
   // Filtrer par agenceId (prioritaire) ou par agence (legacy)
@@ -41,6 +41,7 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
       user_nom: users.nom,
       user_prenom: users.prenom,
       user_telephone: users.telephone,
+      user_photo_profile: users.photoProfile,
     })
     .from(clients)
     .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
@@ -61,8 +62,69 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
     prenom: r.user_prenom || r.client.prenom,
     telephone: r.user_telephone || r.client.telephone,
     type_marche_nom: r.type_marche_nom,
-    agence_nom: r.agence_nom
+    agence_nom: r.agence_nom,
+    // Photo: prioritize user.photoProfile, fallback to legacy client fields
+    photoUrl: r.user_photo_profile || r.client.photoProfile || r.client.photoUrl
   }));
+}
+
+export async function getClientsPaginated(
+  filter: { agence?: string; agenceId?: string } = {},
+  page: number = 1,
+  perPage: number = 25
+): Promise<{ data: (Client & { type_marche_nom?: string | null; agence_nom?: string | null; photoUrl?: string | null })[]; total: number }> {
+  const conditions = [];
+
+  if (filter.agenceId && filter.agenceId !== "all") {
+    conditions.push(eq(clients.agenceId, filter.agenceId));
+  } else if (filter.agence && filter.agence !== "all") {
+    conditions.push(eq(clients.agence, filter.agence));
+  }
+
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(clients)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
+
+  let query = db
+    .select({
+      client: clients,
+      type_marche_nom: typesMarches.nom,
+      agence_nom: agences.nom,
+      user_nom: users.nom,
+      user_prenom: users.prenom,
+      user_telephone: users.telephone,
+      user_photo_profile: users.photoProfile,
+    })
+    .from(clients)
+    .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
+    .leftJoin(agences, eq(clients.agenceId, agences.id))
+    .leftJoin(users, eq(clients.userId, users.id))
+    .$dynamic();
+
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as any;
+  }
+
+  const results = await query
+    .orderBy(desc(clients.createdAt))
+    .limit(perPage)
+    .offset((page - 1) * perPage);
+
+  return {
+    data: results.map((r) => ({
+      ...r.client,
+      nom: r.user_nom || r.client.nom,
+      prenom: r.user_prenom || r.client.prenom,
+      telephone: r.user_telephone || r.client.telephone,
+      type_marche_nom: r.type_marche_nom,
+      agence_nom: r.agence_nom,
+      photoUrl: r.user_photo_profile || r.client.photoProfile || r.client.photoUrl,
+    })),
+    total,
+  };
 }
 
 export async function createClient(insertClient: InsertClient): Promise<Client> {

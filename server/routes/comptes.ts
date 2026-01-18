@@ -22,10 +22,11 @@ import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { z } from "zod";
 import comptesService, { CompteError } from "../services/comptes";
+import { createVirementProgramme, executeCompteTransfer } from "../services/compte-transfers";
 import { storage } from "../storage";
-import { and, eq, sql } from "drizzle-orm";
+import { aliasedTable, and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "../db";
-import { comptes } from "@shared/schema";
+import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
 
 // Validation schemas
 const createCompteSchema = z.object({
@@ -80,6 +81,22 @@ const transfertAgenceSchema = z.object({
   motif: z.string().optional(),
 });
 
+const virementCompteSchema = z.object({
+  sourceCompteId: z.string().uuid(),
+  destinationCompteId: z.string().uuid().optional(),
+  destinationAccountNumber: z.string().min(3).optional(),
+  montant: z.coerce.number().positive("Le montant doit etre positif"),
+  scheduled: z.boolean().optional().default(false),
+  frequence: z.enum(["once", "daily", "weekly", "monthly"]).optional().default("once"),
+});
+
+const updateVirementProgrammeSchema = z.object({
+  montant: z.coerce.number().positive().optional(),
+  frequence: z.enum(["once", "daily", "weekly", "monthly"]).optional(),
+  prochaineExecution: z.string().nullable().optional(),
+  actif: z.boolean().optional(),
+});
+
 export function registerComptesRoutes(app: Express) {
   // ============================================================================
   // CREATE COMPTE
@@ -117,13 +134,36 @@ export function registerComptesRoutes(app: Express) {
         .where(whereClause)
         .groupBy(comptes.typeCompte);
 
+        const tauxStats = await db.select({
+          typeCompte: comptes.typeCompte,
+          tauxMoyen: sql<number>`avg(coalesce(${produitsCompte.tauxInteret}, 0))`.mapWith(Number),
+        })
+        .from(comptes)
+        .leftJoin(produitsCompte, eq(comptes.produitId, produitsCompte.id))
+        .where(whereClause)
+        .groupBy(comptes.typeCompte);
+
+        const tauxByType = Object.fromEntries(
+          tauxStats.map((stat) => [stat.typeCompte, Number(stat.tauxMoyen || 0)])
+        );
+
         // Format for frontend
+        const totalAccounts = allStats.reduce((sum, s) => sum + s.count, 0);
+        const tauxMoyenGlobal =
+          totalAccounts > 0
+            ? allStats.reduce((sum, s) => sum + (tauxByType[s.typeCompte] || 0) * s.count, 0) / totalAccounts
+            : 0;
+
         const result = {
           total: allStats.reduce((sum, s) => sum + s.count, 0),
           epargne: allStats.find(s => s.typeCompte === "Épargne")?.count || 0,
           courant: allStats.find(s => s.typeCompte === "Courant")?.count || 0,
           bloque: allStats.find(s => s.typeCompte === "Bloqué")?.count || 0,
-          totalSolde: allStats.reduce((sum, s) => sum + (s.totalSolde || 0), 0)
+          totalSolde: allStats.reduce((sum, s) => sum + (s.totalSolde || 0), 0),
+          tauxMoyenGlobal,
+          tauxMoyenEpargne: tauxByType["Épargne"] || 0,
+          tauxMoyenCourant: tauxByType["Courant"] || 0,
+          tauxMoyenBloque: tauxByType["Bloqué"] || 0,
         };
 
         res.json(result);
@@ -278,6 +318,501 @@ export function registerComptesRoutes(app: Express) {
       } catch (error: any) {
         console.error("Error listing comptes:", error);
         res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  /**
+   * GET /api/accounts/check/:accountNumber - Vérifier un compte par numéro
+   * Retourne uniquement le nom/prénom pour confidentialité
+   */
+  app.get(
+    "/api/accounts/check/:accountNumber",
+    requireAuth,
+    requireAgenceAccess(),
+    async (req, res) => {
+      try {
+        const accountNumber = String(req.params.accountNumber || '').trim();
+        if (!accountNumber) {
+          return res.status(400).json({ message: "Numéro de compte requis" });
+        }
+
+        const agenceFilter = req.agenceFilter as { agence?: string } | null;
+        const conditions: any[] = [eq(comptes.numeroCompte, accountNumber)];
+        if (agenceFilter?.agence && agenceFilter.agence !== 'all') {
+          conditions.push(eq(clients.agence, agenceFilter.agence));
+        }
+
+        const [result] = await db
+          .select({
+            clientNom: clients.nom,
+            clientPrenom: clients.prenom,
+            userNom: users.nom,
+            userPrenom: users.prenom,
+          })
+          .from(comptes)
+          .leftJoin(clients, eq(comptes.clientId, clients.id))
+          .leftJoin(users, eq(clients.userId, users.id))
+          .where(and(...conditions))
+          .limit(1);
+
+        if (!result) {
+          return res.status(404).json({ message: "Compte introuvable" });
+        }
+
+        const ownerName = `${result.userNom || result.clientNom || ''} ${result.userPrenom || result.clientPrenom || ''}`.trim();
+        return res.json({
+          found: true,
+          accountNumber,
+          ownerName: ownerName || 'Compte trouvé',
+        });
+      } catch (error: any) {
+        console.error("Error checking account number:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  /**
+   * GET /api/produits-compte - Liste des produits de compte (taux d'intérêt au niveau produit)
+   */
+  app.get("/api/produits-compte", requireAuth, requireAgenceAccess(), async (req, res) => {
+    try {
+      const typeCompte = req.query.typeCompte as string | undefined;
+      const actifOnly = req.query.actif !== 'false';
+
+      const conditions: any[] = [];
+      if (actifOnly) conditions.push(eq(produitsCompte.actif, true));
+      if (typeCompte) conditions.push(eq(produitsCompte.typeCompte, typeCompte as any));
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const produits = whereClause
+        ? await db.select().from(produitsCompte).where(whereClause)
+        : await db.select().from(produitsCompte);
+
+      res.json(addSnakeCaseAliasesDeep(produits));
+    } catch (error: any) {
+      console.error("Error listing produits compte:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * POST /api/comptes/transferts - Virement interne immediat ou programme
+   */
+  app.post(
+    "/api/comptes/transferts",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    requireAgenceAccess(),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body) as any;
+        const parsed = virementCompteSchema.parse(data);
+
+        if (!parsed.destinationCompteId && !parsed.destinationAccountNumber) {
+          return res.status(400).json({ message: "Compte destinataire requis" });
+        }
+
+        let destinationCompteId = parsed.destinationCompteId;
+        const destinationNumber = parsed.destinationAccountNumber?.trim();
+        if (!destinationCompteId && destinationNumber) {
+          const [destCompte] = await db
+            .select()
+            .from(comptes)
+            .where(eq(comptes.numeroCompte, destinationNumber))
+            .limit(1);
+          if (!destCompte) {
+            return res.status(404).json({ message: "Compte destinataire introuvable" });
+          }
+          destinationCompteId = destCompte.id;
+        }
+
+        if (!destinationCompteId) {
+          return res.status(400).json({ message: "Compte destinataire introuvable" });
+        }
+
+        if (destinationCompteId === parsed.sourceCompteId) {
+          return res.status(400).json({ message: "Compte source et destinataire identiques" });
+        }
+
+        const userId = req.session?.user?.id || null;
+
+        if (parsed.scheduled) {
+          const schedule = await createVirementProgramme({
+            compteSourceId: parsed.sourceCompteId,
+            compteDestId: destinationCompteId,
+            montant: parsed.montant,
+            frequence: parsed.frequence,
+            createdBy: userId,
+          });
+
+          return res.status(201).json(
+            addSnakeCaseAliasesDeep({
+              scheduled: true,
+              schedule,
+            })
+          );
+        }
+
+        const result = await executeCompteTransfer({
+          compteSourceId: parsed.sourceCompteId,
+          compteDestId: destinationCompteId,
+          montant: parsed.montant,
+          createdBy: userId,
+        });
+
+        return res.status(201).json({
+          scheduled: false,
+          mouvementId: result.mouvementId,
+        });
+      } catch (error: any) {
+        console.error("Error compte transfer:", error);
+        res.status(400).json({ message: error.message || "Erreur transfert" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/transferts-programmes/stats - Statistiques des virements programmés
+   */
+  app.get(
+    "/api/comptes/transferts-programmes/stats",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        const agenceId = req.selectedAgenceId;
+        const sourceCompte = aliasedTable(comptes, "source_compte");
+        const destCompte = aliasedTable(comptes, "dest_compte");
+
+        const conditions: any[] = [];
+        if (agenceId) {
+          conditions.push(
+            or(eq(sourceCompte.agenceId, agenceId), eq(destCompte.agenceId, agenceId))
+          );
+        }
+
+        const whereClause = conditions.length ? and(...conditions) : undefined;
+
+        // Fetch all relevant transfers to calculate stats in memory (easier for complex weighting)
+        // or complex SQL. Let's do SQL for robustness.
+        const stats = await db
+          .select({
+            totalCount: sql<number>`count(*)`.mapWith(Number),
+            activeCount: sql<number>`sum(case when ${virementsProgrammes.actif} = true then 1 else 0 end)`.mapWith(Number),
+            pausedCount: sql<number>`sum(case when ${virementsProgrammes.actif} = false then 1 else 0 end)`.mapWith(Number),
+            failedCount: sql<number>`sum(case when ${virementsProgrammes.statutDernier} = 'failed' then 1 else 0 end)`.mapWith(Number),
+            // Weighted volume for ALL active transfers
+            currentWeightedVolume: sql<number>`sum(
+              case 
+                when ${virementsProgrammes.actif} = true then 
+                  case ${virementsProgrammes.frequence}
+                    when 'daily' then ${virementsProgrammes.montant} * 30
+                    when 'weekly' then ${virementsProgrammes.montant} * 4
+                    when 'monthly' then ${virementsProgrammes.montant}
+                    else 0
+                  end
+                else 0
+              end
+            )`.mapWith(Number),
+            // Weighted volume for transfers created > 30 days ago (Old Baseline)
+            oldWeightedVolume: sql<number>`sum(
+              case 
+                when ${virementsProgrammes.actif} = true and ${virementsProgrammes.createdAt} < NOW() - INTERVAL '30 days' then 
+                  case ${virementsProgrammes.frequence}
+                    when 'daily' then ${virementsProgrammes.montant} * 30
+                    when 'weekly' then ${virementsProgrammes.montant} * 4
+                    when 'monthly' then ${virementsProgrammes.montant}
+                    else 0
+                  end
+                else 0
+              end
+            )`.mapWith(Number),
+            nextExecution: sql<string>`min(case when ${virementsProgrammes.actif} = true then ${virementsProgrammes.prochaineExecution} else null end)`,
+          })
+          .from(virementsProgrammes)
+          .leftJoin(sourceCompte, eq(virementsProgrammes.compteSourceId, sourceCompte.id))
+          .leftJoin(destCompte, eq(virementsProgrammes.compteDestId, destCompte.id))
+          .where(whereClause);
+
+        const result = stats[0] || {
+          totalCount: 0,
+          activeCount: 0,
+          pausedCount: 0,
+          failedCount: 0,
+          currentWeightedVolume: 0,
+          oldWeightedVolume: 0,
+          nextExecution: null,
+        };
+
+        const currentVol = result.currentWeightedVolume || 0;
+        const oldVol = result.oldWeightedVolume || 0;
+        
+        let trend = 0;
+        if (oldVol > 0) {
+          trend = ((currentVol - oldVol) / oldVol) * 100;
+        } else if (currentVol > 0) {
+          trend = 100; // 100% growth if started from 0
+        }
+
+        res.json({
+          totalCount: result.totalCount,
+          activeCount: result.activeCount,
+          pausedCount: result.pausedCount,
+          failedCount: result.failedCount,
+          totalVolume: currentVol,
+          nextExecution: result.nextExecution,
+          trend: Math.round(trend),
+          trendUp: trend >= 0
+        });
+      } catch (error: any) {
+        console.error("Error fetching scheduled transfer stats:", error);
+        res.status(500).json({ message: "Erreur lors du chargement des statistiques" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes/transferts-programmes - Lister les virements programmés
+   */
+  app.get(
+    "/api/comptes/transferts-programmes",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+        const offset = (page - 1) * limit;
+        const search = String(req.query.search || "").trim();
+        const actifParam = req.query.actif as string | undefined;
+        const actif = actifParam === "true" ? true : actifParam === "false" ? false : undefined;
+
+        const sourceCompte = aliasedTable(comptes, "source_compte");
+        const destCompte = aliasedTable(comptes, "dest_compte");
+        const sourceClient = aliasedTable(clients, "source_client");
+        const destClient = aliasedTable(clients, "dest_client");
+        const sourceUser = aliasedTable(users, "source_user");
+        const destUser = aliasedTable(users, "dest_user");
+
+        const conditions: any[] = [];
+        if (req.selectedAgenceId) {
+          conditions.push(
+            or(eq(sourceCompte.agenceId, req.selectedAgenceId), eq(destCompte.agenceId, req.selectedAgenceId))
+          );
+        }
+
+        if (actif !== undefined) {
+          conditions.push(eq(virementsProgrammes.actif, actif));
+        }
+
+        if (search) {
+          const pattern = `%${search}%`;
+          conditions.push(or(
+            ilike(sourceCompte.numeroCompte, pattern),
+            ilike(destCompte.numeroCompte, pattern),
+            ilike(sql`COALESCE(${sourceClient.nom}, '')`, pattern),
+            ilike(sql`COALESCE(${sourceClient.prenom}, '')`, pattern),
+            ilike(sql`COALESCE(${destClient.nom}, '')`, pattern),
+            ilike(sql`COALESCE(${destClient.prenom}, '')`, pattern),
+            ilike(sql`COALESCE(${sourceUser.nom}, '')`, pattern),
+            ilike(sql`COALESCE(${sourceUser.prenom}, '')`, pattern),
+            ilike(sql`COALESCE(${destUser.nom}, '')`, pattern),
+            ilike(sql`COALESCE(${destUser.prenom}, '')`, pattern),
+          ));
+        }
+
+        const whereClause = conditions.length ? and(...conditions) : undefined;
+
+        const [countResult] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(virementsProgrammes)
+          .leftJoin(sourceCompte, eq(virementsProgrammes.compteSourceId, sourceCompte.id))
+          .leftJoin(destCompte, eq(virementsProgrammes.compteDestId, destCompte.id))
+          .leftJoin(sourceClient, eq(sourceCompte.clientId, sourceClient.id))
+          .leftJoin(destClient, eq(destCompte.clientId, destClient.id))
+          .leftJoin(sourceUser, eq(sourceClient.userId, sourceUser.id))
+          .leftJoin(destUser, eq(destClient.userId, destUser.id))
+          .where(whereClause);
+
+        const schedules = await db
+          .select({
+            id: virementsProgrammes.id,
+            compteSourceId: virementsProgrammes.compteSourceId,
+            compteDestId: virementsProgrammes.compteDestId,
+            montant: virementsProgrammes.montant,
+            frequence: virementsProgrammes.frequence,
+            prochaineExecution: virementsProgrammes.prochaineExecution,
+            actif: virementsProgrammes.actif,
+            dernierExecution: virementsProgrammes.dernierExecution,
+            statutDernier: virementsProgrammes.statutDernier,
+            erreurDerniere: virementsProgrammes.erreurDerniere,
+            createdAt: virementsProgrammes.createdAt,
+            updatedAt: virementsProgrammes.updatedAt,
+            createdBy: virementsProgrammes.createdBy,
+            sourceNumero: sourceCompte.numeroCompte,
+            sourceType: sourceCompte.typeCompte,
+            sourceAgenceId: sourceCompte.agenceId,
+            destNumero: destCompte.numeroCompte,
+            destType: destCompte.typeCompte,
+            destAgenceId: destCompte.agenceId,
+            sourceClientNom: sourceClient.nom,
+            sourceClientPrenom: sourceClient.prenom,
+            sourceUserNom: sourceUser.nom,
+            sourceUserPrenom: sourceUser.prenom,
+            destClientNom: destClient.nom,
+            destClientPrenom: destClient.prenom,
+            destUserNom: destUser.nom,
+            destUserPrenom: destUser.prenom,
+          })
+          .from(virementsProgrammes)
+          .leftJoin(sourceCompte, eq(virementsProgrammes.compteSourceId, sourceCompte.id))
+          .leftJoin(destCompte, eq(virementsProgrammes.compteDestId, destCompte.id))
+          .leftJoin(sourceClient, eq(sourceCompte.clientId, sourceClient.id))
+          .leftJoin(destClient, eq(destCompte.clientId, destClient.id))
+          .leftJoin(sourceUser, eq(sourceClient.userId, sourceUser.id))
+          .leftJoin(destUser, eq(destClient.userId, destUser.id))
+          .where(whereClause)
+          .orderBy(desc(virementsProgrammes.createdAt))
+          .limit(limit)
+          .offset(offset);
+
+        res.json(
+          addSnakeCaseAliasesDeep({
+            data: schedules,
+            pagination: {
+              page,
+              limit,
+              total: Number(countResult?.count || 0),
+              totalPages: Math.ceil(Number(countResult?.count || 0) / limit),
+            },
+          })
+        );
+      } catch (error: any) {
+        console.error("Error listing scheduled transfers:", error);
+        res.status(500).json({ message: error.message || "Erreur chargement virements programmes" });
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/comptes/transferts-programmes/:id - Mettre à jour un virement programmé
+   */
+  app.patch(
+    "/api/comptes/transferts-programmes/:id",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body) as any;
+        const parsed = updateVirementProgrammeSchema.parse(data);
+
+        if (Object.keys(parsed).length === 0) {
+          return res.status(400).json({ message: "Aucune modification fournie" });
+        }
+
+        const sourceCompte = aliasedTable(comptes, "source_compte");
+        const destCompte = aliasedTable(comptes, "dest_compte");
+
+        const [existing] = await db
+          .select({
+            id: virementsProgrammes.id,
+            actif: virementsProgrammes.actif,
+            prochaineExecution: virementsProgrammes.prochaineExecution,
+            sourceAgenceId: sourceCompte.agenceId,
+            destAgenceId: destCompte.agenceId,
+          })
+          .from(virementsProgrammes)
+          .leftJoin(sourceCompte, eq(virementsProgrammes.compteSourceId, sourceCompte.id))
+          .leftJoin(destCompte, eq(virementsProgrammes.compteDestId, destCompte.id))
+          .where(eq(virementsProgrammes.id, req.params.id))
+          .limit(1);
+
+        if (!existing) {
+          return res.status(404).json({ message: "Virement programmé introuvable" });
+        }
+
+        if (
+          req.selectedAgenceId &&
+          existing.sourceAgenceId !== req.selectedAgenceId &&
+          existing.destAgenceId !== req.selectedAgenceId
+        ) {
+          return res.status(403).json({ message: "Accès refusé pour ce virement programmé" });
+        }
+
+        const updateData: Record<string, any> = {
+          updatedAt: new Date(),
+        };
+
+        if (parsed.montant !== undefined) {
+          updateData.montant = parsed.montant.toString();
+        }
+        if (parsed.frequence !== undefined) {
+          updateData.frequence = parsed.frequence;
+        }
+        if (parsed.actif !== undefined) {
+          updateData.actif = parsed.actif;
+        }
+        if (parsed.prochaineExecution !== undefined) {
+          if (parsed.prochaineExecution === null || parsed.prochaineExecution === "") {
+            updateData.prochaineExecution = null;
+          } else {
+            const nextDate = new Date(parsed.prochaineExecution);
+            if (Number.isNaN(nextDate.getTime())) {
+              return res.status(400).json({ message: "Date de prochaine exécution invalide" });
+            }
+            updateData.prochaineExecution = nextDate;
+          }
+        }
+
+        if (parsed.actif === true && parsed.prochaineExecution === undefined) {
+          const existingNext = existing.prochaineExecution ? new Date(existing.prochaineExecution) : null;
+          if (!existingNext || existingNext < new Date()) {
+            updateData.prochaineExecution = new Date();
+          }
+        }
+
+        if (parsed.montant !== undefined || parsed.frequence !== undefined || parsed.prochaineExecution !== undefined) {
+          updateData.statutDernier = "pending";
+          updateData.erreurDerniere = null;
+        }
+
+        const [updated] = await db
+          .update(virementsProgrammes)
+          .set(updateData)
+          .where(eq(virementsProgrammes.id, req.params.id))
+          .returning();
+
+        await logAudit(
+          req,
+          "UPDATE_VIREMENT_PROGRAMME",
+          "virement_programme",
+          updated.id,
+          {
+            montant: parsed.montant,
+            frequence: parsed.frequence,
+            prochaineExecution: parsed.prochaineExecution,
+            actif: parsed.actif,
+          },
+          "success",
+          "medium"
+        );
+
+        res.json(addSnakeCaseAliasesDeep(updated));
+      } catch (error: any) {
+        if (error.name === "ZodError") {
+          return res.status(400).json({
+            message: "Données invalides",
+            details: error.errors,
+          });
+        }
+        console.error("Error updating scheduled transfer:", error);
+        res.status(500).json({ message: error.message || "Erreur mise à jour virement programmé" });
       }
     }
   );

@@ -184,7 +184,7 @@ async function validateSessionCaisse(sessionId: string): Promise<void> {
   if (!session) {
     throw new CompteError("Session caisse non trouvée", "SESSION_NOT_FOUND");
   }
-  if (session.statut !== "Ouverte") {
+  if (session.closedAt) {
     throw new CompteError("Session caisse fermée", "SESSION_CLOSED");
   }
 }

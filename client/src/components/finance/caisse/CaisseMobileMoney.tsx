@@ -6,7 +6,7 @@ import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
-import { securityConfigApi, SecurityConfigResponse } from '../../../lib/api-client';
+import { securityConfigApi, SecurityConfigResponse, clientSearchApi } from '../../../lib/api-client';
 import { toast } from '../../../lib/toast';
 
 interface Client {
@@ -92,14 +92,11 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/clients/search?q=${encodeURIComponent(searchTerm)}&limit=1`);
-      if (!response.ok) throw new Error('Erreur recherche');
-      const clients = await response.json();
+      const response = await clientSearchApi.search(searchTerm, { page: 1, perPage: 1 });
+      const clients = response.data || [];
 
-      if (clients && clients.length > 0) {
+      if (clients.length > 0) {
         setSelectedClient(clients[0]);
-      } else {
-        // Simple visual feedback could be added here
       }
     } catch (error: any) {
       console.error('Erreur recherche client:', error);

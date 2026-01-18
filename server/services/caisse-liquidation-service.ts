@@ -83,7 +83,7 @@ export class CaisseLiquidationService {
         .from(sessionsCaisse)
         .where(and(
           eq(sessionsCaisse.caisseId, caisseId),
-          eq(sessionsCaisse.statut, "Ouverte"),
+          isNull(sessionsCaisse.closedAt),
           isNull(sessionsCaisse.deletedAt)
         ));
 
@@ -150,7 +150,7 @@ export class CaisseLiquidationService {
           .from(sessionsCaisse)
           .where(and(
             eq(sessionsCaisse.caisseId, autreCaisse.id),
-            eq(sessionsCaisse.statut, "Ouverte"),
+            isNull(sessionsCaisse.closedAt),
             isNull(sessionsCaisse.deletedAt)
           ));
 
@@ -272,7 +272,7 @@ export class CaisseLiquidationService {
           .from(sessionsCaisse)
           .where(and(
             eq(sessionsCaisse.caisseId, params.destinationId),
-            eq(sessionsCaisse.statut, "Ouverte"),
+            isNull(sessionsCaisse.closedAt),
             isNull(sessionsCaisse.deletedAt)
           ));
 

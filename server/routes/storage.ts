@@ -2,6 +2,10 @@ import { Router } from 'express';
 import multer from 'multer';
 import { StorageService } from '../services/storage-service';
 import { requireAuth } from '../auth';
+import { db } from '../db';
+import { clients, documents } from '@shared/schema';
+import { eq, sql } from 'drizzle-orm';
+import { SystemRole, normalizeRole } from '@shared/types/roles';
 
 const router = Router();
 
@@ -84,14 +88,87 @@ router.post('/presigned-url', requireAuth, async (req, res) => {
 router.get('/documents/:id/view', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const user = (req as any).user as { id: string; role?: string };
+    const normalizedRole = normalizeRole(user?.role);
 
-    // TODO: Fetch document from DB and verify user permissions
-    // const document = await db.select().from(documents).where(eq(documents.id, id));
-    // if (!document || !canUserAccessDocument(req.user, document)) {
-    //   return res.status(403).json({ error: 'Accès refusé' });
-    // }
+    if (!normalizedRole) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
 
-    const objectKey = `secure-docs/${id}`; // Example
+    let objectKey: string | null = null;
+    let ownerId: string | null = null;
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) {
+      const [document] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
+      if (document) {
+        objectKey = document.objectPath || null;
+        if (document.referenceType === 'client' && document.referenceId) {
+          const [client] = await db
+            .select({ userId: clients.userId })
+            .from(clients)
+            .where(eq(clients.id, document.referenceId))
+            .limit(1);
+          ownerId = client?.userId || null;
+        }
+        if (!ownerId && document.uploadedBy) {
+          ownerId = document.uploadedBy;
+        }
+      }
+    }
+
+    if (!objectKey) {
+      const clientDocResult = await db.execute(sql`
+        select ${clients.id} as "clientId",
+               ${clients.userId} as "userId",
+               doc as document
+        from ${clients},
+             jsonb_array_elements(${clients.documents}) as doc
+        where doc->>'id' = ${id}
+        limit 1
+      `);
+
+      const clientDoc = clientDocResult.rows[0] as
+        | { clientId: string; userId: string | null; document: any }
+        | undefined;
+
+      if (clientDoc?.document) {
+        const doc =
+          typeof clientDoc.document === 'string'
+            ? (JSON.parse(clientDoc.document) as Record<string, any>)
+            : (clientDoc.document as Record<string, any>);
+        objectKey =
+          doc.document_url ||
+          doc.documentUrl ||
+          doc.object_key ||
+          doc.objectKey ||
+          doc.url ||
+          null;
+        ownerId = doc.owner_id || doc.ownerId || clientDoc.userId || null;
+      }
+    }
+
+    objectKey = typeof objectKey === 'string' && objectKey.length > 0 ? objectKey : null;
+
+    if (!objectKey) {
+      return res.status(404).json({ error: 'Document introuvable' });
+    }
+
+    const isPrivileged =
+      normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+    const isSelfRole =
+      normalizedRole === SystemRole.CLIENT || normalizedRole === SystemRole.AGENT_TERRAIN;
+
+    if (!isPrivileged) {
+      if (!isSelfRole || !ownerId || ownerId !== user.id) {
+        return res.status(403).json({ error: 'Accès refusé' });
+      }
+    }
+
+    if (objectKey.startsWith('http') || objectKey.startsWith('data:')) {
+      return res.json({ url: objectKey });
+    }
+
     const url = await StorageService.getPresignedDownloadUrl(objectKey, 900);
 
     res.json({ url });

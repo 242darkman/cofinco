@@ -17,6 +17,7 @@ import AgentValidations from './components/agent/AgentValidations';
 import ReportGenerator from './components/shared/ReportGenerator';
 import AdminGestionAcces from './components/admin/AdminGestionAcces';
 import AdminModuleComplet from './components/admin/AdminModuleComplet';
+import AdminVirementsProgrammes from './components/admin/AdminVirementsProgrammes';
 import DashboardEnhanced from './components/dashboard/DashboardEnhanced';
 import Dashboard from './components/dashboard/Dashboard';
 import OfflineIndicator from './components/shared/OfflineIndicator';
@@ -25,10 +26,10 @@ import MessagesModule from './components/shared/MessagesModule';
 import ExcelModule from './components/shared/ExcelModule';
 import UserProfile from './components/shared/UserProfile';
 import LoadingScreen from './components/ui/LoadingScreen';
-import { clientsApi } from './lib/api';
 import AppShell from './components/layout/AppShell';
 import PlatformSidebarContent from './components/layout/PlatformSidebarContent';
 import PlatformHeader from './components/layout/PlatformHeader';
+import MobileBottomNav from './components/layout/MobileBottomNav';
 import { PLATFORM_MENU_ITEMS } from './constants/menuItems';
 import { getRouteByKey, canAccessRoute } from './lib/routes-config';
 import ForcePasswordChange from './components/auth/ForcePasswordChange';
@@ -237,6 +238,8 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
 
       case 'transfert':
         return <TransfertArgent />;
+      case 'virements_programmes':
+        return <AdminVirementsProgrammes />;
       case 'bourse':
         return <BourseModule />;
       case 'rh':
@@ -277,6 +280,17 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
         sidebarWidthClosed="w-16"
         contentOffsetOpen="lg:ml-64"
         contentOffsetClosed="lg:ml-16"
+        bottomNav={
+          <MobileBottomNav
+            currentModule={currentModule}
+            onModuleChange={(module) => {
+              handleModuleChange(module);
+              setSidebarOpen(false);
+            }}
+            onMenuToggle={() => setSidebarOpen((prev) => !prev)}
+            menuOpen={sidebarOpen}
+          />
+        }
         sidebar={
           <PlatformSidebarContent
             sidebarOpen={sidebarOpen}

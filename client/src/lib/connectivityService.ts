@@ -1,3 +1,9 @@
+import {
+  SERVER_HEALTH_ENDPOINT,
+  SERVER_HEALTH_PING_INTERVAL_MS,
+  SERVER_HEALTH_OFFLINE_THRESHOLD_MS,
+} from './serverHealthConfig';
+
 type ConnectivityCallback = (isOnline: boolean) => void;
 
 class ConnectivityService {
@@ -5,9 +11,9 @@ class ConnectivityService {
   private callbacks: Set<ConnectivityCallback> = new Set();
   private pingInterval: number | null = null;
   private lastPingSuccess: number = Date.now();
-  private pingEndpoint: string = '/api/health';
-  private pingIntervalMs: number = 30000;
-  private offlineThresholdMs: number = 60000;
+  private pingEndpoint: string = SERVER_HEALTH_ENDPOINT;
+  private pingIntervalMs: number = SERVER_HEALTH_PING_INTERVAL_MS;
+  private offlineThresholdMs: number = SERVER_HEALTH_OFFLINE_THRESHOLD_MS;
 
   constructor() {
     this.setupEventListeners();

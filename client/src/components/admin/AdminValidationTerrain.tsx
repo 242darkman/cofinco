@@ -7,6 +7,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole } from '@shared/types/roles';
+import { requestAllPages } from '../../lib/api-client';
 
 interface PaiementTerrain {
   id: string;
@@ -71,14 +72,32 @@ export default function AdminValidationTerrain() {
   });
 
   // Data Fetching with React Query - now includes agenceId in query
-  const { data: allPayments = [], isLoading, isRefetching } = useQuery({
-    queryKey: ['/api/paiements-terrain', { agenceId: selectedAgenceId }],
+  const { data: paymentsResponse, isLoading, isRefetching } = useQuery({
+    queryKey: ['/api/paiements-terrain', { agenceId: selectedAgenceId, page, search: searchTerm }],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (selectedAgenceId) {
-        params.append('agenceId', selectedAgenceId);
+      if (searchTerm.trim()) {
+        const allPayments = await requestAllPages<PaiementTerrain>('/paiements-terrain', selectedAgenceId ? { agenceId: selectedAgenceId } : undefined);
+        return {
+          success: true,
+          data: allPayments,
+          meta: {
+            pagination: {
+              page: 1,
+              per_page: itemsPerPage,
+              total_items: allPayments.length,
+              total_pages: Math.max(1, Math.ceil(allPayments.length / itemsPerPage)),
+            },
+            filters: { agenceId: selectedAgenceId || undefined },
+          },
+          links: { self: '', next: null, prev: null },
+        };
       }
-      const url = `/api/paiements-terrain${params.toString() ? `?${params.toString()}` : ''}`;
+
+      const params = new URLSearchParams();
+      if (selectedAgenceId) params.append('agenceId', selectedAgenceId);
+      params.append('page', String(page));
+      params.append('per_page', String(itemsPerPage));
+      const url = `/api/paiements-terrain?${params.toString()}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch payments');
       return response.json();
@@ -142,19 +161,29 @@ export default function AdminValidationTerrain() {
     }
   };
 
-  const filteredData = allPayments.filter((p: PaiementTerrain) => {
-    const search = searchTerm.toLowerCase();
-    return (
-        p.reference?.toLowerCase().includes(search) ||
-        p.clients?.nom?.toLowerCase().includes(search) ||
-        p.clients?.prenom?.toLowerCase().includes(search) ||
-        p.agents_terrain?.nom?.toLowerCase().includes(search)
-    );
-  });
+  const allPayments = paymentsResponse?.data || [];
+  const isSearching = searchTerm.trim().length > 0;
+  const filteredData = isSearching
+    ? allPayments.filter((p: PaiementTerrain) => {
+        const search = searchTerm.toLowerCase();
+        return (
+          p.reference?.toLowerCase().includes(search) ||
+          p.clients?.nom?.toLowerCase().includes(search) ||
+          p.clients?.prenom?.toLowerCase().includes(search) ||
+          p.agents_terrain?.nom?.toLowerCase().includes(search)
+        );
+      })
+    : allPayments;
 
-  // Pagination Logic
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedData = filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+  const totalPages = isSearching
+    ? Math.max(1, Math.ceil(filteredData.length / itemsPerPage))
+    : paymentsResponse?.meta?.pagination?.total_pages || 1;
+  const totalItems = isSearching
+    ? filteredData.length
+    : paymentsResponse?.meta?.pagination?.total_items || 0;
+  const paginatedData = isSearching
+    ? filteredData.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    : filteredData;
 
   const columns = [
     { 
@@ -227,7 +256,7 @@ export default function AdminValidationTerrain() {
            <div className="flex items-center gap-2">
              <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Validations Terrain</h2>
              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-xs font-medium border border-amber-500/20">
-               {allPayments.length} en attente
+               {totalItems} en attente
              </span>
            </div>
            <p className="text-slate-500 text-sm">Valider les transactions collectées par les agents en temps réel</p>

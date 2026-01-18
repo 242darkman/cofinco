@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { clientApi } from '../lib/api-client';
 
 export interface Client {
   id: string;
@@ -17,18 +18,20 @@ export interface Client {
   createdAt: string;
 }
 
-export function useClients() {
-  const { data: clients = [], isLoading: loading, error, refetch } = useQuery<Client[]>({
-    queryKey: ['clients'],
+export function useClients(pagination?: { page?: number; perPage?: number }) {
+  const page = pagination?.page ?? 1;
+  const perPage = pagination?.perPage ?? 25;
+
+  const { data: response, isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['clients', page, perPage],
     queryFn: async () => {
-      const response = await fetch('/api/clients');
-      if (!response.ok) throw new Error('Erreur serveur');
-      return response.json();
+      return clientApi.getAll({ page, perPage });
     }
   });
 
   return {
-    clients,
+    clients: response?.data || [],
+    meta: response?.meta,
     loading,
     error: error ? (error as Error).message : null,
     refresh: refetch

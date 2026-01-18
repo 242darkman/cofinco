@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  CheckCircle, XCircle, Clock, DollarSign, Search, Filter, 
-  ChevronRight, AlertTriangle, UserCheck, Wallet, ArrowRightLeft, RefreshCw 
+import {
+  CheckCircle, XCircle, Clock, DollarSign, Search,
+  UserCheck, Wallet, ArrowRightLeft, RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -105,6 +105,8 @@ export default function CreditRefundsPage() {
       toast.success('Remboursement approuvé avec succès');
       queryClient.invalidateQueries({ queryKey: ['credit-refunds'] });
       setShowApproveDialog(false);
+      // Notify sidebar to refresh badge count
+      window.dispatchEvent(new CustomEvent('refund-update'));
     },
     onError: (err) => {
       toast.error(handleApiError(err));
@@ -129,6 +131,8 @@ export default function CreditRefundsPage() {
       toast.success('Paiement effectué avec succès');
       queryClient.invalidateQueries({ queryKey: ['credit-refunds'] });
       setShowPayDialog(false);
+      // Notify sidebar to refresh badge count
+      window.dispatchEvent(new CustomEvent('refund-update'));
     },
     onError: (err) => {
       toast.error(handleApiError(err));
@@ -206,12 +210,13 @@ export default function CreditRefundsPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-2">Remboursements Crédit</h1>
-          <p className="text-slate-400">Gestion des remboursements de frais pour demandes rejetées</p>
+          <h1 className="text-2xl font-bold text-white mb-2 truncate">Restitutions de Frais de Dossier</h1>
+          <p className="text-slate-400 text-sm md:text-base">Gérer les remboursements des frais d'engagement pour les dossiers rejetés</p>
         </div>
-        <button 
+        <button
            onClick={() => queryClient.invalidateQueries({ queryKey: ['credit-refunds'] })}
            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition"
+           title="Actualiser"
         >
           <RefreshCw size={20} />
         </button>

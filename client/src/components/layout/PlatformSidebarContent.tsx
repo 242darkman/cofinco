@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Menu, X, LogOut, Lock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { maintenanceApi } from '../../lib/api-client';
+import { maintenanceApi, caisseAgentApi, creditRefundsApi } from '../../lib/api-client';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 import { usePermissionsContext } from '../../contexts/PermissionsContext';
-import { caisseAgentApi } from '../../lib/api-client';
 import { isAdminRole } from '@shared/types/roles';
 
 interface PlatformSidebarContentProps {
@@ -36,6 +35,7 @@ export default function PlatformSidebarContent({
   // Maintenance Status State
   const [lockedModules, setLockedModules] = useState<Set<string>>(new Set());
   const [pendingValidationsCount, setPendingValidationsCount] = useState<number>(0);
+  const [pendingRefundsCount, setPendingRefundsCount] = useState<number>(0);
 
   // Fetch Pending Validations Count
   const fetchPendingCount = async () => {
@@ -49,6 +49,21 @@ export default function PlatformSidebarContent({
     } catch (error) {
        // Silent error for dashboard counters
        console.error("Dashboard counter error:", error);
+    }
+  };
+
+  // Fetch Pending Refunds Count (Restitutions Frais)
+  const fetchPendingRefundsCount = async () => {
+    try {
+      if (canAccessRoute(getRouteByKey('remboursements')!, userRole)) {
+        const result = await creditRefundsApi.countPending();
+        if (result && typeof result.count === 'number') {
+          setPendingRefundsCount(result.count);
+        }
+      }
+    } catch (error) {
+       // Silent error for dashboard counters
+       console.error("Refunds counter error:", error);
     }
   };
 
@@ -71,6 +86,7 @@ export default function PlatformSidebarContent({
 
     fetchStatus();
     fetchPendingCount();
+    fetchPendingRefundsCount();
 
     // Real-time Updates Listener
     const handleMaintenanceUpdate = (event: CustomEvent) => {
@@ -99,17 +115,28 @@ export default function PlatformSidebarContent({
         });
     };
 
-    const handleOperationUpdate = (event: CustomEvent) => {
+    const handleOperationUpdate = () => {
       // Refresh count when operations change status
       fetchPendingCount();
     };
 
+    const handleRefundUpdate = () => {
+      // Refresh refund count when refunds change status
+      fetchPendingRefundsCount();
+    };
+
     window.addEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
     window.addEventListener('operation-update', handleOperationUpdate as EventListener);
+    window.addEventListener('refund-update', handleRefundUpdate as EventListener);
+
+    // Polling interval for refunds (every 30 seconds) for real-time feel
+    const refundPollInterval = setInterval(fetchPendingRefundsCount, 30000);
 
     return () => {
         window.removeEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
         window.removeEventListener('operation-update', handleOperationUpdate as EventListener);
+        window.removeEventListener('refund-update', handleRefundUpdate as EventListener);
+        clearInterval(refundPollInterval);
     };
   }, [userRole]);
 
@@ -245,7 +272,7 @@ export default function PlatformSidebarContent({
     const isAdmin = isAdminRole(userRole);
     const showMaintenanceLock = (isMaintenanceLocked || isPlatformLocked) && !isAdmin;
 
-    const isDisabled = route.key === 'transfert' || route.key === 'bourse' || showMaintenanceLock;
+    const isDisabled = route.key === 'bourse' || showMaintenanceLock;
 
     return (
       <button
@@ -285,10 +312,16 @@ export default function PlatformSidebarContent({
           )
         )}
 
-        {/* Real-time Badge for Collapsed Sidebar */}
+        {/* Real-time Badge for Collapsed Sidebar - Validations */}
         {!sidebarOpen && route.key === 'agentValidations' && pendingValidationsCount > 0 && (
           <div className="absolute top-1 right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {pendingValidationsCount}
+          </div>
+        )}
+        {/* Real-time Badge for Collapsed Sidebar - Restitutions Frais */}
+        {!sidebarOpen && route.key === 'remboursements' && pendingRefundsCount > 0 && (
+          <div className="absolute top-1 right-2 bg-cyan-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+            {pendingRefundsCount}
           </div>
         )}
 
@@ -300,6 +333,11 @@ export default function PlatformSidebarContent({
             {route.key === 'agentValidations' && pendingValidationsCount > 0 && (
               <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingValidationsCount}
+              </span>
+            )}
+            {route.key === 'remboursements' && pendingRefundsCount > 0 && (
+              <span className="bg-cyan-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+                {pendingRefundsCount}
               </span>
             )}
             {isDisabled && (

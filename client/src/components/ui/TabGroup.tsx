@@ -25,6 +25,7 @@ export interface Tab {
   label: string;
   icon?: LucideIcon;
   badge?: number | string;
+  badgeClassName?: string;
   disabled?: boolean;
 }
 
@@ -129,6 +130,11 @@ const TabGroup: React.FC<TabGroupProps> = ({
         const isActive = activeTab === tab.key;
         const Icon = tab.icon;
 
+        // Custom default style if no class provided
+        const defaultBadgeStyle = isActive
+             ? 'bg-white/20 text-white'
+             : 'bg-slate-600 text-slate-300';
+
         return (
           <button
             key={tab.key}
@@ -145,14 +151,11 @@ const TabGroup: React.FC<TabGroupProps> = ({
           >
             {Icon && <Icon size={sizeConfig.icon} />}
             <span>{tab.label}</span>
-            {tab.badge !== undefined && (
+            {tab.badge !== undefined && valOrZero(tab.badge) && (
               <span
                 className={`
-                  px-1.5 py-0.5 rounded-full text-[10px] font-bold
-                  ${isActive
-                    ? 'bg-white/20 text-white'
-                    : 'bg-slate-600 text-slate-300'
-                  }
+                  px-1.5 py-0.5 rounded-full text-[10px] font-bold ml-1
+                  ${tab.badgeClassName || defaultBadgeStyle}
                 `}
               >
                 {tab.badge}
@@ -164,5 +167,10 @@ const TabGroup: React.FC<TabGroupProps> = ({
     </div>
   );
 };
+
+function valOrZero(v: string | number) {
+    if (typeof v === 'number') return v > 0;
+    return !!v;
+}
 
 export default TabGroup;

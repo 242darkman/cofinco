@@ -31,7 +31,11 @@ export function useSecuritySettings() {
       if (!response.ok) throw new Error('Erreur serveur');
       
       const data = await response.json();
-      setSettings(Array.isArray(data) && data.length > 0 ? data[0] : null);
+      if (Array.isArray(data)) {
+        setSettings(data.length > 0 ? data[0] : null);
+      } else {
+        setSettings(data || null);
+      }
     } catch (err) {
       console.error('Erreur fetch security settings:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');

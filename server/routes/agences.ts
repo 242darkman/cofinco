@@ -3,7 +3,7 @@ import { db } from "../db";
 import { agences, userAgences, users, coffresForts, comptesLiaison } from "../../shared/schema";
 import { employes } from "../../shared/schema/employes";
 import { clients } from "../../shared/schema/clients";
-import { eq, and, ilike, or, desc, asc, sql } from "drizzle-orm";
+import { eq, and, ilike, or, desc, asc, sql, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../auth";
 import { logAudit } from "../audit";
 import { CoffresFortsService } from "../services/transfert-inter-coffres";
@@ -421,6 +421,16 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Agence non trouvée" });
       }
 
+      const [primaryCountResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(userAgences)
+        .where(and(
+          eq(userAgences.userId, userId),
+          eq(userAgences.isPrimary, true),
+          eq(userAgences.actif, true)
+        ));
+      const hasPrimary = Number(primaryCountResult?.count || 0) > 0;
+
       // Vérifier si l'affectation existe déjà
       const existing = await db
         .select()
@@ -428,18 +438,48 @@ export function registerAgencesRoutes(app: Express) {
         .where(and(eq(userAgences.userId, userId), eq(userAgences.agenceId, agenceId)));
 
       if (existing.length > 0) {
+        const current = existing[0];
+        let finalIsPrimary = Boolean(isPrimary);
+        if (!finalIsPrimary) {
+          const [otherPrimaryResult] = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(userAgences)
+            .where(and(
+              eq(userAgences.userId, userId),
+              eq(userAgences.isPrimary, true),
+              eq(userAgences.actif, true),
+              ne(userAgences.id, current.id)
+            ));
+          const hasOtherPrimary = Number(otherPrimaryResult?.count || 0) > 0;
+          if (!hasOtherPrimary) {
+            finalIsPrimary = true;
+          }
+        }
+
+        if (finalIsPrimary) {
+          await db
+            .update(userAgences)
+            .set({ isPrimary: false, updatedAt: new Date() })
+            .where(and(eq(userAgences.userId, userId), eq(userAgences.isPrimary, true)));
+        }
+
         // Réactiver si elle était désactivée
         const [updated] = await db
           .update(userAgences)
-          .set({ actif: true, isPrimary, role, updatedAt: new Date() })
+          .set({ actif: true, isPrimary: finalIsPrimary, role, updatedAt: new Date() })
           .where(eq(userAgences.id, existing[0].id))
           .returning();
 
         return res.json(updated);
       }
 
+      let finalIsPrimary = Boolean(isPrimary);
+      if (!finalIsPrimary && !hasPrimary) {
+        finalIsPrimary = true;
+      }
+
       // Si isPrimary, désactiver les autres agences primaires
-      if (isPrimary) {
+      if (finalIsPrimary) {
         await db
           .update(userAgences)
           .set({ isPrimary: false, updatedAt: new Date() })
@@ -451,7 +491,7 @@ export function registerAgencesRoutes(app: Express) {
         .values({
           userId,
           agenceId,
-          isPrimary,
+          isPrimary: finalIsPrimary,
           role,
           actif: true
         })
@@ -493,8 +533,36 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Affectation non trouvée" });
       }
 
+      let nextActif = actif !== undefined ? Boolean(actif) : current.actif;
+      let nextIsPrimary = isPrimary !== undefined ? Boolean(isPrimary) : current.isPrimary;
+      if (!nextActif) {
+        nextIsPrimary = false;
+      }
+
+      if (current.isPrimary && (!nextIsPrimary || !nextActif)) {
+        const [replacement] = await db
+          .select()
+          .from(userAgences)
+          .where(and(
+            eq(userAgences.userId, current.userId),
+            eq(userAgences.actif, true),
+            ne(userAgences.id, current.id)
+          ))
+          .orderBy(desc(userAgences.createdAt))
+          .limit(1);
+
+        if (!replacement) {
+          return res.status(400).json({ error: "Un utilisateur doit conserver une agence primaire active." });
+        }
+
+        await db
+          .update(userAgences)
+          .set({ isPrimary: true, updatedAt: new Date() })
+          .where(eq(userAgences.id, replacement.id));
+      }
+
       // Si on définit comme primaire, désactiver les autres
-      if (isPrimary === true) {
+      if (nextIsPrimary === true) {
         await db
           .update(userAgences)
           .set({ isPrimary: false })
@@ -504,9 +572,9 @@ export function registerAgencesRoutes(app: Express) {
       const [updated] = await db
         .update(userAgences)
         .set({
-          isPrimary: isPrimary !== undefined ? isPrimary : current.isPrimary,
+          isPrimary: nextIsPrimary,
           role: role !== undefined ? role : current.role,
-          actif: actif !== undefined ? actif : current.actif,
+          actif: nextActif,
           updatedAt: new Date()
         })
         .where(eq(userAgences.id, id))

@@ -5,7 +5,7 @@ export interface UserPermission {
   permission_name: string;
   permission_code: string;
   granted: boolean;
-  source: string; // 'role' ou 'custom'
+  source: 'role' | 'custom';
 }
 
 export function useUserPermissions(selectedUserId?: string) {
@@ -129,7 +129,7 @@ export function useUserPermissions(selectedUserId?: string) {
     }
   };
 
-  const getUserPermissionStatus = (permCode: string): { granted: boolean; source: string } => {
+  const getUserPermissionStatus = (permCode: string): { granted: boolean; source: 'role' | 'custom' | 'none' } => {
     const perm = userPermissions.find(p => p.permission_code === permCode);
     if (!perm) {
       return { granted: false, source: 'none' };

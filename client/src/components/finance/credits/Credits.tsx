@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign, XCircle, RefreshCw } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog } from '../../ui';
+import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
 import { useCredits } from '../../../hooks/credits/useCredits';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { useEnquetes } from '../../../hooks/credits/useEnquetes';
@@ -15,7 +16,7 @@ import CreditFeesPaymentModal from './CreditFeesPaymentModal';
 import EnqueteDetailModal from './EnqueteDetailModal';
 import ReferenceTable from './CreditRemboursement';
 import { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';
-import { formatClientName } from '../../../lib/format';
+import { formatClientName, resolveClientPhotoUrl } from '../../../lib/format';
 import { TableColumn } from '../../ui/ResponsiveTable';
 import { ProtectedFeature } from '../../auth/ProtectedFeature';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -24,14 +25,15 @@ import { toast } from 'sonner';
 
 type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements';
 
-const TABS = [
+// Helper to get static configuration
+const getTabConfig = () => [
   { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
   { key: 'credits', label: 'Crédits', icon: CreditCard },
-  { key: 'demandes', label: 'À traiter', icon: FileText }, // New demands, rejected, cancelled
-  { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck }, // Only "A enquêter" (ready for investigation)
-  { key: 'approbation', label: 'Approbation', icon: CheckCircle }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
-  { key: 'commission', label: 'Commission Crédit', icon: DollarSign }, // Approved demands waiting for disbursement
-  { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw }, // Credit reevaluation workflow
+  { key: 'demandes', label: 'À traiter', icon: FileText, badgeColors: 'bg-blue-100 text-blue-800' }, // New demands, rejected, cancelled
+  { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck, badgeColors: 'bg-yellow-100 text-yellow-800' }, // Only "A enquêter" (ready for investigation)
+  { key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeColors: 'bg-red-100 text-red-800' }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
+  { key: 'commission', label: 'Commission Crédit', icon: DollarSign, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
+  { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw, badgeColors: 'bg-gray-100 text-gray-800' }, // Credit reevaluation workflow
   { key: 'remboursements', label: 'Remboursements', icon: TrendingUp }
 ];
 
@@ -83,10 +85,27 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   }, [activeView]);
 
   // Hooks
+  // Hooks
   const credits = useCredits();
   const demandes = useDemandes();
   const enquetes = useEnquetes();
   const stats = useCreditStats();
+  const { counts: badgeCounts } = useCreditCounts();
+
+  // Dynamic Tabs Configuration
+  const tabs = getTabConfig().map(tab => {
+    let count = 0;
+    if (badgeCounts) {
+      switch (tab.key) {
+        case 'demandes': count = badgeCounts.toProcess; break;
+        case 'enquetes': count = badgeCounts.investigation; break;
+        case 'approbation': count = badgeCounts.approval; break;
+        case 'commission': count = badgeCounts.commission; break;
+        case 'reevaluations': count = badgeCounts.reevaluation; break;
+      }
+    }
+    return { ...tab, badge: count };
+  });
 
   // Offline Sync Logic
   const offlineItems = useLiveQuery(() => db.enquetes_offline.where('synced').equals(0).toArray());
@@ -181,7 +200,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const renderClientName = (item: any) => {
     const client = item.clients || item.client;
     const name = formatClientName(client?.nom, client?.prenom) || 'Client Inconnu';
-    const photoUrl = client?.photo_url || client?.photoProfile;
+    const photoUrl = resolveClientPhotoUrl(client?.photo_url || client?.photoProfile);
     const initials = (client?.nom?.[0] || 'C').toUpperCase();
 
     return (
@@ -298,7 +317,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <TabGroup 
           activeTab={activeTab} 
           onTabChange={(key) => setActiveTab(key as TabId)}
-          tabs={TABS} 
+          tabs={tabs} 
           variant="pills"
         />
       </Card>

@@ -73,6 +73,10 @@ vi.mock('../storage/tontines', () => ({
     createContributionTontineWithLedger: vi.fn(),
 }));
 
+vi.mock('../services/tontine-logic', () => ({
+    isTourFullyPaid: vi.fn().mockResolvedValue({ isPaid: false, montantRestant: 1000 }),
+}));
+
 describe('Production Readiness - Staged Features Robustness', () => {
 
   beforeEach(() => {

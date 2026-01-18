@@ -1,4 +1,5 @@
 import {
+  CalendarClock,
   LayoutDashboard,
   Users,
   Wallet,
@@ -16,7 +17,7 @@ import {
   Settings,
   MessageSquare,
   UserCircle,
-  RefreshCw,
+  Undo2,
   BarChart3,
   CheckCircle,
 } from 'lucide-react';
@@ -29,7 +30,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   // Services Clients
   { labelKey: 'menuClients', icon: Users, key: 'clients', section: 'services' },
   { labelKey: 'menuCredits', icon: Banknote, key: 'credits', section: 'services' },
-  { labelKey: 'menuRemboursements', icon: RefreshCw, key: 'remboursements', section: 'services' },
+  { labelKey: 'menuRemboursements', icon: Undo2, key: 'remboursements', section: 'services' },
   { labelKey: 'menuCompte', icon: PiggyBank, key: 'epargnes', section: 'services' },
   { labelKey: 'menuTontines', icon: CircleDollarSign, key: 'tontines', section: 'services' },
 
@@ -39,6 +40,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   { labelKey: 'menuValidations', icon: CheckCircle, key: 'agentValidations', section: 'operations' },
   { labelKey: 'menuTransfert', icon: ArrowLeftRight, key: 'transfert', section: 'operations' },
   { labelKey: 'menuCoffre', icon: Shield, key: 'coffre', section: 'operations' },
+  { labelKey: 'menuVirementsProgrammes', icon: CalendarClock, key: 'virements_programmes', section: 'operations' },
 
   // Gestion
   { labelKey: 'menuComptabilite', icon: BookOpen, key: 'comptabilite', section: 'gestion' },

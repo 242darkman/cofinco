@@ -28,6 +28,8 @@ export interface TableColumn<T> {
   primary?: boolean;        // Primary field (shown as title on mobile)
   hideOnMobile?: boolean;   // Hide this column on mobile card view
   format?: (value: any, item: T) => ReactNode;
+  mobileFormat?: (value: any, item: T) => ReactNode;
+  mobileClassName?: string;
   badge?: boolean;          // Render as badge
   badgeClassName?: string;  // Custom class for badge
   icon?: LucideIcon;
@@ -78,6 +80,12 @@ function ResponsiveTable<T extends Record<string, any>>({
     if (value === null || value === undefined) return '';
     if (typeof value === 'object') return String(value);
     return value;
+  };
+
+  const formatMobileValue = (item: T, column: TableColumn<T>): ReactNode => {
+    const value = getValue(item, column.key as string);
+    if (column.mobileFormat) return column.mobileFormat(value, item);
+    return formatValue(item, column);
   };
 
   // Badge component
@@ -155,7 +163,7 @@ function ResponsiveTable<T extends Record<string, any>>({
               {/* Header row with primary + actions */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  {formatValue(item, primaryColumn)}
+                  {formatMobileValue(item, primaryColumn)}
                 </div>
                 {actions && (
                   <div className="flex items-center gap-0.5 shrink-0">
@@ -171,14 +179,24 @@ function ResponsiveTable<T extends Record<string, any>>({
                     .filter((col) => !col.primary && !col.hideOnMobile && String(col.key) !== 'actions')
                     .map((col) => {
                       const value = getValue(item, col.key as string);
-                      if (value === null || value === undefined || (typeof value === 'string' && value === '')) return null;
+                      const mobileContent = formatMobileValue(item, col);
+                      if (
+                        mobileContent === null ||
+                        mobileContent === undefined ||
+                        mobileContent === '' ||
+                        (!col.mobileFormat && (value === null || value === undefined || (typeof value === 'string' && value === '')))
+                      ) {
+                        return null;
+                      }
                       
                       return (
-                        <div key={col.key as string}>
-                          {col.badge ? (
+                        <div key={col.key as string} className={col.mobileClassName}>
+                          {col.mobileFormat ? (
+                            mobileContent
+                          ) : col.badge ? (
                             <Badge value={value} className={col.badgeClassName} />
                           ) : (
-                            formatValue(item, col)
+                            mobileContent
                           )}
                         </div>
                       );

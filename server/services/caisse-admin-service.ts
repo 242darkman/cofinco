@@ -13,6 +13,7 @@ import {
   type Caisse,
 } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
+import { ForcedCloseReason } from "@shared/enums";
 
 export interface ForceCloseSessionParams {
   sessionId: string;
@@ -68,7 +69,7 @@ export class CaisseAdminService {
         };
       }
 
-      if (session.statut !== "Ouverte") {
+      if (session.closedAt) {
         return {
           success: false,
           error: "La session n'est pas ouverte",
@@ -83,12 +84,9 @@ export class CaisseAdminService {
       const [closedSession] = await db
         .update(sessionsCaisse)
         .set({
-          statut: "Fermée",
-          dateFermeture: new Date(),
-          closedReason: "admin_force",
-          forcedClose: true,
+          closedAt: new Date(),
+          forcedCloseReason: params.motif || ForcedCloseReason.ADMIN_FORCE,
           forceClosedBy: params.closedBy,
-          forceCloseMotif: params.motif,
           forceClosedAt: new Date(),
           fundsKeptInCaisse: params.keepFunds || false,
           soldeReel: soldeTheorique.toString(), // Assume theoretical = real for force close
@@ -181,7 +179,7 @@ export class CaisseAdminService {
         .from(sessionsCaisse)
         .where(and(
           eq(sessionsCaisse.caisseId, caisseId),
-          eq(sessionsCaisse.statut, "Ouverte"),
+          isNull(sessionsCaisse.closedAt),
           isNull(sessionsCaisse.deletedAt)
         ));
 

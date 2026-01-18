@@ -12,7 +12,8 @@ interface SessionCaisse {
   id: string;
   solde_initial: number;
   solde_theorique: number;
-  date_ouverture: string;
+  openedAt?: string;
+  opened_at?: string;
 }
 
 interface CaisseRapprochementProps {

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import { requestListAll } from '../lib/api-client';
 
 export interface ExcelRow {
   [key: string]: any;
@@ -14,6 +15,15 @@ interface UseExcelSheetProps {
   initialColumns: string[];
   initialData?: ExcelRow[];
 }
+
+const normalizeApiPath = (endpoint: string) =>
+  endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
+
+const parseEndpointParams = (endpoint: string) => {
+  const [path, query] = endpoint.split('?');
+  const params = query ? Object.fromEntries(new URLSearchParams(query)) : undefined;
+  return { path, params };
+};
 
 export function useExcelSheet({ initialColumns, initialData = [] }: UseExcelSheetProps) {
   const [spreadsheetData, setSpreadsheetData] = useState<ExcelRow[]>(initialData);
@@ -136,10 +146,23 @@ export function useExcelSheet({ initialColumns, initialData = [] }: UseExcelShee
              return;
         }
 
-        const response = await fetch(endpoint, { credentials: 'include' });
-        if (!response.ok) throw new Error(`Erreur ${response.status}`);
-        
-        const data = await response.json();
+        if (!endpoint) throw new Error('Endpoint manquant');
+
+        let data: any[] = [];
+        if (endpoint.startsWith('/api/')) {
+             const { path, params } = parseEndpointParams(endpoint);
+             data = await requestListAll<any>(normalizeApiPath(path), params);
+        } else {
+             const response = await fetch(endpoint, { credentials: 'include' });
+             if (!response.ok) throw new Error(`Erreur ${response.status}`);
+             const payload = await response.json();
+             if (Array.isArray(payload)) {
+               data = payload;
+             } else if (payload?.data && Array.isArray(payload.data)) {
+               data = payload.data;
+             }
+        }
+
         if (!data || data.length === 0) throw new Error('Aucune donnée à exporter');
 
         // Clean data (remove nulls)

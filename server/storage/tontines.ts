@@ -1,4 +1,4 @@
-import { tontines, membresTontine, contributionsTontine, clients, users, tontineRegles, tontinePenalites, tontineDistributions, tontinePlans, tontineAlertes } from "@shared/schema";
+import { tontines, membresTontine, contributionsTontine, clients, users, userAgences, agences, tontineRegles, tontinePenalites, tontineDistributions, tontinePlans, tontineAlertes } from "@shared/schema";
 import { type Tontine, type InsertTontine, type MembreTontine, type InsertMembreTontine, type ContributionTontine, type InsertContributionTontine,
     type TontineRegle, type InsertTontineRegle, type TontinePenalite, type InsertTontinePenalite,
     type TontinePlan, type InsertTontinePlan,
@@ -116,7 +116,13 @@ export async function getAllTontines(filter: { agence?: string } = {}): Promise<
         ))
         .leftJoin(tontineDistributions, eq(tontines.id, tontineDistributions.tontineId))
         .leftJoin(users, eq(tontines.gestionnaireId, users.id))
-        .where(eq(users.agence, filter.agence))
+        .leftJoin(userAgences, and(
+          eq(userAgences.userId, users.id),
+          eq(userAgences.isPrimary, true),
+          eq(userAgences.actif, true)
+        ))
+        .leftJoin(agences, eq(userAgences.agenceId, agences.id))
+        .where(eq(agences.nom, filter.agence))
         .groupBy(tontines.id)
         .orderBy(desc(tontines.createdAt));
 

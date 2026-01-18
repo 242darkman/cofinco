@@ -1,20 +1,21 @@
 import { users, loginAttempts, pushSubscriptions, notificationPreferences, pushNotificationLogs } from "@shared/schema";
 import { type User, type InsertUser, type LoginAttempt, type InsertLoginAttempt, type PushSubscription, type InsertPushSubscription, type NotificationPreferences, type InsertNotificationPreferences, type PushNotificationLog, type InsertPushNotificationLog } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import { notDeleted } from "./query-helpers";
 
 export async function getUser(id: string): Promise<User | undefined> {
-  const [user] = await db.select().from(users).where(and(eq(users.id, id), isNull(users.deletedAt)));
+  const [user] = await db.select().from(users).where(and(eq(users.id, id), notDeleted(users)));
   return user || undefined;
 }
 
 export async function getUserByUsername(username: string): Promise<User | undefined> {
-  const [user] = await db.select().from(users).where(and(eq(users.username, username), isNull(users.deletedAt)));
+  const [user] = await db.select().from(users).where(and(eq(users.username, username), notDeleted(users)));
   return user || undefined;
 }
 
 export async function getAllUsers(): Promise<User[]> {
-  return db.select().from(users).where(isNull(users.deletedAt)).orderBy(desc(users.createdAt));
+  return db.select().from(users).where(notDeleted(users)).orderBy(desc(users.createdAt));
 }
 
 export async function createUser(insertUser: InsertUser): Promise<User> {

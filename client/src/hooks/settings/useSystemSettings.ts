@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useServerHealth } from '../../contexts/ServerHealthContext';
 
 export interface SystemSetting {
   id: string;
@@ -15,6 +16,7 @@ export function useSystemSettings() {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { isServerReachable } = useServerHealth();
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -62,8 +64,9 @@ export function useSystemSettings() {
   };
 
   useEffect(() => {
+    if (!isServerReachable) return;
     fetchSettings();
-  }, []);
+  }, [isServerReachable]);
 
   return {
     settings,

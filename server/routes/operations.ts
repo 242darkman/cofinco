@@ -2,16 +2,21 @@ import type { Express } from "express";
 import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { normalizeKeysDeep, addSnakeCaseAliasesDeep, parsePagination, paginateResponse } from "./utils";
 import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { getWsInstance } from "../ws-server";
 
 export function registerOperationsRoutes(app: Express) {
   // Agents
   app.get("/api/agents-terrain", requireAuth, async (req, res) => {
-      const agents = await storage.getAllAgentsTerrain();
-      // Agents enriched with dynamic stats (clients, performance)
-      res.json(addSnakeCaseAliasesDeep(agents));
+      const { page, perPage } = parsePagination(req.query);
+      const { data, total } = await storage.getAgentsTerrainPaginated(page, perPage);
+      res.json(
+        paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+          path: `${req.baseUrl}${req.path}`,
+          query: req.query,
+        })
+      );
   });
 
   // Create agent terrain (roles: admin, chef)
@@ -44,8 +49,14 @@ export function registerOperationsRoutes(app: Express) {
 
   // Prospections
   app.get("/api/prospections", requireAuth, async (req, res) => {
-      const list = await storage.getAllProspections();
-      res.json(addSnakeCaseAliasesDeep(list));
+      const { page, perPage } = parsePagination(req.query);
+      const { data, total } = await storage.getProspectionsPaginated(page, perPage);
+      res.json(
+        paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+          path: `${req.baseUrl}${req.path}`,
+          query: req.query,
+        })
+      );
   });
 
   // Create prospection (roles: admin, chef, terrain, superviseur)
@@ -65,8 +76,14 @@ export function registerOperationsRoutes(app: Express) {
 
   // Visites
   app.get("/api/visites-terrain", requireAuth, async (req, res) => {
-      const list = await storage.getAllVisitesTerrain();
-      res.json(addSnakeCaseAliasesDeep(list));
+      const { page, perPage } = parsePagination(req.query);
+      const { data, total } = await storage.getVisitesTerrainPaginated(page, perPage);
+      res.json(
+        paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+          path: `${req.baseUrl}${req.path}`,
+          query: req.query,
+        })
+      );
   });
   
 
@@ -167,21 +184,58 @@ export function registerOperationsRoutes(app: Express) {
         // For chef d'agence, automatically filter by their agency
         const normalizedRole = normalizeRole(user?.role);
         if (normalizedRole === SystemRole.CHEF_AGENCE) {
-          // Get employe record to find agenceId
-          const employe = await storage.getEmployeByUserId(user.id);
-          agenceId = employe?.agenceId || undefined;
+          agenceId = user?.agenceId || undefined;
+          if (!agenceId && user?.id) {
+            const employe = await storage.getEmployeByUserId(user.id);
+            agenceId = employe?.agenceId || undefined;
+          }
         } else if (normalizedRole === SystemRole.ADMIN) {
           // For admin, use query parameter (optional)
           agenceId = req.query.agenceId as string | undefined;
           if (agenceId === 'all') agenceId = undefined;
         }
 
-        // Use the new getPendingPaiementsByAgence function
-        const list = await storage.getPendingPaiementsByAgence(agenceId);
-        res.json(addSnakeCaseAliasesDeep(list));
+        const { page, perPage } = parsePagination(req.query);
+        const { data, total } = await storage.getPendingPaiementsByAgencePaginated(agenceId, page, perPage);
+        res.json(
+          paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+            path: `${req.baseUrl}${req.path}`,
+            query: req.query,
+            filters: agenceId ? { agenceId } : {},
+          })
+        );
       } catch (error: any) {
         console.error('Error fetching paiements terrain:', error);
         res.status(500).json({ error: 'Failed to fetch payments' });
+      }
+  });
+
+  // POS Devices
+  app.get("/api/pos-devices", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+      try {
+        const user = req.session.user;
+        const normalizedRole = normalizeRole(user?.role);
+        const queryAgenceId = req.query.agenceId as string | undefined;
+
+        const agenceId = normalizedRole === SystemRole.ADMIN ? queryAgenceId : user?.agenceId || queryAgenceId;
+        const assignedTo = req.query.assignedTo as string | undefined;
+
+        const { page, perPage } = parsePagination(req.query);
+        const { data, total } = await storage.getPosDevicesPaginated({ agenceId, assignedTo }, page, perPage);
+
+        res.json(
+          paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+            path: `${req.baseUrl}${req.path}`,
+            query: req.query,
+            filters: {
+              ...(agenceId ? { agenceId } : {}),
+              ...(assignedTo ? { assignedTo } : {}),
+            },
+          })
+        );
+      } catch (error: any) {
+        console.error('Error fetching POS devices:', error);
+        res.status(500).json({ error: 'Failed to fetch POS devices' });
       }
   });
 

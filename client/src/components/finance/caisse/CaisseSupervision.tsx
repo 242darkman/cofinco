@@ -4,6 +4,7 @@ import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Buildi
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 import { sessionCaisseApi, authApi, userApi } from '../../../lib/api-client';
+import { computeSessionStatus } from '../../../lib/format';
 import { useAgence } from '../../../contexts/AgenceContext';
 import { authService } from '../../../lib/auth';
 import SupervisionConfirmModal, { SupervisionSession } from './shared/SupervisionConfirmModal';
@@ -152,8 +153,11 @@ export default function CaisseSupervision({
     }
   };
 
-  const activeSessions = sessions.filter(s => ['ouverte', 'ouvert'].includes(s.statut?.toLowerCase()));
-  const closedSessions = sessions.filter(s => ['fermée', 'fermé', 'ferme'].includes(s.statut?.toLowerCase()));
+  const resolveSessionStatus = (session: any) => session.computedStatus || computeSessionStatus(session);
+  const resolveOpenedAt = (session: any) => session.openedAt || session.opened_at;
+  const resolveClosedAt = (session: any) => session.closedAt || session.closed_at;
+  const activeSessions = sessions.filter((s) => resolveSessionStatus(s) === 'OPEN');
+  const closedSessions = sessions.filter((s) => resolveSessionStatus(s) === 'CLOSED');
   const totalEspeces = activeSessions.reduce((acc, s) => acc + (Number(s.solde_theorique) || 0), 0);
 
   // Liste des caissiers filtrés
@@ -233,7 +237,7 @@ export default function CaisseSupervision({
 
       // Calculer les statistiques du caissier
       if (history && history.length > 0) {
-        const closedHistory = history.filter((s: any) => ['fermée', 'fermé', 'ferme'].includes(s.statut?.toLowerCase()));
+        const closedHistory = history.filter((s: any) => resolveSessionStatus(s) === 'CLOSED');
         const totalEncaisse = closedHistory.reduce((acc: number, s: any) => {
           const ops = s.operations || [];
           const depots = ops.filter((o: any) => !(o.type_operation || '').toLowerCase().includes('retrait'));
@@ -245,7 +249,7 @@ export default function CaisseSupervision({
         setUserStats({
           totalSessions: history.length,
           sessionsThisMonth: history.filter((s: any) => {
-            const d = new Date(s.date_ouverture);
+            const d = new Date(resolveOpenedAt(s));
             const now = new Date();
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
           }).length,
@@ -321,7 +325,7 @@ export default function CaisseSupervision({
       targetCaisseName: pendingSupervisionSession.caisse_nom || 'Caisse',
       targetAgenceName: pendingSupervisionSession.agence_nom,
       currentBalance: Number(pendingSupervisionSession.solde_theorique) || 0,
-      openedAt: pendingSupervisionSession.date_ouverture,
+      openedAt: resolveOpenedAt(pendingSupervisionSession),
       supervisorId: currentUser.id,
       supervisorName: `${currentUser.prenom || ''} ${currentUser.nom || currentUser.name || ''}`.trim(),
       reason,
@@ -417,7 +421,7 @@ export default function CaisseSupervision({
               <span className="text-[10px] text-slate-500 uppercase font-semibold hidden sm:inline">Fermées</span>
             </div>
             <div className="text-xl sm:text-2xl font-bold text-white">
-              {closedSessions.filter(s => new Date(s.date_fermeture || s.date_ouverture).toDateString() === new Date().toDateString()).length}
+              {closedSessions.filter(s => new Date(resolveClosedAt(s) || resolveOpenedAt(s)).toDateString() === new Date().toDateString()).length}
             </div>
             <div className="text-[9px] sm:text-[10px] text-slate-500">Aujourd'hui</div>
           </div>
@@ -533,7 +537,7 @@ export default function CaisseSupervision({
                             </h4>
                             <div className="flex items-center gap-1.5 text-xs text-emerald-400 mt-0.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                              <span>Ouverte il y a {formatTimeAgo(session.date_ouverture)}</span>
+                              <span>Ouverte il y a {formatTimeAgo(resolveOpenedAt(session))}</span>
                             </div>
                           </div>
                         </div>
@@ -872,7 +876,7 @@ export default function CaisseSupervision({
                 <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
                   <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold mb-1">Ouverture</div>
                   <div className="text-white text-xs sm:text-sm font-medium">
-                    {selectedSession.date_ouverture ? new Date(selectedSession.date_ouverture).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                    {resolveOpenedAt(selectedSession) ? new Date(resolveOpenedAt(selectedSession)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                   </div>
                 </div>
                 <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
@@ -1187,22 +1191,26 @@ export default function CaisseSupervision({
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-2 h-2 rounded-full ${
-                          ['ouverte', 'ouvert'].includes(session.statut?.toLowerCase())
+                          resolveSessionStatus(session) === 'OPEN'
                             ? 'bg-emerald-500'
-                            : 'bg-slate-500'
+                            : resolveSessionStatus(session) === 'TIMED_OUT'
+                              ? 'bg-amber-500'
+                              : 'bg-slate-500'
                         }`} />
                         <div>
                           <div className="text-xs font-medium text-white">
-                            {new Date(session.date_ouverture).toLocaleDateString('fr-FR', {
+                            {new Date(session.openedAt || session.opened_at).toLocaleDateString('fr-FR', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric'
                             })}
                           </div>
                           <div className="text-[10px] text-slate-500">
-                            {session.date_fermeture
-                              ? `Fermée à ${new Date(session.date_fermeture).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                              : 'En cours'
+                            {session.closedAt || session.closed_at
+                              ? `Fermée à ${new Date(session.closedAt || session.closed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                              : resolveSessionStatus(session) === 'TIMED_OUT'
+                                ? 'Expirée'
+                                : 'En cours'
                             }
                           </div>
                         </div>

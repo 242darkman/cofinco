@@ -21,7 +21,7 @@ declare module 'express-session' {
       nom: string;
       prenom: string | null;
       role: SystemRole;
-      agence: string | null;
+      agence?: string | null;
       agenceId?: string;
       email?: string;
       telephone?: string;
@@ -142,7 +142,6 @@ export async function registerUser(userData: {
   telephone?: string | null;
   photoProfile?: string | null;
   role?: string;
-  agence?: string | null;
   statut?: string;
 }): Promise<User> {
   const hashedPassword = await hashPassword(userData.password);

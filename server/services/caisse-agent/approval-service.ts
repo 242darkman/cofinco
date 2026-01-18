@@ -31,7 +31,7 @@ import {
   transactionsCompte,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
-import { generateReference, type MouvementFinancier } from "../ledger";
+import { generateReference, updateCreditSolde, type MouvementFinancier } from "../ledger";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Type pour les résultats d'approbation
@@ -252,14 +252,9 @@ export class ApprovalService {
       })
       .returning();
 
-    // Mettre à jour le solde restant du crédit
-    await tx
-      .update(credits)
-      .set({
-        soldeRestant: sql`GREATEST(0, ${credits.soldeRestant} - ${montant})`,
-        updatedAt: new Date(),
-      })
-      .where(eq(credits.id, metadata.creditId!));
+    // Mettre à jour le solde restant du crédit via la fonction centrale du ledger
+    // Note: delta négatif car on réduit la dette (paiement reçu)
+    await updateCreditSolde(tx, metadata.creditId!, -montant);
 
     // NEW: Insérer dans la table métier remboursements
     await tx.insert(remboursements).values({

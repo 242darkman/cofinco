@@ -904,7 +904,7 @@ hrRouter.get("/presence/by-status/:status", getAuthUser, async (req, res) => {
 // GET /api/hr/organigramme - Structure hiérarchique
 hrRouter.get("/organigramme", getAuthUser, async (req, res) => {
     try {
-        const agenceId = req.user?.agence || undefined; // Filter by user's agency
+        const agenceId = req.user?.agenceId || undefined; // Filter by user's agency
         const orgChart = await storage.getOrganigramme(agenceId);
         res.json(orgChart);
     } catch (error) {

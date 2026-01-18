@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Star, TrendingUp, Award, Zap, Target, Crown } from 'lucide-react';
+import { agentTerrainApi } from '../../lib/api-client';
 
 interface AgentRanking {
   id: string;
@@ -35,16 +36,15 @@ export default function AgentTeamLeaderboard() {
 
       const dateFilter = getDateFilter();
 
-      const agentsRes = await fetch('/api/agents-terrain?statut=Actif');
-      if (!agentsRes.ok) return;
-      const agents = await agentsRes.json();
+      const agents = await agentTerrainApi.getAllList();
+      const actifs = (agents || []).filter((agent: any) => agent.statut === 'Actif');
 
-      if (!agents || agents.length === 0) {
+      if (!actifs || actifs.length === 0) {
         setRankings([]);
         return;
       }
 
-      const rankingPromises = agents.map(async (agent: any) => {
+      const rankingPromises = actifs.map(async (agent: any) => {
         const [gamificationRes, collectesRes, presencesRes, recouvrementsRes] = await Promise.all([
           fetch(`/api/agent-gamification/${agent.id}`),
           fetch(`/api/agent-collectes-cash?agent_id=${agent.id}&date_debut=${dateFilter}`),

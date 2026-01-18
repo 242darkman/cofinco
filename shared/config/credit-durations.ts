@@ -1,10 +1,40 @@
 /**
- * Configuration centralisee des durees suggerees par frequence de remboursement
- * Utilisee par le frontend ET le backend pour garantir la coherence
+ * ------------------------------------------------------------------
+ * CONFIGURATION ET LOGIQUE MÉTIER : FRÉQUENCES & DURÉES
+ * ------------------------------------------------------------------
+ * Fichier partagé Frontend / Backend.
+ * Contient les types, les constantes, les configurations par défaut
+ * et les fonctions pures de validation et de conversion.
  */
+
+// --- CONSTANTES GLOBALES (Pour éviter les "magic numbers") ---
+export const DAYS_IN_WEEK = 7;
+export const DAYS_IN_MONTH_APPROX = 30; // Moyenne pour estimation UI
+export const DAYS_IN_YEAR_COMMERCIAL = 360;
+export const MAX_ECHEANCES_SAFE_LIMIT = 365; // Sécurité anti-boucle ou surcharge
+
+// --- TYPES & ENUMS ---
 
 export type FrequenceRemboursement = "Journalier" | "Hebdomadaire" | "Mensuel" | "Bimensuel" | "Trimestriel";
 export type DureeUnite = "Jour" | "Semaine" | "Mois";
+
+/**
+ * Codes d'erreur pour la validation.
+ * Permet au frontend d'afficher des messages traduits (i18n) au lieu de hardcoder du texte.
+ */
+export enum DurationErrorCode {
+  INCOMPATIBLE_UNIT = "INCOMPATIBLE_UNIT",
+  DURATION_TOO_SHORT = "DURATION_TOO_SHORT",
+  DURATION_TOO_LONG = "DURATION_TOO_LONG",
+  INVALID_FREQUENCY_UNIT = "INVALID_FREQUENCY_UNIT",
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errorCode?: DurationErrorCode;
+  /** Message de debug (fallback si pas de trad) */
+  debugMessage?: string; 
+}
 
 export interface DureeSuggestion {
   valeur: number;
@@ -19,19 +49,21 @@ export interface FrequenceConfig {
   dureesSuggerees: DureeSuggestion[];
 }
 
+// --- CONFIGURATION ---
+
 /**
- * Mapping des unites valides par frequence
+ * Mapping des unités valides par fréquence
  */
 export const FREQUENCE_UNITE_MAP: Record<FrequenceRemboursement, DureeUnite[]> = {
   "Journalier": ["Jour"],
-  "Hebdomadaire": ["Semaine", "Mois"],
+  "Hebdomadaire": ["Semaine", "Mois", "Jour"],
   "Mensuel": ["Mois"],
   "Bimensuel": ["Mois"],
   "Trimestriel": ["Mois"],
 };
 
 /**
- * Configuration par defaut des durees suggerees (fallback si DB vide)
+ * Configuration par défaut des durées suggérées (fallback si DB vide)
  */
 export const DEFAULT_DURATIONS_CONFIG: FrequenceConfig[] = [
   {
@@ -82,39 +114,53 @@ export const DEFAULT_DURATIONS_CONFIG: FrequenceConfig[] = [
   },
 ];
 
+// --- LOGIQUE MÉTIER ---
+
 /**
- * Convertit une duree en nombre de jours (pour calculs backend)
+ * Convertit une durée en nombre de jours ESTIMÉS.
+ * @warning Cette fonction utilise des approximations (Mois = 30j).
+ * NE PAS UTILISER pour le calcul comptable d'intérêts ou les dates de calendrier exactes.
+ * Utiliser uniquement pour l'UI ou des estimations de volume.
  */
 export function convertirDureeEnJours(valeur: number, unite: DureeUnite): number {
   switch (unite) {
     case "Jour":
       return valeur;
     case "Semaine":
-      return valeur * 7;
+      return valeur * DAYS_IN_WEEK;
     case "Mois":
-      return valeur * 30; // Approximation standard
+      return valeur * DAYS_IN_MONTH_APPROX;
     default:
       return valeur;
   }
 }
 
 /**
- * Calcule le nombre d'echeances en fonction de la frequence et de la duree
+ * Calcule le nombre d'échéances théoriques.
+ * Gère spécifiquement les fréquences basées sur les mois pour éviter les erreurs d'arrondi.
  */
 export function calculerNombreEcheances(
   frequence: FrequenceRemboursement,
   dureeValeur: number,
   dureeUnite: DureeUnite
 ): number {
+  // Optimisation: Calcul direct si l'unité est alignée avec la fréquence
+  if (dureeUnite === "Mois") {
+    if (frequence === "Mensuel") return dureeValeur;
+    if (frequence === "Bimensuel") return dureeValeur * 2; // 2x par mois
+    if (frequence === "Trimestriel") return Math.ceil(dureeValeur / 3);
+  }
+
+  // Fallback: Calcul via conversion en jours (pour Hebdomadaire sur X Mois par ex)
   const joursTotal = convertirDureeEnJours(dureeValeur, dureeUnite);
 
   switch (frequence) {
     case "Journalier":
       return joursTotal;
     case "Hebdomadaire":
-      return Math.ceil(joursTotal / 7);
+      return Math.ceil(joursTotal / DAYS_IN_WEEK);
     case "Mensuel":
-      return Math.ceil(joursTotal / 30);
+      return Math.ceil(joursTotal / DAYS_IN_MONTH_APPROX);
     case "Bimensuel":
       return Math.ceil(joursTotal / 15);
     case "Trimestriel":
@@ -125,71 +171,84 @@ export function calculerNombreEcheances(
 }
 
 /**
- * Valide la coherence entre la frequence et la duree
- * Retourne null si valide, sinon un message d'erreur
+ * Valide la cohérence entre la fréquence et la durée.
+ * Retourne un objet ValidationResult pour faciliter l'i18n.
  */
 export function validerCoherenceFrequenceDuree(
   frequence: FrequenceRemboursement,
   dureeValeur: number,
   dureeUnite: DureeUnite
-): string | null {
-  // Verifier que l'unite est compatible avec la frequence
+): ValidationResult {
+  
+  // 1. Validation de l'unité
   const unitesValides = FREQUENCE_UNITE_MAP[frequence];
   if (!unitesValides.includes(dureeUnite)) {
-    return `L'unite "${dureeUnite}" n'est pas compatible avec la frequence "${frequence}". Unites acceptees: ${unitesValides.join(", ")}`;
+    return {
+      isValid: false,
+      errorCode: DurationErrorCode.INCOMPATIBLE_UNIT,
+      debugMessage: `Unité ${dureeUnite} incompatible avec fréquence ${frequence}`
+    };
   }
 
-  // Verifier les valeurs minimales
+  // 2. Calcul des échéances
   const nombreEcheances = calculerNombreEcheances(frequence, dureeValeur, dureeUnite);
+
   if (nombreEcheances < 1) {
-    return "La duree doit permettre au moins une echeance";
+    return {
+      isValid: false,
+      errorCode: DurationErrorCode.DURATION_TOO_SHORT,
+      debugMessage: "Au moins 1 échéance requise"
+    };
   }
 
-  // Verifier les valeurs maximales raisonnables
-  if (nombreEcheances > 365) {
-    return "Le nombre d'echeances ne peut pas depasser 365";
+  if (nombreEcheances > MAX_ECHEANCES_SAFE_LIMIT) {
+    return {
+      isValid: false,
+      errorCode: DurationErrorCode.DURATION_TOO_LONG,
+      debugMessage: `Max échéances dépassé (${nombreEcheances} > ${MAX_ECHEANCES_SAFE_LIMIT})`
+    };
   }
 
-  // Validations specifiques par frequence
+  // 3. Règles métier spécifiques (Hard rules)
+  // Ces règles peuvent être ajustées selon le risk policy
   switch (frequence) {
     case "Journalier":
       if (dureeUnite !== "Jour") {
-        return "Pour un remboursement journalier, la duree doit etre en jours";
+        return { isValid: false, errorCode: DurationErrorCode.INVALID_FREQUENCY_UNIT };
       }
       if (dureeValeur < 7) {
-        return "La duree minimale pour un credit journalier est de 7 jours";
+        return { isValid: false, errorCode: DurationErrorCode.DURATION_TOO_SHORT, debugMessage: "Min 7 jours pour journalier" };
       }
       break;
+
     case "Hebdomadaire":
       if (nombreEcheances < 2) {
-        return "Un credit hebdomadaire doit avoir au moins 2 echeances";
+        return { isValid: false, errorCode: DurationErrorCode.DURATION_TOO_SHORT, debugMessage: "Min 2 semaines pour hebdo" };
       }
       break;
+
     case "Mensuel":
-      if (dureeUnite !== "Mois") {
-        return "Pour un remboursement mensuel, la duree doit etre en mois";
-      }
-      if (dureeValeur < 1) {
-        return "La duree minimale pour un credit mensuel est de 1 mois";
-      }
-      break;
     case "Bimensuel":
+      if (dureeUnite !== "Mois") {
+         return { isValid: false, errorCode: DurationErrorCode.INVALID_FREQUENCY_UNIT };
+      }
       if (dureeValeur < 1) {
-        return "La duree minimale pour un credit bimensuel est de 1 mois";
+        return { isValid: false, errorCode: DurationErrorCode.DURATION_TOO_SHORT, debugMessage: "Min 1 mois requis" };
       }
       break;
+      
     case "Trimestriel":
       if (dureeValeur < 3) {
-        return "La duree minimale pour un credit trimestriel est de 3 mois";
+        return { isValid: false, errorCode: DurationErrorCode.DURATION_TOO_SHORT, debugMessage: "Min 3 mois (1 trimestre)" };
       }
       break;
   }
 
-  return null;
+  return { isValid: true };
 }
 
 /**
- * Retourne la configuration par defaut pour une frequence donnee
+ * Retourne la configuration par défaut pour une fréquence donnée
  */
 export function getDefaultDureeForFrequence(frequence: FrequenceRemboursement): DureeSuggestion | null {
   const config = DEFAULT_DURATIONS_CONFIG.find(c => c.frequence === frequence);
@@ -200,18 +259,15 @@ export function getDefaultDureeForFrequence(frequence: FrequenceRemboursement): 
 }
 
 /**
- * Formate un label de duree pour l'affichage
+ * Formate un label de durée pour l'affichage (Helper UI)
  */
 export function formaterLabelDuree(valeur: number, unite: DureeUnite): string {
-  const pluriel = valeur > 1;
+  const pluriel = valeur > 1 ? "s" : "";
+  // Note: Idéalement, utiliser une lib i18n ici aussi, mais acceptable pour un helper
   switch (unite) {
-    case "Jour":
-      return `${valeur} jour${pluriel ? "s" : ""}`;
-    case "Semaine":
-      return `${valeur} semaine${pluriel ? "s" : ""}`;
-    case "Mois":
-      return `${valeur} mois`;
-    default:
-      return `${valeur} ${unite}`;
+    case "Jour": return `${valeur} jour${pluriel}`;
+    case "Semaine": return `${valeur} semaine${pluriel}`;
+    case "Mois": return `${valeur} mois`; // "Mois" est invariant
+    default: return `${valeur} ${unite}`;
   }
 }

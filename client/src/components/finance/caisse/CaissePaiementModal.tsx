@@ -127,7 +127,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   // Charger les clients via api-client
   const loadClients = useCallback(async () => {
     try {
-      const data = await clientApi.getAll();
+      const data = await clientApi.getAllList();
       setClients(data.filter((c: any) => c.status === 'Actif'));
     } catch (error) {
       console.error('Error loading clients:', error);

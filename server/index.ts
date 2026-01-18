@@ -14,9 +14,12 @@ import { sessionActivityMiddleware, scheduleSessionCleanup } from "./session-tra
 import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
 import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
 import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
+import { startScheduledAccountTransfersCron } from "./cron/scheduled-account-transfers";
 import { startScheduledDisbursementsCron } from "./cron/scheduled-disbursements";
 import { SystemRole } from "@shared/types/roles";
 import { startAutomaticRepaymentsCron } from "./cron/automatic-repayments";
+import { startCreditStatusUpdateCron } from "./cron/update-credit-status";
+import { StorageService } from "./services/storage-service";
 
 const app = express();
 // const httpServer = createServer(app); // Removed to avoid duplicate server creation
@@ -185,11 +188,15 @@ async function seedAdminUser() {
   // Setup auth first (creates session table and middleware)
   await setupAuth(app);
 
+  // Initialize MinIO storage buckets
+  try {
+    await StorageService.initializeBuckets();
+  } catch (error) {
+    logWarn('MinIO bucket initialization failed - file uploads may not work', 'storage');
+  }
+
   // Session activity tracking middleware (must be after auth setup)
   app.use(sessionActivityMiddleware);
-
-  // Create admin user on startup
-  await seedAdminUser();
 
   // Schedule automatic audit log purge (every 3 months retention)
   scheduleAuditPurge();
@@ -209,13 +216,16 @@ async function seedAdminUser() {
 
   // Start the automatic transfers cron job (daily at 2 AM)
   startAutomaticTransfersCron();
+  startScheduledAccountTransfersCron();
   log('[Cron] Automatic transfers job started');
 
   // Start the scheduled disbursements cron job (daily at 9 AM)
   startScheduledDisbursementsCron();
   startAutomaticRepaymentsCron(); // Start Auto Repayments
+  startCreditStatusUpdateCron(); // Start Credit Status Update
   log('[Cron] Scheduled disbursements job started');
   log('[Cron] Automatic repayments job started');
+  log('[Cron] Credit status update job started');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
