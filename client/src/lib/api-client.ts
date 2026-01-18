@@ -105,8 +105,16 @@ function buildQuery(params?: Record<string, unknown>): string {
 async function handleResponse<T>(response: Response, endpoint: string): Promise<T> {
   // Détection session expirée (401 Unauthorized)
   if (response.status === 401) {
-    // Ne pas déclencher pour les endpoints d'auth (évite boucle infinie)
-    if (!endpoint.includes('/auth/login') && !endpoint.includes('/auth/me')) {
+    // Si c'est une 401 sur le login, c'est une erreur de credentials, pas de session
+    if (endpoint.includes('/auth/login')) {
+       // On laisse passer vers le bloc !response.ok standard qui va extraire le message du body
+       // ou on throw direct ici
+       const errorData = await response.json().catch(() => ({ message: 'Identifiants invalides' }));
+       throw new ApiError(errorData.message || 'Identifiants invalides', 401, errorData);
+    }
+
+    // Pour les autres routes, c'est une expiration de session
+    if (!endpoint.includes('/auth/me')) {
       console.warn('[API] Session expirée - déconnexion automatique');
       if (onUnauthorizedCallback) {
         onUnauthorizedCallback();
