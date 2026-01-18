@@ -162,12 +162,38 @@ export default function CaisseDashboard({
 
   const { 
     data: transactions = [], 
-    isLoading: loadingTransactions 
+    isLoading: loadingTransactions,
+    refetch: refetchTransactions
   } = useQuery({
-    queryKey: ['operations-caisse', 'today'], 
-    queryFn: caisseOperationApi.getToday,
+    queryKey: ['operations-caisse', 'today', 'debug'],
+    queryFn: async () => {
+      console.log('Fetching operations for', currentSession?.id);
+      try {
+        const res = await caisseOperationApi.getToday();
+        console.log('Operations fetched:', res);
+        return res;
+      } catch (e) {
+        console.error('Error fetching operations:', e);
+        throw e;
+      }
+    },
+    enabled: !!currentSession,
     initialData: []
   });
+
+  // Debug effect
+  useEffect(() => {
+    console.log('[DEBUG] CaisseDashboard Mounted');
+    console.log('[DEBUG] SupervisedSession:', supervisedSession);
+    console.log('[DEBUG] SessionActive:', sessionActive);
+    console.log('[DEBUG] CurrentSession:', currentSession);
+    
+    // Force refetch
+    refetchSession();
+    if (currentSession) {
+        refetchTransactions();
+    }
+  }, [currentSession?.id]);
 
   const loading = loadingSession || loadingTransactions;
 
@@ -370,8 +396,23 @@ export default function CaisseDashboard({
     }
   };
 
+  // Types d'opérations considérées comme des ENTRÉES (argent qui entre en caisse)
+  const TYPES_ENTREES = [
+    'Dépôt',
+    'Versement',
+    'Remboursement',
+    'Remboursement Crédit',
+    'Encaissement',
+    'Cotisation Tontine',
+    'Approvisionnement coffre',
+    'FRAIS_ENGAGEMENT',
+    'Frais Engagement',
+    'DEPOT_ESPECES',
+    'Dépôt Espèces'
+  ];
+
   const totalEntrees = transactions
-    .filter(t => ['Dépôt', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Encaissement', 'Cotisation Tontine', 'Approvisionnement coffre'].includes(t.type_operation))
+    .filter(t => TYPES_ENTREES.includes(t.type_operation))
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
   const totalSorties = transactions
@@ -612,7 +653,7 @@ export default function CaisseDashboard({
                   </div>
               ) : (
                   transactions.slice(0, 5).map((tx) => {
-                      const isEntree = ['Dépôt', 'Encaissement', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Cotisation Tontine', 'Approvisionnement coffre'].includes(tx.type_operation);
+                      const isEntree = TYPES_ENTREES.includes(tx.type_operation);
                       return (
                       <div key={tx.id} onClick={() => setActiveTab('operations')} className="p-3 sm:p-4 flex items-center justify-between hover:bg-surface-elevated transition-colors cursor-pointer group">
                           <div className="flex items-center gap-3">

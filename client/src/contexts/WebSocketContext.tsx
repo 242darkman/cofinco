@@ -268,7 +268,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "CAISSE_UPDATE":
-         debounceInvalidate(["caisses"]);
+         // Invalider les queries du module caisse pour sync temps réel
+         debounceInvalidate(['session-caisse']);          // Rafraîchir le solde et stats du header
+         debounceInvalidate(['session-caisse', 'active']); // Session active spécifique
+         debounceInvalidate(['operations-caisse']);        // Liste "Transactions Récentes"
+         debounceInvalidate(['operations-caisse', 'today']); // Opérations du jour
+         debounceInvalidate(['supervision-sessions']);     // Vue supervision (ouverture/fermeture caisses)
+         debounceInvalidate(["caisses"]);                  // Liste générale des caisses
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
          break;
 
@@ -339,8 +345,17 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
            debounceInvalidate(['client', aggregateId]);
            debounceInvalidate(['client-portfolio', aggregateId]);
          } else if (aggregateType === 'session_caisse') {
+           // Invalidation spécifique pour une session donnée
            debounceInvalidate(['session', aggregateId]);
            debounceInvalidate(['operations', aggregateId]);
+           // Invalidation globale du module caisse
+           debounceInvalidate(['session-caisse']);
+           debounceInvalidate(['session-caisse', 'active']);
+           debounceInvalidate(['operations-caisse']);
+           debounceInvalidate(['operations-caisse', 'today']);
+           debounceInvalidate(['supervision-sessions']);
+           // Dispatch custom event pour les listeners
+           window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
          } else if (aggregateType === 'coffre') {
            debounceInvalidate(['transferts-coffre', aggregateId]);
            debounceInvalidate(['coffre-stats', aggregateId]);

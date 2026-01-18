@@ -7,7 +7,7 @@ export interface TooltipProps {
   delay?: number;
 }
 
-export default function Tooltip({
+function Tooltip({
   content,
   children,
   position = 'top',
@@ -76,3 +76,6 @@ export default function Tooltip({
     </div>
   );
 }
+
+export { Tooltip };
+export default Tooltip;

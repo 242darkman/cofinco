@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
-import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert, Shield } from 'lucide-react';
+import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert, Shield, Info } from 'lucide-react';
+import Tooltip from '../../ui/Tooltip';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 import { sessionCaisseApi, authApi, userApi } from '../../../lib/api-client';
@@ -503,14 +504,18 @@ export default function CaisseSupervision({
               ) : (
                 /* Mobile: Stack vertical, Desktop: Grid 2 cols */
                 <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4">
-                  {activeSessions.map(session => (
+                  {activeSessions.map(session => {
+                    // Vérifier si c'est la propre session de l'utilisateur connecté
+                    const isOwnSession = session.caissier_id === currentUser?.id;
+
+                    return (
                     <div
                       key={session.id}
                       className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden
                                  active:scale-[0.98] transition-transform touch-manipulation"
                     >
                       {/* Indicateur de statut actif - barre gauche */}
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-400 to-emerald-600" />
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${isOwnSession ? 'from-cyan-400 to-cyan-600' : 'from-emerald-400 to-emerald-600'}`} />
 
                       {/* Badge Agence - positionné en haut à droite */}
                       {session.agence_nom && (
@@ -522,11 +527,32 @@ export default function CaisseSupervision({
                       )}
 
                       <div className="p-3 sm:p-4 pl-4">
+                        {/* En-tête: Nom de la Caisse */}
+                        {session.caisse_nom && (
+                          <div className="mb-2 pb-2 border-b border-slate-700/30">
+                            <div className="flex items-center gap-2">
+                              <Wallet size={14} className="text-amber-400" />
+                              <span className="text-sm font-bold text-white">
+                                {session.caisse_nom}
+                              </span>
+                              {isOwnSession && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                  VOUS
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Header: Avatar + Info + Solde */}
                         <div className="flex items-start gap-3">
                           {/* Avatar */}
-                          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-slate-700 to-slate-800
-                                        flex items-center justify-center border border-slate-600 font-bold text-sm text-slate-200 shrink-0">
+                          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br
+                                        flex items-center justify-center border font-bold text-sm shrink-0
+                                        ${isOwnSession
+                                          ? 'from-cyan-700 to-cyan-800 border-cyan-600 text-cyan-200'
+                                          : 'from-slate-700 to-slate-800 border-slate-600 text-slate-200'
+                                        }`}>
                             {session.caissier_nom?.[0] || 'C'}
                           </div>
 
@@ -568,29 +594,48 @@ export default function CaisseSupervision({
 
                           {/* Bouton "Prendre la main" - visible si permission canTakeControl */}
                           {onTakeControl && permissions.canTakeControl && (
-                            <button
-                              onClick={() => handleRequestSupervision(session)}
-                              disabled={!!activeSupervision && activeSupervision.sessionId !== session.id}
-                              className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
-                                       transition-all touch-manipulation
-                                       ${activeSupervision && activeSupervision.sessionId !== session.id
-                                         ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
-                                         : activeSupervision?.sessionId === session.id
-                                           ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20'
-                                           : 'bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.97] shadow-lg shadow-emerald-500/20'
-                                       }`}
-                            >
-                              {activeSupervision?.sessionId === session.id ? (
-                                <span className="flex items-center justify-center gap-1.5">
-                                  <Shield size={14} />
-                                  En supervision
-                                </span>
-                              ) : activeSupervision ? (
-                                'Supervision active'
-                              ) : (
-                                'Prendre la main'
-                              )}
-                            </button>
+                            isOwnSession ? (
+                              <Tooltip
+                                content="Vous ne pouvez pas superviser votre propre session active"
+                                position="top"
+                              >
+                                <button
+                                  disabled
+                                  className="flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
+                                           bg-cyan-500/20 text-cyan-400 cursor-not-allowed border border-cyan-500/30
+                                           transition-all touch-manipulation"
+                                >
+                                  <span className="flex items-center justify-center gap-1.5">
+                                    <Info size={14} />
+                                    Votre Session
+                                  </span>
+                                </button>
+                              </Tooltip>
+                            ) : (
+                              <button
+                                onClick={() => handleRequestSupervision(session)}
+                                disabled={!!activeSupervision && activeSupervision.sessionId !== session.id}
+                                className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
+                                         transition-all touch-manipulation
+                                         ${activeSupervision && activeSupervision.sessionId !== session.id
+                                           ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+                                           : activeSupervision?.sessionId === session.id
+                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20'
+                                             : 'bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.97] shadow-lg shadow-emerald-500/20'
+                                         }`}
+                              >
+                                {activeSupervision?.sessionId === session.id ? (
+                                  <span className="flex items-center justify-center gap-1.5">
+                                    <Shield size={14} />
+                                    En supervision
+                                  </span>
+                                ) : activeSupervision ? (
+                                  'Supervision active'
+                                ) : (
+                                  'Prendre la main'
+                                )}
+                              </button>
+                            )
                           )}
 
                           {/* Bouton "Forcer la fermeture" - visible si permission canForceClose */}
@@ -611,7 +656,7 @@ export default function CaisseSupervision({
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </div>
