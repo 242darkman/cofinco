@@ -1,8 +1,9 @@
+
 /**
  * WebSocket Hook for Real-Time Caisse Updates
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
 interface CaisseStatusChangedEvent {
@@ -24,16 +25,36 @@ interface SessionForceClosedEvent {
 }
 
 interface UseCaisseWebSocketOptions {
+  caisseId?: string;
+  sessionId?: string;
   onCaisseStatusChanged?: (event: CaisseStatusChangedEvent) => void;
   onSessionForceClosed?: (event: SessionForceClosedEvent) => void;
+  onSessionUpdated?: (data: any) => void;
   enabled?: boolean;
 }
 
 export function useCaisseWebSocket({
+  caisseId,
+  sessionId,
   onCaisseStatusChanged,
   onSessionForceClosed,
+  onSessionUpdated,
   enabled = true,
 }: UseCaisseWebSocketOptions) {
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Use refs for callbacks to avoid re-connecting when they change
+  const onCaisseStatusChangedRef = useRef(onCaisseStatusChanged);
+  const onSessionForceClosedRef = useRef(onSessionForceClosed);
+  const onSessionUpdatedRef = useRef(onSessionUpdated);
+
+  // Update refs on every render
+  useEffect(() => {
+    onCaisseStatusChangedRef.current = onCaisseStatusChanged;
+    onSessionForceClosedRef.current = onSessionForceClosed;
+    onSessionUpdatedRef.current = onSessionUpdated;
+  });
+
   const handleMessage = useCallback((event: MessageEvent) => {
     try {
       const message = JSON.parse(event.data);
@@ -49,8 +70,8 @@ export function useCaisseWebSocket({
       
       switch (data.type) {
         case 'CAISSE_STATUS_CHANGED':
-          if (onCaisseStatusChanged) {
-            onCaisseStatusChanged(data.payload);
+          if (onCaisseStatusChangedRef.current) {
+            onCaisseStatusChangedRef.current(data.payload);
           }
           
           // Show toast notification
@@ -62,8 +83,8 @@ export function useCaisseWebSocket({
           break;
           
         case 'SESSION_FORCE_CLOSED':
-          if (onSessionForceClosed) {
-            onSessionForceClosed(data.payload);
+          if (onSessionForceClosedRef.current) {
+            onSessionForceClosedRef.current(data.payload);
           }
           
           // Show detailed toast
@@ -75,11 +96,19 @@ export function useCaisseWebSocket({
             }
           );
           break;
+
+        case 'MOUVEMENT_CREE':
+        case 'SESSION_CAISSE_CHANGE':
+            // Trigger refresh
+            if (onSessionUpdatedRef.current) {
+                onSessionUpdatedRef.current(data.payload);
+            }
+            break;
       }
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
     }
-  }, [onCaisseStatusChanged, onSessionForceClosed]);
+  }, []); // Constant dependency array
 
   useEffect(() => {
     if (!enabled) return;
@@ -87,15 +116,23 @@ export function useCaisseWebSocket({
     // Connect to WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    wsRef.current = ws;
 
     ws.addEventListener('open', () => {
       console.log('WebSocket connected for caisse updates');
       
-      // Subscribe to caisse events
-      ws.send(JSON.stringify({
-        type: 'SUBSCRIBE',
-        channels: ['CAISSE_UPDATES', 'SESSION_UPDATES'],
-      }));
+      // Subscribe to specific aggregates
+      const subscriptions = [];
+      if (caisseId) subscriptions.push(`caisse:${caisseId}`);
+      if (sessionId) subscriptions.push(`session_caisse:${sessionId}`);
+
+      subscriptions.forEach(aggregate => {
+          ws.send(JSON.stringify({
+            type: 'SUBSCRIBE',
+            aggregate,
+          }));
+          console.log(`[WS] Subscribing to ${aggregate}`);
+      });
     });
 
     ws.addEventListener('message', handleMessage);
@@ -111,5 +148,5 @@ export function useCaisseWebSocket({
     return () => {
       ws.close();
     };
-  }, [enabled, handleMessage]);
+  }, [enabled, caisseId, sessionId, handleMessage]);
 }

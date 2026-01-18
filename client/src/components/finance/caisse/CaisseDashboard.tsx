@@ -13,6 +13,7 @@ import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compte
 import { computeSessionStatus } from '../../../lib/format';
 import { CaisseQuickActions } from './CaisseQuickActions';
 import CaisseOuverture from './CaisseOuverture';
+import { useCaisseWebSocket } from '../../../hooks/useCaisseWebSocket';
 import CaisseOperations from './CaisseOperations';
 import CaisseRapprochement from './CaisseRapprochement';
 import CaisseTransferts from './CaisseTransferts';
@@ -194,6 +195,25 @@ export default function CaisseDashboard({
         refetchTransactions();
     }
   }, [currentSession?.id]);
+
+  // Real-time Updates
+  useCaisseWebSocket({
+    caisseId: currentSession?.caisse_id,
+    sessionId: currentSession?.id,
+    enabled: !!currentSession,
+    onSessionUpdated: (data) => {
+        console.log('[REALTIME] Session Updated:', data);
+        refetchSession(); // To update balance
+        refetchTransactions(); // To show new operation
+        toast.info(data.type === 'MOUVEMENT_CREE' ? 'Nouvelle opération reçue' : 'Session mise à jour');
+    },
+    onCaisseStatusChanged: (data) => {
+        if (data.sessionId === currentSession?.id && data.status === 'Fermée') {
+            refetchSession();
+            toast.warning('La session a été fermée');
+        }
+    }
+  });
 
   const loading = loadingSession || loadingTransactions;
 
