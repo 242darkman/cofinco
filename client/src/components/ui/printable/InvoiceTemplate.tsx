@@ -4,7 +4,7 @@ import { ReceiptData } from './ReceiptTemplate';
 
 // Default Company Info
 const DEFAULT_COMPANY_INFO = {
-  nom: 'COFIN&CO',
+  nom: 'COFIN&CO-M',
   slogan: 'Microfinance & Services Financiers',
   adresse: 'Brazzaville, République du Congo',
   telephone: '+242 06 123 4567',
@@ -22,13 +22,20 @@ interface InvoiceTemplateProps {
 export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
   ({ data, companyInfo = DEFAULT_COMPANY_INFO }, ref) => {
 
-    const formattedDate = new Date(data.date).toLocaleDateString('fr-FR', {
+    const items = data.items || [];
+    const total = data.total ?? 0;
+    const tax = data.tax ?? 0;
+    const date = data.date || new Date();
+    const type = data.type || 'Opération';
+    const reference = data.reference || 'N/A';
+
+    const formattedDate = new Date(date).toLocaleDateString('fr-FR', {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
     });
 
-    const formattedTime = new Date(data.date).toLocaleTimeString('fr-FR', {
+    const formattedTime = new Date(date).toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -122,7 +129,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
                     <span className="text-xs text-slate-500 uppercase">Référence</span>
                   </div>
                   <p className="font-mono text-lg font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-lg inline-block">
-                    {data.reference}
+                    {reference}
                   </p>
 
                   <div className="flex items-center justify-end gap-2 mt-3">
@@ -196,7 +203,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
                   <span className={`text-sm font-bold px-2 py-0.5 rounded ${
                     isDebit ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
                   }`}>
-                    {data.type}
+                    {type}
                   </span>
                 </div>
 
@@ -237,7 +244,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((item, index) => (
+                {items.map((item, index) => (
                   <tr
                     key={index}
                     className={`border-b border-slate-100 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}
@@ -274,16 +281,16 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
                 <div className="flex justify-between items-center py-2 border-b border-slate-200">
                   <span className="text-sm text-slate-600">Sous-total HT</span>
                   <span className="font-mono text-slate-700">
-                    {(data.tax ? data.total - data.tax : data.total).toLocaleString('fr-FR')} {data.devise || 'FCFA'}
+                    {(tax ? total - tax : total).toLocaleString('fr-FR')} {data.devise || 'FCFA'}
                   </span>
                 </div>
 
                 {/* Tax if applicable */}
-                {data.tax && data.tax > 0 && (
+                {tax > 0 && (
                   <div className="flex justify-between items-center py-2 border-b border-slate-200">
                     <span className="text-sm text-slate-600">Taxes / TVA</span>
                     <span className="font-mono text-slate-700">
-                      {data.tax.toLocaleString('fr-FR')} {data.devise || 'FCFA'}
+                      {tax.toLocaleString('fr-FR')} {data.devise || 'FCFA'}
                     </span>
                   </div>
                 )}
@@ -298,7 +305,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
                 `}>
                   <span className="text-white font-bold uppercase text-sm">Total TTC</span>
                   <span className="text-2xl font-black text-white font-mono">
-                    {data.total.toLocaleString('fr-FR')} <span className="text-sm font-normal opacity-80">{data.devise || 'FCFA'}</span>
+                    {total.toLocaleString('fr-FR')} <span className="text-sm font-normal opacity-80">{data.devise || 'FCFA'}</span>
                   </span>
                 </div>
 

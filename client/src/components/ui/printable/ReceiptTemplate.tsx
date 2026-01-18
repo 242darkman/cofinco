@@ -70,7 +70,7 @@ interface ReceiptTemplateProps {
 }
 
 const DEFAULT_COMPANY_INFO: ReceiptCompanyInfo = {
-  name: 'COFIN&CO',
+  name: 'COFIN&CO-M',
   address: 'Brazzaville, République du Congo',
   phone: '+242 06 123 4567',
 };
@@ -130,12 +130,13 @@ const normalizeReceiptData = (data: ReceiptData, companyInfo?: ReceiptCompanyInf
   const clientPhone = data.client?.telephone;
   const clientAccount = maskAccountNumber(data.client?.numeroCompte);
   const currency = data.devise || 'FCFA';
-  const details =
+  const details: { label: string; value: string; isBold?: boolean }[] =
     data.details?.length
       ? data.details
       : data.items?.map((item) => ({
           label: item.details ? `${item.description} - ${item.details}` : item.description,
           value: formatAmount(item.montant, currency),
+          isBold: false,
         })) || [];
 
   return {
