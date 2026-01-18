@@ -411,9 +411,12 @@ coffreRouter.get("/mouvements", async (req, res) => {
         eq(schema.mouvementsFinanciers.agenceId, agenceId),
         sql`(${schema.mouvementsFinanciers.metadata}->>'coffreId' = ${coffre.id} 
             OR ${schema.mouvementsFinanciers.metadata}->>'caisseId' = ${coffre.id}
+            OR ${schema.mouvementsFinanciers.sourceId} = ${coffre.id}
             OR ${schema.mouvementsFinanciers.typePaiement} = 'Approvisionnement coffre'
             OR ${schema.mouvementsFinanciers.typePaiement} = 'Décaissement Crédit'
+            OR ${schema.mouvementsFinanciers.typePaiement} = 'Transfert Sortant'
             OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'APPROVISIONNEMENT_EXTERNE'
+            OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'REFUND_SOURCE'
             OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'TRANSFERT_INTER_COFFRES')`
     );
 

@@ -2209,6 +2209,7 @@ export function registerFinanceRoutes(app: Express) {
                metadata: { 
                    type: 'REFUND_SOURCE', 
                    refundId: refundData.id, 
+                   coffreId: agencyCoffre.id,
                    description: `Source pour rbt frais (Ref: ${refundData.id})`
                }
              }, user.id);
