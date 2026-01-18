@@ -1,29 +1,20 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  CheckCircle2, Printer, FileText, Share2, Download, X, Copy,
-  Smartphone, Receipt, ChevronDown, ChevronUp, Clock, User,
-  Wallet, CreditCard, Building2, ArrowRight, Sparkles, Check
+  CheckCircle2, X, Copy,
+  ChevronDown, ChevronUp, Clock, User,
+  Wallet, CreditCard, Building2, ArrowRight, Sparkles, Check, Receipt
 } from 'lucide-react';
-import { Button } from '../../../ui';
-import { ReceiptData, ReceiptTemplate } from '../../../ui/printable/ReceiptTemplate';
-import { InvoiceTemplate } from '../../../ui/printable/InvoiceTemplate';
-import { useReactToPrint } from 'react-to-print';
+import { ReceiptData } from '../../../ui/printable/ReceiptTemplate';
 import { toast } from 'sonner';
-import { useReceiptPDF } from '@/hooks/finance/useReceiptPDF';
 import { formatClientName } from '@/lib/format';
+import { ReceiptActions } from '../../shared/ReceiptActions';
 
 interface UniversalPaymentSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   term?: string;
   data?: ReceiptData;
-  factureId?: string; // ID de la facture générée par le backend
 }
-
-// Format money helper
-const formatMoney = (amount: number, devise = 'FCFA') => {
-  return `${new Intl.NumberFormat('fr-FR').format(amount)} ${devise}`;
-};
 
 // Copy to clipboard helper
 const copyToClipboard = async (text: string, label: string) => {
@@ -38,27 +29,11 @@ const copyToClipboard = async (text: string, label: string) => {
 export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModalProps> = ({
   isOpen,
   onClose,
-  data,
-  factureId
+  data
 }) => {
-  const [activeTab, setActiveTab] = useState<'ticket' | 'facture'>('ticket');
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
-
-  // Refs for printing
-  const ticketRef = useRef<HTMLDivElement>(null);
-  const invoiceRef = useRef<HTMLDivElement>(null);
-  
-  // PDF generation hook
-  const { downloadPDF } = useReceiptPDF({
-    filename: data
-      ? `${activeTab === 'ticket' ? 'Recu' : 'Facture'}-${data.reference}`
-      : activeTab === 'ticket'
-        ? 'Recu'
-        : 'Facture',
-    format: activeTab === 'ticket' ? 'ticket' : 'a4'
-  });
 
   // Animation sequence
   useEffect(() => {
@@ -69,71 +44,30 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
     }
   }, [isOpen]);
 
-  // Print handlers
-  const handlePrintTicket = useReactToPrint({
-    contentRef: ticketRef,
-    documentTitle: data ? `Ticket-${data.reference}` : 'Ticket',
-  });
-
-  const handlePrintInvoice = useReactToPrint({
-    contentRef: invoiceRef,
-    documentTitle: data ? `Facture-${data.reference}` : 'Facture',
-  });
-
   // Copy reference
   const handleCopyReference = async () => {
-    if (!data) return;
+    if (!data || !data.reference) return;
     await copyToClipboard(data.reference, 'Référence');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Share functionality (Web Share API)
-  const handleShare = async () => {
-    if (!data) return;
-
-    const shareData = {
-      title: `Reçu ${data.type}`,
-      text: `Transaction ${data.reference}\nMontant: ${formatMoney(data.total, data.devise)}\nDate: ${new Date(data.date).toLocaleDateString('fr-FR')}`,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        // User cancelled or error
-        console.log('Share cancelled');
-      }
-    } else {
-      // Fallback: copy to clipboard
-      await copyToClipboard(shareData.text, 'Détails de la transaction');
-    }
-  };
-
   if (!isOpen || !data) return null;
 
+  // Extract values with defaults for type safety
+  const reference = data.reference || '';
+  const total = data.total || 0;
+  const devise = data.devise || 'FCFA';
+  const date = data.date ? new Date(data.date) : new Date();
+  const type = data.type || '';
+  const modePaiement = data.modePaiement || 'Espèces';
+
   const isDebit = ['Retrait', 'Décaissement', 'Prêt', 'Versement coffre'].some(
-    type => data.type?.toLowerCase().includes(type.toLowerCase())
+    t => type.toLowerCase().includes(t.toLowerCase())
   );
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-      {/* Hidden Print Templates (offscreen, not display:none) */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          left: '-10000px',
-          top: '0',
-          width: '210mm',
-          background: 'white',
-          zIndex: -1,
-        }}
-      >
-        <ReceiptTemplate ref={ticketRef} data={data} />
-        <InvoiceTemplate ref={invoiceRef} data={data} />
-      </div>
-
       {/* Modal Container - Mobile: Bottom sheet, Desktop: Centered */}
       <div className="bg-slate-900 w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500 max-h-[95vh] flex flex-col">
 
@@ -209,7 +143,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
               ) : (
                 <>
                   <span className={`text-sm font-mono font-medium ${isDebit ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {data.reference}
+                    {reference}
                   </span>
                   <Copy size={12} className={isDebit ? 'text-amber-400/60' : 'text-emerald-400/60'} />
                 </>
@@ -234,8 +168,8 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Montant</p>
                   <p className={`text-3xl sm:text-4xl font-bold tabular-nums tracking-tight ${isDebit ? 'text-amber-400' : 'text-emerald-400'}`}>
-                    {isDebit ? '-' : '+'}{new Intl.NumberFormat('fr-FR').format(data.total)}
-                    <span className="text-base sm:text-lg font-normal text-slate-500 ml-2">{data.devise || 'FCFA'}</span>
+                    {isDebit ? '-' : '+'}{new Intl.NumberFormat('fr-FR').format(total)}
+                    <span className="text-base sm:text-lg font-normal text-slate-500 ml-2">{devise}</span>
                   </p>
                 </div>
                 <div className={`
@@ -251,12 +185,12 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                 <div className="flex items-center gap-2">
                   <Clock size={14} className="text-slate-500" />
                   <span className="text-sm text-slate-400">
-                    {new Date(data.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
                 <span className="text-slate-600">•</span>
                 <span className="text-sm text-slate-400">
-                  {new Date(data.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             </div>
@@ -283,7 +217,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                       <Receipt size={14} className="text-slate-500" />
                       <span className="text-sm text-slate-500">Type</span>
                     </div>
-                    <span className="text-sm font-medium text-white">{data.type}</span>
+                    <span className="text-sm font-medium text-white">{type}</span>
                   </div>
 
                   {/* Mode de paiement */}
@@ -292,7 +226,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                       <CreditCard size={14} className="text-slate-500" />
                       <span className="text-sm text-slate-500">Mode</span>
                     </div>
-                    <span className="text-sm font-medium text-white">{data.modePaiement}</span>
+                    <span className="text-sm font-medium text-white">{modePaiement}</span>
                   </div>
 
                   {/* Client */}
@@ -329,7 +263,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                         <div key={idx} className="flex justify-between py-1.5 text-sm">
                           <span className="text-slate-400">{item.description}</span>
                           <span className="text-white font-mono">
-                            {new Intl.NumberFormat('fr-FR').format(item.montant)} F
+                            {new Intl.NumberFormat('fr-FR').format(item.montant || 0)} F
                           </span>
                         </div>
                       ))}
@@ -339,89 +273,12 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
               )}
             </div>
 
-            {/* Print Options Tabs */}
-            <div className="space-y-3">
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold px-1">
-                Imprimer / Exporter
-              </p>
-
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
-                <button
-                  onClick={() => setActiveTab('ticket')}
-                  className={`
-                    flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium
-                    transition-all duration-200
-                    ${activeTab === 'ticket'
-                      ? 'bg-slate-800 text-white shadow-lg'
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-                    }
-                  `}
-                >
-                  <Receipt size={16} />
-                  <span>Ticket</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('facture')}
-                  className={`
-                    flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-medium
-                    transition-all duration-200
-                    ${activeTab === 'facture'
-                      ? 'bg-slate-800 text-white shadow-lg'
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-                    }
-                  `}
-                >
-                  <FileText size={16} />
-                  <span>Facture A4</span>
-                </button>
-              </div>
-
-              {/* Print Button */}
-              <button
-                onClick={activeTab === 'ticket' ? handlePrintTicket : handlePrintInvoice}
-                className={`
-                  w-full py-4 rounded-xl font-bold text-white
-                  flex items-center justify-center gap-3
-                  active:scale-[0.98] transition-all
-                  ${activeTab === 'ticket'
-                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 shadow-lg shadow-emerald-500/25'
-                    : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-lg shadow-blue-500/25'
-                  }
-                `}
-              >
-                <Printer size={20} />
-                <span>Imprimer {activeTab === 'ticket' ? 'Ticket' : 'Facture'}</span>
-              </button>
-
-              {/* Secondary Actions */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={handleShare}
-                  className="flex items-center justify-center gap-2 py-3.5 px-4 bg-slate-800/60 hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all border border-slate-700/50 active:scale-[0.98]"
-                >
-                  <Share2 size={16} />
-                  <span>Partager</span>
-                </button>
-                <button
-                  onClick={() => downloadPDF(activeTab === 'ticket' ? ticketRef : invoiceRef)}
-                  className="flex items-center justify-center gap-2 py-3.5 px-4 bg-slate-800/60 hover:bg-slate-800 text-slate-300 rounded-xl text-sm font-medium transition-all border border-slate-700/50 active:scale-[0.98]"
-                >
-                  <Download size={16} />
-                  <span>PDF</span>
-                </button>
-              </div>
-            </div>
-
-            {activeTab === 'ticket' && (
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">
-                  Prévisualisation Ticket
-                </p>
-                <div className="bg-white rounded-lg p-2">
-                  <ReceiptTemplate data={data} />
-                </div>
-              </div>
-            )}
+            {/* Receipt Actions - Shared Component */}
+            <ReceiptActions
+              data={data}
+              showPreview={true}
+              variant="default"
+            />
           </div>
         </div>
 

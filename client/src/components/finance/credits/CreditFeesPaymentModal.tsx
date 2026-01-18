@@ -416,7 +416,6 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
           devise: 'FCFA',
           notes: `Demande de crédit: ${formatMoney(demande.montant_demande)}`,
         } as ReceiptData}
-        factureId={factureId}
       />
     )}
     </>

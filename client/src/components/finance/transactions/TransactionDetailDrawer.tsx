@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Drawer } from 'vaul';
 import {
   X,
-  Printer,
   Copy,
   CheckCircle,
   XCircle,
@@ -12,22 +11,16 @@ import {
   ArrowDownLeft,
   User,
   Calendar,
-  Share2,
-  Download,
   AlertTriangle,
   Hash,
   CreditCard,
   Building,
-  ArrowRight,
-  Mail
+  ArrowRight
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { formatMoney, formatDate } from '../../../lib/format';
-import { Button } from '../../ui';
-import { useReactToPrint } from 'react-to-print';
-import { useReceiptPDF } from '../../../hooks/finance/useReceiptPDF';
-import { ReceiptTemplate, ReceiptData } from '../../ui/printable/ReceiptTemplate';
-import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
+import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
+import { ReceiptActions } from '../shared/ReceiptActions';
 
 // --- Types ---
 
@@ -64,7 +57,6 @@ export interface TransactionDetailDrawerProps {
   transaction: TransactionDetails | null;
   isOpen: boolean;
   onClose: () => void;
-  onPrint?: (transaction: TransactionDetails) => void;
   onReportProblem?: (transaction: TransactionDetails) => void;
 }
 
@@ -127,23 +119,281 @@ const getStatusConfig = (status: string) => {
   }
 };
 
-// --- Component ---
+// --- Subcomponent: Detail Row ---
+interface DetailRowProps {
+  label: string;
+  value?: string | React.ReactNode;
+  icon?: React.ReactNode;
+  mono?: boolean;
+  className?: string;
+}
+
+function DetailRow({ label, value, icon, mono = false, className = '' }: DetailRowProps) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start justify-between py-1.5 border-b border-dashed border-slate-100 dark:border-slate-700/50 last:border-0">
+      <dt className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+        {icon}
+        {label}
+      </dt>
+      <dd className={`
+        text-sm font-semibold text-slate-900 dark:text-slate-100 text-right max-w-[60%]
+        ${mono ? 'font-mono' : ''}
+        ${className}
+      `}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+// --- Drawer Content Component (memoized to prevent re-renders) ---
+interface DrawerContentProps {
+  transaction: TransactionDetails;
+  receiptData: ReceiptData;
+  isDesktop: boolean;
+  isCredit: boolean;
+  statusConfig: ReturnType<typeof getStatusConfig>;
+  isTransfer: boolean;
+  showError: boolean;
+  copied: boolean;
+  onClose: () => void;
+  onCopyReference: () => void;
+  onReportProblem: () => void;
+}
+
+const DrawerContent = React.memo(function DrawerContent({
+  transaction,
+  receiptData,
+  isDesktop,
+  isCredit,
+  statusConfig,
+  isTransfer,
+  showError,
+  copied,
+  onClose,
+  onCopyReference,
+  onReportProblem
+}: DrawerContentProps) {
+  const StatusIcon = statusConfig.icon;
+
+  return (
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-t-[20px] md:rounded-l-2xl md:rounded-tr-none overflow-hidden">
+      {/* Hero Header */}
+      <div className={`
+        relative px-6 pt-8 pb-6 text-center
+        ${isCredit
+          ? 'bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/10'
+          : 'bg-gradient-to-b from-red-500/10 via-red-500/5 to-transparent dark:from-red-500/20 dark:via-red-500/10'
+        }
+      `}>
+        {/* Close Button (Desktop) */}
+        {isDesktop && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            aria-label="Fermer"
+          >
+            <X size={20} className="text-slate-500" />
+          </button>
+        )}
+
+        {/* Status Badge */}
+        <div className="flex justify-center mb-5">
+          <span className={`
+            inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide
+            bg-${statusConfig.color}-500/15 text-${statusConfig.color}-600 dark:text-${statusConfig.color}-400
+            border border-${statusConfig.color}-500/20
+          `}>
+            <StatusIcon size={14} strokeWidth={2.5} />
+            {statusConfig.label}
+          </span>
+        </div>
+
+        {/* Amount - Hero Display */}
+        <div className="mb-2">
+          <span className={`
+            text-4xl sm:text-5xl font-bold font-mono tracking-tight
+            ${isCredit
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-red-600 dark:text-red-400'
+            }
+          `}>
+            {isCredit ? '+' : '-'}{formatMoney(transaction.amount, { showCurrency: false })}
+          </span>
+          <span className="text-lg text-slate-400 font-medium ml-2">FCFA</span>
+        </div>
+
+        {/* Transaction Type */}
+        <p className="text-lg font-medium text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 mb-6">
+          {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+          {transaction.type_operation || transaction.type}
+        </p>
+
+        {/* Reference (Copyable) */}
+        <button
+          onClick={onCopyReference}
+          className="mx-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group"
+        >
+          <Hash size={14} className="text-slate-400" />
+          <span className="text-sm font-mono text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
+            {transaction.reference}
+          </span>
+          {copied ? (
+            <CheckCircle size={14} className="text-emerald-500" />
+          ) : (
+            <Copy size={14} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+          )}
+        </button>
+      </div>
+
+      {/* Body - Scrollable Details */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="space-y-5">
+
+          {/* Transfer Flow (if applicable) */}
+          {isTransfer && (
+            <section className="mb-6">
+              <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                {/* Source */}
+                <div className="text-center flex-1">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">De</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{transaction.source?.name}</p>
+                  {transaction.source?.accountNumber && (
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">{transaction.source.accountNumber}</p>
+                  )}
+                </div>
+
+                {/* Arrow */}
+                <div className="shrink-0 w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center">
+                  <ArrowRight size={18} className="text-cyan-500" />
+                </div>
+
+                {/* Destination */}
+                <div className="text-center flex-1">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Vers</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{transaction.destination?.name}</p>
+                  {transaction.destination?.accountNumber && (
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">{transaction.destination.accountNumber}</p>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Client Info */}
+          {transaction.client && !isTransfer && (
+            <section>
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <User size={14} /> Client
+              </h3>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
+                <DetailRow label="Nom" value={transaction.client.name} />
+                {transaction.client.phone && (
+                  <DetailRow label="Téléphone" value={transaction.client.phone} />
+                )}
+                <DetailRow
+                  label="Compte"
+                  value={transaction.client.accountNumber || 'Espèces'}
+                  mono
+                />
+              </div>
+            </section>
+          )}
+
+          {/* Transaction Details */}
+          <section>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <FileText size={14} /> Détails
+            </h3>
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
+              <DetailRow
+                label="Date & Heure"
+                value={formatDate(transaction.date, { format: 'datetime' })}
+                icon={<Calendar size={14} className="text-slate-400" />}
+              />
+              <DetailRow
+                label="Mode de paiement"
+                value={transaction.mode_paiement || 'Espèces'}
+                icon={<CreditCard size={14} className="text-slate-400" />}
+              />
+              <DetailRow
+                label="Agent"
+                value={transaction.agent || 'Système'}
+                icon={<User size={14} className="text-slate-400" />}
+              />
+              {transaction.agence && (
+                <DetailRow
+                  label="Agence"
+                  value={transaction.agence}
+                  icon={<Building size={14} className="text-slate-400" />}
+                />
+              )}
+              {transaction.description && (
+                <DetailRow
+                  label="Note"
+                  value={transaction.description}
+                  className="italic text-slate-500 dark:text-slate-400"
+                />
+              )}
+            </div>
+          </section>
+
+          {/* Error message if failed */}
+          {showError && (
+            <section className="animate-in fade-in slide-in-from-bottom-2">
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+                <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                    Transaction échouée
+                  </p>
+                  <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
+                    {transaction.metadata?.error_message || 'Une erreur est survenue lors du traitement de cette transaction.'}
+                  </p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Receipt Actions - Shared Component */}
+          <section>
+            <ReceiptActions
+              data={receiptData}
+              showPreview={false}
+              showEmail={true}
+              variant="light"
+            />
+          </section>
+
+          {/* Tertiary Action (Report Problem) */}
+          {showError && (
+            <button
+              onClick={onReportProblem}
+              className="w-full py-2 text-sm text-red-500 hover:text-red-400 transition-colors flex items-center justify-center gap-2"
+            >
+              <AlertTriangle size={14} />
+              Signaler un problème
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// --- Main Component ---
 
 export default function TransactionDetailDrawer({
   transaction,
   isOpen,
   onClose,
-  onPrint,
   onReportProblem
 }: TransactionDetailDrawerProps) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [copied, setCopied] = useState(false);
 
-  // Refs for printing/PDF
-  const ticketRef = useRef<HTMLDivElement>(null);
-  const invoiceRef = useRef<HTMLDivElement>(null);
-
-  // Prepare Receipt Data
+  // Prepare Receipt Data for ReceiptActions
   const receiptData: ReceiptData | null = useMemo(() => {
     if (!transaction) return null;
 
@@ -184,31 +434,6 @@ export default function TransactionDetailDrawer({
     };
   }, [transaction]);
 
-  // Hooks
-  const { downloadPDF } = useReceiptPDF({
-    filename: `Recu-${transaction?.reference || 'Transaction'}`,
-    format: 'ticket'
-  });
-
-  // Print Handlers
-  const handlePrintTicket = useReactToPrint({
-    contentRef: ticketRef,
-    documentTitle: `Ticket-${transaction?.reference || ''}`,
-  });
-
-  const handlePrintInvoice = useReactToPrint({
-    contentRef: invoiceRef,
-    documentTitle: `Facture-${transaction?.reference || ''}`,
-  });
-
-  const handlePrint = useCallback(() => {
-    if (onPrint && transaction) {
-      onPrint(transaction);
-    } else {
-      handlePrintTicket();
-    }
-  }, [onPrint, transaction, handlePrintTicket]);
-
   // Copy Reference
   const handleCopyReference = useCallback(() => {
     if (!transaction?.reference) return;
@@ -217,49 +442,6 @@ export default function TransactionDetailDrawer({
     toast.success("Référence copiée !", { duration: 2000 });
     setTimeout(() => setCopied(false), 2000);
   }, [transaction?.reference]);
-
-  // Share functionality (Native Share API)
-  const handleShare = useCallback(async () => {
-    if (!transaction) return;
-
-    const shareData = {
-      title: `Transaction ${transaction.reference}`,
-      text: `Transaction de ${formatMoney(transaction.amount)} FCFA - ${transaction.type_operation || transaction.type}\nRéférence: ${transaction.reference}\nDate: ${formatDate(transaction.date, { format: 'datetime' })}`,
-    };
-
-    try {
-      if (navigator.share && navigator.canShare(shareData)) {
-        await navigator.share(shareData);
-        toast.success('Partagé avec succès');
-      } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(shareData.text);
-        toast.success('Détails copiés dans le presse-papiers');
-      }
-    } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        toast.error('Erreur lors du partage');
-      }
-    }
-  }, [transaction]);
-
-  // Email send (opens mail client)
-  const handleSendEmail = useCallback(() => {
-    if (!transaction) return;
-
-    const subject = encodeURIComponent(`Reçu Transaction ${transaction.reference}`);
-    const body = encodeURIComponent(
-      `Bonjour,\n\nVeuillez trouver ci-dessous les détails de la transaction:\n\n` +
-      `Type: ${transaction.type_operation || transaction.type}\n` +
-      `Montant: ${formatMoney(transaction.amount)} FCFA\n` +
-      `Référence: ${transaction.reference}\n` +
-      `Date: ${formatDate(transaction.date, { format: 'datetime' })}\n` +
-      `Statut: ${normalizeStatus(transaction.status)}\n\n` +
-      `Cordialement`
-    );
-
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
-  }, [transaction]);
 
   // Report problem
   const handleReportProblem = useCallback(() => {
@@ -271,286 +453,15 @@ export default function TransactionDetailDrawer({
   }, [onReportProblem, transaction]);
 
   // Don't render if no transaction and closed
-  if (!transaction && !isOpen) return null;
+  if (!transaction || !isOpen || !receiptData) return null;
 
-  const isCredit = isEntree(transaction?.type_operation || transaction?.type || '');
-  const statusConfig = getStatusConfig(transaction?.status || 'Succès');
-  const StatusIcon = statusConfig.icon;
-  const isTransfer = transaction?.source && transaction?.destination;
-  const showError = normalizeStatus(transaction?.status || '') === 'Échec';
-
-  // --- Content Renderer ---
-  const Content = () => {
-    if (!transaction) return null;
-
-    return (
-      <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-t-[20px] md:rounded-l-2xl md:rounded-tr-none overflow-hidden">
-        {/* Hidden Print Templates */}
-        {receiptData && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'fixed',
-              left: '-10000px',
-              top: '0',
-              width: '210mm',
-              background: 'white',
-              zIndex: -1,
-            }}
-          >
-            <ReceiptTemplate ref={ticketRef} data={receiptData} />
-            <InvoiceTemplate ref={invoiceRef} data={receiptData} />
-          </div>
-        )}
-
-        {/* Hero Header */}
-        <div className={`
-          relative px-6 pt-8 pb-6 text-center
-          ${isCredit
-            ? 'bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/10'
-            : 'bg-gradient-to-b from-red-500/10 via-red-500/5 to-transparent dark:from-red-500/20 dark:via-red-500/10'
-          }
-        `}>
-          {/* Close Button (Desktop) */}
-          {isDesktop && (
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-              aria-label="Fermer"
-            >
-              <X size={20} className="text-slate-500" />
-            </button>
-          )}
-
-          {/* Status Badge */}
-          <div className="flex justify-center mb-5">
-            <span className={`
-              inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide
-              bg-${statusConfig.color}-500/15 text-${statusConfig.color}-600 dark:text-${statusConfig.color}-400
-              border border-${statusConfig.color}-500/20
-            `}>
-              <StatusIcon size={14} strokeWidth={2.5} />
-              {statusConfig.label}
-            </span>
-          </div>
-
-          {/* Amount - Hero Display */}
-          <div className="mb-2">
-            <span className={`
-              text-4xl sm:text-5xl font-bold font-mono tracking-tight
-              ${isCredit
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : 'text-red-600 dark:text-red-400'
-              }
-            `}>
-              {isCredit ? '+' : '-'}{formatMoney(transaction.amount, { showCurrency: false })}
-            </span>
-            <span className="text-lg text-slate-400 font-medium ml-2">FCFA</span>
-          </div>
-
-          {/* Transaction Type */}
-          <p className="text-lg font-medium text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 mb-6">
-            {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
-            {transaction.type_operation || transaction.type}
-          </p>
-
-          {/* Reference (Copyable) */}
-          <button
-            onClick={handleCopyReference}
-            className="mx-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group"
-          >
-            <Hash size={14} className="text-slate-400" />
-            <span className="text-sm font-mono text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
-              {transaction.reference}
-            </span>
-            {copied ? (
-              <CheckCircle size={14} className="text-emerald-500" />
-            ) : (
-              <Copy size={14} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
-            )}
-          </button>
-        </div>
-
-        {/* Body - Scrollable Details */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-5">
-
-            {/* Transfer Flow (if applicable) */}
-            {isTransfer && (
-              <section className="mb-6">
-                <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                  {/* Source */}
-                  <div className="text-center flex-1">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">De</p>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{transaction.source?.name}</p>
-                    {transaction.source?.accountNumber && (
-                      <p className="text-xs text-slate-500 font-mono mt-0.5">{transaction.source.accountNumber}</p>
-                    )}
-                  </div>
-
-                  {/* Arrow */}
-                  <div className="shrink-0 w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center">
-                    <ArrowRight size={18} className="text-cyan-500" />
-                  </div>
-
-                  {/* Destination */}
-                  <div className="text-center flex-1">
-                    <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Vers</p>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{transaction.destination?.name}</p>
-                    {transaction.destination?.accountNumber && (
-                      <p className="text-xs text-slate-500 font-mono mt-0.5">{transaction.destination.accountNumber}</p>
-                    )}
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* Client Info */}
-            {transaction.client && !isTransfer && (
-              <section>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <User size={14} /> Client
-                </h3>
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
-                  <DetailRow label="Nom" value={transaction.client.name} />
-                  {transaction.client.phone && (
-                    <DetailRow label="Téléphone" value={transaction.client.phone} />
-                  )}
-                  <DetailRow
-                    label="Compte"
-                    value={transaction.client.accountNumber || 'Espèces'}
-                    mono
-                  />
-                </div>
-              </section>
-            )}
-
-            {/* Transaction Details */}
-            <section>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <FileText size={14} /> Détails
-              </h3>
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
-                <DetailRow
-                  label="Date & Heure"
-                  value={formatDate(transaction.date, { format: 'datetime' })}
-                  icon={<Calendar size={14} className="text-slate-400" />}
-                />
-                <DetailRow
-                  label="Mode de paiement"
-                  value={transaction.mode_paiement || 'Espèces'}
-                  icon={<CreditCard size={14} className="text-slate-400" />}
-                />
-                <DetailRow
-                  label="Agent"
-                  value={transaction.agent || 'Système'}
-                  icon={<User size={14} className="text-slate-400" />}
-                />
-                {transaction.agence && (
-                  <DetailRow
-                    label="Agence"
-                    value={transaction.agence}
-                    icon={<Building size={14} className="text-slate-400" />}
-                  />
-                )}
-                {transaction.description && (
-                  <DetailRow
-                    label="Note"
-                    value={transaction.description}
-                    className="italic text-slate-500 dark:text-slate-400"
-                  />
-                )}
-              </div>
-            </section>
-
-            {/* Error message if failed */}
-            {showError && (
-              <section className="animate-in fade-in slide-in-from-bottom-2">
-                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4 flex items-start gap-3">
-                  <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-red-700 dark:text-red-400">
-                      Transaction échouée
-                    </p>
-                    <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
-                      {transaction.metadata?.error_message || 'Une erreur est survenue lors du traitement de cette transaction.'}
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-          </div>
-        </div>
-
-        {/* Footer - Fixed Actions */}
-        <div className="shrink-0 p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 safe-area-bottom">
-          {/* Primary Action */}
-          <div className="flex gap-3 mb-3">
-            <Button
-              variant="primary"
-              className={`
-                flex-1 h-12 rounded-xl text-white shadow-lg font-semibold
-                ${isCredit
-                  ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
-                  : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-500/20'
-                }
-              `}
-              onClick={handlePrint}
-            >
-              <Printer size={18} className="mr-2" />
-              Reçu / Facture
-            </Button>
-          </div>
-
-          {/* Secondary Actions */}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1 h-10 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-              onClick={() => downloadPDF(ticketRef)}
-            >
-              <Download size={16} className="mr-1.5" />
-              PDF
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 h-10 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-              onClick={handleShare}
-            >
-              <Share2 size={16} className="mr-1.5" />
-              Partager
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 h-10 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-              onClick={handleSendEmail}
-            >
-              <Mail size={16} className="mr-1.5" />
-              Email
-            </Button>
-          </div>
-
-          {/* Tertiary Action (Report Problem) */}
-          {showError && (
-            <button
-              onClick={handleReportProblem}
-              className="w-full mt-3 py-2 text-sm text-red-500 hover:text-red-400 transition-colors flex items-center justify-center gap-2"
-            >
-              <AlertTriangle size={14} />
-              Signaler un problème
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // --- Render ---
+  const isCredit = isEntree(transaction.type_operation || transaction.type || '');
+  const statusConfig = getStatusConfig(transaction.status || 'Succès');
+  const isTransfer = !!(transaction.source && transaction.destination);
+  const showError = normalizeStatus(transaction.status || '') === 'Échec';
 
   // Desktop: Slideover / Side Panel
   if (isDesktop) {
-    if (!isOpen) return null;
-
     return (
       <div className="fixed inset-0 z-50 flex justify-end">
         {/* Backdrop */}
@@ -561,7 +472,19 @@ export default function TransactionDetailDrawer({
 
         {/* Slideover Content */}
         <div className="relative w-full max-w-md h-full bg-white dark:bg-slate-900 shadow-2xl animate-in slide-in-from-right duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800">
-          <Content />
+          <DrawerContent
+            transaction={transaction}
+            receiptData={receiptData}
+            isDesktop={isDesktop}
+            isCredit={isCredit}
+            statusConfig={statusConfig}
+            isTransfer={isTransfer}
+            showError={showError}
+            copied={copied}
+            onClose={onClose}
+            onCopyReference={handleCopyReference}
+            onReportProblem={handleReportProblem}
+          />
         </div>
       </div>
     );
@@ -579,39 +502,22 @@ export default function TransactionDetailDrawer({
           </div>
 
           <div className="flex-1 overflow-hidden flex flex-col">
-            <Content />
+            <DrawerContent
+              transaction={transaction}
+              receiptData={receiptData}
+              isDesktop={isDesktop}
+              isCredit={isCredit}
+              statusConfig={statusConfig}
+              isTransfer={isTransfer}
+              showError={showError}
+              copied={copied}
+              onClose={onClose}
+              onCopyReference={handleCopyReference}
+              onReportProblem={handleReportProblem}
+            />
           </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
   );
 }
-
-// --- Subcomponent: Detail Row ---
-interface DetailRowProps {
-  label: string;
-  value?: string | React.ReactNode;
-  icon?: React.ReactNode;
-  mono?: boolean;
-  className?: string;
-}
-
-function DetailRow({ label, value, icon, mono = false, className = '' }: DetailRowProps) {
-  if (!value) return null;
-  return (
-    <div className="flex items-start justify-between py-1.5 border-b border-dashed border-slate-100 dark:border-slate-700/50 last:border-0">
-      <dt className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-        {icon}
-        {label}
-      </dt>
-      <dd className={`
-        text-sm font-semibold text-slate-900 dark:text-slate-100 text-right max-w-[60%]
-        ${mono ? 'font-mono' : ''}
-        ${className}
-      `}>
-        {value}
-      </dd>
-    </div>
-  );
-}
-

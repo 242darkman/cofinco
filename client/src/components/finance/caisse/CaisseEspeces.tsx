@@ -987,7 +987,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       )}
 
       {/* Print Receipt Dialog */}
-      <UniversalPaymentSuccessModal 
+      <UniversalPaymentSuccessModal
         isOpen={showSuccessModal}
         onClose={() => {
             setShowSuccessModal(false);
@@ -997,7 +997,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         }}
         term="Terminer"
         data={receiptData}
-        factureId={factureId}
       />
     </div>
   );

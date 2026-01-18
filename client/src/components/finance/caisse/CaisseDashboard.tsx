@@ -771,7 +771,7 @@ export default function CaisseDashboard({
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
-        <UniversalPaymentSuccessModal 
+        <UniversalPaymentSuccessModal
             isOpen={showHistoryReceipt}
             onClose={() => {
               setShowHistoryReceipt(false);
@@ -779,7 +779,6 @@ export default function CaisseDashboard({
             }}
             term="Fermer"
             data={historyReceiptData}
-            factureId={historyFactureId}
         />
         
       <div className="w-full min-h-screen flex flex-col p-4 md:p-6">

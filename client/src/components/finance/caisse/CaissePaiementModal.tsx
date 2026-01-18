@@ -1048,7 +1048,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
       </div>
 
       {/* Universal Success Modal */}
-      <UniversalPaymentSuccessModal 
+      <UniversalPaymentSuccessModal
         isOpen={showReceipt}
         onClose={() => {
             setShowReceipt(false);
@@ -1058,7 +1058,6 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
         }}
         term="Terminer"
         data={receiptData}
-        factureId={factureId}
       />
     </div>
   );
