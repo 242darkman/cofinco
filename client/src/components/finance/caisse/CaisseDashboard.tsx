@@ -29,6 +29,8 @@ import { isAdminRole } from '@shared/types/roles';
 
 import CaisseAccessControl from './CaisseAccessControl';
 import CaisseClientInfos from './CaisseClientInfos';
+import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
+import type { TransactionItem, TransactionDetails } from '../transactions';
 
 interface SessionCaisse {
   id: string;
@@ -120,6 +122,10 @@ export default function CaisseDashboard({
   const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
   const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [historyFactureId, setHistoryFactureId] = useState<string | undefined>(undefined);
+
+  // Transaction Detail Drawer State
+  const [selectedTxDetail, setSelectedTxDetail] = useState<TransactionDetails | null>(null);
+  const [isTxDrawerOpen, setIsTxDrawerOpen] = useState(false);
 
   // React Query for Real-time Data
   const { 
@@ -448,10 +454,10 @@ export default function CaisseDashboard({
     { key: 'infos-client', label: 'Info Client', icon: Users },
     { key: 'especes', label: 'Espèces', icon: Wallet },
     { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !mobileMoneyEnabled },
+    { key: 'historique', label: 'Historique', icon: Clock },
     { key: 'rapprochement', label: 'Clôture', icon: RefreshCw },
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft },
     { key: 'etats', label: 'États', icon: FileText },
-
     { key: 'supervision', label: 'Supervision', icon: Shield },
   ];
 
@@ -477,6 +483,33 @@ export default function CaisseDashboard({
     switch (activeTab) {
       case 'operations':
         return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} onBack={() => setActiveTab('dashboard')} /></div> : null;
+      case 'historique':
+        return (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 -mx-4 md:-mx-6 -mb-16">
+            <TransactionHistoryPage
+              transactions={transactions.map(tx => ({
+                id: tx.id,
+                reference: tx.reference,
+                amount: toNumber(tx.montant),
+                type: tx.type_operation,
+                type_operation: tx.type_operation,
+                status: 'Succès' as const,
+                date: tx.created_at,
+                description: tx.description,
+                client: tx.client_nom ? {
+                  name: `${tx.client_nom} ${tx.client_prenom || ''}`.trim(),
+                  phone: tx.client_telephone
+                } : undefined,
+                agent: currentSession?.caissier_nom,
+                mode_paiement: tx.mode_paiement,
+                created_at: tx.created_at
+              }))}
+              isLoading={loadingTransactions}
+              onRefresh={() => refetchTransactions()}
+              onBack={() => setActiveTab('dashboard')}
+            />
+          </div>
+        );
       case 'especes':
         return currentSession ? (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -654,60 +687,47 @@ export default function CaisseDashboard({
           )}
       </div>
 
-      {/* Recent Transactions */}
-       <Card variant="default" padding="none" className="overflow-hidden">
-           <div className="p-4 border-b border-edge flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Clock size={16} className="text-cyan-400" />
-                    <h3 className="text-sm font-bold text-white">Transactions Récentes</h3>
-                </div>
-                <button onClick={() => setActiveTab('operations')} className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
-                    Voir tout
-                </button>
-           </div>
-           
-           <div className="divide-y divide-edge">
-              {transactions.length === 0 ? (
-                  <div className="p-8 text-center bg-surface-muted/30">
-                      <p className="text-xs text-slate-500">Aucune transaction aujourd'hui</p>
-                  </div>
-              ) : (
-                  transactions.slice(0, 5).map((tx) => {
-                      const isEntree = TYPES_ENTREES.includes(tx.type_operation);
-                      return (
-                      <div key={tx.id} onClick={() => setActiveTab('operations')} className="p-3 sm:p-4 flex items-center justify-between hover:bg-surface-elevated transition-colors cursor-pointer group">
-                          <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isEntree ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                                  {isEntree ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                              </div>
-                              <div>
-                                  <p className="text-sm font-medium text-white group-hover:text-cyan-400 transition-colors line-clamp-1">{tx.description || tx.type_operation}</p>
-                                  <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                                      <span>{new Date(tx.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                                      <span>•</span>
-                                      <span>{tx.mode_paiement}</span>
-                                  </div>
-                              </div>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleShowHistoryReceipt(tx);
-                                }}
-                              >
-                                  <FileText size={14} />
-                              </Button>
-                          </div>
-                          <span className={`text-sm font-bold whitespace-nowrap ${isEntree ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {isEntree ? '+' : '-'}{formattedMoney(tx.montant)}
-                          </span>
-                      </div>
-                  );})
-              )}
-           </div>
-       </Card>
+      {/* Recent Transactions - Using new TransactionsList component */}
+      <TransactionsList
+        transactions={transactions.map(tx => ({
+          id: tx.id,
+          reference: tx.reference,
+          amount: toNumber(tx.montant),
+          type: tx.type_operation,
+          type_operation: tx.type_operation,
+          status: 'Succès' as const,
+          date: tx.created_at,
+          description: tx.description,
+          client: tx.client_nom ? {
+            name: `${tx.client_nom} ${tx.client_prenom || ''}`.trim(),
+            phone: tx.client_telephone
+          } : undefined,
+          agent: currentSession?.caissier_nom,
+          mode_paiement: tx.mode_paiement,
+          created_at: tx.created_at
+        }))}
+        onTransactionClick={(tx) => {
+          setSelectedTxDetail({
+            id: tx.id,
+            reference: tx.reference,
+            amount: tx.amount,
+            type: tx.type_operation || tx.type,
+            type_operation: tx.type_operation,
+            status: tx.status,
+            date: tx.date,
+            description: tx.description,
+            client: tx.client,
+            agent: tx.agent,
+            mode_paiement: tx.mode_paiement
+          });
+          setIsTxDrawerOpen(true);
+        }}
+        isLoading={loadingTransactions}
+        emptyMessage="Aucune transaction aujourd'hui"
+        headerTitle="Transactions Récentes"
+        onViewAll={() => setActiveTab('historique')}
+        maxItems={5}
+      />
 
     </div>
         );
@@ -932,6 +952,16 @@ export default function CaisseDashboard({
           }}
         />
       )}
+
+      {/* Transaction Detail Drawer */}
+      <TransactionDetailDrawer
+        transaction={selectedTxDetail}
+        isOpen={isTxDrawerOpen}
+        onClose={() => {
+          setIsTxDrawerOpen(false);
+          setTimeout(() => setSelectedTxDetail(null), 300);
+        }}
+      />
     </div>
   );
 }
