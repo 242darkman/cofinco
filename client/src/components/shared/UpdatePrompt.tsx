@@ -19,7 +19,7 @@ export function UpdatePrompt() {
                 Mise à jour disponible
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Une nouvelle version de l'application est disponible. Veuillez rafraîchir pour en profiter.
+                Une nouvelle version de l'application ({__APP_VERSION__}) est disponible. Veuillez rafraîchir pour en profiter.
               </p>
             </div>
           </div>

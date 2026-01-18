@@ -138,7 +138,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
           if (!status) return false;
           
           // Strict check against known closed statuses
-          return status !== 'Clôturé' && status !== 'Fermé' && status !== 'clôturé';
+          return status !== 'Clôturé';
       }) : [];
       setComptesExistants(activeComptes);
       
