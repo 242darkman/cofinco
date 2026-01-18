@@ -442,6 +442,10 @@ export const comptes = pgTable(
     dernierVersementAuto: timestamp("dernier_versement_auto"),
     prochainVersementAuto: timestamp("prochain_versement_auto"),
 
+    // Intérêts
+    accruedInterest: numeric("accrued_interest").notNull().default("0"),
+    dateDerniereCapitalisation: timestamp("date_derniere_capitalisation"),
+
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),

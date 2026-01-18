@@ -158,32 +158,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Function to seed admin user on startup
-async function seedAdminUser() {
-  try {
-    const existingAdmin = await db.select().from(users).where(eq(users.username, 'admin'));
-    
-    if (existingAdmin.length === 0) {
-      log('Creating admin user...', 'seed');
-      const hashedPassword = await hashPassword('admin123');
-      
-      await db.insert(users).values({
-        username: 'admin',
-        password: hashedPassword,
-        nom: 'Administrateur',
-        prenom: 'Système',
-        email: 'admin@cofin.com',
-        role: SystemRole.ADMIN,
-        agence: 'Siège',
-        statut: 'Actif',
-      });
-      
-      log('Admin user created: admin/admin123', 'seed');
-    }
-  } catch (error) {
-    logError('Error seeding admin user', error instanceof Error ? error : undefined, 'seed');
-  }
-}
 
 (async () => {
   // Setup auth first (creates session table and middleware)
@@ -229,6 +203,11 @@ async function seedAdminUser() {
   log('[Cron] Automatic repayments job started');
   log('[Cron] Credit status update job started');
   log('[Cron] Scheduled agency migrations job started');
+
+  // Initialize Interest Scheduler (Daily Accrual & Monthly Capitalization)
+  // Auto-starts jobs in constructor
+  const { interestScheduler } = await import("./services/interest-scheduler");
+  log('[Cron] Interest Scheduler initialized');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

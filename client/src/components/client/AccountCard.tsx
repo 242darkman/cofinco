@@ -10,7 +10,7 @@ interface CompteBancaire {
   numeroCompte: string;
   soldeCourant: string;
   tauxInteret?: number;
-  statut: 'Actif' | 'Fermé' | 'Suspendu' | 'Clôturé';
+  statut: 'Actif' | 'Fermé' | 'Suspendu' | 'Clôturé' | 'EN_ATTENTE_PAIEMENT';
   blocageActif?: boolean;
   blocageMotif?: string;
   blocageFin?: string;
@@ -136,7 +136,23 @@ export default function AccountCard({ compte, onEdit, onAction }: AccountCardPro
              <p className="text-[10px] text-slate-500 uppercase tracking-tight">
                {isBloque ? 'Solde (Bloqué)' : 'Solde Disponible'}
              </p>
-             <Badge value={compte.statut} size="sm" variant={compte.statut === 'Actif' ? 'success' : compte.statut === 'Suspendu' ? 'warning' : 'danger'} />
+             <Badge 
+                value={
+                   compte.statut === 'EN_ATTENTE_PAIEMENT' ? 'En attente paiement' :
+                   compte.statut === 'Actif' ? 'Actif' :
+                   compte.statut === 'Suspendu' ? 'Suspendu' :
+                   compte.statut === 'Clôturé' ? 'Clôturé' :
+                   compte.statut === 'Fermé' ? 'Fermé' :
+                   (compte.statut as string).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+                } 
+                size="sm" 
+                variant={
+                    compte.statut === 'Actif' ? 'success' : 
+                    compte.statut === 'Suspendu' ? 'warning' : 
+                    compte.statut === 'EN_ATTENTE_PAIEMENT' ? 'danger' :
+                    'danger'
+                } 
+             />
           </div>
           
           <div className="flex items-baseline gap-1">

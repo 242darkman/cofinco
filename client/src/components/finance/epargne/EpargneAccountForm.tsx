@@ -26,6 +26,8 @@ interface Client {
   agence_nom?: string;
 }
 
+import { type Compte } from '../../../../../shared/schema/finance';
+
 interface CompteExistant {
   id: string;
   numero_compte: string;
@@ -33,6 +35,7 @@ interface CompteExistant {
   type_compte: string;
   solde: number;
   solde_courant?: string | number;
+  statut?: Compte['statut'];
 }
 
 interface ProduitCompte {
@@ -128,7 +131,15 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const loadComptesClient = useCallback(async (clientIdParam: string) => {
     try {
       const data = await compteEpargneApi.getByClient(clientIdParam);
-      const activeComptes = Array.isArray(data) ? data.filter((c: any) => c.statut === 'Actif') : [];
+      // Fix: Include all accounts that are not permanently closed to prevent duplicates
+      // This includes 'Actif', 'Suspendu' and 'EN_ATTENTE_PAIEMENT'
+      const activeComptes = Array.isArray(data) ? data.filter((c: any) => {
+          const status = c.statut as Compte['statut'] | undefined;
+          if (!status) return false;
+          
+          // Strict check against known closed statuses
+          return status !== 'Clôturé' && status !== 'Fermé' && status !== 'clôturé';
+      }) : [];
       setComptesExistants(activeComptes);
       
       // Check eligibility for internal transfer
@@ -552,71 +563,82 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                   
                   {/* Visual Account Type Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {(['Courant', 'Épargne', 'Bloqué'] as TypeCompte[]).map((type) => {
-                      // Normalize for comparison (handle case and accents)
-                      const normalizeType = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                      const normalizedType = normalizeType(type);
-                      
-                      const isOwned = comptesExistants.some(c => {
-                        const compteType = c.typeCompte || c.type_compte || '';
-                        return normalizeType(compteType) === normalizedType;
-                      });
-                      
-                      const isSelected = formData.type_compte === type;
-                      const isDisabled = loading || isOwned;
-                      
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => !isDisabled && handleInputChange('type_compte', type)}
-                          disabled={isDisabled}
-                          className={`
-                            relative p-4 rounded-lg border-2 transition-all text-left
-                            ${isOwned
-                              ? 'bg-slate-800/30 border-slate-700 opacity-50 cursor-not-allowed'
-                              : isSelected
-                                ? 'bg-blue-600/20 border-blue-500 shadow-lg shadow-blue-500/20'
-                                : 'bg-slate-700/50 border-slate-600 hover:border-blue-500/50 hover:bg-slate-700 cursor-pointer'
+                  {(['Courant', 'Épargne', 'Bloqué'] as TypeCompte[]).map((type) => {
+                    // Normalize for comparison (handle case and accents)
+                    const normalizeType = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    const normalizedType = normalizeType(type);
+                    
+                    // Check if client ALREADY has this account type
+                    const isOwned = comptesExistants.some(c => {
+                      const compteType = c.typeCompte || c.type_compte || '';
+                      // Also check detailed type if needed, but usually typeCompte enum is enough
+                      return normalizeType(compteType) === normalizedType;
+                    });
+                    
+                    const isSelected = formData.type_compte === type;
+                    const isDisabled = loading || isOwned; // Disabled if already owned
+                    
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => !isDisabled && handleInputChange('type_compte', type)}
+                        disabled={isDisabled}
+                        className={`
+                          relative p-4 rounded-lg border-2 transition-all text-left
+                          ${isOwned
+                            ? 'bg-slate-800/30 border-slate-700 opacity-60 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-blue-600/20 border-blue-500 shadow-lg shadow-blue-500/20'
+                              : 'bg-slate-700/50 border-slate-600 hover:border-blue-500/50 hover:bg-slate-700 cursor-pointer'
+                          }
+                        `}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`
+                            mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0
+                            ${isOwned 
+                              ? 'border-slate-600 bg-slate-700'
+                              : isSelected 
+                                ? 'border-blue-500 bg-blue-500' 
+                                : 'border-slate-500'
                             }
-                          `}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className={`
-                              mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0
-                              ${isOwned 
-                                ? 'border-slate-600 bg-slate-700'
-                                : isSelected 
-                                  ? 'border-blue-500 bg-blue-500' 
-                                  : 'border-slate-500'
-                              }
-                            `}>
-                              {isOwned ? (
-                                <CheckCircle size={14} className="text-slate-500" />
-                              ) : isSelected && (
-                                <div className="w-2 h-2 bg-white rounded-full" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <p className={`font-semibold text-sm ${isOwned ? 'text-slate-500' : isSelected ? 'text-white' : 'text-slate-300'}`}>
-                                {type}
-                              </p>
-                              <p className={`text-xs mt-1 ${isOwned ? 'text-slate-600' : 'text-slate-400'}`}>
-                                {type === 'Courant' && 'Opérations quotidiennes'}
-                                {type === 'Épargne' && 'Économies avec intérêts'}
-                                {type === 'Bloqué' && 'Épargne à terme fixe'}
-                              </p>
-                              {isOwned && (
-                                <span className="inline-block mt-1 px-2 py-0.5 bg-slate-700 text-slate-500 text-[10px] font-bold rounded-full">
-                                  DÉJÀ POSSÉDÉ
+                          `}>
+                            {isOwned ? (
+                              <CheckCircle size={14} className="text-slate-500" />
+                            ) : isSelected && (
+                              <div className="w-2 h-2 bg-white rounded-full" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`font-semibold text-sm ${isOwned ? 'text-slate-500' : isSelected ? 'text-white' : 'text-slate-300'}`}>
+                              {type} {isOwned && (
+                                <span className="text-xs font-normal opacity-70">
+                                  {isOwned && comptesExistants.some(c => {
+                                     const cType = (c.typeCompte || c.type_compte || '').toLowerCase();
+                                     const nType = normalizedType.toLowerCase();
+                                     // Simple check, assumed correct as we are in the loop
+                                     return (cType.includes(nType) || nType.includes(cType)) && c.statut === 'EN_ATTENTE_PAIEMENT';
+                                  }) ? '(En attente)' : '(Déjà actif)'}
                                 </span>
                               )}
-                            </div>
+                            </p>
+                            <p className={`text-xs mt-1 ${isOwned ? 'text-slate-600' : 'text-slate-400'}`}>
+                              {type === 'Courant' && 'Opérations quotidiennes'}
+                              {type === 'Épargne' && 'Économies avec intérêts'}
+                              {type === 'Bloqué' && 'Épargne à terme fixe'}
+                            </p>
+                            {isOwned && (
+                              <span className="inline-block mt-2 px-2 py-0.5 bg-slate-800 text-slate-500 text-[10px] uppercase font-bold rounded-full border border-slate-700">
+                                Compte existant
+                              </span>
+                            )}
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
                   
                   {/* Show owned accounts */}
                   {comptesExistants.length > 0 && (

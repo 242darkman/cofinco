@@ -21,6 +21,7 @@ import {
   evenementsOutbox,
   sessionsCaisse,
   clients,
+  users,
   credits,
   type Compte,
   type TransactionCompte,
@@ -54,6 +55,20 @@ export type MotifBlocage =
   | "Décision interne"
   | "Litige"
   | "Autre";
+
+// State Machine Transitions
+// Actif <-> Suspendu
+// Actif -> Clôturé (Final)
+// Suspendu -> Clôturé (Final)
+// EN_ATTENTE_PAIEMENT -> Actif (via premier versement)
+// EN_ATTENTE_PAIEMENT -> Clôturé (via rejet/timeout)
+
+export const VALID_TRANSITIONS: Record<StatutCompte, StatutCompte[]> = {
+  "Actif": ["Suspendu", "Clôturé"],
+  "Suspendu": ["Actif", "Clôturé"],
+  "Clôturé": [], // Terminal state
+  "EN_ATTENTE_PAIEMENT": ["Actif", "Clôturé"]
+};
 
 export interface CreateCompteData {
   clientId: string;
@@ -108,17 +123,31 @@ export async function clientHasCompteOfType(
   clientId: string,
   typeCompte: TypeCompte
 ): Promise<boolean> {
-  const [existing] = await db
+  // Fetch non-deleted accounts for this client
+  const existingAccounts = await db
     .select()
     .from(comptes)
     .where(
       and(
         eq(comptes.clientId, clientId),
-        eq(comptes.typeCompte, typeCompte),
         isNull(comptes.deletedAt)
       )
     );
-  return !!existing;
+
+  // Normalize and check in JS to be absolutely sure about casing/accents
+  const normalizedTarget = typeCompte.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  return existingAccounts.some(acc => {
+      const accType = (acc.typeCompte || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const isSameType = accType === normalizedTarget;
+      
+      // Check status: Only 'Clôturé' or 'Fermé' are considered free
+      // 'Actif', 'Suspendu', 'EN_ATTENTE_PAIEMENT' all count as existing account
+      const status = (acc.statut || '').toLowerCase();
+      const isClosed = ['clôturé', 'fermé', 'cloture', 'ferme'].includes(status);
+      
+      return isSameType && !isClosed;
+  });
 }
 
 /**
@@ -137,6 +166,8 @@ export function canWithdraw(compte: typeof comptes.$inferSelect): {
   }
 
   // Blocage check for Bloqué accounts
+  // Admin role check should be done at the call site (retirerDuCompte),
+  // but here we just check the account state.
   if (compte.typeCompte === "Bloqué" && compte.blocageActif) {
     return {
       allowed: false,
@@ -472,7 +503,23 @@ export async function retirerDuCompte(
   // 2. Validate withdrawal is allowed (CRITICAL for Bloqué accounts)
   const withdrawCheck = canWithdraw(compte);
   if (!withdrawCheck.allowed) {
-    throw new CompteError(withdrawCheck.reason!, "WITHDRAWAL_NOT_ALLOWED");
+    // Check if user is Admin to override
+    let isAdmin = false;
+    if (userId) {
+       const user = await db.query.users.findFirst({
+           where: eq(users.id, userId)
+       });
+       const { isAdminRole } = await import("@shared/types/roles");
+       if (user && isAdminRole(user.role)) {
+           isAdmin = true;
+       }
+    }
+
+    if (!isAdmin) {
+        throw new CompteError(withdrawCheck.reason!, "WITHDRAWAL_NOT_ALLOWED");
+    }
+    // If admin, we proceed but maybe add a note in observations?
+    // For now we just allow it.
   }
 
   // 3. Check sufficient balance
@@ -787,6 +834,71 @@ export async function transfererCompteAgence(
       },
     });
 
+    return updated;
+  });
+}
+
+// ============================================================================
+// STATUS MANAGEMENT (STATE MACHINE)
+// ============================================================================
+
+export async function changeAccountStatus(
+  compteId: string, 
+  nouveauStatut: StatutCompte, 
+  motif: string, 
+  userId?: string
+): Promise<typeof comptes.$inferSelect> {
+  return await db.transaction(async (tx) => {
+    const [compte] = await tx.select().from(comptes).where(eq(comptes.id, compteId));
+    if (!compte) {
+      throw new CompteError("Compte non trouvé", "COMPTE_NOT_FOUND");
+    }
+
+    const ancienStatut = compte.statut as StatutCompte;
+    
+    // Idempotency check
+    if (ancienStatut === nouveauStatut) {
+      return compte;
+    }
+
+    // Validate Transition
+    const allowedTransitions = VALID_TRANSITIONS[ancienStatut];
+    if (!allowedTransitions || !allowedTransitions.includes(nouveauStatut)) {
+      throw new CompteError(
+        `Transition de statut non autorisée: ${ancienStatut} -> ${nouveauStatut}`,
+        "INVALID_STATE_TRANSITION"
+      );
+    }
+
+    // Update
+    const [updated] = await tx
+      .update(comptes)
+      .set({
+        statut: nouveauStatut,
+        updatedAt: new Date(),
+        // If closing, set deletedAt for logical deletion if needed, or just keep as Clôturé
+        // Schema says: uqClientTypeActif handles deleted_at IS NULL. 
+        // If we want to allow re-creation of same type, we might need to soft-delete OR keep it Clôturé.
+        // Current logic in clientHasCompteOfType checks for Clôturé status, so we don't strictly need soft delete yet.
+      })
+      .where(eq(comptes.id, compteId))
+      .returning();
+
+    // Event Log
+    await tx.insert(evenementsOutbox).values({
+      type: "MOUVEMENT_STATUT_CHANGE",
+      aggregateType: "compte",
+      aggregateId: compteId,
+      payload: {
+        compteId,
+        ancienStatut,
+        nouveauStatut,
+        motif,
+        changedBy: userId,
+        timestamp: new Date().toISOString()
+      },
+    });
+    
     return updated;
   });
 }

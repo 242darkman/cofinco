@@ -21,7 +21,7 @@ interface CompteBancaire {
   taux_interet?: number;
   dateOuverture?: string;
   date_ouverture?: string;
-  statut: 'Actif' | 'Fermé' | 'Suspendu' | 'Clôturé';
+  statut: 'Actif' | 'Fermé' | 'Suspendu' | 'Clôturé' | 'EN_ATTENTE_PAIEMENT';
   blocageActif?: boolean;
   blocage_actif?: boolean;
   blocageMotif?: string;
@@ -405,7 +405,16 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                 {/* Type selection logic same as before but disabled if editing */}
                  <div className="grid grid-cols-3 gap-2">
                   {['Courant', 'Épargne', 'Bloqué']
-                    .filter(type => !comptes.some(c => c.typeCompte === type && c.statut !== 'Clôturé' && c.statut !== 'Fermé'))
+                    .filter(type => {
+                        const normalizedType = type.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        return !comptes.some(c => {
+                             const cType = (c.typeCompte || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                             const isSameType = cType === normalizedType;
+                             // Tout statut qui n'est pas explicitement fermé/clôturé est considéré comme actif/en cours
+                             const isActive = !['clôturé', 'fermé', 'cloture', 'ferme'].includes((c.statut || '').toLowerCase());
+                             return isSameType && isActive;
+                        });
+                    })
                     .map((type) => (
                     <button
                         key={type}
