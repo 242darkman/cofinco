@@ -16,7 +16,9 @@ import {
   sessionsCaisse,
   operationsCaisse,
   clients,
-  demandesCredit
+  demandesCredit,
+  coffresForts,
+  transactionsCompte
 } from "@shared/schema";
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
@@ -2156,26 +2158,101 @@ export function registerFinanceRoutes(app: Express) {
              const courantAccount = clientAccounts.find(c => c.typeCompte === 'Courant' && c.statut === 'Actif');
              if (!courantAccount) throw new Error("No active current account found for client");
 
-             // Create Transaction
-             await storage.createTransactionCompte({
-                compteId: courantAccount.id,
-                typePaiement: 'Dépôt Courant',
-                montant: amount.toString(),
-                observations: `Remboursement Frais Dossier (Ref: ${refundData.id})`,
-                methodePaiement: 'Virement', 
-             }, tx);
 
-             // Create Ledger Entry
+
+             // 1. Identify Client Account & Agency
+             // Already found above as 'courantAccount'. We also need the client to know THEIR agency
+             const client = await storage.getClient(refundData.clientId);
+             if (!client) throw new Error("Client not found");
+             
+             // CRITICAL: Always use the CLIENT'S agency for the source of funds, 
+             // regardless of who is processing the refund (e.g. Admin at Siege)
+             const sourceAgenceId = client.agenceId;
+
+
+             if (!sourceAgenceId) throw new Error("Client has no agency assigned");
+
+             if (!courantAccount) throw new Error("Client has no current account to receive refund");
+
+             // 2. Identify Agency Safe (Coffre-Fort) for Source of Funds
+             const [agencyCoffre] = await tx.select()
+                 .from(coffresForts)
+                 .where(
+                     eq(coffresForts.ownerId, sourceAgenceId)
+                 );
+             if (!agencyCoffre) throw new Error("Agency safe not found for refund source");
+
+             // 3. Check Safe Balance
+             const safeBalance = Number(agencyCoffre.solde || 0);
+             const refundAmount = Number(amount);
+             if (safeBalance < refundAmount) {
+                 throw new Error(`Insufficient funds in agency safe (Required: ${refundAmount}, Available: ${safeBalance})`);
+             }
+
+             // 4. DEBIT SAFE (Source)
+             // 4a. Update Safe Balance
+             await tx.update(coffresForts)
+               .set({ 
+                   solde: sql`${coffresForts.solde} - ${refundAmount}`,
+                   updatedAt: new Date()
+               })
+               .where(eq(coffresForts.id, agencyCoffre.id));
+
+             // 4b. Create Debit Mouvement (Coffre)
+             const coffreMouvement = await createMouvementFinancier(tx, {
+               montant: refundAmount.toString(),
+               sens: 'Débit',
+               sourceModule: 'COFFRE', // Money leaves the safe
+               typePaiement: 'Transfert Sortant',
+               sourceId: agencyCoffre.id,
+               agenceId: refundData.agenceId,
+               metadata: { 
+                   type: 'REFUND_SOURCE', 
+                   refundId: refundData.id, 
+                   description: `Source pour rbt frais (Ref: ${refundData.id})`
+               }
+             }, user.id);
+
+             // 5. CREDIT CLIENT ACCOUNT (Destination)
+             // 5a. Create Credit Mouvement (Account) linked to source
              mouvement = await createMouvementFinancier(tx, {
-               montant: amount.toString(),
+               montant: refundAmount.toString(),
                sens: 'Crédit',
-               sourceModule: 'SYSTEME',
+               sourceModule: 'SYSTEME', // Or 'COFFRE' but functionally it's a deposit
                typePaiement: 'Dépôt Courant',
                clientId: refundData.clientId,
                compteId: courantAccount.id,
-               // creditId: refundData.demandeId, // Incorrect: demandeId is not a creditId
-               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id, demandeId: refundData.demandeId }
+               // Link to the source debit for audit
+               metadata: { 
+                   type: 'REFUND_PAYMENT', 
+                   refundId: refundData.id, 
+                   demandeId: refundData.demandeId,
+                   sourceMouvementId: coffreMouvement.id 
+               }
              }, user.id);
+             
+             // 5b. Update Client Account Balance
+             // We use the helper if available, or manual update if not easily reachable in this scope.
+             // Given imports, we'll do manual SQL update to be safe and atomic here.
+             const [updatedAccount] = await tx.update(comptes)
+                 .set({
+                     soldeCourant: sql`${comptes.soldeCourant} + ${refundAmount}`,
+                     updatedAt: new Date()
+                 })
+                 .where(eq(comptes.id, courantAccount.id))
+                 .returning();
+
+             // 5c. Create Transaction Record (Crucial for History Display)
+             await tx.insert(transactionsCompte).values({
+               compteId: courantAccount.id,
+               mouvementId: mouvement.id,
+               typePaiement: 'Dépôt Courant',
+               montant: refundAmount.toString(),
+               soldeApres: updatedAccount.soldeCourant,
+               methodePaiement: 'Virement',
+               observations: `Remboursement Frais Dossier (Ref: ${refundData.id})`,
+               createdBy: user.id
+             });
              
              paymentRefString = `VIREMENT-${mouvement.reference}`;
 
@@ -2208,7 +2285,6 @@ export function registerFinanceRoutes(app: Express) {
                typePaiement: 'Retrait Courant',
                sessionCaisseId: sessionCaisseId,
                clientId: refundData.clientId,
-               // creditId: refundData.demandeId, // Incorrect
                metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id, operationId: op.id, demandeId: refundData.demandeId }
              }, user.id);
              

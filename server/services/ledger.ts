@@ -18,7 +18,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
 
 // Types for the ledger service
-export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE";
+export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE";
 export type SensMouvement = "Débit" | "Crédit";
 export type TypeEvenement =
   | "MOUVEMENT_CREE"
@@ -82,6 +82,7 @@ export function generateReference(sourceModule: SourceModule | "TIC"): string {
     DECAISSEMENT_PROGRAMME: "DCP",
     COMPTE: "CPT",
     TIC: "TIC",
+    COFFRE: "COF",
   };
   
   return `${prefixes[sourceModule]}-${year}${month}${day}-${time}${random}`;
