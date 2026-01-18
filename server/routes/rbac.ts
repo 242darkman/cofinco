@@ -191,7 +191,14 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_created', role: normalizedRole } });
+          wsInstance.broadcast({ 
+            type: "RBAC_UPDATE", 
+            payload: { 
+              entity: 'role_permission', 
+              role: normalizedRole, 
+              permissions: [created] 
+            } 
+          });
       }
 
       res.status(201).json(created);
@@ -229,7 +236,15 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_updated', id } });
+          // Need to fetch role for optimizations
+          wsInstance.broadcast({ 
+            type: "RBAC_UPDATE", 
+            payload: { 
+              entity: 'role_permission', 
+              id,
+              permissions: [updated]
+            } 
+          });
       }
 
       res.json(updated);
@@ -265,7 +280,14 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'permission_deleted', id } });
+          wsInstance.broadcast({ 
+            type: "RBAC_UPDATE", 
+            payload: { 
+              entity: 'role_permission', 
+              role: deleted.role,
+              permissions: [deleted]
+            } 
+          });
       }
 
       res.json({ message: "Permission supprimée", deleted });
@@ -335,7 +357,14 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'bulk_update', role: normalizedRole } });
+          wsInstance.broadcast({ 
+            type: "RBAC_UPDATE", 
+            payload: { 
+              entity: 'role_permission', 
+              role: normalizedRole,
+              permissions: results
+            } 
+          });
       }
 
       res.json({ message: "Permissions mises à jour", count: results.length, results });
@@ -615,7 +644,14 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'user_permission_toggled', userId } });
+          wsInstance.broadcast({ 
+            type: "RBAC_UPDATE", 
+            payload: { 
+              entity: 'user_permission', 
+              userId,
+              permissions: [{ permissionId: permission_id, granted }]
+            } 
+          });
       }
 
       res.json({ message: "Permission mise à jour", permissionId: permission_id, granted });
@@ -646,7 +682,14 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ type: "RBAC_UPDATE", payload: { type: 'user_permissions_reset', userId } });
+          wsInstance.broadcast({ 
+            type: "RBAC_UPDATE", 
+            payload: { 
+              entity: 'user_permission', 
+              userId,
+              type: 'reset'
+            } 
+          });
       }
 
       res.json({ message: "Permissions réinitialisées" });

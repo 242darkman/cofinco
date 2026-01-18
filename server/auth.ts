@@ -72,12 +72,13 @@ export async function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET || 'cofin-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
-    name: 'cofin.sid',
+    rolling: true, // Refresh session with every request
+    name: isProduction ? '__Host-cofin_sess' : 'cofin_sess', // __Host- prefix requires Secure attribute
     proxy: true,
     cookie: {
-      secure: isProduction,
+      secure: isProduction, // __Host- requires true, but localhost dev might be http
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 30 * 60 * 1000, // 30 minutes
       sameSite: 'lax',
       // Don't set domain - let browser handle it automatically
     },
@@ -147,6 +148,7 @@ export async function registerUser(userData: {
   const hashedPassword = await hashPassword(userData.password);
   return storage.createUser({
     ...userData,
+    role: userData.role as SystemRole | undefined,
     password: hashedPassword,
   });
 }

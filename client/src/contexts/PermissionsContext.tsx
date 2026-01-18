@@ -44,7 +44,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         shouldRefresh = true;
       } else if (payload.entity === 'role_permission') {
         // Refresh only if it affects my role
-        shouldRefresh = true; 
+        if (currentUser.role === payload.role) {
+          shouldRefresh = true; 
+        } 
       } else if (payload.entity === 'user_permission') {
         // Refresh only if it's for me
         if (payload.userId === currentUser.id) {

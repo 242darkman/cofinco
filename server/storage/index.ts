@@ -261,6 +261,7 @@ export interface IStorage {
     getAllSessionsCaisse(filter?: { agence?: string }): Promise<any[]>;
     createSessionCaisse(session: InsertSessionCaisse): Promise<SessionCaisse>;
     updateSessionCaisse(id: string, updateData: Partial<InsertSessionCaisse>): Promise<SessionCaisse | undefined>;
+    updateUserConnectionStatus(userId: string, status: 'CONNECTED' | 'DISCONNECTED'): Promise<void>;
     closeSessionCaisse(id: string, closeData: { soldeReel: string; ecart: string; billetageFermeture: any; observations?: string }): Promise<SessionCaisse | undefined>;
     getSessionsByCaissier(caissierId: string): Promise<SessionCaisse[]>;
 

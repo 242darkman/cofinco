@@ -856,6 +856,16 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return session || undefined;
   }
 
+  export async function updateUserConnectionStatus(userId: string, status: 'CONNECTED' | 'DISCONNECTED'): Promise<void> {
+    // Only update if there is an active session for this user
+    await db.update(sessionsCaisse)
+      .set({ connectionStatus: status })
+      .where(and(
+        eq(sessionsCaisse.caissierId, userId),
+        isNull(sessionsCaisse.closedAt)
+      ));
+  }
+
   export async function closeSessionCaisse(id: string, closeData: { soldeReel: string; ecart: string; billetageFermeture: any; observations?: string }): Promise<SessionCaisse | undefined> {
     const [session] = await db.update(sessionsCaisse)
       .set({

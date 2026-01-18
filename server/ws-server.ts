@@ -1,8 +1,15 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { parse } from "url";
+import { parse as parseCookie } from "cookie";
+import { unsign } from "cookie-signature";
 import { sessionMiddleware } from "./auth";
 import { storage } from "./storage";
+
+// Extend WebSocket interface
+interface ExtendedWebSocket extends WebSocket {
+  isAlive: boolean;
+}
 
 type GlobalMessage = {
   type: "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "PRESENCE_UPDATE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "REALTIME_EVENT" | "OPERATIONS_UPDATE" | "TONTINE_UPDATE" | "CAISSE_UPDATE" | "COMPTE_UPDATE" | "EMPLOYE_UPDATE" | "RBAC_UPDATE" | "HR_UPDATE" | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT" | "MAINTENANCE_UPDATE" | "SETTINGS_UPDATE" | "FORCE_LOGOUT";
@@ -19,18 +26,39 @@ const subscriptions = new Map<string, Set<WebSocket>>();
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ noServer: true });
 
-  server.on("upgrade", (request, socket, head) => {
+  function heartbeat(this: WebSocket) {
+    (this as ExtendedWebSocket).isAlive = true;
+  }
+
+  // Heartbeat Interval
+  const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      const extWs = ws as ExtendedWebSocket;
+      if (extWs.isAlive === false) {
+          console.log('[WebSocket] Terminating inactive connection');
+          return ws.terminate();
+      }
+
+      extWs.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  wss.on("close", () => {
+    clearInterval(interval);
+  });
+
+  server.prependListener("upgrade", (request, socket, head) => {
     // Handle socket errors to prevent EPIPE crashes
     socket.on('error', (err: any) => {
       if (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ECONNREFUSED') {
-        // Ignore benign connection errors during upgrade
         return;
       }
       console.error('[WebSocket] Socket error during upgrade:', err);
     });
 
     try {
-      // Parse URL for path and query params
+      // Parse URL for path only (no query params)
       const url = parse(request.url || '', true);
       
       // Only handle /ws path
@@ -38,56 +66,60 @@ export function setupWebSocket(server: Server) {
         return;
       }
       
-      console.log('[WebSocket] Upgrade request on:', url.pathname, 'query:', url.query);
+      console.log('[WebSocket] Upgrade request on:', url.pathname);
       
-      const queryUserId = url.query.userId as string | undefined;
-      const isDev = process.env.NODE_ENV !== 'production';
+      const isProduction = process.env.NODE_ENV === 'production';
 
-      // Import session middleware (Already imported at top)
-
-
-      // Helper to proceed with upgrade
-      const proceedWithUpgrade = (userId: string, session: any = null) => {
-          try {
-              // Store userId in request for connection handler
-              (request as any).authenticatedUserId = userId;
-              (request as any).userAgence = session?.user?.agence;
-              (request as any).userRole = session?.user?.role;
-
-              // Upgrade to WebSocket with authenticated session
-              console.log('[WebSocket] Upgrading connection for user:', userId);
-              wss.handleUpgrade(request, socket, head, (ws) => {
-                console.log('[WebSocket] Connection established for user:', userId);
-                try {
-                    wss.emit("connection", ws, request);
-                } catch (emitError) {
-                    console.error('[WebSocket] Error emitting connection event:', emitError);
-                }
-              });
-          } catch (error) {
-              console.error('[WebSocket] Error inside proceedWithUpgrade:', error);
-              try {
-                  socket.destroy();
-              } catch (e) { /* ignore */ }
-          }
-      };
-
-      console.log('[WebSocket] Debug:', { isDev, queryUserId, nodeEnv: process.env.NODE_ENV });
-
-      // FAST PATH (Dev only): Trust query param to avoid session middleware crash
-      if (isDev && queryUserId) {
-          console.log('[WebSocket] Dev mode: Fast-track authentication with query userId:', queryUserId);
-          proceedWithUpgrade(queryUserId);
+      // 1. Strict Cookie Authentication
+      const cookieHeader = request.headers.cookie;
+      if (!cookieHeader) {
+          console.log('[WebSocket] Rejected: No cookie header');
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
           return;
       }
-      
+
+      const cookies = parseCookie(cookieHeader);
+      // Need to match the logic in auth.ts
+      const cookieName = isProduction ? '__Host-cofin_sess' : 'cofin_sess';
+      const signedSessionId = cookies[cookieName];
+
+      if (!signedSessionId) {
+          console.log('[WebSocket] Rejected: Session cookie missing');
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+      }
+
+      // 2. Unsign Cookie
+      // express-session cookies are prefixed with "s:"
+      if (!signedSessionId.startsWith('s:')) {
+           console.log('[WebSocket] Rejected: Invalid cookie format');
+           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+           socket.destroy();
+           return;
+      }
+
+      const sessionSecret = process.env.SESSION_SECRET || 'cofin-secret-key-change-in-production';
+      const sessionId = unsign(signedSessionId.slice(2), sessionSecret);
+
+      if (!sessionId) {
+          console.log('[WebSocket] Rejected: Cookie signature invalid');
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+      }
+
+      // 3. Validate Session from Store (via Middleware access or direct DB check)
+      // Since we need to hydrate the user, running the session middleware is the standard way.
+      // It will fetch the session from DB (PostgresStore) and populate req.session.
+
       if (!sessionMiddleware) {
          console.error('[WebSocket] Session middleware not available');
          socket.destroy();
          return;
       }
 
-      // Parse session from cookie (Production or missing query param)
       const mockRes = {
         on: () => {},
         writeHead: () => {},
@@ -104,21 +136,47 @@ export function setupWebSocket(server: Server) {
         }
         
         const session = (request as any).session;
-        const sessionUserId = session?.userId as string | undefined;
         
-        // Use session userId
-        const userId = sessionUserId;
-        
-        console.log('[WebSocket] Auth check - session:', !!sessionUserId);
+        // Final sanity check: session ID must match what we unsigned
+        // (Middleware usually handles this, but good to be sure)
+        if (session.id !== sessionId) {
+             console.log('[WebSocket] Warning: Session ID mismatch (middleware vs cookie)');
+        }
+
+        const userId = session?.userId;
         
         if (!userId) {
-          console.log('[WebSocket] Rejected: No userId');
+          console.log('[WebSocket] Rejected: No userId in session (expired or invalid)');
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
         }
         
-        proceedWithUpgrade(userId, session);
+        // 4. Proceed with Upgrade
+        try {
+              // Store userId in request for connection handler
+              (request as any).authenticatedUserId = userId;
+              (request as any).userAgence = session?.user?.agence;
+              (request as any).userRole = session?.user?.role;
+
+              console.error('[WS-DEBUG] Connection established for user:', userId);
+              wss.handleUpgrade(request, socket, head, (ws) => {
+                const extWs = ws as ExtendedWebSocket;
+                extWs.isAlive = true;
+                extWs.on("pong", heartbeat);
+
+                try {
+                    wss.emit("connection", ws, request);
+                } catch (emitError) {
+                    console.error('[WebSocket] Error emitting connection event:', emitError);
+                }
+              });
+          } catch (error) {
+              console.error('[WebSocket] Error inside upgrading:', error);
+              try {
+                  socket.destroy();
+              } catch (e) { /* ignore */ }
+          }
       });
     } catch (unexpectedError) {
       console.error('[WebSocket] Critical error in upgrade handler:', unexpectedError);
@@ -142,6 +200,7 @@ export function setupWebSocket(server: Server) {
 
     // Use pre-authenticated values from upgrade handler
     const userId = (request as any).authenticatedUserId as string;
+    console.log("[WS] Connection established for userId:", userId); // Added log
     const userAgence = (request as any).userAgence as string | undefined;
     const userRole = (request as any).userRole as string | undefined;
 
@@ -156,6 +215,11 @@ export function setupWebSocket(server: Server) {
       }
       clients.get(userId)?.push(ws);
       
+      // Update Connection Status (Dead Man Switch)
+      storage.updateUserConnectionStatus(userId, 'CONNECTED').catch(err => {
+          console.error(`[WebSocket] Failed to update 'CONNECTED' status for ${userId}`, err);
+      });
+
       // Notify everyone of new user presence
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
@@ -275,6 +339,12 @@ export function setupWebSocket(server: Server) {
         }
         if (userSockets.length === 0) {
           clients.delete(userId);
+
+          // Update Connection Status (Dead Man Switch)
+          storage.updateUserConnectionStatus(userId, 'DISCONNECTED').catch(err => {
+              console.error(`[WebSocket] Failed to update 'DISCONNECTED' status for ${userId}`, err);
+          });
+
           // Notify everyone of offline status
           wss.clients.forEach((client) => {
              if (client.readyState === WebSocket.OPEN) {

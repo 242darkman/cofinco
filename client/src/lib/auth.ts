@@ -60,6 +60,21 @@ class AuthService {
   private permissionsLoaded: boolean = false;
   private sessionCheckInterval: NodeJS.Timeout | null = null;
   private onSessionExpired: (() => void) | null = null;
+  private broadcastChannel: BroadcastChannel | null = null;
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      this.broadcastChannel = new BroadcastChannel('auth-channel');
+      this.broadcastChannel.onmessage = (event) => {
+        if (event.data === 'logout') {
+          console.log('🔄 Logout triggered from another tab');
+          this.clearSession();
+          // Force reload to clear React state and redirect to login
+          window.location.href = '/';
+        }
+      };
+    }
+  }
 
   /**
    * Authentification utilisateur
@@ -222,6 +237,7 @@ class AuthService {
   async logout() {
     try {
       await authApi.logout();
+      this.broadcastChannel?.postMessage('logout');
     } catch (error) {
       console.error('Logout error:', error);
     }

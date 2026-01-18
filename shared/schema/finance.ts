@@ -795,6 +795,7 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   agenceId: uuid("agence_id").references(() => agences.id), // Agence de la session caisse
   caisseId: uuid("caisse_id").notNull().references(() => caisses.id), // Physical caisse link
   // Colonnes pour robustesse production
+  connectionStatus: text("connection_status", { enum: ["CONNECTED", "DISCONNECTED"] }).default("DISCONNECTED"),
   lastActivity: timestamp("last_activity").defaultNow(), // Heartbeat - dernière activité
   timeoutAt: timestamp("timeout_at"), // Date d'expiration prévue
   forcedCloseReason: text("forced_close_reason"),
