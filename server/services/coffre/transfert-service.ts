@@ -96,17 +96,9 @@ export class TransfertCoffreService {
       return { success: false, errorCode: "PERMISSION_DENIED", error: "La caisse n'appartient pas à votre agence" };
     }
 
-    // 4. Déterminer source et destination
-    let caisseSourceId: string;
-    let caisseDestinationId: string;
-
-    if (params.typeTransfert === "COFFRE_VERS_CAISSE") {
-      caisseSourceId = coffreFort.id;
-      caisseDestinationId = params.caisseId;
-    } else {
-      caisseSourceId = params.caisseId;
-      caisseDestinationId = coffreFort.id;
-    }
+    // 4. Déterminer source et destination (simplifié avec la nouvelle structure)
+    const coffreId = coffreFort.id;
+    const caisseId = params.caisseId;
 
     // 5. Vérifier idempotence
     if (params.idempotencyKey) {
@@ -126,8 +118,8 @@ export class TransfertCoffreService {
     const [transfert] = await db.insert(transfertsCoffreCaisse).values({
       agenceId: params.agenceId,
       typeTransfert: params.typeTransfert,
-      caisseSourceId,
-      caisseDestinationId,
+      coffreId,
+      caisseId,
       montant: params.montant.toString(),
       motif: params.motif,
       commentaire: params.commentaire,
@@ -359,16 +351,25 @@ export class TransfertCoffreService {
       .limit(params.limit)
       .offset(offset);
 
-    // Enrichir avec les noms des caisses
+    // Enrichir avec les noms des caisses et coffres
     const enriched = await Promise.all(transferts.map(async (t) => {
-      const [source] = await db.select().from(caisses).where(eq(caisses.id, t.caisseSourceId));
-      const [dest] = await db.select().from(caisses).where(eq(caisses.id, t.caisseDestinationId));
+      const [coffre] = await db.select().from(coffresForts).where(eq(coffresForts.id, t.coffreId));
+      const [caisse] = await db.select().from(caisses).where(eq(caisses.id, t.caisseId));
       const [requester] = await db.select().from(users).where(eq(users.id, t.requestedBy));
       
+      let sourceNom, destNom;
+      if (t.typeTransfert === "COFFRE_VERS_CAISSE") {
+        sourceNom = coffre?.nom;
+        destNom = caisse?.nom;
+      } else {
+        sourceNom = caisse?.nom;
+        destNom = coffre?.nom;
+      }
+
       return {
         ...t,
-        caisseSourceNom: source?.nom,
-        caisseDestinationNom: dest?.nom,
+        caisseSourceNom: sourceNom,
+        caisseDestinationNom: destNom,
         requestedByNom: requester?.nom,
         requestedByPrenom: requester?.prenom,
       };
@@ -395,10 +396,7 @@ export class TransfertCoffreService {
     limit: number;
   }) {
     const conditions = [
-      or(
-        eq(transfertsCoffreCaisse.caisseSourceId, params.caisseId),
-        eq(transfertsCoffreCaisse.caisseDestinationId, params.caisseId)
-      ),
+      eq(transfertsCoffreCaisse.caisseId, params.caisseId),
     ];
 
     if (params.statut) {
@@ -427,8 +425,8 @@ export class TransfertCoffreService {
 
     if (!transfert) return null;
 
-    const [source] = await db.select().from(caisses).where(eq(caisses.id, transfert.caisseSourceId));
-    const [dest] = await db.select().from(caisses).where(eq(caisses.id, transfert.caisseDestinationId));
+    const [coffre] = await db.select().from(coffresForts).where(eq(coffresForts.id, transfert.coffreId));
+    const [caisse] = await db.select().from(caisses).where(eq(caisses.id, transfert.caisseId));
     const [requester] = await db.select().from(users).where(eq(users.id, transfert.requestedBy));
     const validator = transfert.validatedBy 
       ? (await db.select().from(users).where(eq(users.id, transfert.validatedBy)))[0]
@@ -437,10 +435,21 @@ export class TransfertCoffreService {
       ? (await db.select().from(users).where(eq(users.id, transfert.executedBy)))[0]
       : null;
 
+    let caisseSource, caisseDestination;
+    if (transfert.typeTransfert === "COFFRE_VERS_CAISSE") {
+        caisseSource = coffre; // Typage: CoffreFort casté en compatible Caisse côté front ou adaptateur
+        caisseDestination = caisse;
+    } else {
+        caisseSource = caisse;
+        caisseDestination = coffre;
+    }
+
     return {
       ...transfert,
-      caisseSource: source,
-      caisseDestination: dest,
+      caisseSource, 
+      caisseDestination,
+      // Ces propriétés sont utilisées par le front pour l'affichage ?
+      // Si le front attend un objet avec { nom: ... }, coffre et caisse ont tous les deux 'nom'.
       requester: { nom: requester?.nom, prenom: requester?.prenom },
       validator: validator ? { nom: validator.nom, prenom: validator.prenom } : null,
       executor: executor ? { nom: executor.nom, prenom: executor.prenom } : null,

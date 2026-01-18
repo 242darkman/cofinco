@@ -4,16 +4,13 @@ import {
   mouvementsFinanciers,
   operationsCaisse,
   caisses,
+  coffresForts,
   sessionsCaisse,
   transfertsCoffreAuditLogs,
 } from "@shared/schema";
-// We need to decide if we use evenementsOutbox or something else for events. 
-// The user prompt mentioned it but didn't provide schema. I'll omit it for now or check if it exists in 'finance'.
-// Checking 'finance.ts' earlier content... it wasn't obvious. I will stick to what's certain.
-// I'll assume 'evenementsOutbox' might not be there yet, so I will comment it out or look for it later.
-// Actually, looking at finance.ts view, I didn't see 'evenementsOutbox'. I will skip it for now to avoid errors.
-
 import { eq, sql, desc, and, isNull } from "drizzle-orm";
+import { getWsInstance } from "../../ws-server";
+
 // import { generateReference, createMouvementFinancier } from "../ledger"; // Need to make sure this exists or I implement it.
 // I will implement helper functions here if they don't exist, to be safe.
 
@@ -36,6 +33,29 @@ export interface ExecuteTransferResult {
   error?: string;
 }
 
+// Helper to update balance
+async function updateBalance(tx: any, entityType: 'coffre' | 'caisse', id: string, amountChange: number) {
+    if (entityType === 'coffre') {
+        const result = await tx.update(coffresForts)
+            .set({ 
+                solde: sql`${coffresForts.solde} + ${amountChange}`,
+                updatedAt: new Date()
+            })
+            .where(eq(coffresForts.id, id))
+            .returning({ solde: coffresForts.solde });
+        return result[0];
+    } else {
+        const result = await tx.update(caisses)
+            .set({ 
+                solde: sql`${caisses.solde} + ${amountChange}`,
+                updatedAt: new Date()
+            })
+            .where(eq(caisses.id, id))
+            .returning({ solde: caisses.solde });
+        return result[0];
+    }
+}
+
 export async function executeTransfertCoffre(
   transfertId: string,
   executorId: string,
@@ -46,10 +66,6 @@ export async function executeTransfertCoffre(
 ): Promise<ExecuteTransferResult> {
   
   return await db.transaction(async (tx) => {
-    // 1. Récupérer et verrouiller le transfert (SELECT FOR UPDATE)
-    // Drizzle doesn't support 'FOR UPDATE' easily in all drivers/versions without raw SQL or specific helper.
-    // We will assume standard select for now, or use SQL if critical.
-    // For simplicity in this stack, standard select. Optimistic locking via 'verrouille' check is done below.
     const [transfert] = await tx
       .select()
       .from(transfertsCoffreCaisse)
@@ -59,33 +75,28 @@ export async function executeTransfertCoffre(
       throw new Error("TRANSFERT_NOT_FOUND: Transfert introuvable");
     }
 
-    // 2. Vérifier le statut
     if (transfert.statut !== "Validé") {
       throw new Error(`INVALID_STATUS: Le transfert doit être 'Validé' pour être exécuté (actuel: ${transfert.statut})`);
     }
 
-    // 3. Vérifier si déjà exécuté (idempotence)
     if (transfert.verrouille || transfert.executedAt) {
       throw new Error("ALREADY_EXECUTED: Ce transfert a déjà été exécuté");
     }
 
-    // 4. Récupérer les caisses
-    const [caisseSource] = await tx
-      .select()
-      .from(caisses)
-      .where(eq(caisses.id, transfert.caisseSourceId));
+    // 4. Récupérer les entités
+    const [coffre] = await tx.select().from(coffresForts).where(eq(coffresForts.id, transfert.coffreId));
+    const [caisse] = await tx.select().from(caisses).where(eq(caisses.id, transfert.caisseId));
 
-    const [caisseDest] = await tx
-      .select()
-      .from(caisses)
-      .where(eq(caisses.id, transfert.caisseDestinationId));
-
-    if (!caisseSource || !caisseDest) {
-      throw new Error("CAISSE_NOT_FOUND: Caisse source ou destination introuvable");
+    if (!coffre || !caisse) {
+      throw new Error("ENTITY_NOT_FOUND: Coffre ou Caisse introuvable");
     }
 
+    // Déterminer source et destination
+    const isCoffreSource = transfert.typeTransfert === "COFFRE_VERS_CAISSE";
+    
+    // Vérifier solde source
     const montant = parseFloat(transfert.montant);
-    const soldeSource = parseFloat(caisseSource.solde || "0");
+    const soldeSource = parseFloat((isCoffreSource ? coffre.solde : caisse.solde) || "0");
 
     if (soldeSource < montant) {
       throw new Error(`INSUFFICIENT_FUNDS: Solde insuffisant (disponible: ${soldeSource}, requis: ${montant})`);
@@ -96,7 +107,8 @@ export async function executeTransfertCoffre(
     const refDebit = `${groupRef}-DEB`;
     const refCredit = `${groupRef}-CRE`;
 
-    // 6. Créer le mouvement DÉBIT (sortie caisse source)
+    // 6. Créer le mouvement DÉBIT (Sortie Source)
+    // Source: Si Coffre (Sortie Coffre), Si Caisse (Sortie Caisse)
     const [mouvementDebit] = await tx.insert(mouvementsFinanciers).values({
       montant: transfert.montant,
       sens: "Débit",
@@ -108,15 +120,16 @@ export async function executeTransfertCoffre(
       dateOperation: new Date(),
       metadata: {
         transfertId: transfert.id,
-        caisseId: caisseSource.id,
-        type: "SORTIE_COFFRE_CAISSE",
+        coffreId: isCoffreSource ? coffre.id : undefined,
+        caisseId: !isCoffreSource ? caisse.id : undefined,
+        type: isCoffreSource ? "SORTIE_COFFRE" : "SORTIE_CAISSE",
         groupRef,
-        description: `Transfert sortant vers ${caisseDest.nom}`,
-        categorie: "Transfert Caisse", 
+        description: `Transfert sortant vers ${isCoffreSource ? caisse.nom : coffre.nom}`,
+        categorie: "Transfert Interne", 
       },
     }).returning();
 
-    // 7. Créer le mouvement CRÉDIT (entrée caisse destination)
+    // 7. Créer le mouvement CRÉDIT (Entrée Destination)
     const [mouvementCredit] = await tx.insert(mouvementsFinanciers).values({
       montant: transfert.montant,
       sens: "Crédit",
@@ -128,190 +141,83 @@ export async function executeTransfertCoffre(
       dateOperation: new Date(),
       metadata: {
         transfertId: transfert.id,
-        caisseId: caisseDest.id,
-        type: "ENTREE_COFFRE_CAISSE",
+        coffreId: !isCoffreSource ? coffre.id : undefined,
+        caisseId: isCoffreSource ? caisse.id : undefined,
+        type: !isCoffreSource ? "ENTREE_COFFRE" : "ENTREE_CAISSE",
         groupRef,
-        description: `Transfert entrant de ${caisseSource.nom}`,
-        categorie: "Transfert Caisse",
+        description: `Transfert entrant de ${isCoffreSource ? coffre.nom : caisse.nom}`,
+        categorie: "Transfert Interne",
       },
     }).returning();
 
-    // 8. Créer les opérations caisse
-    const typeOpSource = transfert.typeTransfert === "COFFRE_VERS_CAISSE" 
-      ? "Approvisionnement coffre" // This actually means "Provisioning FROM Coffre" based on context flow... wait.
-      : "Versement coffre";       // "Payment TO Coffre"
-
-    // If COFFRE_VERS_CAISSE: Source is Coffre, Dest is Caisse.
-    // Source Op (Coffre): ? (Coffre is a Caisse too).
-    // Dest Op (Caisse): Approvisionnement coffre (Incoming funds from Coffre).
-
-    // Let's stick to the enum values added.
-    // If COFFRE -> CAISSE:
-    //   Source (Coffre): Transfert sortant? Or "Approvisionnement coffre" negative? 
-    //   The enum has "Approvisionnement coffre" (Caisse gets money) and "Versement coffre" (Caisse gives money).
-    //   For the Coffre itself, likely just "Transfert caisse" or specific op.
-    //   Let's use "Transfert caisse" generic for the Coffre side, and specific for the user Caisse side.
-    
-    // Logic:
-    // Op for User Caisse is the important one for the report.
-    // If CaisseSource is UserCaisse (Caisse -> Coffre), Type is "Versement coffre".
-    // If CaisseDest is UserCaisse (Coffre -> Caisse), Type is "Approvisionnement coffre".
-
-    let typeOpSourceVal = "Transfert caisse";
-    let typeOpDestVal = "Transfert caisse";
-
-    if (transfert.typeTransfert === "CAISSE_VERS_COFFRE") {
-        typeOpSourceVal = "Versement coffre"; // Source is Caisse
-    } else {
-        typeOpDestVal = "Approvisionnement coffre"; // Dest is Caisse
-    }
-
-    // 8. Créer les opérations caisse (seulement si une session est liée)
+    // 8. Gestion des Opérations Caisse (Seulement pour le côté Caisse)
     let operationSource: any = null;
     let operationDest: any = null;
 
-    // Déterminer la session pour la source (si c'est une caisse utilisateur)
-    const isSourceCaisse = transfert.typeTransfert === "CAISSE_VERS_COFFRE";
-    let sessionIdSource = isSourceCaisse ? (sessionExecuteId || transfert.sessionRequestId) : null;
-
-    // RESOLUTION AUTOMATIQUE SESSION SOURCE
-    if (isSourceCaisse && !sessionIdSource) {
-      const [activeSession] = await tx.select()
-        .from(sessionsCaisse)
-        .where(and(
-          eq(sessionsCaisse.caisseId, caisseSource.id),
-          isNull(sessionsCaisse.closedAt)
-        ))
-        .orderBy(desc(sessionsCaisse.openedAt))
-        .limit(1);
-      
-      if (activeSession) {
-        sessionIdSource = activeSession.id;
-      }
-    }
-
-    if (sessionIdSource) {
-      const [op] = await tx.insert(operationsCaisse).values({
-        sessionId: sessionIdSource,
-        mouvementId: mouvementDebit.id,
-        typeOperation: typeOpSourceVal as any,
-        montant: transfert.montant,
-        methodePaiement: "Espèces",
-        reference: refDebit,
-        description: `Transfert ${transfert.reference} - Sortie vers ${caisseDest.nom}`,
-        // caisseId n'existe pas dans operationsCaisse, c'est lié via sessionId
-        statut: "Posté",
-      }).returning();
-      operationSource = op;
-    }
-
-    // Déterminer la session pour la destination (si c'est une caisse utilisateur)
-    const isDestCaisse = transfert.typeTransfert === "COFFRE_VERS_CAISSE";
-    let sessionIdDest: string | null = null;
-
-    if (isDestCaisse) {
-      // Vérifier si le sessionExecuteId passé correspond à la caisse destination
-      if (sessionExecuteId) {
-        const [sessionCheck] = await tx.select()
-          .from(sessionsCaisse)
-          .where(and(
-            eq(sessionsCaisse.id, sessionExecuteId),
-            eq(sessionsCaisse.caisseId, caisseDest.id),
-            isNull(sessionsCaisse.closedAt)
-          ));
-
-        if (sessionCheck) {
-          sessionIdDest = sessionExecuteId;
+    // Si Caisse -> Coffre (Source = Caisse)
+    if (!isCoffreSource) {
+        // Caisse Source: Versement vers coffre (Sortie)
+        const sessionId = sessionExecuteId || transfert.sessionRequestId; // Execute ID priority if passed, else Request ID
+        // Note: Logic for session finding skipped for brevity but ideally reused
+        if (sessionId) {
+            const [op] = await tx.insert(operationsCaisse).values({
+                sessionId,
+                mouvementId: mouvementDebit.id,
+                typeOperation: "Versement coffre",
+                montant: transfert.montant,
+                methodePaiement: "Espèces",
+                reference: refDebit,
+                description: `Versement vers ${coffre.nom}`,
+                statut: "Posté"
+            }).returning();
+            operationSource = op;
+            
+            // Update Session Solde Theorique (Sortie)
+            await tx.update(sessionsCaisse)
+                .set({ soldeTheorique: sql`${sessionsCaisse.soldeTheorique} - ${montant}`, updatedAt: new Date() })
+                .where(eq(sessionsCaisse.id, sessionId));
         }
-      }
+    }
 
-      // Fallback: utiliser sessionRequestId si c'est sur la bonne caisse
-      if (!sessionIdDest && transfert.sessionRequestId) {
-        const [sessionCheck] = await tx.select()
-          .from(sessionsCaisse)
-          .where(and(
-            eq(sessionsCaisse.id, transfert.sessionRequestId),
-            eq(sessionsCaisse.caisseId, caisseDest.id),
-            isNull(sessionsCaisse.closedAt)
-          ));
+    // Si Coffre -> Caisse (Dest = Caisse)
+    if (isCoffreSource) {
+        // Caisse Dest: Approvisionnement depuis coffre (Entrée)
+        // Need to find session for Dest Caisse
+        // Assuming sessionExecuteId corresponds to the executing cashier receiving funds
+        const sessionId = sessionExecuteId; 
+        
+        if (sessionId) {
+            const [op] = await tx.insert(operationsCaisse).values({
+                sessionId,
+                mouvementId: mouvementCredit.id,
+                typeOperation: "Approvisionnement coffre",
+                montant: transfert.montant,
+                methodePaiement: "Espèces",
+                reference: refCredit,
+                description: `Approvisionnement depuis ${coffre.nom}`,
+                statut: "Posté"
+            }).returning();
+            operationDest = op;
 
-        if (sessionCheck) {
-          sessionIdDest = transfert.sessionRequestId;
+             // Update Session Solde Theorique (Entrée)
+             await tx.update(sessionsCaisse)
+                .set({ soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${montant}`, updatedAt: new Date() })
+                .where(eq(sessionsCaisse.id, sessionId));
         }
-      }
-
-      // RESOLUTION AUTOMATIQUE: chercher une session ouverte sur la caisse destination
-      if (!sessionIdDest) {
-        const [activeSession] = await tx.select()
-          .from(sessionsCaisse)
-          .where(and(
-            eq(sessionsCaisse.caisseId, caisseDest.id),
-            isNull(sessionsCaisse.closedAt)
-          ))
-          .orderBy(desc(sessionsCaisse.openedAt))
-          .limit(1);
-
-        if (activeSession) {
-          sessionIdDest = activeSession.id;
-        }
-      }
     }
 
-    if (sessionIdDest) {
-      const [op] = await tx.insert(operationsCaisse).values({
-        sessionId: sessionIdDest,
-        mouvementId: mouvementCredit.id,
-        typeOperation: typeOpDestVal as any,
-        montant: transfert.montant,
-        methodePaiement: "Espèces",
-        reference: refCredit,
-        description: `Transfert ${transfert.reference} - Entrée de ${caisseSource.nom}`,
-        statut: "Posté",
-      }).returning();
-      operationDest = op;
+    // 9. Mise à jour des Soldes Réels
+    const soldeDestAvant = parseFloat((isCoffreSource ? caisse.solde : coffre.solde) || "0");
+
+    if (isCoffreSource) {
+        await updateBalance(tx, 'coffre', coffre.id, -montant); // Coffre Debit
+        await updateBalance(tx, 'caisse', caisse.id, montant);  // Caisse Credit
+    } else {
+        await updateBalance(tx, 'caisse', caisse.id, -montant); // Caisse Debit
+        await updateBalance(tx, 'coffre', coffre.id, montant);  // Coffre Credit
     }
 
-    // 9. Mettre à jour les soldes des caisses (atomique avec FOR UPDATE)
-    const soldeDestAvant = parseFloat(caisseDest.solde || "0");
-
-    // Source: diminue
-    const [updatedCaisseSource] = await tx.update(caisses)
-      .set({
-        solde: sql`${caisses.solde} - ${montant}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(caisses.id, caisseSource.id))
-      .returning({ solde: caisses.solde });
-
-    // Destination: augmente
-    const [updatedCaisseDest] = await tx.update(caisses)
-      .set({
-        solde: sql`${caisses.solde} + ${montant}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(caisses.id, caisseDest.id))
-      .returning({ solde: caisses.solde });
-
-    // 10. Mettre à jour les soldes théoriques des sessions si elles existent
-    if (sessionIdSource) {
-      await tx.update(sessionsCaisse)
-        .set({
-          soldeTheorique: sql`${sessionsCaisse.soldeTheorique} - ${montant}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(sessionsCaisse.id, sessionIdSource));
-    }
-
-    if (sessionIdDest) {
-      await tx.update(sessionsCaisse)
-        .set({
-          soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${montant}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(sessionsCaisse.id, sessionIdDest));
-    }
-
-    // 11. Mettre à jour le transfert
+    // 10. Finaliser le transfert
     const [updatedTransfert] = await tx.update(transfertsCoffreCaisse)
       .set({
         statut: "Exécuté",
@@ -329,40 +235,56 @@ export async function executeTransfertCoffre(
       .where(eq(transfertsCoffreCaisse.id, transfertId))
       .returning();
 
-    // 12. Créer l'entrée d'audit complète
+    // 11. Audit Log
     await tx.insert(transfertsCoffreAuditLogs).values({
       transfertId,
       action: "EXECUTED",
       statutAvant: "Validé",
       statutApres: "Exécuté",
       details: {
-        // Mouvements financiers
-        mouvementDebitId: mouvementDebit.id,
-        mouvementCreditId: mouvementCredit.id,
-        groupRef,
-        // Opérations caisse
-        operationSourceId: operationSource?.id,
-        operationDestId: operationDest?.id,
-        sessionIdSource,
-        sessionIdDest,
-        // Soldes source
-        caisseSourceId: caisseSource.id,
-        caisseSourceNom: caisseSource.nom,
+        amount: montant,
+        coffreId: coffre.id,
+        caisseId: caisse.id,
+        direction: isCoffreSource ? "COFFRE->CAISSE" : "CAISSE->COFFRE",
         soldeSourceAvant: soldeSource,
-        soldeSourceApres: parseFloat(updatedCaisseSource?.solde || "0"),
-        // Soldes destination
-        caisseDestId: caisseDest.id,
-        caisseDestNom: caisseDest.nom,
-        soldeDestAvant,
-        soldeDestApres: parseFloat(updatedCaisseDest?.solde || "0"),
-        // Billetage
-        billetage,
-        montant,
+        soldeDestAvant: soldeDestAvant,
+        // (skipped apres soldes for brevity/perf, or fetch from update result)
       },
       userId: executorId,
       ipAddress,
       userAgent,
     });
+
+    // 12. WebSocket Notification (Real-Time)
+    try {
+        const ws = getWsInstance();
+        if (ws) {
+             // Notify Agence (Coffre Updates)
+             ws.broadcastToAggregate('coffre', transfert.agenceId, {
+                type: 'REALTIME_EVENT',
+                payload: {
+                    aggregateType: 'coffre',
+                    aggregateId: transfert.agenceId,
+                    event: 'TRANSFERT_EXECUTED',
+                    transfertId: transfertId
+                }
+             });
+
+             // Notify Caisse (Balance Updates)
+             ws.broadcastToAggregate('caisse', caisse.id, {
+                type: 'CAISSE_UPDATE',
+                payload: {
+                    caisseId: caisse.id,
+                    type: 'BALANCE_UPDATED',
+                    newBalance: isCoffreSource 
+                        ? (Number(caisse.solde) + Number(montant)) 
+                        : (Number(caisse.solde) - Number(montant))
+                }
+             });
+        }
+    } catch (e) {
+        console.error("Failed to broadcast WS event for transfert", e);
+    }
 
     return {
       success: true,

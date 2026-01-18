@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { agences } from "./agences";
+import { coffresForts } from "./coffres-forts";
 import { caisses, sessionsCaisse, operationsCaisse, mouvementsFinanciers } from "./finance";
 
 // ========== ENUM STATUT TRANSFERT COFFRE ==========
@@ -32,9 +33,9 @@ export const transfertsCoffreCaisse = pgTable(
     // Type de transfert
     typeTransfert: typeTransfertCoffreEnum("type_transfert").notNull(),
     
-    // Source et destination (l'un est toujours le coffre-fort)
-    caisseSourceId: uuid("caisse_source_id").notNull().references(() => caisses.id, { onDelete: "restrict" }),
-    caisseDestinationId: uuid("caisse_destination_id").notNull().references(() => caisses.id, { onDelete: "restrict" }),
+    // Relation Coffre <-> Caisse
+    coffreId: uuid("coffre_id").notNull().references(() => coffresForts.id, { onDelete: "restrict" }), // .as alias removed
+    caisseId: uuid("caisse_id").notNull().references(() => caisses.id, { onDelete: "restrict" }),
     
     // Montant et devise
     montant: numeric("montant").notNull(),
@@ -95,14 +96,13 @@ export const transfertsCoffreCaisse = pgTable(
     // Index de performance
     idxAgenceStatut: index("idx_transferts_coffre_agence_statut").on(t.agenceId, t.statut),
     idxAgenceDate: index("idx_transferts_coffre_agence_date").on(t.agenceId, t.createdAt),
-    idxCaisseSource: index("idx_transferts_coffre_source").on(t.caisseSourceId),
-    idxCaisseDest: index("idx_transferts_coffre_dest").on(t.caisseDestinationId),
+    idxCoffre: index("idx_transferts_coffre_coffre").on(t.coffreId),
+    idxCaisse: index("idx_transferts_coffre_caisse").on(t.caisseId),
     idxStatutDate: index("idx_transferts_coffre_statut_date").on(t.statut, t.createdAt),
     idxRequestedBy: index("idx_transferts_coffre_requested_by").on(t.requestedBy),
     
     // Contraintes métier
     chkMontantPos: sql`CONSTRAINT chk_transferts_coffre_montant_pos CHECK (${t.montant} > 0)`,
-    chkDifferentCaisses: sql`CONSTRAINT chk_transferts_coffre_different CHECK (${t.caisseSourceId} <> ${t.caisseDestinationId})`,
   }),
 );
 

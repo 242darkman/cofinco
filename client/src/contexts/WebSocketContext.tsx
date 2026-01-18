@@ -341,6 +341,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          } else if (aggregateType === 'session_caisse') {
            debounceInvalidate(['session', aggregateId]);
            debounceInvalidate(['operations', aggregateId]);
+         } else if (aggregateType === 'coffre') {
+           debounceInvalidate(['transferts-coffre', aggregateId]);
+           debounceInvalidate(['coffre-stats', aggregateId]);
+           debounceInvalidate(['coffre-mouvements', aggregateId]);
          }
          break;
 
