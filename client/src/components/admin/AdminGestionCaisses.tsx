@@ -7,7 +7,6 @@ import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
 import { ForceCloseModal } from './ForceCloseModal';
-import { useCaisseWebSocket } from '../../hooks/useCaisseWebSocket';
 import { isAdminRole, normalizeRole } from '@shared/types/roles';
 
 interface Caisse {
@@ -103,25 +102,10 @@ export default function AdminGestionCaisses() {
     },
     enabled: !!user?.agenceId || isAdmin,
     refetchOnWindowFocus: true,
+    refetchInterval: 30000, // Refresh every 30 seconds instead of using unstable WebSocket
   });
 
-  // WebSocket for real-time updates
-  useCaisseWebSocket({
-    onCaisseStatusChanged: (event) => {
-      console.log('Caisse status changed:', event);
-      queryClient.invalidateQueries({ queryKey: ['caisses'] });
-    },
-    onSessionForceClosed: (event) => {
-      console.log('Session force closed:', event);
-      queryClient.invalidateQueries({ queryKey: ['caisses'] });
-    },
-    onSessionUpdated: (event) => {
-      // Refresh list on any financial movement or session change
-      // This ensures "Solde" is always up to date
-      queryClient.invalidateQueries({ queryKey: ['caisses'] });
-    },
-    enabled: true,
-  });
+  // WebSocket removed as per user request to avoid unnecessary connection errors
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => await api.post('/caisses', data),

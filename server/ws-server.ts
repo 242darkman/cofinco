@@ -232,6 +232,7 @@ export function setupWebSocket(server: Server) {
     }
 
     ws.on("message", (message) => {
+       (ws as ExtendedWebSocket).isAlive = true;
        try {
          const data = JSON.parse(message.toString());
          
