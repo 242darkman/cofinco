@@ -88,6 +88,9 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
           
           return {
             ...t,
+            // Ensure numeric values are formatted as numbers (backend transmits them as strings for numeric type)
+            montant: Number(t.montant) || 0,
+            solde_apres: Number(t.solde_apres || t.soldeApres || 0),
             type_transaction: typeTransaction,
             date_transaction: t.createdAt || t.created_at || new Date().toISOString(),
             description: t.observations || t.typePaiement || t.type_paiement,
@@ -320,10 +323,10 @@ export default function EpargneDetailModal({ compteId, onClose }: EpargneDetailM
                           <div className={`text-xl font-bold ${
                             transaction.montant > 0 ? 'text-green-400' : 'text-blue-400'
                           }`}>
-                            {transaction.montant > 0 ? '+' : ''}{transaction.montant.toLocaleString()} FCFA
+                            {transaction.montant > 0 ? '+' : ''}{(transaction.montant ?? 0).toLocaleString()} FCFA
                           </div>
                           <div className="text-xs text-slate-400">
-                            Solde: {transaction.solde_apres.toLocaleString()} FCFA
+                            Solde: {(transaction.solde_apres ?? 0).toLocaleString()} FCFA
                           </div>
                         </div>
                         
