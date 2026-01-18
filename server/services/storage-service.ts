@@ -102,7 +102,8 @@ export class StorageService {
     isPublic: boolean = false
   ): Promise<string> {
     const bucket = isPublic ? PUBLIC_BUCKET : PRIVATE_BUCKET;
-    const key = `${path}/${Date.now()}-${file.originalname}`;
+    const sanitizedName = this.sanitizeFilename(file.originalname);
+    const key = `${path}/${Date.now()}-${sanitizedName}`;
 
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
@@ -131,7 +132,8 @@ export class StorageService {
     isPublic: boolean = false
   ): Promise<string> {
     const bucket = isPublic ? PUBLIC_BUCKET : PRIVATE_BUCKET;
-    const key = `${path}/${filename}`;
+    const sanitizedName = this.sanitizeFilename(filename);
+    const key = `${path}/${sanitizedName}`;
 
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
@@ -155,7 +157,8 @@ export class StorageService {
     isPublic: boolean = false
   ): Promise<{ uploadUrl: string; objectKey: string }> {
     const bucket = isPublic ? PUBLIC_BUCKET : PRIVATE_BUCKET;
-    const key = `${path}/${Date.now()}-${filename}`;
+    const sanitizedName = this.sanitizeFilename(filename);
+    const key = `${path}/${Date.now()}-${sanitizedName}`;
 
     const command = new PutObjectCommand({
       Bucket: bucket,
@@ -270,5 +273,33 @@ export class StorageService {
     
     // Strategy: Just try to delete from public, if we assume keys are relative.
     // Optimization: Caller passes context.
+  }
+
+  /**
+   * Sanitize filename to be ASCII-safe for S3/MinIO
+   */
+  private static sanitizeFilename(filename: string): string {
+    // Split into name and extension
+    const lastDotIndex = filename.lastIndexOf('.');
+    let name = filename;
+    let ext = '';
+    
+    if (lastDotIndex !== -1) {
+      name = filename.substring(0, lastDotIndex);
+      ext = filename.substring(lastDotIndex).toLowerCase(); // Extension stays lowercase
+    }
+
+    const sanitizedName = name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-zA-Z0-9-]/g, '-')   // Replace non-alphanumeric with -
+      .replace(/-+/g, '-')             // Collapse dashes
+      .replace(/^-+|-+$/g, '')         // Trim dashes
+      .toLowerCase();
+
+    // Ensure extension only contains alphanumeric characters and a single leading dot
+    const sanitizedExt = ext.replace(/[^a-z0-9.]/g, '');
+
+    return sanitizedName + sanitizedExt;
   }
 }
