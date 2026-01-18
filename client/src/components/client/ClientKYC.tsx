@@ -16,6 +16,20 @@ const isImage = (url: string) => {
 
 const isDirectUrl = (url: string) => url.startsWith('http') || url.startsWith('data:');
 
+// Fix malformed URLs that have double prefixes (e.g., http://host/bucket/http://host/bucket/key)
+const normalizeDocumentUrl = (url: string): string => {
+  if (!url) return url;
+
+  // Check for double http:// pattern (malformed URL)
+  const doubleHttpMatch = url.match(/^(https?:\/\/[^/]+\/[^/]+\/)(https?:\/\/.+)$/);
+  if (doubleHttpMatch) {
+    // Return the second (inner) URL which is the real one
+    return doubleHttpMatch[2];
+  }
+
+  return url;
+};
+
 // Translate status to French for UI display
 const translateStatus = (status: string): string => {
   const statusLower = status?.toLowerCase();
@@ -27,10 +41,26 @@ const translateStatus = (status: string): string => {
   }
 };
 
+// Translate document type to French for UI display
+const translateDocumentType = (docType: string): string => {
+  switch (docType) {
+    case 'ID_CARD_FRONT': return 'Pièce d\'identité (Recto)';
+    case 'ID_CARD_BACK': return 'Pièce d\'identité (Verso)';
+    case 'PROOF_OF_ADDRESS': return 'Justificatif de domicile';
+    case 'AVATAR': return 'Photo de profil';
+    case 'OTHER': return 'Autre';
+    case 'ID Card': return 'Carte d\'identité';
+    case 'Passport': return 'Passeport';
+    case 'Contract': return 'Contrat';
+    case 'Photo': return 'Photo';
+    default: return docType;
+  }
+};
+
 interface ClientDocument {
   id: string;
   client_id: string;
-  document_type: 'ID Card' | 'Passport' | 'Contract' | 'Photo' | 'Other';
+  document_type: 'ID Card' | 'Passport' | 'Contract' | 'Photo' | 'Other' | 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PROOF_OF_ADDRESS' | 'AVATAR' | 'OTHER';
   document_name: string;
   document_url: string;
   owner_id?: string;
@@ -63,8 +93,11 @@ function KycDocumentCard({
   onDelete,
   getStatusIcon
 }: KycDocumentCardProps) {
+  // Normalize the URL first to fix any malformed double-prefix URLs
+  const normalizedDocUrl = normalizeDocumentUrl(doc.document_url);
+
   // Déterminer si l'URL est directement utilisable (http/https ou data:)
-  const hasDirectUrl = Boolean(doc.document_url && isDirectUrl(doc.document_url));
+  const hasDirectUrl = Boolean(normalizedDocUrl && isDirectUrl(normalizedDocUrl));
   // Les documents legacy n'ont pas d'entrée en base, on utilise leur document_url directement
   const isLegacyDoc = doc.id.startsWith('legacy-');
 
@@ -75,7 +108,7 @@ function KycDocumentCard({
 
   // Résoudre l'URL finale : URL directe si disponible, sinon URL signée
   // Ne jamais utiliser doc.document_url si c'est une clé MinIO (ne commence pas par http/data)
-  const resolvedUrl = hasDirectUrl ? doc.document_url : signedUrl;
+  const resolvedUrl = hasDirectUrl ? normalizedDocUrl : signedUrl;
   const showSkeleton = needsSignedUrl && isLoading;
 
   const handleImageError = () => {
@@ -107,7 +140,7 @@ function KycDocumentCard({
           <div className="min-w-0">
             <p className="font-semibold text-white text-sm truncate pr-2">{doc.document_name}</p>
             <div className="flex items-center gap-2 mt-1">
-              <Badge value={doc.document_type} size="sm" variant="neutral" />
+              <Badge value={translateDocumentType(doc.document_type)} size="sm" variant="neutral" />
               <span className="text-[10px] text-slate-500">
                 {new Date(doc.created_at).toLocaleDateString()}
               </span>

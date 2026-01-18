@@ -327,11 +327,17 @@ export function resolveClientPhotoUrl(url: string | null | undefined): string {
     try {
       const urlObj = new URL(raw);
       const pathParts = urlObj.pathname.split('/').filter(Boolean);
-      // Logic copied from ClientModule.tsx to handle internal/minio URLs
-      // Rewrite http://minio/bucket/key -> /api/uploads/files/key
+      // Handle MinIO public-assets URLs: http://localhost:9000/public-assets/profiles/xxx.jpg
+      // Extract the key after the bucket name and proxy through API
       if (pathParts.length >= 2) {
-           const key = pathParts.slice(1).join('/');
-           return `/api/uploads/files/${key}`;
+        const bucketName = pathParts[0]; // e.g., 'public-assets' or 'secure-docs'
+        const key = pathParts.slice(1).join('/'); // e.g., 'profiles/xxx.jpg'
+        // For public-assets bucket, route through the files API
+        if (bucketName === 'public-assets') {
+          return `/api/uploads/files/${key}`;
+        }
+        // For secure-docs or other buckets, the signed URL is already usable directly
+        return raw;
       }
       return raw;
     } catch {

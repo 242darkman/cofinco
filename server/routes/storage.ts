@@ -166,7 +166,13 @@ router.get('/documents/:id/view', requireAuth, async (req, res) => {
     }
 
     if (objectKey.startsWith('http') || objectKey.startsWith('data:')) {
-      return res.json({ url: objectKey });
+      // Fix malformed URLs that have double prefixes (e.g., http://host/bucket/http://host/bucket/key)
+      let normalizedUrl = objectKey;
+      const doubleHttpMatch = objectKey.match(/^(https?:\/\/[^/]+\/[^/]+\/)(https?:\/\/.+)$/);
+      if (doubleHttpMatch) {
+        normalizedUrl = doubleHttpMatch[2];
+      }
+      return res.json({ url: normalizedUrl });
     }
 
     const url = await StorageService.getPresignedDownloadUrl(objectKey, 900);
