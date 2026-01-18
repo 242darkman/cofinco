@@ -97,20 +97,6 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     versement_auto_jour: '28'
   });
 
-  useEffect(() => {
-    loadClients();
-  }, []);
-
-  useEffect(() => {
-    if (formData.client_id) {
-      loadComptesClient(formData.client_id);
-    }
-  }, [formData.client_id]);
-
-  useEffect(() => {
-    loadProduits(formData.type_compte);
-  }, [formData.type_compte, loadProduits]);
-
   const loadClients = useCallback(async () => {
     setLoadingClients(true);
     try {
@@ -171,6 +157,20 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       setComptesExistants([]);
     }
   }, [formData.type_compte]);
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  useEffect(() => {
+    if (formData.client_id) {
+      loadComptesClient(formData.client_id);
+    }
+  }, [formData.client_id]);
+
+  useEffect(() => {
+    loadProduits(formData.type_compte);
+  }, [formData.type_compte, loadProduits]);
 
   const filteredClients = useMemo(() => {
     const query = searchQuery.toLowerCase();
