@@ -109,7 +109,6 @@ import {
   ordresBourse,
   transactionsBourse,
   watchlistBourse,
-  agencyMigrations,
   documents,
   logeSettings,
   demandesConges,
@@ -133,6 +132,12 @@ import {
 } from '@shared/schema';
 import { hashPassword } from './auth';
 import { eq } from 'drizzle-orm';
+import {
+  agencyMigrations,
+  migrationPreFlightChecks,
+  migrationEntityLogs,
+  migrationAuditLogs
+} from '@shared/schema/agency_migration';
 
 // ----------------------------------------------------------------------
 // DATA DEFINITIONS
@@ -286,7 +291,12 @@ async function seedDemoSimple() {
     await db.delete(portefeuillesBourse); // ref clients
     await db.delete(pushSubscriptions); // ref users
     await db.delete(notificationPreferences); // ref users
-    await db.delete(agencyMigrations); // ref agences
+
+    // Agency migration tables (delete in correct order - children first)
+    await db.delete(migrationAuditLogs);
+    await db.delete(migrationEntityLogs);
+    await db.delete(migrationPreFlightChecks);
+    await db.delete(agencyMigrations);
     await db.delete(documents); // ref users
     await db.delete(logeSettings);
     await db.delete(formationParticipants); // ref employes, formations

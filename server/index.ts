@@ -19,6 +19,7 @@ import { startScheduledDisbursementsCron } from "./cron/scheduled-disbursements"
 import { SystemRole } from "@shared/types/roles";
 import { startAutomaticRepaymentsCron } from "./cron/automatic-repayments";
 import { startCreditStatusUpdateCron } from "./cron/update-credit-status";
+import { startScheduledMigrationsCron } from "./cron/scheduled-migrations";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -223,9 +224,11 @@ async function seedAdminUser() {
   startScheduledDisbursementsCron();
   startAutomaticRepaymentsCron(); // Start Auto Repayments
   startCreditStatusUpdateCron(); // Start Credit Status Update
+  startScheduledMigrationsCron(); // Start Agency Migration Scheduler
   log('[Cron] Scheduled disbursements job started');
   log('[Cron] Automatic repayments job started');
   log('[Cron] Credit status update job started');
+  log('[Cron] Scheduled agency migrations job started');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

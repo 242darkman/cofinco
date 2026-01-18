@@ -1,18 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { 
-  Building2, Users, Receipt, AlertTriangle, CheckCircle, 
-  ArrowRight, Loader2, ArrowRightLeft, Shield 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Building2, Users, Receipt, AlertTriangle, CheckCircle,
+  ArrowRight, Loader2, Shield, Calendar, Play, X, AlertCircle,
+  FileText, Clock, Ban, RefreshCw, Download, Eye
 } from 'lucide-react';
 import { Modal, Button, SearchableSelect, ProgressBar, Badge } from '../ui';
 import { api } from '../../lib/api-client';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
+// ============================================
+// TYPES
+// ============================================
 
 interface Agency {
   id: string;
   nom: string;
   ville?: string;
   codeAgence: string;
+}
+
+interface PreFlightCheck {
+  type: string;
+  passed: boolean;
+  blocking: boolean;
+  message: string;
+  details?: any;
+  resolution?: string;
+}
+
+interface DryRunResult {
+  volumetry: {
+    clients: number;
+    comptes: number;
+    credits: number;
+    demandesCredit: number;
+    tontines: number;
+    employes: number;
+    sessionsCaisse: number;
+  };
+  preFlightChecks: PreFlightCheck[];
+  conflicts: Array<{
+    type: string;
+    entityId: string;
+    description: string;
+    resolution: string;
+  }>;
+  financials: {
+    soldesCoffresTransferes: number;
+    totalSoldesComptes: number;
+    totalCreditsEnCours: number;
+    totalDemandesEnAttente: number;
+  };
+  warnings: string[];
+  canProceed: boolean;
+  blockingReasons: string[];
+}
+
+interface MigrationStatus {
+  id: string;
+  reference: string;
+  status: string;
+  progress: number;
+  currentStep?: string;
+  error?: string;
+  logs?: Array<{ step: string; timestamp: string; success: boolean; count?: number }>;
+  report?: any;
+  scheduledAt?: string;
+  completedAt?: string;
 }
 
 interface MigrationWizardProps {
@@ -22,21 +79,47 @@ interface MigrationWizardProps {
   onSuccess: () => void;
 }
 
+// ============================================
+// CONSTANTS
+// ============================================
+
 const STEPS = [
   { id: 'clients', title: 'Clients', icon: Users },
   { id: 'employees', title: 'Personnel', icon: Building2 },
   { id: 'treasury', title: 'Trésorerie', icon: Receipt },
+  { id: 'schedule', title: 'Planification', icon: Calendar },
+  { id: 'analysis', title: 'Analyse', icon: Eye },
   { id: 'confirm', title: 'Confirmation', icon: Shield }
 ];
 
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  DRAFT: { label: 'Brouillon', color: 'bg-slate-500' },
+  PENDING: { label: 'En attente', color: 'bg-yellow-500' },
+  SCHEDULED: { label: 'Planifié', color: 'bg-blue-500' },
+  PRE_FLIGHT_CHECK: { label: 'Vérifications', color: 'bg-purple-500' },
+  PROCESSING: { label: 'En cours', color: 'bg-orange-500' },
+  COMPLETED: { label: 'Terminé', color: 'bg-green-500' },
+  FAILED: { label: 'Échoué', color: 'bg-red-500' },
+  CANCELLED: { label: 'Annulé', color: 'bg-gray-500' },
+};
+
+// ============================================
+// COMPONENT
+// ============================================
+
 export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess }: MigrationWizardProps) {
+  const queryClient = useQueryClient();
+
+  // State
   const [currentStep, setCurrentStep] = useState(0);
   const [targetClients, setTargetClients] = useState<string | number>('');
   const [targetEmployees, setTargetEmployees] = useState<string | number>('');
   const [targetTreasury, setTargetTreasury] = useState<string | number>('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<string>('');
+  const [executeNow, setExecuteNow] = useState(true);
   const [migrationId, setMigrationId] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Fetch available agencies (excluding source)
   const { data: agences } = useQuery({
@@ -49,55 +132,99 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   });
 
   // Poll migration status
+  const { data: migrationStatus, refetch: refetchStatus } = useQuery({
+    queryKey: ['migration-status', migrationId],
+    queryFn: async () => {
+      if (!migrationId) return null;
+      return api.get<MigrationStatus>(`/agences/migrations/${migrationId}/status`);
+    },
+    enabled: !!migrationId,
+    refetchInterval: migrationId ? 2000 : false,
+  });
+
+  // Handle migration completion
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (migrationId) {
-      interval = setInterval(async () => {
-        try {
-          const status = await api.get<{ status: string; progress: number; error?: string }>(`/agences/migrations/${migrationId}/status`);
-          setProgress(status.progress);
-          
-          if (status.status === 'COMPLETED') {
-            clearInterval(interval);
-            toast.success('Migration terminée avec succès');
-            onSuccess();
-            onClose();
-          } else if (status.status === 'FAILED') {
-            clearInterval(interval);
-            toast.error(`Erreur: ${status.error}`);
-            setIsSubmitting(false);
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }, 2000);
+    if (migrationStatus?.status === 'COMPLETED') {
+      toast.success('Migration terminée avec succès !');
+      onSuccess();
+    } else if (migrationStatus?.status === 'FAILED') {
+      toast.error(`Erreur: ${migrationStatus.error}`);
     }
-    return () => clearInterval(interval);
-  }, [migrationId, onClose, onSuccess]);
+  }, [migrationStatus?.status, onSuccess]);
 
-  const handleNext = () => {
-    if (currentStep < STEPS.length - 1) {
-      setCurrentStep(prev => prev + 1);
-    } else {
-      startMigration();
+  // Mutations
+  const createMigrationMutation = useMutation({
+    mutationFn: async (data: {
+      targetAgenceClients?: string;
+      targetAgenceEmployes?: string;
+      targetAgenceCoffre?: string;
+      scheduledAt?: string;
+    }) => {
+      return api.post<MigrationStatus>(`/agences/${sourceAgence.id}/migrations`, data);
+    },
+    onSuccess: (data) => {
+      setMigrationId(data.id);
+      toast.success(`Migration créée (Réf: ${data.reference})`);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la création de la migration');
     }
-  };
+  });
 
-  const startMigration = async () => {
-    setIsSubmitting(true);
-    try {
-      const res = await api.post<{ id: string }>(`/agences/${sourceAgence.id}/migrate`, {
-        targetAgenceClients: targetClients,
-        targetAgenceEmployes: targetEmployees,
-        targetAgenceCoffre: targetTreasury
-      });
-      setMigrationId(res.id);
-    } catch (error) {
-      toast.error("Impossible de démarrer la migration");
-      setIsSubmitting(false);
+  const dryRunMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return api.post<DryRunResult>(`/agences/migrations/${id}/dry-run`);
+    },
+    onSuccess: (data) => {
+      setDryRunResult(data);
+      setIsAnalyzing(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de l\'analyse');
+      setIsAnalyzing(false);
     }
-  };
+  });
 
+  const submitMigrationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return api.post(`/agences/migrations/${id}/submit`);
+    },
+    onSuccess: () => {
+      toast.success('Migration soumise');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la soumission');
+    }
+  });
+
+  const executeMigrationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return api.post(`/agences/migrations/${id}/execute`);
+    },
+    onSuccess: () => {
+      toast.success('Migration démarrée');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors du lancement');
+    }
+  });
+
+  const cancelMigrationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return api.post(`/agences/migrations/${id}/cancel`, { reason: 'Annulée par l\'utilisateur' });
+    },
+    onSuccess: () => {
+      toast.info('Migration annulée');
+      setMigrationId(null);
+      setDryRunResult(null);
+      setCurrentStep(0);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de l\'annulation');
+    }
+  });
+
+  // Helpers
   const agencyOptions = agences?.map((a: Agency) => ({
     value: a.id,
     label: a.nom,
@@ -109,37 +236,103 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       case 0: return !!targetClients;
       case 1: return !!targetEmployees;
       case 2: return !!targetTreasury;
+      case 3: return executeNow || !!scheduledAt;
+      case 4: return dryRunResult?.canProceed ?? false;
       default: return true;
+    }
+  };
+
+  const formatMoney = (amount: number) => {
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 }).format(amount);
+  };
+
+  // Navigation
+  const handleNext = async () => {
+    if (currentStep === 3) {
+      // Créer la migration et lancer le dry run
+      setIsAnalyzing(true);
+      try {
+        const migration = await createMigrationMutation.mutateAsync({
+          targetAgenceClients: targetClients as string,
+          targetAgenceEmployes: targetEmployees as string,
+          targetAgenceCoffre: targetTreasury as string,
+          scheduledAt: !executeNow && scheduledAt ? new Date(scheduledAt).toISOString() : undefined
+        });
+        await dryRunMutation.mutateAsync(migration.id);
+        setCurrentStep(4);
+      } catch (error) {
+        setIsAnalyzing(false);
+      }
+    } else if (currentStep === 5) {
+      // Confirmer et lancer
+      if (migrationId) {
+        await submitMigrationMutation.mutateAsync(migrationId);
+        if (executeNow) {
+          await executeMigrationMutation.mutateAsync(migrationId);
+        }
+      }
+    } else {
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep === 4 && migrationId) {
+      cancelMigrationMutation.mutate(migrationId);
+    } else if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  // Is processing?
+  const isProcessing = migrationStatus?.status === 'PROCESSING' ||
+    migrationStatus?.status === 'PRE_FLIGHT_CHECK';
+  const isCompleted = migrationStatus?.status === 'COMPLETED';
+  const isFailed = migrationStatus?.status === 'FAILED';
+  const isScheduled = migrationStatus?.status === 'SCHEDULED';
+
+  // Reset on close
+  const handleClose = () => {
+    if (!isProcessing) {
+      setCurrentStep(0);
+      setTargetClients('');
+      setTargetEmployees('');
+      setTargetTreasury('');
+      setScheduledAt('');
+      setExecuteNow(true);
+      setMigrationId(null);
+      setDryRunResult(null);
+      onClose();
     }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={() => !isSubmitting && onClose()}
+      onClose={handleClose}
       title={`Fermeture et Migration : ${sourceAgence.nom}`}
-      size="lg"
+      size="xl"
     >
       <div className="space-y-6">
         {/* Stepper Header */}
-        <div className="flex justify-between relative">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-700 -z-10" />
+        <div className="flex justify-between relative overflow-x-auto pb-2">
+          <div className="absolute top-5 left-0 w-full h-0.5 bg-slate-700 -z-10" />
           {STEPS.map((step, idx) => {
             const Icon = step.icon;
             const isActive = idx === currentStep;
             const isCompleted = idx < currentStep;
 
             return (
-              <div key={step.id} className="flex flex-col items-center bg-slate-800 px-2">
+              <div key={step.id} className="flex flex-col items-center bg-slate-800 px-2 min-w-[70px]">
                 <div className={`
                   w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors
-                  ${isActive ? 'border-blue-500 bg-blue-500/20 text-blue-400' : 
-                    isCompleted ? 'border-green-500 bg-green-500/20 text-green-400' : 
-                    'border-slate-600 bg-slate-800 text-slate-500'}
+                  ${isActive ? 'border-blue-500 bg-blue-500/20 text-blue-400' :
+                    isCompleted ? 'border-green-500 bg-green-500/20 text-green-400' :
+                      'border-slate-600 bg-slate-800 text-slate-500'}
                 `}>
-                  <Icon size={20} />
+                  <Icon size={18} />
                 </div>
-                <span className={`text-xs mt-2 font-medium ${isActive ? 'text-white' : 'text-slate-500'}`}>
+                <span className={`text-xs mt-2 font-medium text-center ${isActive ? 'text-white' : 'text-slate-500'}`}>
                   {step.title}
                 </span>
               </div>
@@ -148,139 +341,498 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
         </div>
 
         {/* Content */}
-        <div className="min-h-[200px] py-4">
-            {isSubmitting ? (
-                <div className="flex flex-col items-center justify-center p-8 space-y-4">
-                    <Loader2 className="animate-spin text-blue-500" size={48} />
-                    <h3 className="text-xl font-bold text-white">Migration en cours...</h3>
-                    <div className="w-full max-w-xs">
-                        <ProgressBar value={progress} max={100} color="primary" size="md" />
+        <div className="min-h-[350px] py-4">
+          {/* Processing State */}
+          {isProcessing && (
+            <div className="flex flex-col items-center justify-center p-8 space-y-4">
+              <Loader2 className="animate-spin text-blue-500" size={48} />
+              <h3 className="text-xl font-bold text-white">Migration en cours...</h3>
+              <p className="text-slate-400 text-sm">{migrationStatus?.currentStep || 'Initialisation'}</p>
+              <div className="w-full max-w-md">
+                <ProgressBar value={migrationStatus?.progress || 0} max={100} color="primary" size="md" />
+              </div>
+              <p className="text-slate-400 text-center">
+                Ne fermez pas cette fenêtre. Progression: {migrationStatus?.progress || 0}%
+              </p>
+
+              {/* Steps Log */}
+              {migrationStatus?.logs && migrationStatus.logs.length > 0 && (
+                <div className="w-full max-w-md mt-4 bg-slate-900 rounded-lg p-4 max-h-40 overflow-y-auto">
+                  {migrationStatus.logs.map((log, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm py-1">
+                      {log.success ? (
+                        <CheckCircle className="text-green-500 shrink-0" size={14} />
+                      ) : (
+                        <X className="text-red-500 shrink-0" size={14} />
+                      )}
+                      <span className="text-slate-300">{log.step}</span>
+                      {log.count !== undefined && (
+                        <span className="text-slate-500">({log.count})</span>
+                      )}
                     </div>
-                    <p className="text-slate-400 text-center">
-                        Ne fermez pas cette fenêtre. Opération en arrière-plan.<br/>
-                        Transférés: {progress}%
-                    </p>
+                  ))}
                 </div>
-            ) : (
-                <>
-                {currentStep === 0 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                        <div className="bg-blue-500/10 p-4 rounded-lg flex gap-3 border border-blue-500/20 font-sans">
-                            <Users className="text-blue-400 shrink-0" />
-                            <div>
-                                <h4 className="font-bold text-blue-400">Transfert de la Clientèle</h4>
-                                <p className="text-sm text-slate-300">
-                                    Veuillez sélectionner l'agence qui reprendra la gestion des clients actifs de {sourceAgence.nom}.
-                                </p>
-                            </div>
-                        </div>
-                        <SearchableSelect
-                            label="Agence de destination (Clients)"
-                            name="targetClients"
-                            value={targetClients}
-                            onChange={(val) => setTargetClients(val)}
-                            options={agencyOptions}
-                            placeholder="Rechercher une agence..."
+              )}
+            </div>
+          )}
+
+          {/* Completed State */}
+          {isCompleted && (
+            <div className="flex flex-col items-center justify-center p-8 space-y-4">
+              <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
+                <CheckCircle className="text-green-500" size={48} />
+              </div>
+              <h3 className="text-xl font-bold text-white">Migration Terminée !</h3>
+              <p className="text-slate-400 text-center">
+                L'agence {sourceAgence.nom} a été fermée avec succès.<br />
+                Toutes les données ont été transférées.
+              </p>
+
+              {migrationStatus?.report && (
+                <div className="w-full max-w-md bg-slate-900 rounded-lg p-4 mt-4">
+                  <h4 className="font-medium text-white mb-3">Résumé de la Migration</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-slate-400">Clients migrés:</span>
+                    <span className="text-white">{migrationStatus.report.volumetry?.clients || 0}</span>
+                    <span className="text-slate-400">Comptes migrés:</span>
+                    <span className="text-white">{migrationStatus.report.volumetry?.comptes || 0}</span>
+                    <span className="text-slate-400">Crédits migrés:</span>
+                    <span className="text-white">{migrationStatus.report.volumetry?.credits || 0}</span>
+                    <span className="text-slate-400">Fonds transférés:</span>
+                    <span className="text-white">{formatMoney(migrationStatus.report.financials?.soldesCoffresTransferes || 0)}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-4">
+                <Button variant="outline" onClick={handleClose} icon={X}>
+                  Fermer
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    // TODO: Download PDF report
+                    toast.info('Téléchargement du rapport...');
+                  }}
+                  icon={Download}
+                >
+                  Télécharger le Rapport
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Failed State */}
+          {isFailed && (
+            <div className="flex flex-col items-center justify-center p-8 space-y-4">
+              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center">
+                <X className="text-red-500" size={48} />
+              </div>
+              <h3 className="text-xl font-bold text-white">Migration Échouée</h3>
+              <p className="text-red-400 text-center">{migrationStatus?.error}</p>
+              <p className="text-slate-400 text-sm text-center">
+                La migration a été annulée. Aucune donnée n'a été modifiée.
+              </p>
+              <div className="flex gap-3 mt-4">
+                <Button variant="outline" onClick={handleClose} icon={X}>
+                  Fermer
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    if (migrationId) {
+                      executeMigrationMutation.mutate(migrationId);
+                    }
+                  }}
+                  icon={RefreshCw}
+                >
+                  Réessayer
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Scheduled State */}
+          {isScheduled && (
+            <div className="flex flex-col items-center justify-center p-8 space-y-4">
+              <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Calendar className="text-blue-500" size={48} />
+              </div>
+              <h3 className="text-xl font-bold text-white">Migration Planifiée</h3>
+              <p className="text-slate-400 text-center">
+                La migration sera exécutée automatiquement le:<br />
+                <span className="text-white font-medium">
+                  {migrationStatus?.scheduledAt &&
+                    format(new Date(migrationStatus.scheduledAt), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                </span>
+              </p>
+              <p className="text-amber-400 text-sm text-center flex items-center gap-2">
+                <AlertCircle size={16} />
+                L'agence est maintenant en mode "Lecture seule"
+              </p>
+              <div className="flex gap-3 mt-4">
+                <Button
+                  variant="danger"
+                  onClick={() => migrationId && cancelMigrationMutation.mutate(migrationId)}
+                  icon={Ban}
+                >
+                  Annuler la Planification
+                </Button>
+                <Button variant="outline" onClick={handleClose} icon={X}>
+                  Fermer
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Wizard Steps */}
+          {!isProcessing && !isCompleted && !isFailed && !isScheduled && (
+            <>
+              {/* Step 0: Clients */}
+              {currentStep === 0 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                  <div className="bg-blue-500/10 p-4 rounded-lg flex gap-3 border border-blue-500/20 font-sans">
+                    <Users className="text-blue-400 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-blue-400">Transfert de la Clientèle</h4>
+                      <p className="text-sm text-slate-300">
+                        Sélectionnez l'agence qui reprendra la gestion des clients, comptes, crédits et tontines de {sourceAgence.nom}.
+                      </p>
+                    </div>
+                  </div>
+                  <SearchableSelect
+                    label="Agence de destination (Clients)"
+                    name="targetClients"
+                    value={targetClients}
+                    onChange={(val) => setTargetClients(val)}
+                    options={agencyOptions}
+                    placeholder="Rechercher une agence..."
+                  />
+                </div>
+              )}
+
+              {/* Step 1: Employees */}
+              {currentStep === 1 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                  <div className="bg-purple-500/10 p-4 rounded-lg flex gap-3 border border-purple-500/20 font-sans">
+                    <Building2 className="text-purple-400 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-purple-400">Réaffectation du Personnel</h4>
+                      <p className="text-sm text-slate-300">
+                        Les employés seront rattachés administrativement à la nouvelle agence.
+                      </p>
+                    </div>
+                  </div>
+                  <SearchableSelect
+                    label="Agence d'affectation (Employés)"
+                    name="targetEmployees"
+                    value={targetEmployees}
+                    onChange={(val) => setTargetEmployees(val)}
+                    options={agencyOptions}
+                    placeholder="Rechercher une agence..."
+                  />
+                </div>
+              )}
+
+              {/* Step 2: Treasury */}
+              {currentStep === 2 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                  <div className="bg-amber-500/10 p-4 rounded-lg flex gap-3 border border-amber-500/20 font-sans">
+                    <Receipt className="text-amber-400 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-amber-400">Transfert de Fonds (Trésorerie)</h4>
+                      <p className="text-sm text-slate-300">
+                        Le solde du coffre-fort sera transféré comptablement vers le coffre de l'agence cible.
+                      </p>
+                    </div>
+                  </div>
+                  <SearchableSelect
+                    label="Agence de destination (Fonds)"
+                    name="targetTreasury"
+                    value={targetTreasury}
+                    onChange={(val) => setTargetTreasury(val)}
+                    options={agencyOptions}
+                    placeholder="Rechercher une agence (ex: Siège)..."
+                  />
+                </div>
+              )}
+
+              {/* Step 3: Schedule */}
+              {currentStep === 3 && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                  <div className="bg-indigo-500/10 p-4 rounded-lg flex gap-3 border border-indigo-500/20 font-sans">
+                    <Calendar className="text-indigo-400 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-indigo-400">Planification de l'Exécution</h4>
+                      <p className="text-sm text-slate-300">
+                        Choisissez quand effectuer la migration. Une planification différée permet de préparer l'équipe.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="flex items-center gap-3 p-4 bg-slate-900 rounded-lg cursor-pointer border border-slate-700 hover:border-blue-500 transition-colors">
+                      <input
+                        type="radio"
+                        name="schedule"
+                        checked={executeNow}
+                        onChange={() => setExecuteNow(true)}
+                        className="w-5 h-5 text-blue-500"
+                      />
+                      <div>
+                        <span className="font-medium text-white">Exécuter maintenant</span>
+                        <p className="text-sm text-slate-400">La migration démarrera immédiatement après confirmation</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-4 bg-slate-900 rounded-lg cursor-pointer border border-slate-700 hover:border-blue-500 transition-colors">
+                      <input
+                        type="radio"
+                        name="schedule"
+                        checked={!executeNow}
+                        onChange={() => setExecuteNow(false)}
+                        className="w-5 h-5 text-blue-500"
+                      />
+                      <div className="flex-1">
+                        <span className="font-medium text-white">Planifier pour plus tard</span>
+                        <p className="text-sm text-slate-400">L'agence passera en mode "lecture seule" jusqu'à la migration</p>
+                      </div>
+                    </label>
+
+                    {!executeNow && (
+                      <div className="ml-8 mt-2">
+                        <label className="block text-sm text-slate-400 mb-2">Date et heure d'exécution</label>
+                        <input
+                          type="datetime-local"
+                          value={scheduledAt}
+                          onChange={(e) => setScheduledAt(e.target.value)}
+                          min={new Date().toISOString().slice(0, 16)}
+                          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
                         />
-                    </div>
-                )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
-                {currentStep === 1 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                        <div className="bg-purple-500/10 p-4 rounded-lg flex gap-3 border border-purple-500/20 font-sans">
-                            <Building2 className="text-purple-400 shrink-0" />
-                            <div>
-                                <h4 className="font-bold text-purple-400">Réaffectation du Personnel</h4>
-                                <p className="text-sm text-slate-300">
-                                    Les employés actuels seront rattachés administrativement à la nouvelle agence sélectionnée.
-                                </p>
-                            </div>
-                        </div>
-                        <SearchableSelect
-                            label="Agence d'affectation (Employés)"
-                            name="targetEmployees"
-                            value={targetEmployees}
-                            onChange={(val) => setTargetEmployees(val)}
-                            options={agencyOptions}
-                            placeholder="Rechercher une agence..."
-                        />
+              {/* Step 4: Analysis (Dry Run) */}
+              {currentStep === 4 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                  {isAnalyzing ? (
+                    <div className="flex flex-col items-center justify-center p-8">
+                      <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
+                      <p className="text-slate-300">Analyse en cours...</p>
                     </div>
-                )}
-
-                {currentStep === 2 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                        <div className="bg-amber-500/10 p-4 rounded-lg flex gap-3 border border-amber-500/20 font-sans">
-                            <Receipt className="text-amber-400 shrink-0" />
-                            <div>
-                                <h4 className="font-bold text-amber-400">Transfert de Fonds (Trésorerie)</h4>
-                                <p className="text-sm text-slate-300">
-                                    Le solde restant du coffre-fort sera transféré comptablement vers le coffre de l'agence cible.
-                                </p>
+                  ) : dryRunResult ? (
+                    <>
+                      {/* Pre-flight checks */}
+                      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                        <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                          <Shield size={18} />
+                          Vérifications Préalables
+                        </h4>
+                        <div className="space-y-2">
+                          {dryRunResult.preFlightChecks.map((check, idx) => (
+                            <div key={idx} className="flex items-start gap-3 p-2 rounded bg-slate-800">
+                              {check.passed ? (
+                                <CheckCircle className="text-green-500 shrink-0 mt-0.5" size={18} />
+                              ) : check.blocking ? (
+                                <X className="text-red-500 shrink-0 mt-0.5" size={18} />
+                              ) : (
+                                <AlertCircle className="text-yellow-500 shrink-0 mt-0.5" size={18} />
+                              )}
+                              <div className="flex-1">
+                                <span className={check.passed ? 'text-green-400' : check.blocking ? 'text-red-400' : 'text-yellow-400'}>
+                                  {check.message}
+                                </span>
+                                {!check.passed && check.resolution && (
+                                  <p className="text-xs text-slate-400 mt-1">{check.resolution}</p>
+                                )}
+                              </div>
                             </div>
+                          ))}
                         </div>
-                        <SearchableSelect
-                            label="Agence de destination (Fonds)"
-                            name="targetTreasury"
-                            value={targetTreasury}
-                            onChange={(val) => setTargetTreasury(val)}
-                            options={agencyOptions}
-                            placeholder="Rechercher une agence (ex: Siège)..."
-                        />
+                      </div>
+
+                      {/* Volumetry */}
+                      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                        <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                          <FileText size={18} />
+                          Données à Migrer
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="text-center p-3 bg-slate-800 rounded-lg">
+                            <div className="text-2xl font-bold text-blue-400">{dryRunResult.volumetry.clients}</div>
+                            <div className="text-xs text-slate-400">Clients</div>
+                          </div>
+                          <div className="text-center p-3 bg-slate-800 rounded-lg">
+                            <div className="text-2xl font-bold text-green-400">{dryRunResult.volumetry.comptes}</div>
+                            <div className="text-xs text-slate-400">Comptes</div>
+                          </div>
+                          <div className="text-center p-3 bg-slate-800 rounded-lg">
+                            <div className="text-2xl font-bold text-amber-400">{dryRunResult.volumetry.credits}</div>
+                            <div className="text-xs text-slate-400">Crédits</div>
+                          </div>
+                          <div className="text-center p-3 bg-slate-800 rounded-lg">
+                            <div className="text-2xl font-bold text-purple-400">{dryRunResult.volumetry.employes}</div>
+                            <div className="text-xs text-slate-400">Employés</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Financials */}
+                      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                        <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                          <Receipt size={18} />
+                          Impact Financier
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Solde coffre à transférer:</span>
+                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.soldesCoffresTransferes)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Total soldes comptes:</span>
+                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.totalSoldesComptes)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Crédits en cours:</span>
+                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.totalCreditsEnCours)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Demandes en attente:</span>
+                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.totalDemandesEnAttente)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Warnings */}
+                      {dryRunResult.warnings.length > 0 && (
+                        <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">
+                          <h4 className="font-medium text-yellow-400 mb-2 flex items-center gap-2">
+                            <AlertTriangle size={18} />
+                            Avertissements
+                          </h4>
+                          <ul className="text-sm text-slate-300 space-y-1">
+                            {dryRunResult.warnings.map((w, idx) => (
+                              <li key={idx}>• {w}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Can Proceed? */}
+                      {!dryRunResult.canProceed && (
+                        <div className="bg-red-500/10 rounded-lg p-4 border border-red-500/20">
+                          <h4 className="font-medium text-red-400 mb-2 flex items-center gap-2">
+                            <Ban size={18} />
+                            Migration Bloquée
+                          </h4>
+                          <ul className="text-sm text-slate-300 space-y-1">
+                            {dryRunResult.blockingReasons.map((r, idx) => (
+                              <li key={idx}>• {r}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Step 5: Confirmation */}
+              {currentStep === 5 && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                  <div className="bg-red-500/10 p-4 rounded-lg flex gap-3 border border-red-500/20">
+                    <AlertTriangle className="text-red-400 shrink-0" />
+                    <div>
+                      <h4 className="font-bold text-red-400">Attention : Action Irréversible</h4>
+                      <p className="text-sm text-slate-300">
+                        Une fois confirmée, l'agence <strong>{sourceAgence.nom}</strong> sera définitivement fermée.
+                      </p>
                     </div>
-                )}
+                  </div>
 
-                {currentStep === 3 && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                         <div className="bg-red-500/10 p-4 rounded-lg flex gap-3 border border-red-500/20">
-                            <AlertTriangle className="text-red-400 shrink-0" />
-                            <div>
-                                <h4 className="font-bold text-red-400">Attention : Action Irréversible</h4>
-                                <p className="text-sm text-slate-300">
-                                    Une fois validée, l'agence <strong>{sourceAgence.nom}</strong> sera définitivement fermée et ses données migrées.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="bg-slate-900 rounded-lg p-4 space-y-3 border border-slate-700">
-                            <h4 className="font-medium text-white border-b border-slate-700 pb-2">Récapitulatif</h4>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-400">Clients vers :</span>
-                                <span className="text-white">{agences?.find((a: Agency) => a.id === targetClients)?.nom}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-400">Employés vers :</span>
-                                <span className="text-white">{agences?.find((a: Agency) => a.id === targetEmployees)?.nom}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-slate-400">Fonds vers :</span>
-                                <span className="text-white">{agences?.find((a: Agency) => a.id === targetTreasury)?.nom}</span>
-                            </div>
-                        </div>
+                  <div className="bg-slate-900 rounded-lg p-4 space-y-3 border border-slate-700">
+                    <h4 className="font-medium text-white border-b border-slate-700 pb-2">Récapitulatif Final</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Clients, Comptes, Crédits vers:</span>
+                        <span className="text-white">{agences?.find((a: Agency) => a.id === targetClients)?.nom}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Employés vers:</span>
+                        <span className="text-white">{agences?.find((a: Agency) => a.id === targetEmployees)?.nom}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Fonds vers:</span>
+                        <span className="text-white">{agences?.find((a: Agency) => a.id === targetTreasury)?.nom}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Exécution:</span>
+                        <span className="text-white">
+                          {executeNow ? 'Immédiate' : format(new Date(scheduledAt), "d MMM yyyy 'à' HH:mm", { locale: fr })}
+                        </span>
+                      </div>
                     </div>
-                )}
-                </>
-            )}
+                  </div>
+
+                  {dryRunResult && (
+                    <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                      <div className="grid grid-cols-4 gap-4 text-center">
+                        <div>
+                          <div className="text-xl font-bold text-blue-400">{dryRunResult.volumetry.clients}</div>
+                          <div className="text-xs text-slate-400">Clients</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-green-400">{dryRunResult.volumetry.comptes}</div>
+                          <div className="text-xs text-slate-400">Comptes</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-amber-400">{dryRunResult.volumetry.credits}</div>
+                          <div className="text-xs text-slate-400">Crédits</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-purple-400">{formatMoney(dryRunResult.financials.soldesCoffresTransferes)}</div>
+                          <div className="text-xs text-slate-400">Fonds</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Footer */}
-        {!isSubmitting && (
-            <div className="flex justify-between pt-4 border-t border-slate-700">
+        {!isProcessing && !isCompleted && !isFailed && !isScheduled && (
+          <div className="flex justify-between pt-4 border-t border-slate-700">
             <Button
-                variant="outline"
-                onClick={currentStep === 0 ? onClose : () => setCurrentStep(prev => prev - 1)}
+              variant="outline"
+              onClick={currentStep === 0 ? handleClose : handleBack}
+              disabled={createMigrationMutation.isPending || dryRunMutation.isPending}
             >
-                {currentStep === 0 ? 'Annuler' : 'Retour'}
+              {currentStep === 0 ? 'Annuler' : 'Retour'}
             </Button>
-            
+
             <Button
-                variant={currentStep === 3 ? 'danger' : 'primary'}
-                onClick={handleNext}
-                disabled={!canProceed()}
-                icon={currentStep === 3 ? AlertTriangle : ArrowRight}
+              variant={currentStep === 5 ? 'danger' : 'primary'}
+              onClick={handleNext}
+              disabled={!canProceed() || createMigrationMutation.isPending || dryRunMutation.isPending || submitMigrationMutation.isPending}
+              icon={currentStep === 5 ? (executeNow ? Play : Calendar) : ArrowRight}
             >
-                {currentStep === STEPS.length - 1 ? 'Confirmer la Migration' : 'Suivant'}
+              {createMigrationMutation.isPending || dryRunMutation.isPending ? (
+                <Loader2 className="animate-spin" size={16} />
+              ) : currentStep === 3 ? (
+                'Analyser'
+              ) : currentStep === 5 ? (
+                executeNow ? 'Lancer la Migration' : 'Planifier la Migration'
+              ) : (
+                'Suivant'
+              )}
             </Button>
-            </div>
+          </div>
         )}
       </div>
     </Modal>

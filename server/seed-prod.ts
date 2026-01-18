@@ -43,6 +43,12 @@ import {
   virementsProgrammes,
   decaissementsProgrammes,
 } from '@shared/schema';
+import {
+  agencyMigrations,
+  migrationPreFlightChecks,
+  migrationEntityLogs,
+  migrationAuditLogs,
+} from '@shared/schema/agency_migration';
 import { hashPassword } from './auth';
 import { SystemRole } from '@shared/types/roles';
 
@@ -200,7 +206,7 @@ async function seedProd() {
     await db.delete(exercices);
     await db.delete(creditPlans);
     await db.delete(maintenanceModules); // Module lock status
-    
+
     // Deletion for reevaluation dependencies
     await db.delete(scoringHistory);
     await db.delete(enquetesComplementaires);
@@ -212,6 +218,12 @@ async function seedProd() {
     await db.delete(versementsAutomatiques);
     await db.delete(virementsProgrammes);
     await db.delete(decaissementsProgrammes);
+
+    // Agency migration tables (delete in correct order - children first)
+    await db.delete(migrationAuditLogs);
+    await db.delete(migrationEntityLogs);
+    await db.delete(migrationPreFlightChecks);
+    await db.delete(agencyMigrations);
 
     // Inter-vault transfer dependencies (delete in correct order)
     await db.delete(tachesRegularisation);

@@ -7,8 +7,14 @@ import { eq, and, ilike, or, desc, asc, sql, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../auth";
 import { logAudit } from "../audit";
 import { CoffresFortsService } from "../services/transfert-inter-coffres";
-import { agencyMigrations, insertAgencyMigrationSchema } from "../../shared/schema/agency_migration";
-import { agencyMigrationService } from "../services/agency-migration";
+import {
+  agencyMigrations,
+  migrationPreFlightChecks,
+  migrationAuditLogs,
+  migrationEntityLogs,
+  MIGRATION_STATUS
+} from "../../shared/schema/agency_migration";
+import { agencyMigrationService, MigrationError } from "../services/agency-migration";
 
 export function registerAgencesRoutes(app: Express) {
   // ============================================
@@ -661,40 +667,153 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // ============================================
-  // AGENCY MIGRATION ROUTES
+  // AGENCY MIGRATION ROUTES (V2 - Production Ready)
   // ============================================
 
-  // POST /api/agences/:id/migrate - Initier une migration
-  app.post("/api/agences/:id/migrate", requireRole("admin"), async (req, res) => {
+  // POST /api/agences/:id/migrations - Créer une nouvelle migration
+  app.post("/api/agences/:id/migrations", requireRole("admin"), async (req, res) => {
     try {
       const { id } = req.params;
-      const { targetAgenceClients, targetAgenceEmployes, targetAgenceCoffre } = req.body;
+      const {
+        targetAgenceClients,
+        targetAgenceEmployes,
+        targetAgenceCoffre,
+        scheduledAt
+      } = req.body;
       const userId = (req as any).session?.userId;
 
-      // 1. Create Migration Record
-      const [migration] = await db
-        .insert(agencyMigrations)
-        .values({
-          sourceAgencyId: id,
-          targetClientsAgencyId: targetAgenceClients,
-          targetEmployeesAgencyId: targetAgenceEmployes,
-          targetTreasuryAgencyId: targetAgenceCoffre,
-          status: "PENDING",
-          progress: 0,
-          createdBy: userId
-        })
-        .returning();
+      // Vérifier que l'agence source existe et est active
+      const [sourceAgence] = await db
+        .select()
+        .from(agences)
+        .where(eq(agences.id, id));
 
-      // 2. Trigger Async Processing (Fire and Forget)
-      agencyMigrationService.processMigration(migration.id).catch(err => {
-        console.error("Background Migration Failed:", err);
+      if (!sourceAgence) {
+        return res.status(404).json({ error: "Agence source non trouvée" });
+      }
+
+      if (sourceAgence.statut === "Fermé") {
+        return res.status(400).json({ error: "Cette agence est déjà fermée" });
+      }
+
+      // Créer la migration
+      const migration = await agencyMigrationService.createMigration({
+        sourceAgencyId: id,
+        targetClientsAgencyId: targetAgenceClients,
+        targetEmployeesAgencyId: targetAgenceEmployes,
+        targetTreasuryAgencyId: targetAgenceCoffre,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+        createdBy: userId
       });
 
-      await logAudit(req, "MIGRATE", "agences", id, { migrationId: migration.id });
+      await logAudit(req, "MIGRATE_CREATE", "agences", id, { migrationId: migration.id, reference: migration.reference });
 
       res.status(201).json(migration);
     } catch (error: any) {
-      console.error("Erreur POST /api/agences/:id/migrate:", error);
+      console.error("Erreur POST /api/agences/:id/migrations:", error);
+      if (error instanceof MigrationError) {
+        return res.status(400).json({ error: error.message, code: error.code, details: error.details });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/agences/migrations/:id/dry-run - Simulation de migration
+  app.post("/api/agences/migrations/:id/dry-run", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const result = await agencyMigrationService.runDryRun(id);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Erreur POST /api/agences/migrations/:id/dry-run:", error);
+      if (error instanceof MigrationError) {
+        return res.status(400).json({ error: error.message, code: error.code });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/agences/migrations/:id/submit - Soumettre pour exécution
+  app.post("/api/agences/migrations/:id/submit", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).session?.userId;
+
+      await agencyMigrationService.submitMigration(id, userId);
+
+      const migration = await agencyMigrationService.getMigrationStatus(id);
+
+      await logAudit(req, "MIGRATE_SUBMIT", "agency_migrations", id, { status: migration?.status });
+
+      res.json(migration);
+    } catch (error: any) {
+      console.error("Erreur POST /api/agences/migrations/:id/submit:", error);
+      if (error instanceof MigrationError) {
+        return res.status(400).json({ error: error.message, code: error.code });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/agences/migrations/:id/execute - Exécuter immédiatement
+  app.post("/api/agences/migrations/:id/execute", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).session?.userId;
+      const ipAddress = req.ip;
+      const userAgent = req.get("User-Agent");
+
+      // Vérifier le statut
+      const migration = await agencyMigrationService.getMigrationStatus(id);
+      if (!migration) {
+        return res.status(404).json({ error: "Migration non trouvée" });
+      }
+
+      if (migration.status !== MIGRATION_STATUS.PENDING && migration.status !== MIGRATION_STATUS.SCHEDULED) {
+        return res.status(400).json({
+          error: `La migration ne peut pas être exécutée (statut actuel: ${migration.status})`,
+          code: "INVALID_STATUS"
+        });
+      }
+
+      // Lancer l'exécution en arrière-plan
+      agencyMigrationService.processMigration(id, { userId, ipAddress, userAgent }).catch(err => {
+        console.error("Background Migration Failed:", err);
+      });
+
+      await logAudit(req, "MIGRATE_EXECUTE", "agency_migrations", id, {});
+
+      res.json({ message: "Migration démarrée", migrationId: id });
+    } catch (error: any) {
+      console.error("Erreur POST /api/agences/migrations/:id/execute:", error);
+      if (error instanceof MigrationError) {
+        return res.status(400).json({ error: error.message, code: error.code });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // POST /api/agences/migrations/:id/cancel - Annuler une migration
+  app.post("/api/agences/migrations/:id/cancel", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const userId = (req as any).session?.userId;
+
+      await agencyMigrationService.cancelMigration(id, reason || "Annulée par l'administrateur", userId);
+
+      const migration = await agencyMigrationService.getMigrationStatus(id);
+
+      await logAudit(req, "MIGRATE_CANCEL", "agency_migrations", id, { reason });
+
+      res.json(migration);
+    } catch (error: any) {
+      console.error("Erreur POST /api/agences/migrations/:id/cancel:", error);
+      if (error instanceof MigrationError) {
+        return res.status(400).json({ error: error.message, code: error.code });
+      }
       res.status(500).json({ error: error.message });
     }
   });
@@ -704,10 +823,7 @@ export function registerAgencesRoutes(app: Express) {
     try {
       const { id } = req.params;
 
-      const [migration] = await db
-        .select()
-        .from(agencyMigrations)
-        .where(eq(agencyMigrations.id, id));
+      const migration = await agencyMigrationService.getMigrationStatus(id);
 
       if (!migration) {
         return res.status(404).json({ error: "Migration non trouvée" });
@@ -716,6 +832,136 @@ export function registerAgencesRoutes(app: Express) {
       res.json(migration);
     } catch (error: any) {
       console.error("Erreur GET /api/agences/migrations/:id/status:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agences/migrations/:id/pre-flight-checks - Résultats des vérifications
+  app.get("/api/agences/migrations/:id/pre-flight-checks", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const checks = await agencyMigrationService.getMigrationPreFlightChecks(id);
+
+      res.json(checks);
+    } catch (error: any) {
+      console.error("Erreur GET /api/agences/migrations/:id/pre-flight-checks:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agences/migrations/:id/audit-logs - Logs d'audit
+  app.get("/api/agences/migrations/:id/audit-logs", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const logs = await agencyMigrationService.getMigrationAuditLogs(id);
+
+      res.json(logs);
+    } catch (error: any) {
+      console.error("Erreur GET /api/agences/migrations/:id/audit-logs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agences/migrations/:id/entities - Entités migrées
+  app.get("/api/agences/migrations/:id/entities", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { type } = req.query;
+
+      const entities = await agencyMigrationService.getMigrationEntityLogs(id, type as string | undefined);
+
+      res.json(entities);
+    } catch (error: any) {
+      console.error("Erreur GET /api/agences/migrations/:id/entities:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agences/migrations/:id/report - Télécharger le rapport
+  app.get("/api/agences/migrations/:id/report", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const migration = await agencyMigrationService.getMigrationStatus(id);
+
+      if (!migration) {
+        return res.status(404).json({ error: "Migration non trouvée" });
+      }
+
+      if (!migration.report) {
+        return res.status(400).json({ error: "Aucun rapport disponible pour cette migration" });
+      }
+
+      // Retourner le rapport JSON (peut être transformé en PDF côté client ou via un service dédié)
+      res.json({
+        reference: migration.reference,
+        sourceAgencyId: migration.sourceAgencyId,
+        status: migration.status,
+        report: migration.report,
+        completedAt: migration.completedAt
+      });
+    } catch (error: any) {
+      console.error("Erreur GET /api/agences/migrations/:id/report:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/agences/:id/migrations - Liste des migrations d'une agence
+  app.get("/api/agences/:id/migrations", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const migrations = await db
+        .select()
+        .from(agencyMigrations)
+        .where(eq(agencyMigrations.sourceAgencyId, id))
+        .orderBy(desc(agencyMigrations.createdAt));
+
+      res.json(migrations);
+    } catch (error: any) {
+      console.error("Erreur GET /api/agences/:id/migrations:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============================================
+  // LEGACY ROUTE (Backward Compatibility)
+  // ============================================
+
+  // POST /api/agences/:id/migrate - Ancienne route (redirige vers la nouvelle)
+  app.post("/api/agences/:id/migrate", requireRole("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { targetAgenceClients, targetAgenceEmployes, targetAgenceCoffre } = req.body;
+      const userId = (req as any).session?.userId;
+
+      // Créer la migration
+      const migration = await agencyMigrationService.createMigration({
+        sourceAgencyId: id,
+        targetClientsAgencyId: targetAgenceClients,
+        targetEmployeesAgencyId: targetAgenceEmployes,
+        targetTreasuryAgencyId: targetAgenceCoffre,
+        createdBy: userId
+      });
+
+      // Soumettre immédiatement
+      await agencyMigrationService.submitMigration(migration.id, userId);
+
+      // Lancer l'exécution
+      agencyMigrationService.processMigration(migration.id, { userId }).catch(err => {
+        console.error("Background Migration Failed:", err);
+      });
+
+      await logAudit(req, "MIGRATE", "agences", id, { migrationId: migration.id });
+
+      res.status(201).json(migration);
+    } catch (error: any) {
+      console.error("Erreur POST /api/agences/:id/migrate:", error);
+      if (error instanceof MigrationError) {
+        return res.status(400).json({ error: error.message, code: error.code, details: error.details });
+      }
       res.status(500).json({ error: error.message });
     }
   });
