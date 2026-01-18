@@ -27,6 +27,7 @@ import { storage } from "../storage";
 import { aliasedTable, and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
+import { getWsInstance } from "../ws-server";
 
 // Validation schemas
 const createCompteSchema = z.object({
@@ -255,7 +256,7 @@ export function registerComptesRoutes(app: Express) {
         );
 
         // Broadcast pour mise à jour UI
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
           wsInstance.broadcast({
             type: "DASHBOARD_UPDATE",

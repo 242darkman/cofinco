@@ -7,6 +7,7 @@ import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from 
 import { db } from "../db";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { getWsInstance } from "../ws-server";
 
 // Helper for parsing with schema
 const parseWithSchema = <T extends z.ZodTypeAny>(schema: T, data: unknown): z.infer<T> => {
@@ -94,7 +95,7 @@ export function registerSettingsRoutes(app: Express) {
         });
       
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'settings_changed' } });
       }
@@ -259,7 +260,7 @@ export function registerSettingsRoutes(app: Express) {
       `);
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'platform_reset' } });
       }
@@ -390,7 +391,7 @@ export function registerSettingsRoutes(app: Express) {
       await db.execute(sql`SET session_replication_role = 'origin'`);
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'agence_reset', agenceId } });
       }

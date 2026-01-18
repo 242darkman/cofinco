@@ -4,6 +4,7 @@ import { insertCompteSchema, insertEcritureSchema, insertJournalSchema, insertDe
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { requireAuth, requireRole } from "../auth";
 import { z } from "zod";
+import { getWsInstance } from "../ws-server";
 
 export function registerAccountingRoutes(app: Express) {
 
@@ -26,7 +27,7 @@ export function registerAccountingRoutes(app: Express) {
       const compte = await storage.createCompte(data);
       
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'compte_new', id: compte.id } });
       }
@@ -50,7 +51,7 @@ export function registerAccountingRoutes(app: Express) {
       const journal = await storage.createJournal(data);
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'journal_new', id: journal.id } });
       }
@@ -85,7 +86,7 @@ export function registerAccountingRoutes(app: Express) {
       const ecriture = await storage.createEcriture(headerData, lignesData);
       
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'ecriture_new', id: ecriture.id } });
       }
@@ -120,7 +121,7 @@ export function registerAccountingRoutes(app: Express) {
       const declaration = await storage.createDeclarationTva(data);
       
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'tva_new', id: declaration.id } });
       }

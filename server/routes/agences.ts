@@ -15,6 +15,7 @@ import {
   MIGRATION_STATUS
 } from "../../shared/schema/agency_migration";
 import { agencyMigrationService, MigrationError } from "../services/agency-migration";
+import { getWsInstance } from "../ws-server";
 
 export function registerAgencesRoutes(app: Express) {
   // ============================================
@@ -215,7 +216,7 @@ export function registerAgencesRoutes(app: Express) {
       });
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_new', id: result.agence.id } });
       }
@@ -269,7 +270,7 @@ export function registerAgencesRoutes(app: Express) {
       await logAudit(req, "UPDATE", "agences", id, { changes: data });
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_updated', id } });
       }
@@ -317,7 +318,7 @@ export function registerAgencesRoutes(app: Express) {
       await logAudit(req, "DELETE", "agences", id, { nom: deleted.nom });
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'agence_deleted', id } });
       }
@@ -510,7 +511,7 @@ export function registerAgencesRoutes(app: Express) {
       });
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'user_assigned', agenceId, userId } });
       }
@@ -589,7 +590,7 @@ export function registerAgencesRoutes(app: Express) {
       await logAudit(req, "UPDATE", "user_agences", id, { changes: req.body });
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'assignment_updated', id } });
       }
@@ -621,7 +622,7 @@ export function registerAgencesRoutes(app: Express) {
       await logAudit(req, "DELETE", "user_agences", id, {});
 
       // Notify
-      const wsInstance = require("../ws-server").getWsInstance();
+      const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "AGENCE_UPDATE", payload: { type: 'assignment_deleted', id } });
       }

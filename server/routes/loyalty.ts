@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { requireRole } from "../middleware";
+import { getWsInstance } from "../ws-server";
 
 const loyaltyRouter = Router();
 
@@ -43,7 +44,7 @@ loyaltyRouter.post("/:clientId/bonus", requireAuth, requireRole(['admin', 'rh'])
         await storage.calculateEngagementScore(clientId);
         
         // Notify
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "LOYALTY_UPDATE", payload: { type: 'bonus_added', clientId, points } });
         }
