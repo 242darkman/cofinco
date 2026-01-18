@@ -2170,11 +2170,11 @@ export function registerFinanceRoutes(app: Express) {
                montant: amount.toString(),
                sens: 'Crédit',
                sourceModule: 'SYSTEME',
-               typePaiement: 'Virement',
+               typePaiement: 'Dépôt Courant',
                clientId: refundData.clientId,
                compteId: courantAccount.id,
-               creditId: refundData.demandeId,
-               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id }
+               // creditId: refundData.demandeId, // Incorrect: demandeId is not a creditId
+               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id, demandeId: refundData.demandeId }
              }, user.id);
              
              paymentRefString = `VIREMENT-${mouvement.reference}`;
@@ -2205,11 +2205,11 @@ export function registerFinanceRoutes(app: Express) {
                sens: 'Débit',
                sourceModule: 'SYSTEME',
                sourceId: op.id,
-               typePaiement: 'Espèces',
+               typePaiement: 'Retrait Courant',
                sessionCaisseId: sessionCaisseId,
                clientId: refundData.clientId,
-               creditId: refundData.demandeId,
-               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id, operationId: op.id }
+               // creditId: refundData.demandeId, // Incorrect
+               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id, operationId: op.id, demandeId: refundData.demandeId }
              }, user.id);
              
              paymentRefString = `CASH-${op.reference}`;
