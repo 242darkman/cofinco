@@ -267,6 +267,7 @@ export interface IStorage {
 
     // Operations Caisse
     getOperationsBySession(sessionId: string): Promise<OperationCaisse[]>;
+    getOperationsBySessionWithSens(sessionId: string): Promise<any[]>;
     getAllOperationsCaisse(): Promise<OperationCaisse[]>;
     getOperationsCaisseByDateRange(start: Date, end: Date): Promise<OperationCaisse[]>;
     getOperationsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: string): Promise<OperationCaisse[]>;

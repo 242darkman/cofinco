@@ -898,6 +898,17 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       .orderBy(desc(operationsCaisse.createdAt));
   }
 
+  // Helper for accurate balance calculation using Ledger Sens
+  export async function getOperationsBySessionWithSens(sessionId: string) {
+    return db.select({
+        ...getTableColumns(operationsCaisse),
+        sens: mouvementsFinanciers.sens
+    })
+    .from(operationsCaisse)
+    .leftJoin(mouvementsFinanciers, eq(operationsCaisse.mouvementId, mouvementsFinanciers.id))
+    .where(eq(operationsCaisse.sessionId, sessionId));
+  }
+
   export async function getOperationsByClientAndDateRange(clientId: string, start: Date, end: Date, type?: string): Promise<OperationCaisse[]> {
     const conditions = [
       eq(operationsCaisse.clientId, clientId),

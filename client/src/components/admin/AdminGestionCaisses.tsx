@@ -115,6 +115,11 @@ export default function AdminGestionCaisses() {
       console.log('Session force closed:', event);
       queryClient.invalidateQueries({ queryKey: ['caisses'] });
     },
+    onSessionUpdated: (event) => {
+      // Refresh list on any financial movement or session change
+      // This ensures "Solde" is always up to date
+      queryClient.invalidateQueries({ queryKey: ['caisses'] });
+    },
     enabled: true,
   });
 

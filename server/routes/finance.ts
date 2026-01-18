@@ -1102,15 +1102,16 @@ export function registerFinanceRoutes(app: Express) {
          let currentSolde = c.solde || "0";
 
          if (activeSession) {
-            // Calculate real-time balance for Admin View as well
-            const ops = await storage.getOperationsBySession(activeSession.id);
+            // Calculate real-time balance using Ledger SENS (Source of Truth)
+            // This fixes discrepancies where some operation types were missing from the hardcoded list
+            const ops = await storage.getOperationsBySessionWithSens(activeSession.id);
             let solde = Number(activeSession.soldeInitial || 0);
             
             for (const op of ops) {
                 const montant = Number(op.montant || 0);
-                if (['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre'].includes(op.typeOperation)) {
+                if (op.sens === 'Crédit') {
                     solde += montant;
-                } else if (['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre'].includes(op.typeOperation)) {
+                } else if (op.sens === 'Débit') {
                     solde -= montant;
                 }
             }
