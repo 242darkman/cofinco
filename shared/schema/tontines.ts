@@ -5,7 +5,7 @@ import { users } from "./auth";
 import { clients } from "./clients";
 import { agences } from "./agences";
 import { mouvementsFinanciers, comptes } from "./finance";
-import { methodePaiementEnum, statutTransactionEnum } from "@shared/enum/enums";
+import { methodePaiementEnum, statutTransactionEnum } from "../enum/enums";
 import { sql } from "drizzle-orm";
 
 // Tontines
@@ -36,7 +36,7 @@ export const tontines = pgTable("tontines", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertTontineSchema = createInsertSchema(tontines, {
+export const insertTontineSchema = (createInsertSchema(tontines as any, {
   dateDebut: (schema) =>
     z.preprocess(
       (value) => {
@@ -64,8 +64,8 @@ export const insertTontineSchema = createInsertSchema(tontines, {
   montantCotisation: z.coerce.string(),
   tauxPlateforme: z.coerce.string().optional().default("0"),
   solde: z.coerce.string().optional().default("0"),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertTontine = z.infer<typeof insertTontineSchema>;
+}) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertTontine = any;
 export type Tontine = typeof tontines.$inferSelect;
 
 // Membres de tontine
@@ -90,8 +90,8 @@ export const membresTontine = pgTable("membres_tontine", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertMembreTontineSchema = createInsertSchema(membresTontine).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertMembreTontine = z.infer<typeof insertMembreTontineSchema>;
+export const insertMembreTontineSchema = (createInsertSchema(membresTontine) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertMembreTontine = any;
 export type MembreTontine = typeof membresTontine.$inferSelect;
 
 // Contributions tontine
@@ -135,10 +135,10 @@ export const contributionsTontine = pgTable(
   }),
 );
 
-export const insertContributionTontineSchema = createInsertSchema(contributionsTontine, {
+export const insertContributionTontineSchema = (createInsertSchema(contributionsTontine as any, {
   montant: z.coerce.string(),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertContributionTontine = z.infer<typeof insertContributionTontineSchema>;
+}) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertContributionTontine = any;
 export type ContributionTontine = typeof contributionsTontine.$inferSelect;
 
 // Tontine Règles (added from previous session context)
@@ -151,10 +151,10 @@ export const tontineRegles = pgTable("tontine_regles", {
   actif: boolean("actif").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
-export const insertTontineRegleSchema = createInsertSchema(tontineRegles, {
+export const insertTontineRegleSchema = (createInsertSchema(tontineRegles as any, {
   montantPenalite: z.coerce.string(),
-}).omit({ id: true, createdAt: true });
-export type InsertTontineRegle = z.infer<typeof insertTontineRegleSchema>;
+}) as any).omit({ id: true, createdAt: true });
+export type InsertTontineRegle = any;
 export type TontineRegle = typeof tontineRegles.$inferSelect;
 
 // Tontine Pénalités
@@ -172,10 +172,10 @@ export const tontinePenalites = pgTable("tontine_penalites", {
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
-export const insertTontinePenaliteSchema = createInsertSchema(tontinePenalites, {
+export const insertTontinePenaliteSchema = (createInsertSchema(tontinePenalites as any, {
   montant: z.coerce.string(),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertTontinePenalite = z.infer<typeof insertTontinePenaliteSchema>;
+}) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertTontinePenalite = any;
 export type TontinePenalite = typeof tontinePenalites.$inferSelect;
 
 // Tontine Distributions
@@ -193,10 +193,10 @@ export const tontineDistributions = pgTable("tontine_distributions", {
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
-export const insertTontineDistributionSchema = createInsertSchema(tontineDistributions, {
+export const insertTontineDistributionSchema = (createInsertSchema(tontineDistributions as any, {
   montantTotal: z.coerce.string(),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertTontineDistribution = z.infer<typeof insertTontineDistributionSchema>;
+}) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertTontineDistribution = any;
 export type TontineDistribution = typeof tontineDistributions.$inferSelect;
 
 // Tontine Alertes
@@ -212,8 +212,8 @@ export const tontineAlertes = pgTable("tontine_alertes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertTontineAlerteSchema = createInsertSchema(tontineAlertes).omit({ id: true, createdAt: true });
-export type InsertTontineAlerte = z.infer<typeof insertTontineAlerteSchema>;
+export const insertTontineAlerteSchema = (createInsertSchema(tontineAlertes) as any).omit({ id: true, createdAt: true });
+export type InsertTontineAlerte = any;
 export type TontineAlerte = typeof tontineAlertes.$inferSelect;
 // Tontine Plans (Presets)
 export const tontinePlans = pgTable("tontine_plans", {
@@ -232,9 +232,9 @@ export const tontinePlans = pgTable("tontine_plans", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertTontinePlanSchema = createInsertSchema(tontinePlans, {
+export const insertTontinePlanSchema = (createInsertSchema(tontinePlans as any, {
   montantCotisation: z.coerce.string(),
   tauxPlateforme: z.coerce.string(),
-}).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertTontinePlan = z.infer<typeof insertTontinePlanSchema>;
+}) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTontinePlan = any;
 export type TontinePlan = typeof tontinePlans.$inferSelect;

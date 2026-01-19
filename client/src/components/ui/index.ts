@@ -27,6 +27,9 @@ export type { ResponsiveTableProps, TableColumn } from './ResponsiveTable';
 export { default as FormField } from './FormField';
 export type { FormFieldProps } from './FormField';
 
+export { default as Input } from './Input';
+export type { InputProps } from './Input';
+
 export { default as Switch } from './Switch';
 
 export { default as SelectField } from './SelectField';

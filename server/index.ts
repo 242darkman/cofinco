@@ -204,6 +204,11 @@ app.use((req, res, next) => {
   log('[Cron] Credit status update job started');
   log('[Cron] Scheduled agency migrations job started');
 
+  // Start Account Cleanup Cron
+  const { accountCleanup } = await import("./services/account-cleanup");
+  accountCleanup.start();
+  log('[Cron] Account cleanup job started');
+
   // Initialize Interest Scheduler (Daily Accrual & Monthly Capitalization)
   // Auto-starts jobs in constructor
   const { interestScheduler } = await import("./services/interest-scheduler");

@@ -375,6 +375,65 @@ export function registerComptesRoutes(app: Express) {
   );
 
   /**
+   * GET /api/comptes/pending-activation - Lister les comptes en attente d'activation (pour encaissement)
+   * Tri: FIFO (plus ancien en premier)
+   */
+  app.get(
+    "/api/comptes/pending-activation",
+    requireAuth,
+    requireRole("admin", "chef", "caisse"),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+        try {
+            const agenceId = req.selectedAgenceId;
+            const conditions: any[] = [eq(comptes.statut, 'EN_ATTENTE_PAIEMENT')];
+            
+            if (agenceId) {
+                conditions.push(eq(comptes.agenceId, agenceId));
+            }
+
+            const results = await db
+                .select({
+                    id: comptes.id,
+                    numeroCompte: comptes.numeroCompte,
+                    typeCompte: comptes.typeCompte,
+                    montantInitial: comptes.soldeCourant,
+                    createdAt: comptes.createdAt,
+                    clientId: clients.id,
+                    clientNom: clients.nom,
+                    clientPrenom: clients.prenom,
+                    clientPhoto: clients.photoUrl,
+                    userPhoto: users.photoProfile,
+                })
+                .from(comptes)
+                .innerJoin(clients, eq(comptes.clientId, clients.id))
+                .leftJoin(users, eq(clients.userId, users.id))
+                .where(and(...conditions))
+                .orderBy(comptes.createdAt);
+
+            const formatted = results.map(r => ({
+                id: r.id,
+                numeroCompte: r.numeroCompte,
+                typeCompte: r.typeCompte,
+                montantInitial: parseFloat(r.montantInitial || '0'),
+                createdAt: r.createdAt,
+                client: {
+                    id: r.clientId,
+                    nom: r.clientNom,
+                    prenom: r.clientPrenom,
+                    photoUrl: r.clientPhoto || r.userPhoto
+                }
+            }));
+
+            res.json(formatted);
+        } catch (error) {
+            console.error("Error fetching pending activations:", error);
+            res.status(500).json({ message: "Erreur lors du chargement des activations en attente" });
+        }
+    }
+  );
+
+  /**
    * GET /api/produits-compte - Liste des produits de compte (taux d'intérêt au niveau produit)
    */
   app.get("/api/produits-compte", requireAuth, requireAgenceAccess(), async (req, res) => {

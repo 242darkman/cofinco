@@ -31,6 +31,8 @@ import CaisseAccessControl from './CaisseAccessControl';
 import CaisseClientInfos from './CaisseClientInfos';
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
+import { PendingActivationDrawer } from './PendingActivationDrawer';
+import { UserCheck } from 'lucide-react';
 
 interface SessionCaisse {
   id: string;
@@ -102,6 +104,7 @@ export default function CaisseDashboard({
 
   const [showOuverture, setShowOuverture] = useState(false);
   const [showPaiement, setShowPaiement] = useState(false);
+  const [showActivationDrawer, setShowActivationDrawer] = useState(false);
   const [initialPaymentType, setInitialPaymentType] = useState<string | undefined>(undefined);
   const [caissesSeparees, setCaissesSeparees] = useState<any[]>([]);
   
@@ -660,32 +663,44 @@ export default function CaisseDashboard({
              </Card>
           </div>
 
-          {/* Pending Activations Alert */}
-          {comptesEnAttenteCount > 0 && (
-             <div className="mt-4 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-between animate-in slide-in-from-left duration-500">
-                <div className="flex items-center gap-3">
-                   <div className="p-2 rounded-lg bg-orange-500/20 text-orange-400">
-                      <Users size={20} />
-                   </div>
-                   <div>
-                      <p className="text-sm font-bold text-white">{comptesEnAttenteCount} Compte{comptesEnAttenteCount > 1 ? 's' : ''} en attente d'activation</p>
-                      <p className="text-xs text-orange-400/80">Versement initial requis</p>
-                   </div>
-                </div>
-                <Button 
-                   size="sm" 
-                   className="bg-orange-500 hover:bg-orange-600 text-white border-none shadow-lg shadow-orange-500/20"
-                   onClick={() => {
-                       setInitialPaymentType('Dépôt');
-                       setShowPaiement(true);
-                       toast.info("Recherchez le compte par numéro ou nom client pour activer.");
-                   }}
-                >
-                   Encaisser
-                </Button>
-             </div>
-          )}
+           {/* Pending Activations Alert - Replaced by Action Card */}
+           {comptesEnAttenteCount > 0 && (
+             <Card 
+                variant="default" 
+                padding="sm" 
+                className="cursor-pointer border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 transition-all group animate-pulse"
+                onClick={() => setShowActivationDrawer(true)}
+             >
+                 <div className="flex flex-col items-center gap-3 py-2">
+                     <div className="relative p-3 rounded-xl bg-orange-500/20 text-orange-400 group-hover:scale-110 transition-transform">
+                         <UserCheck size={24} />
+                         <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900">
+                           {comptesEnAttenteCount}
+                         </span>
+                     </div>
+                     <span className="text-sm font-bold text-orange-400 group-hover:text-orange-300">
+                       Activations
+                     </span>
+                 </div>
+             </Card>
+           )}
       </div>
+
+      <PendingActivationDrawer 
+        open={showActivationDrawer}
+        onClose={() => setShowActivationDrawer(false)}
+        onActivate={(compteId, montant) => {
+           setShowActivationDrawer(false);
+           // Open payment modal
+           setInitialPaymentType('Dépôt');
+           // Logic to pre-fill account/amount would require props on CaissePaiementModal, 
+           // but for now we follow the user request to just open the modal.
+           // Ideally we should pass the account ID to the modal.
+           setShowPaiement(true); 
+           // We can use a toast to guide
+           toast.info(`Montant à encaisser : ${new Intl.NumberFormat('fr-FR').format(montant)} FCFA`);
+        }}
+      />
 
       {/* Recent Transactions - Using new TransactionsList component */}
       <TransactionsList

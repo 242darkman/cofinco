@@ -1,6 +1,6 @@
-import { clients, typesMarches, tags, clientTags, clientActivities, users, agences } from "@shared/schema";
+import { clients, typesMarches, tags, clientTags, clientActivities, users, agences, historiquePoints } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
-import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User } from "@shared/schema";
+import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User, type InsertHistoriquePoints } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, isNull, sql } from "drizzle-orm";
 
@@ -206,8 +206,6 @@ export async function getClientActivities(clientId: string): Promise<ClientActiv
 }
 
 // Loyalty Points System
-import { historiquePoints, type InsertHistoriquePoints } from "@shared/schema";
-import { sql } from "drizzle-orm";
 
 export async function addLoyaltyPoints(
   clientId: string,

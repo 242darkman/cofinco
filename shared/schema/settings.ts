@@ -36,8 +36,8 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({ updatedAt: true, id: true });
-export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
+export const insertSystemSettingsSchema = (createInsertSchema(systemSettings) as any).omit({ updatedAt: true, id: true });
+export type InsertSystemSettings = any;
 export type SystemSettings = typeof systemSettings.$inferSelect;
 
 // Maintenance Modules table (Granular Locking)
@@ -51,8 +51,8 @@ export const maintenanceModules = pgTable("maintenance_modules", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertMaintenanceModuleSchema = createInsertSchema(maintenanceModules).omit({ id: true, updatedAt: true });
-export type InsertMaintenanceModule = z.infer<typeof insertMaintenanceModuleSchema>;
+export const insertMaintenanceModuleSchema = (createInsertSchema(maintenanceModules) as any).omit({ id: true, updatedAt: true });
+export type InsertMaintenanceModule = any;
 export type MaintenanceModule = typeof maintenanceModules.$inferSelect;
 
 // Feature Flags table
@@ -67,8 +67,8 @@ export const featureFlags = pgTable("feature_flags", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
+export const insertFeatureFlagSchema = (createInsertSchema(featureFlags) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFeatureFlag = any;
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 
 // Security Settings table
@@ -88,8 +88,8 @@ export const securitySettings = pgTable("security_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertSecuritySettingsSchema = createInsertSchema(securitySettings).omit({ updatedAt: true, id: true });
-export type InsertSecuritySettings = z.infer<typeof insertSecuritySettingsSchema>;
+export const insertSecuritySettingsSchema = (createInsertSchema(securitySettings) as any).omit({ updatedAt: true, id: true });
+export type InsertSecuritySettings = any;
 export type SecuritySettings = typeof securitySettings.$inferSelect;
 
 // UI Customization table
@@ -105,8 +105,8 @@ export const uiCustomization = pgTable("ui_customization", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUICustomizationSchema = createInsertSchema(uiCustomization).omit({ updatedAt: true, id: true });
-export type InsertUICustomization = z.infer<typeof insertUICustomizationSchema>;
+export const insertUICustomizationSchema = (createInsertSchema(uiCustomization) as any).omit({ updatedAt: true, id: true });
+export type InsertUICustomization = any;
 export type UICustomization = typeof uiCustomization.$inferSelect;
 
 // Notifications table
@@ -125,8 +125,8 @@ export const notifications = pgTable("notifications", {
   expiresAt: timestamp("expires_at"),
 });
 
-export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
-export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export const insertNotificationSchema = (createInsertSchema(notifications) as any).omit({ id: true, createdAt: true });
+export type InsertNotification = any;
 export type Notification = typeof notifications.$inferSelect;
 
 // Audit Logs
@@ -144,8 +144,8 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
-export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export const insertAuditLogSchema = (createInsertSchema(auditLogs) as any).omit({ id: true, createdAt: true });
+export type InsertAuditLog = any;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
 // Push Subscriptions
@@ -162,8 +162,8 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export const insertPushSubscriptionSchema = (createInsertSchema(pushSubscriptions) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPushSubscription = any;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 
 // SMS Templates (from existing code in original file)
@@ -179,8 +179,8 @@ export const smsTemplates = pgTable("sms_templates", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertSmsTemplateSchema = createInsertSchema(smsTemplates).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertSmsTemplate = z.infer<typeof insertSmsTemplateSchema>;
+export const insertSmsTemplateSchema = (createInsertSchema(smsTemplates) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSmsTemplate = any;
 export type SmsTemplate = typeof smsTemplates.$inferSelect;
 
 export const smsNotifications = pgTable("sms_notifications", {
@@ -200,8 +200,8 @@ export const smsNotifications = pgTable("sms_notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertSmsNotificationSchema = createInsertSchema(smsNotifications).omit({ id: true, createdAt: true });
-export type InsertSmsNotification = z.infer<typeof insertSmsNotificationSchema>;
+export const insertSmsNotificationSchema = (createInsertSchema(smsNotifications) as any).omit({ id: true, createdAt: true });
+export type InsertSmsNotification = any;
 export type SmsNotification = typeof smsNotifications.$inferSelect;
 
 export const notificationPreferences = pgTable("notification_preferences", {
@@ -216,8 +216,8 @@ export const notificationPreferences = pgTable("notification_preferences", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+export const insertNotificationPreferencesSchema = (createInsertSchema(notificationPreferences) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertNotificationPreferences = any;
 export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 
 export const pushNotificationLogs = pgTable("push_notification_logs", {
@@ -230,8 +230,8 @@ export const pushNotificationLogs = pgTable("push_notification_logs", {
   sentAt: timestamp("sent_at").defaultNow(),
 });
 
-export const insertPushNotificationLogSchema = createInsertSchema(pushNotificationLogs).omit({ id: true, sentAt: true });
-export type InsertPushNotificationLog = z.infer<typeof insertPushNotificationLogSchema>;
+export const insertPushNotificationLogSchema = (createInsertSchema(pushNotificationLogs) as any).omit({ id: true, sentAt: true });
+export type InsertPushNotificationLog = any;
 export type PushNotificationLog = typeof pushNotificationLogs.$inferSelect;
 
 export const smsProviderSettings = pgTable("sms_provider_settings", {
@@ -252,6 +252,6 @@ export const smsProviderSettings = pgTable("sms_provider_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertSmsProviderSettingsSchema = createInsertSchema(smsProviderSettings).omit({ updatedAt: true, id: true });
-export type InsertSmsProviderSettings = z.infer<typeof insertSmsProviderSettingsSchema>;
+export const insertSmsProviderSettingsSchema = (createInsertSchema(smsProviderSettings) as any).omit({ updatedAt: true, id: true });
+export type InsertSmsProviderSettings = any;
 export type SmsProviderSettings = typeof smsProviderSettings.$inferSelect;

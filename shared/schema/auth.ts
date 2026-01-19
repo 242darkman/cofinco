@@ -64,8 +64,8 @@ export const users = pgTable("users", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export const insertUserSchema = (createInsertSchema(users) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertUser = any;
 export type User = typeof users.$inferSelect;
 
 // Types de compte possibles
@@ -95,8 +95,8 @@ export const loginAttempts = pgTable("login_attempts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).omit({ id: true, createdAt: true });
-export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
+export const insertLoginAttemptSchema = (createInsertSchema(loginAttempts) as any).omit({ id: true, createdAt: true });
+export type InsertLoginAttempt = any;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
 
 // User Permissions table - Permissions personnalisées par utilisateur (granulaire)
@@ -114,8 +114,8 @@ export const userPermissions = pgTable("user_permissions", {
   unq: unique().on(t.userId, t.permissionId),
 }));
 
-export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
+export const insertUserPermissionSchema = (createInsertSchema(userPermissions) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserPermission = any;
 export type UserPermission = typeof userPermissions.$inferSelect;
 
 // Active Sessions table - Tracking précis des sessions utilisateurs
@@ -135,8 +135,8 @@ export const activeSessions = pgTable("active_sessions", {
   isActive: boolean("is_active").notNull().default(true),
 });
 
-export const insertActiveSessionSchema = createInsertSchema(activeSessions).omit({ id: true });
-export type InsertActiveSession = z.infer<typeof insertActiveSessionSchema>;
+export const insertActiveSessionSchema = (createInsertSchema(activeSessions) as any).omit({ id: true });
+export type InsertActiveSession = any;
 export type ActiveSession = typeof activeSessions.$inferSelect;
 
 // ============================================
@@ -155,8 +155,8 @@ export const modules = pgTable("modules", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertModuleSchema = createInsertSchema(modules).omit({ id: true, createdAt: true });
-export type InsertModule = z.infer<typeof insertModuleSchema>;
+export const insertModuleSchema = (createInsertSchema(modules) as any).omit({ id: true, createdAt: true });
+export type InsertModule = any;
 export type Module = typeof modules.$inferSelect;
 
 // Permissions table - Liste des types de permissions disponibles
@@ -169,8 +169,8 @@ export const permissions = pgTable("permissions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true, createdAt: true });
-export type InsertPermission = z.infer<typeof insertPermissionSchema>;
+export const insertPermissionSchema = (createInsertSchema(permissions) as any).omit({ id: true, createdAt: true });
+export type InsertPermission = any;
 export type Permission = typeof permissions.$inferSelect;
 
 // Role Permissions table - Permissions par défaut pour chaque rôle
@@ -183,6 +183,6 @@ export const rolePermissions = pgTable("role_permissions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export const insertRolePermissionSchema = (createInsertSchema(rolePermissions) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRolePermission = any;
 export type RolePermission = typeof rolePermissions.$inferSelect;

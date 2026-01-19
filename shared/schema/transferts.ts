@@ -4,8 +4,12 @@ import { z } from "zod";
 import { users } from "./auth";
 import { clients } from "./clients";
 import { mouvementsFinanciers } from "./finance";
-import { methodePaiementEnum, statutTransactionEnum } from "@shared/enum/enums";
+import { methodePaiementEnum, statutTransactionEnum } from "../enum/enums";
 import { sql } from "drizzle-orm";
+
+// ============================================================================
+// TABLE DEFINITIONS
+// ============================================================================
 
 // Niveaux KYC pour les clients
 export const kycLevels = pgTable("kyc_levels", {
@@ -20,10 +24,6 @@ export const kycLevels = pgTable("kyc_levels", {
   actif: boolean("actif").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-export const insertKycLevelSchema = createInsertSchema(kycLevels).omit({ id: true, createdAt: true });
-export type InsertKycLevel = z.infer<typeof insertKycLevelSchema>;
-export type KycLevel = typeof kycLevels.$inferSelect;
 
 // Transferts d'argent
 export const transferts = pgTable(
@@ -44,7 +44,7 @@ export const transferts = pgTable(
     referenceExterne: text("reference_externe"),
     idempotencyKey: text("idempotency_key"),
 
-    sens: text("sens").notNull(), // "Entrée" | "Sortie" (ou enum si tu veux)
+    sens: text("sens").notNull(), // "Entrée" | "Sortie"
     destinataire: text("destinataire"),
     numeroTelephone: text("numero_telephone"),
     motif: text("motif"),
@@ -64,10 +64,6 @@ export const transferts = pgTable(
   }),
 );
 
-export const insertTransfertSchema = createInsertSchema(transferts).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertTransfert = z.infer<typeof insertTransfertSchema>;
-export type Transfert = typeof transferts.$inferSelect;
-
 // Audit des transferts
 export const transfertAuditLogs = pgTable("transfert_audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -83,10 +79,6 @@ export const transfertAuditLogs = pgTable("transfert_audit_logs", {
   hashActuel: text("hash_actuel"),
   timestamp: timestamp("timestamp").defaultNow(),
 });
-
-export const insertTransfertAuditLogSchema = createInsertSchema(transfertAuditLogs).omit({ id: true, timestamp: true });
-export type InsertTransfertAuditLog = z.infer<typeof insertTransfertAuditLogSchema>;
-export type TransfertAuditLog = typeof transfertAuditLogs.$inferSelect;
 
 // Limites de transfert
 export const transfertLimits = pgTable("transfert_limits", {
@@ -107,10 +99,6 @@ export const transfertLimits = pgTable("transfert_limits", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertTransfertLimitSchema = createInsertSchema(transfertLimits).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertTransfertLimit = z.infer<typeof insertTransfertLimitSchema>;
-export type TransfertLimit = typeof transfertLimits.$inferSelect;
-
 // Webhooks
 export const transfertWebhooks = pgTable("transfert_webhooks", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -128,10 +116,6 @@ export const transfertWebhooks = pgTable("transfert_webhooks", {
   processedAt: timestamp("processed_at"),
 });
 
-export const insertTransfertWebhookSchema = createInsertSchema(transfertWebhooks).omit({ id: true, receivedAt: true });
-export type InsertTransfertWebhook = z.infer<typeof insertTransfertWebhookSchema>;
-export type TransfertWebhook = typeof transfertWebhooks.$inferSelect;
-
 // Blacklist
 export const transfertBlacklist = pgTable("transfert_blacklist", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -145,10 +129,6 @@ export const transfertBlacklist = pgTable("transfert_blacklist", {
   ajouteParId: uuid("ajoute_par_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-export const insertTransfertBlacklistSchema = createInsertSchema(transfertBlacklist).omit({ id: true, createdAt: true });
-export type InsertTransfertBlacklist = z.infer<typeof insertTransfertBlacklistSchema>;
-export type TransfertBlacklist = typeof transfertBlacklist.$inferSelect;
 
 // Reconciliation
 export const transfertReconciliation = pgTable("transfert_reconciliation", {
@@ -167,10 +147,6 @@ export const transfertReconciliation = pgTable("transfert_reconciliation", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-export const insertTransfertReconciliationSchema = createInsertSchema(transfertReconciliation).omit({ id: true, createdAt: true });
-export type InsertTransfertReconciliation = z.infer<typeof insertTransfertReconciliationSchema>;
-export type TransfertReconciliation = typeof transfertReconciliation.$inferSelect;
 
 // OTP Validations
 export const otpValidations = pgTable("otp_validations", {
@@ -194,6 +170,38 @@ export const otpValidations = pgTable("otp_validations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertOtpValidationSchema = createInsertSchema(otpValidations).omit({ id: true, createdAt: true });
-export type InsertOtpValidation = z.infer<typeof insertOtpValidationSchema>;
+// ============================================================================
+// SCHEMAS & TYPES
+// ============================================================================
+
+export const insertKycLevelSchema = (createInsertSchema(kycLevels) as any).omit({ id: true, createdAt: true });
+export type InsertKycLevel = any;
+export type KycLevel = typeof kycLevels.$inferSelect;
+
+export const insertTransfertSchema = (createInsertSchema(transferts) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTransfert = any;
+export type Transfert = typeof transferts.$inferSelect;
+
+export const insertTransfertAuditLogSchema = (createInsertSchema(transfertAuditLogs) as any).omit({ id: true, timestamp: true });
+export type InsertTransfertAuditLog = any;
+export type TransfertAuditLog = typeof transfertAuditLogs.$inferSelect;
+
+export const insertTransfertLimitSchema = (createInsertSchema(transfertLimits) as any).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTransfertLimit = any;
+export type TransfertLimit = typeof transfertLimits.$inferSelect;
+
+export const insertTransfertWebhookSchema = (createInsertSchema(transfertWebhooks) as any).omit({ id: true, receivedAt: true });
+export type InsertTransfertWebhook = any;
+export type TransfertWebhook = typeof transfertWebhooks.$inferSelect;
+
+export const insertTransfertBlacklistSchema = (createInsertSchema(transfertBlacklist) as any).omit({ id: true, createdAt: true });
+export type InsertTransfertBlacklist = any;
+export type TransfertBlacklist = typeof transfertBlacklist.$inferSelect;
+
+export const insertTransfertReconciliationSchema = (createInsertSchema(transfertReconciliation) as any).omit({ id: true, createdAt: true });
+export type InsertTransfertReconciliation = any;
+export type TransfertReconciliation = typeof transfertReconciliation.$inferSelect;
+
+export const insertOtpValidationSchema = (createInsertSchema(otpValidations) as any).omit({ id: true, createdAt: true });
+export type InsertOtpValidation = any;
 export type OtpValidation = typeof otpValidations.$inferSelect;

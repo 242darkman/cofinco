@@ -246,6 +246,7 @@ export const statutCompteEnum = pgEnum("statut_compte_enum", [
   "Suspendu",
   "Clôturé",
   "EN_ATTENTE_PAIEMENT",
+  "Annulé",
 ]);
 
 export const motifBlocageEnum = pgEnum("motif_blocage_enum", [
