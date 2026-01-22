@@ -937,17 +937,26 @@ export async function getClientPortfolio(clientId: string) {
       .where(eq(membresTontine.clientId, clientId)),
   ]);
 
-  // Calculate totals
+  // Calculate totals - ONLY count ACTIVE accounts for real totals
+  // PENDING_ACTIVATION funds are virtual (not yet deposited)
+  const isActiveAccount = (c: typeof comptesResult[0]) =>
+    c.statut === StatutCompteConst.ACTIVE;
+
   const totalEpargne = comptesResult
-    .filter((c) => c.typeCompte === TypeCompteEnum.SAVINGS)
+    .filter((c) => c.typeCompte === TypeCompteEnum.SAVINGS && isActiveAccount(c))
     .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
 
   const totalCourant = comptesResult
-    .filter((c) => c.typeCompte === TypeCompteEnum.CURRENT)
+    .filter((c) => c.typeCompte === TypeCompteEnum.CURRENT && isActiveAccount(c))
     .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
 
   const totalBloque = comptesResult
-    .filter((c) => c.typeCompte === TypeCompteEnum.BLOCKED)
+    .filter((c) => c.typeCompte === TypeCompteEnum.BLOCKED && isActiveAccount(c))
+    .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
+
+  // Calculate pending deposits (virtual funds waiting to be deposited)
+  const totalPendingDeposit = comptesResult
+    .filter((c) => c.statut === StatutCompteConst.PENDING_ACTIVATION)
     .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
 
   const totalCreditsRestant = creditsResult.reduce(
@@ -967,6 +976,7 @@ export async function getClientPortfolio(clientId: string) {
       courant: totalCourant,
       bloque: totalBloque,
       totalComptes: totalEpargne + totalCourant + totalBloque,
+      pendingDeposit: totalPendingDeposit, // Virtual funds awaiting deposit
       creditsRestant: totalCreditsRestant,
     },
   };

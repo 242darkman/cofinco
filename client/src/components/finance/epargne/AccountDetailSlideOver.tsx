@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  X, User, TrendingUp, TrendingDown, Calendar, 
+import {
+  X, User, TrendingUp, TrendingDown, Calendar,
   DollarSign, Percent, Lock, Download, Copy,
-  CreditCard, ExternalLink, ArrowUpRight, ArrowDownLeft
+  CreditCard, ExternalLink, ArrowUpRight, ArrowDownLeft,
+  AlertTriangle, Banknote
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '../../ui/sheet';
 import TabGroup from '../../ui/TabGroup';
@@ -13,11 +14,12 @@ import { compteEpargneApi, transactionEpargneApi, clientApi } from '../../../lib
 import { TransactionRowActions } from '../shared/TransactionRowActions';
 import { ReceiptViewer } from '../shared/ReceiptViewer';
 import { useReceiptActions } from '../../../hooks/finance/useReceiptActions';
-import { getAccountBalance, getAccountUiConfig, getMonthlyInterestEstimate } from '../../../lib/account-config';
+import { getAccountBalance, getAccountUiConfig, getMonthlyInterestEstimate, getRealBalance, getPendingDepositAmount } from '../../../lib/account-config';
 import { getStatusLabel, ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { isDepositType, isWithdrawalType } from '@shared/enum/status-constants';
 import StatementExportModal from './StatementExportModal';
 import { formatClientName } from '../../../lib/format';
+import { useLocation } from 'wouter';
 
 interface AccountDetailSlideOverProps {
   compteId: string | null;
@@ -26,6 +28,7 @@ interface AccountDetailSlideOverProps {
 }
 
 export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: AccountDetailSlideOverProps) {
+  const [, navigate] = useLocation();
   const [compte, setCompte] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,12 +138,15 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
 
   if (!compte && !loading) return null;
 
-  const uiConfig = compte ? getAccountUiConfig(compte, 'staff') : { 
-      theme: 'blue', type: 'Compte', interestRate: 0, statusLabel: 'Actif', isLocked: false, 
-      accentClassName: '', bgClassName: '', badgeClassName: '', icon: CreditCard 
+  const uiConfig = compte ? getAccountUiConfig(compte, 'staff') : {
+      theme: 'blue', type: 'Compte', interestRate: 0, statusLabel: 'Actif', isLocked: false,
+      accentClassName: '', bgClassName: '', badgeClassName: '', icon: CreditCard, isPendingActivation: false
   };
-  
+
   const balance = compte ? getAccountBalance(compte) : 0;
+  const realBalance = compte ? getRealBalance(compte) : 0;
+  const pendingAmount = compte ? getPendingDepositAmount(compte) : 0;
+  const isPending = uiConfig.isPendingActivation;
 
   // Gradient based on type
   const getGradient = () => {
@@ -216,35 +222,88 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
              ) : (
                 <div className="p-4 space-y-6">
                    
-                   {/* 2. Hero Section (Virtual Card) */}
-                   <div className={`rounded-2xl p-6 text-white shadow-xl relative overflow-hidden ${getGradient()}`}>
-                      <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                      
-                      <div className="relative z-10">
-                         <div className="flex justify-between items-start mb-6">
-                            <p className="opacity-80 text-sm font-medium">Solde Disponible</p>
-                            {(() => {
-                               const Icon = uiConfig.icon;
-                               return <Icon className="text-white/80" />;
-                            })()}
+                   {/* 2. Hero Section (Virtual Card) - Different for PENDING_ACTIVATION */}
+                   {isPending ? (
+                     // PENDING ACTIVATION: Special "funds not yet deposited" card
+                     <div className="relative overflow-hidden rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-900 p-6">
+                       {/* Hatched pattern background to signify "not yet real" */}
+                       <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(135deg,#fff_25%,transparent_25%,transparent_50%,#fff_50%,#fff_75%,transparent_75%,transparent)] bg-[length:20px_20px]" />
+
+                       <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                         <div className="space-y-2 flex-1">
+                           <div className="flex items-center gap-2 text-amber-500 font-bold text-xs uppercase tracking-wider">
+                             <AlertTriangle size={14} />
+                             <span>Activation Requise</span>
+                           </div>
+
+                           <div className="flex items-center gap-3 opacity-60">
+                             <Lock size={24} className="text-slate-400" />
+                             <span className="text-4xl font-mono text-slate-300 line-through decoration-slate-600">
+                               {pendingAmount.toLocaleString('fr-FR')} <span className="text-lg font-sans">FCFA</span>
+                             </span>
+                           </div>
+
+                           <p className="text-sm text-slate-500 max-w-sm">
+                             Ce montant est en attente. Le solde réel du compte est de <strong className="text-white">0 FCFA</strong> tant que le versement initial n'est pas validé.
+                           </p>
                          </div>
-                         
-                         <h1 className="text-4xl font-bold font-mono tracking-tight mb-8">
-                            {balance.toLocaleString('fr-FR')} <span className="text-lg opacity-60 font-sans">FCFA</span>
-                         </h1>
-                         
-                         <div className="flex justify-between items-end text-sm opacity-90 font-medium">
-                            <div>
-                               <div className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Titulaire</div>
-                               <div>{formatClientName(compte.clients?.nom, compte.clients?.prenom)}</div>
-                            </div>
-                            <div className="text-right">
-                               <div className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Ouverture</div>
-                               <div>{new Date(compte.date_ouverture || compte.createdAt).toLocaleDateString()}</div>
-                            </div>
+
+                         {/* Primary Action: Go to cash register */}
+                         <button
+                           onClick={() => {
+                             onClose();
+                             navigate(`/caisse?ref=${compte.numero_compte}&amount=${pendingAmount}`);
+                           }}
+                           className="flex items-center gap-3 px-6 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.02]"
+                         >
+                           <Banknote size={20} />
+                           <span>Encaisser maintenant</span>
+                         </button>
+                       </div>
+
+                       {/* Footer info */}
+                       <div className="relative z-10 flex justify-between items-end text-sm mt-6 pt-4 border-t border-slate-800">
+                         <div>
+                           <div className="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Titulaire</div>
+                           <div className="text-slate-400">{formatClientName(compte.clients?.nom, compte.clients?.prenom)}</div>
                          </div>
-                      </div>
-                   </div>
+                         <div className="text-right">
+                           <div className="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Ouverture</div>
+                           <div className="text-slate-400">{new Date(compte.date_ouverture || compte.createdAt).toLocaleDateString()}</div>
+                         </div>
+                       </div>
+                     </div>
+                   ) : (
+                     // ACTIVE: Standard balance card
+                     <div className={`rounded-2xl p-6 text-white shadow-xl relative overflow-hidden ${getGradient()}`}>
+                        <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+
+                        <div className="relative z-10">
+                           <div className="flex justify-between items-start mb-6">
+                              <p className="opacity-80 text-sm font-medium">Solde Disponible</p>
+                              {(() => {
+                                 const Icon = uiConfig.icon;
+                                 return <Icon className="text-white/80" />;
+                              })()}
+                           </div>
+
+                           <h1 className="text-4xl font-bold font-mono tracking-tight mb-8">
+                              {realBalance.toLocaleString('fr-FR')} <span className="text-lg opacity-60 font-sans">FCFA</span>
+                           </h1>
+
+                           <div className="flex justify-between items-end text-sm opacity-90 font-medium">
+                              <div>
+                                 <div className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Titulaire</div>
+                                 <div>{formatClientName(compte.clients?.nom, compte.clients?.prenom)}</div>
+                              </div>
+                              <div className="text-right">
+                                 <div className="text-xs opacity-60 uppercase tracking-wider mb-0.5">Ouverture</div>
+                                 <div>{new Date(compte.date_ouverture || compte.createdAt).toLocaleDateString()}</div>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+                   )}
 
                    {/* KPIs (In/Out) */}
                    <div className="grid grid-cols-2 gap-4">

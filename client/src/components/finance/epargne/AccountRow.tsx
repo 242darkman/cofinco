@@ -1,10 +1,25 @@
 import React from 'react';
-import { MoreHorizontal, Lock, TrendingUp, TrendingDown, Eye } from 'lucide-react';
+import { MoreHorizontal, Lock, TrendingUp, TrendingDown, Eye, AlertTriangle, Banknote } from 'lucide-react';
 import Badge from '../../ui/Badge';
-import { getAccountUiConfig, getAccountBalance } from '../../../lib/account-config';
+import { getAccountUiConfig, getAccountBalance, getRealBalance, getPendingDepositAmount } from '../../../lib/account-config';
 import { formatClientName } from '../../../lib/format';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { IconButton } from '../../ui';
+
+// Mapping EN -> FR pour les types de compte
+const TYPE_COMPTE_LABELS: Record<string, string> = {
+  'CURRENT': 'Courant',
+  'SAVINGS': 'Épargne',
+  'BLOCKED': 'Bloqué',
+  // Legacy FR values (for backwards compatibility)
+  'Courant': 'Courant',
+  'Épargne': 'Épargne',
+  'Bloqué': 'Bloqué',
+};
+
+const getTypeCompteLabel = (type: string): string => {
+  return TYPE_COMPTE_LABELS[type] || type;
+};
 
 interface AccountRowProps {
   account: any;
@@ -16,6 +31,9 @@ interface AccountRowProps {
 const AccountRow: React.FC<AccountRowProps> = ({ account, onManage, onTransaction, onAction }) => {
   const uiConfig = getAccountUiConfig(account, 'staff');
   const balance = getAccountBalance(account);
+  const realBalance = getRealBalance(account);
+  const pendingAmount = getPendingDepositAmount(account);
+  const isPending = uiConfig.isPendingActivation;
   
   // Generate initials for avatar
   const getInitials = (nom: string, prenom?: string) => {
@@ -65,7 +83,7 @@ const AccountRow: React.FC<AccountRowProps> = ({ account, onManage, onTransactio
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-slate-500 font-mono tracking-wide">{account.numero_compte}</span>
             <span className="hidden sm:inline-flex text-[10px] text-slate-600 border border-slate-700/50 px-1.5 rounded bg-slate-800/50">
-               {account.type_compte}
+               {getTypeCompteLabel(account.type_compte || account.typeCompte || '')}
             </span>
           </div>
         </div>
@@ -73,17 +91,31 @@ const AccountRow: React.FC<AccountRowProps> = ({ account, onManage, onTransactio
 
       {/* Financials & Status (Desktop) */}
       <div className="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto mt-2 sm:mt-0">
-        
+
         {/* Balance */}
         <div className="text-right">
-             <div className="text-emerald-400 font-bold font-mono tracking-tight">
-                {balance.toLocaleString('fr-FR')} <span className="text-xs text-slate-500 ml-0.5">FCFA</span>
-             </div>
-             {uiConfig.interestRate > 0 && (
+             {isPending ? (
+               // PENDING_ACTIVATION: Show grayed out "virtual" amount with lock icon
+               <div className="flex items-center gap-2">
+                 <Lock size={14} className="text-slate-500" />
+                 <span className="text-slate-500 font-mono tracking-tight line-through decoration-slate-600">
+                   {pendingAmount.toLocaleString('fr-FR')} <span className="text-xs ml-0.5">FCFA</span>
+                 </span>
+               </div>
+             ) : (
+               <div className="text-emerald-400 font-bold font-mono tracking-tight">
+                  {realBalance.toLocaleString('fr-FR')} <span className="text-xs text-slate-500 ml-0.5">FCFA</span>
+               </div>
+             )}
+             {isPending ? (
+               <div className="text-[10px] text-amber-500 hidden sm:block font-medium">
+                 Non encaissé
+               </div>
+             ) : uiConfig.interestRate > 0 ? (
                 <div className="text-[10px] text-slate-500 hidden sm:block">
                    Taux: {uiConfig.interestRate}%
                 </div>
-             )}
+             ) : null}
         </div>
 
         {/* Status Desktop */}
@@ -110,33 +142,46 @@ const AccountRow: React.FC<AccountRowProps> = ({ account, onManage, onTransactio
                     sideOffset={5}
                     align="end"
                   >
-                     <DropdownMenu.Item 
+                     <DropdownMenu.Item
                         onSelect={() => onManage(account)}
                         className="group flex items-center px-2 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg outline-none cursor-pointer"
                      >
                         <Eye className="mr-2 h-4 w-4 text-slate-400 group-hover:text-white" />
                         Voir Détails
                      </DropdownMenu.Item>
-                     
+
                      <DropdownMenu.Separator className="h-px bg-slate-800 my-1" />
-                     
-                     <DropdownMenu.Item 
-                        onSelect={() => onTransaction(account, 'Dépôt')}
-                        disabled={!uiConfig.canReceive}
-                        className="group flex items-center px-2 py-2 text-sm text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                        <TrendingUp className="mr-2 h-4 w-4" />
-                        Faire un Dépôt
-                     </DropdownMenu.Item>
-                     
-                     <DropdownMenu.Item 
-                        onSelect={() => onTransaction(account, 'Retrait')}
-                        disabled={!uiConfig.canTransferOut}
-                        className="group flex items-center px-2 py-2 text-sm text-blue-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                        <TrendingDown className="mr-2 h-4 w-4" />
-                        Faire un Retrait
-                     </DropdownMenu.Item>
+
+                     {isPending ? (
+                        // PENDING_ACTIVATION: Show "Encaisser Dépôt" as primary action
+                        <DropdownMenu.Item
+                           onSelect={() => onTransaction(account, 'Dépôt')}
+                           className="group flex items-center px-2 py-2 text-sm text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg outline-none cursor-pointer font-medium"
+                        >
+                           <Banknote className="mr-2 h-4 w-4" />
+                           Encaisser le dépôt initial
+                        </DropdownMenu.Item>
+                     ) : (
+                        <>
+                           <DropdownMenu.Item
+                              onSelect={() => onTransaction(account, 'Dépôt')}
+                              disabled={!uiConfig.canReceive}
+                              className="group flex items-center px-2 py-2 text-sm text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                           >
+                              <TrendingUp className="mr-2 h-4 w-4" />
+                              Faire un Dépôt
+                           </DropdownMenu.Item>
+
+                           <DropdownMenu.Item
+                              onSelect={() => onTransaction(account, 'Retrait')}
+                              disabled={!uiConfig.canTransferOut}
+                              className="group flex items-center px-2 py-2 text-sm text-blue-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                           >
+                              <TrendingDown className="mr-2 h-4 w-4" />
+                              Faire un Retrait
+                           </DropdownMenu.Item>
+                        </>
+                     )}
                   </DropdownMenu.Content>
               </DropdownMenu.Portal>
            </DropdownMenu.Root>

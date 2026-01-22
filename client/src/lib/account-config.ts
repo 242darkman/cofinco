@@ -34,6 +34,7 @@ export interface AccountUiConfig {
   canReceive: boolean;
   canUnlock: boolean;
   interestRate: number;
+  isPendingActivation?: boolean;
 }
 
 export type AccountViewRole = 'client' | 'staff';
@@ -85,12 +86,13 @@ export function getAccountUiConfig(account: AccountLike, role: AccountViewRole =
   const status = String(account.statut || StatutCompte.ACTIVE);
   const isLocked = type === 'Bloqué' || account.blocageActif === true || account.blocage_actif === true;
   const isActive = status === StatutCompte.ACTIVE;
-  
+  const isPendingActivation = status === StatutCompte.PENDING_ACTIVATION;
+
   // Use centralized labels and colors
   const statusLabel = getStatusLabel(status, ACCOUNT_STATUS_LABELS);
-  
-  // Override color if the account is technically "Locked" but active? 
-  // Actually the pill should reflect the STATUS (Active/Closed), 
+
+  // Override color if the account is technically "Locked" but active?
+  // Actually the pill should reflect the STATUS (Active/Closed),
   // lock icon shows lock state.
   const badgeClassName = getStatusColor(status, ACCOUNT_STATUS_COLORS);
 
@@ -103,11 +105,36 @@ export function getAccountUiConfig(account: AccountLike, role: AccountViewRole =
     accentClassName: TYPE_STYLES[type].accentClassName,
     statusLabel,
     isLocked,
-    canTransferOut: isActive && !isLocked,
-    canReceive: isLocked ? true : isActive,
+    // PENDING_ACTIVATION accounts cannot do transfers - funds are virtual
+    canTransferOut: isActive && !isLocked && !isPendingActivation,
+    canReceive: isPendingActivation ? true : (isLocked ? true : isActive),
     canUnlock: role === 'staff' && isLocked,
     interestRate,
+    isPendingActivation,
   };
+}
+
+/**
+ * Get the "real" balance for display purposes.
+ * PENDING_ACTIVATION accounts show 0 as real balance (funds not yet deposited).
+ */
+export function getRealBalance(account: AccountLike): number {
+  const status = String(account.statut || StatutCompte.ACTIVE);
+  if (status === StatutCompte.PENDING_ACTIVATION) {
+    return 0; // Virtual funds - not yet encashed
+  }
+  return getAccountBalance(account);
+}
+
+/**
+ * Get the pending deposit amount for PENDING_ACTIVATION accounts.
+ */
+export function getPendingDepositAmount(account: AccountLike): number {
+  const status = String(account.statut || StatutCompte.ACTIVE);
+  if (status === StatutCompte.PENDING_ACTIVATION) {
+    return getAccountBalance(account); // This is the amount to be deposited
+  }
+  return 0;
 }
 
 export function getMonthlyInterestEstimate(balance: number, rate: number): number {

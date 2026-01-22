@@ -117,10 +117,11 @@ export function registerDashboardRoutes(app: Express) {
         }).from(credits).where(withAgence(credits)),
 
         // 3. Epargnes statistics - ONLY Savings accounts
+        // CRITICAL: montantTotal must EXCLUDE PENDING_ACTIVATION accounts (virtual funds)
         db.select({
           total: count(),
           actifs: sql<number>`COUNT(CASE WHEN ${comptes.statut} = ${StatutCompte.ACTIVE} THEN 1 END)`,
-          montantTotal: sql<number>`COALESCE(SUM(${comptes.soldeCourant}::numeric), 0)`
+          montantTotal: sql<number>`COALESCE(SUM(CASE WHEN ${comptes.statut} = ${StatutCompte.ACTIVE} THEN ${comptes.soldeCourant}::numeric ELSE 0 END), 0)`
         }).from(comptes).where(withAgence(comptes, eq(comptes.typeCompte, TypeCompte.SAVINGS))),
 
         // 4. Tontines statistics
@@ -563,6 +564,7 @@ export function registerDashboardRoutes(app: Express) {
               SELECT SUM(solde_courant)::numeric
               FROM comptes co
               WHERE DATE(created_at) <= day
+              AND co.statut = 'ACTIVE'
               AND (${sqlAgenceFilter('co')})
             ), 0) as epargnes_total
           FROM date_series

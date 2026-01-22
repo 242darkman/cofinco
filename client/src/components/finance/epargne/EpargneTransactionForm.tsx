@@ -1,17 +1,22 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, Loader2 } from 'lucide-react';
+import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { transactionEpargneApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
+import { StatutCompte } from '@shared/enum/status-constants';
 
 interface Compte {
   id: string;
   numero_compte: string;
   type_compte: string;
+  typeCompte?: string;
   solde: number;
+  soldeCourant?: number;
+  solde_courant?: number;
+  statut?: string;
   clients: {
     nom: string;
     id: string;
@@ -45,10 +50,19 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentModalType, setPaymentModalType] = useState<'mobile_money' | 'especes'>('especes');
 
+  // Detect if this is a PENDING_ACTIVATION account (initial deposit)
+  const isPendingActivation = compte.statut === StatutCompte.PENDING_ACTIVATION;
+  const pendingDepositAmount = isPendingActivation
+    ? (compte.solde ?? compte.soldeCourant ?? compte.solde_courant ?? 0)
+    : 0;
+  // For pending accounts, actual balance is 0
+  const actualBalance = isPendingActivation ? 0 : (compte.solde ?? compte.soldeCourant ?? compte.solde_courant ?? 0);
+
   const [formData, setFormData] = useState({
-    montant: '',
+    // Pre-fill amount for pending activation deposits
+    montant: isPendingActivation && type === 'Dépôt' ? String(pendingDepositAmount) : '',
     reference: '',
-    description: '',
+    description: isPendingActivation ? 'Encaissement du dépôt initial' : '',
     mode_paiement: 'CASH' as ModePaiement
   });
 
@@ -57,8 +71,9 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
   // Memoized calculations
   const montantNum = useMemo(() => parseFloat(formData.montant) || 0, [formData.montant]);
   const nouveauSolde = useMemo(() => {
-    return compte.solde + (type === 'Dépôt' ? 1 : -1) * montantNum;
-  }, [compte.solde, type, montantNum]);
+    // For pending activation, start from 0
+    return actualBalance + (type === 'Dépôt' ? 1 : -1) * montantNum;
+  }, [actualBalance, type, montantNum]);
 
   // Safe escaped values
   const safeClientName = useMemo(() => escapeHtml(compte.clients.nom), [compte.clients.nom]);
@@ -78,8 +93,16 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
     }
 
     // Check balance for withdrawal
-    if (type === 'Retrait' && montantNum > compte.solde) {
-      newErrors.montant = `Solde insuffisant. Maximum disponible: ${formatMoney(compte.solde)}`;
+    if (type === 'Retrait' && montantNum > actualBalance) {
+      newErrors.montant = `Solde insuffisant. Maximum disponible: ${formatMoney(actualBalance)}`;
+    }
+
+    // For pending activation, amount must match or be less than pending deposit
+    if (isPendingActivation && type === 'Dépôt' && montantNum !== pendingDepositAmount) {
+      // Allow partial deposit or exact amount
+      if (montantNum > pendingDepositAmount) {
+        newErrors.montant = `Le montant ne peut pas dépasser le dépôt initial prévu: ${formatMoney(pendingDepositAmount)}`;
+      }
     }
 
     // Validate operator for mobile money deposits
@@ -120,18 +143,21 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
 
     try {
       const montantTransaction = type === 'Retrait' ? -montantNum : montantNum;
-      const calculatedNouveauSolde = compte.solde + montantTransaction;
+      // For pending activation, start from 0
+      const calculatedNouveauSolde = actualBalance + montantTransaction;
 
       // Sanitize user inputs
       const sanitizedReference = sanitizeInput(paymentRef || formData.reference);
       const sanitizedDescription = sanitizeInput(formData.description) ||
-        `${type} de ${montantNum.toLocaleString('fr-FR')} FCFA via ${formData.mode_paiement}`;
+        (isPendingActivation
+          ? `Encaissement dépôt initial: ${montantNum.toLocaleString('fr-FR')} FCFA`
+          : `${type} de ${montantNum.toLocaleString('fr-FR')} FCFA via ${formData.mode_paiement}`);
 
       await transactionEpargneApi.create({
         compte_id: compte.id,
         type_transaction: type,
         montant: montantTransaction,
-        solde_avant: compte.solde,
+        solde_avant: actualBalance,
         solde_apres: calculatedNouveauSolde,
         reference: sanitizedReference,
         mode_paiement: formData.mode_paiement,
@@ -139,9 +165,18 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
         description: sanitizedDescription
       });
 
-      await compteEpargneApi.update(compte.id, { solde: calculatedNouveauSolde });
+      // Update account - for pending activation, also activate the account
+      if (isPendingActivation && type === 'Dépôt') {
+        await compteEpargneApi.update(compte.id, {
+          solde: calculatedNouveauSolde,
+          statut: StatutCompte.ACTIVE // Activate the account
+        });
+        toast.success(`Compte activé ! Dépôt de ${formatMoney(montantNum)} encaissé avec succès`);
+      } else {
+        await compteEpargneApi.update(compte.id, { solde: calculatedNouveauSolde });
+        toast.success(`${type} de ${formatMoney(montantNum)} effectué avec succès`);
+      }
 
-      toast.success(`${type} de ${formatMoney(montantNum)} effectué avec succès`);
       onSuccess();
     } catch (error) {
       const errorMessage = handleApiError(error, `Erreur lors du ${type.toLowerCase()}`);
@@ -151,7 +186,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
       setLoading(false);
       setShowPaymentModal(false);
     }
-  }, [compte, type, montantNum, formData, selectedOperator, onSuccess]);
+  }, [compte, type, montantNum, actualBalance, isPendingActivation, formData, selectedOperator, onSuccess]);
 
   const handlePaymentValidation = useCallback((paymentRef: string, operator?: string) => {
     processTransaction(paymentRef, operator);
@@ -174,10 +209,11 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
   }, [errors]);
 
   const isDeposit = type === 'Dépôt';
-  const headerBgClass = isDeposit ? 'bg-green-500/10' : 'bg-blue-500/10';
-  const IconComponent = isDeposit ? TrendingUp : TrendingDown;
-  const iconColorClass = isDeposit ? 'text-green-400' : 'text-blue-400';
-  const buttonColorClass = isDeposit ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700';
+  const isInitialDeposit = isPendingActivation && isDeposit;
+  const headerBgClass = isInitialDeposit ? 'bg-amber-500/10' : (isDeposit ? 'bg-green-500/10' : 'bg-blue-500/10');
+  const IconComponent = isInitialDeposit ? Banknote : (isDeposit ? TrendingUp : TrendingDown);
+  const iconColorClass = isInitialDeposit ? 'text-amber-400' : (isDeposit ? 'text-green-400' : 'text-blue-400');
+  const buttonColorClass = isInitialDeposit ? 'bg-amber-600 hover:bg-amber-700' : (isDeposit ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700');
 
   return (
     <>
@@ -195,7 +231,9 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                 <IconComponent className={iconColorClass} size={24} aria-hidden="true" />
               </div>
               <div>
-                <h2 id="transaction-form-title" className="text-2xl font-bold text-white">{type}</h2>
+                <h2 id="transaction-form-title" className="text-2xl font-bold text-white">
+                  {isInitialDeposit ? 'Encaissement Initial' : type}
+                </h2>
                 <p className="text-slate-400 text-sm">{safeNumeroCompte}</p>
               </div>
             </div>
@@ -219,6 +257,19 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               </div>
             )}
 
+            {/* Pending Activation Alert */}
+            {isPendingActivation && type === 'Dépôt' && (
+              <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-4 flex items-start gap-3" role="alert">
+                <AlertTriangle className="text-amber-400 flex-shrink-0 mt-0.5" size={20} aria-hidden="true" />
+                <div>
+                  <p className="text-amber-400 font-semibold">Encaissement du dépôt initial</p>
+                  <p className="text-amber-300/80 text-sm mt-1">
+                    Ce compte est en attente d'activation. Encaissez le montant prévu ({formatMoney(pendingDepositAmount)}) pour activer le compte.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Account Info */}
             <div className="bg-slate-700/50 rounded-lg p-4" role="region" aria-label="Informations du compte">
               <div className="flex justify-between items-center mb-2">
@@ -227,12 +278,25 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               </div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-slate-400 text-sm">Type de compte</span>
-                <span className="text-white">{compte.type_compte}</span>
+                <span className="text-white">{compte.type_compte || compte.typeCompte}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400 text-sm">Solde actuel</span>
-                <span className="text-2xl font-bold text-green-400">{formatMoney(compte.solde)}</span>
-              </div>
+              {isPendingActivation ? (
+                <>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-slate-400 text-sm">Solde réel actuel</span>
+                    <span className="text-xl font-bold text-slate-500">0 FCFA</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-slate-600 pt-2 mt-2">
+                    <span className="text-amber-400 text-sm font-medium">Montant à encaisser</span>
+                    <span className="text-2xl font-bold text-amber-400">{formatMoney(pendingDepositAmount)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 text-sm">Solde actuel</span>
+                  <span className="text-2xl font-bold text-green-400">{formatMoney(actualBalance)}</span>
+                </div>
+              )}
             </div>
 
             {/* Payment Mode Selection */}
@@ -317,7 +381,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                 autoFocus
                 disabled={loading}
                 min="100"
-                max={type === 'Retrait' ? compte.solde : VALIDATION_LIMITS.MAX_EPARGNE}
+                max={type === 'Retrait' ? actualBalance : (isPendingActivation ? pendingDepositAmount : VALIDATION_LIMITS.MAX_EPARGNE)}
                 aria-invalid={!!errors.montant}
                 aria-describedby={errors.montant ? 'montant-error' : type === 'Retrait' ? 'montant-help' : undefined}
               />
@@ -326,7 +390,12 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               )}
               {type === 'Retrait' && !errors.montant && (
                 <p id="montant-help" className="text-xs text-slate-400 mt-1">
-                  Maximum disponible: {formatMoney(compte.solde)}
+                  Maximum disponible: {formatMoney(actualBalance)}
+                </p>
+              )}
+              {isPendingActivation && type === 'Dépôt' && !errors.montant && (
+                <p className="text-xs text-amber-400 mt-1">
+                  Montant prévu pour activation: {formatMoney(pendingDepositAmount)}
                 </p>
               )}
             </div>
@@ -406,6 +475,11 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                   <>
                     <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                     Traitement...
+                  </>
+                ) : isPendingActivation && type === 'Dépôt' ? (
+                  <>
+                    <CheckCircle size={18} aria-hidden="true" />
+                    Encaisser et Activer le compte
                   </>
                 ) : (
                   `Confirmer ${type}`

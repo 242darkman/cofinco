@@ -12,6 +12,7 @@ import {
 import {
   StatutCredit,
   StatutUser,
+  StatutCompte,
   TypeCompte
 } from "@shared/enum/status-constants";
 import { SystemRole } from "@shared/types/roles";
@@ -101,13 +102,16 @@ export async function getGlobalStats(agenceId?: string): Promise<DashboardStats>
     .where(withAgence(credits)),
 
     // C. LIQUIDITÉ (Épargne Totale)
+    // CRITICAL: Exclude PENDING_ACTIVATION accounts - those funds are virtual/not yet deposited
     db.select({
       totalEpargne: sql<number>`COALESCE(SUM(CAST(${comptes.soldeCourant} AS DECIMAL)), 0)`
     }).from(comptes)
     .where(and(
       withAgence(comptes),
       // Use strict enum value check (TypeCompte.SAVINGS = 'SAVINGS')
-      eq(comptes.typeCompte, TypeCompte.SAVINGS)
+      eq(comptes.typeCompte, TypeCompte.SAVINGS),
+      // ONLY count ACTIVE accounts - PENDING_ACTIVATION funds are not real yet
+      eq(comptes.statut, StatutCompte.ACTIVE)
     )),
 
     // D. ACTIVITÉ AGENTS (Architecture V3: via userRoles)
