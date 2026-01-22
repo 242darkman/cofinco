@@ -32,6 +32,9 @@ export const users = pgTable("users", {
   email: text("email"),
   telephone: text("telephone"),
   sexe: varchar("sexe", { length: 1 }), // 'M' ou 'F'
+  dateNaissance: date("date_naissance"),
+  adresse: text("adresse"),
+  ville: varchar("ville", { length: 100 }),
   photoProfile: text("photo_profile"),
 
   // Type de compte et accès
@@ -63,6 +66,9 @@ export const createUserSchema = z.object({
   email: z.string().email("Email invalide").optional().nullable(),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
+  dateNaissance: z.string().optional().nullable(), // Format: YYYY-MM-DD
+  adresse: z.string().optional().nullable(),
+  ville: z.string().optional().nullable(),
   photoProfile: z.string().optional().nullable(),
   typeCompte: z.enum(['employe', 'client', 'both']).default('employe'),
   canLogin: z.boolean().default(true),

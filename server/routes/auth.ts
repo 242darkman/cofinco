@@ -346,20 +346,35 @@ export function registerAuthRoutes(app: Express) {
       // Erreur lors de la récupération, on continue sans
     }
 
-    // Enrichir avec les données employé si disponibles
+    // Enrichir avec les données employé si disponibles (incluant poste et département)
     let employeData: Record<string, any> | null = null;
     try {
-      const employe = await storage.getEmployeByUserId(req.session.user.id);
-      if (employe) {
-        employeData = {
-          matricule: employe.matricule,
-          poste: employe.poste,
-          departement: employe.departement,
-          dateEmbauche: employe.dateEmbauche,
-          typeContrat: employe.typeContrat,
-          salaireBase: employe.salaireBase,
-          hasCaissePin: !!employe.caissePin
-        };
+      const employeBase = await storage.getEmployeByUserId(req.session.user.id);
+      if (employeBase) {
+        // Récupérer les données complètes avec poste et département
+        const employeWithDetails = await storage.getEmployeWithUser(employeBase.id);
+        if (employeWithDetails) {
+          employeData = {
+            matricule: employeWithDetails.matricule,
+            jobPositionId: employeWithDetails.jobPositionId,
+            dateEmbauche: employeWithDetails.dateEmbauche,
+            typeContrat: employeWithDetails.typeContrat,
+            salaireBase: employeWithDetails.salaireBase,
+            hasCaissePin: !!employeWithDetails.caissePin,
+            agenceId: employeWithDetails.agenceId,
+            // Données enrichies depuis les jointures
+            jobPosition: employeWithDetails.jobPosition ? {
+              id: employeWithDetails.jobPosition.id,
+              code: employeWithDetails.jobPosition.code,
+              name: employeWithDetails.jobPosition.name,
+            } : null,
+            department: employeWithDetails.department ? {
+              id: employeWithDetails.department.id,
+              code: employeWithDetails.department.code,
+              name: employeWithDetails.department.name,
+            } : null,
+          };
+        }
       }
     } catch {
       // Pas de données employé, c'est OK
@@ -423,7 +438,7 @@ export function registerAuthRoutes(app: Express) {
       if (!user) return res.status(404).json({ message: "User not found" });
 
       const normalizedBody = normalizeUserPayload(req.body);
-      const { nom, prenom, email, telephone, username, photoProfile } = normalizedBody;
+      const { nom, prenom, email, telephone, username, photoProfile, dateNaissance, adresse, ville } = normalizedBody;
       
       // If username is being changed, check for duplicates
       if (username && username !== user.username) {
@@ -447,6 +462,17 @@ export function registerAuthRoutes(app: Express) {
 
       if (photoProfile !== undefined) {
         updateData.photoProfile = photoProfile;
+      }
+
+      // Nouveaux champs: dateNaissance, adresse, ville
+      if (dateNaissance !== undefined) {
+        updateData.dateNaissance = dateNaissance;
+      }
+      if (adresse !== undefined) {
+        updateData.adresse = adresse;
+      }
+      if (ville !== undefined) {
+        updateData.ville = ville;
       }
       
       const [updated] = await db.update(users)

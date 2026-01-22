@@ -14,7 +14,6 @@ const VALIDATION_PATTERNS = {
   email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   phone: /^\+?[0-9]{8,15}$/, // Format international ou local (8-15 chiffres, + optionnel)
   cnss: /^[A-Z0-9]{6,20}$/i, // Format alphanumérique (6-20 caractères)
-  matricule: /^EMP-[A-Z]{3}-\d{4}-[A-Z0-9]{4}$/i, // Format: EMP-XXX-YYYY-XXXX
 };
 
 // Âge minimum légal pour embauche (18 ans)
@@ -44,6 +43,27 @@ interface Agence {
   code: string;
 }
 
+// Interface pour les départements et postes
+interface Department {
+  id: string;
+  code: string;
+  name: string;
+  isActive?: boolean;
+}
+
+interface JobPosition {
+  id: string;
+  departmentId: string;
+  code: string;
+  name: string;
+  isActive?: boolean;
+  department: {
+    id: string;
+    code: string;
+    name: string;
+  };
+}
+
 // Modes de calcul de paie
 const MODE_CALCUL_PAIE_OPTIONS = [
   { value: 'MONTHLY', label: 'Mensuel' },
@@ -52,18 +72,6 @@ const MODE_CALCUL_PAIE_OPTIONS = [
 ];
 
 // Génération du matricule automatique
-const generateMatricule = (agenceCode: string): string => {
-  const year = new Date().getFullYear();
-  const randomHex = Math.random().toString(16).substring(2, 6).toUpperCase();
-  // Prendre les 3 premières lettres du code agence ou nom
-  const agencePrefix = agenceCode
-    .replace(/[^A-Za-z]/g, '')
-    .substring(0, 3)
-    .toUpperCase()
-    .padEnd(3, 'X');
-  return `EMP-${agencePrefix}-${year}-${randomHex}`;
-};
-
 interface EmployeeFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -101,6 +109,12 @@ export default function EmployeeForm({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [modeCalculPaie, setModeCalculPaie] = useState<'MONTHLY' | 'HOURLY' | 'DAILY'>('MONTHLY');
   const [agenceId, setAgenceId] = useState<string>('');
+
+  // États pour départements et postes
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [jobPositions, setJobPositions] = useState<JobPosition[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
+  const [selectedJobPositionId, setSelectedJobPositionId] = useState<string | null>(null);
 
   // Référence pour détecter les modifications non sauvegardées
   const initialDataRef = useRef<string>(JSON.stringify(initialData));
@@ -192,11 +206,11 @@ export default function EmployeeForm({
       errors.numeroCnss = 'Format CNSS invalide (6-20 caractères alphanumériques)';
     }
 
-    // Validation matricule (obligatoire et format auto-généré)
-    if (!formData.matricule) {
-      errors.matricule = 'Matricule requis (sélectionnez une agence pour le générer)';
-    } else if (!VALIDATION_PATTERNS.matricule.test(formData.matricule)) {
-      errors.matricule = 'Format matricule invalide (EMP-XXX-YYYY-XXXX)';
+    // Matricule sera généré automatiquement côté serveur - pas de validation côté client
+
+    // Validation poste (jobPositionId requis)
+    if (!selectedJobPositionId) {
+      errors.jobPositionId = 'Le poste est requis';
     }
 
     // Validation salaire (doit être positif)
@@ -244,7 +258,7 @@ export default function EmployeeForm({
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId]);
+  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,6 +277,7 @@ export default function EmployeeForm({
       userId: selectedUserId, // Lier au user sélectionné
       agenceId: agenceId,
       modeCalculPaie: modeCalculPaie,
+      jobPositionId: selectedJobPositionId, // Poste lié au département
     };
 
     const result = await onSave(enrichedData as any);
@@ -274,26 +289,47 @@ export default function EmployeeForm({
     } else {
       toast.error(result.error || 'Erreur lors de la sauvegarde');
     }
-  }, [formData, onSave, onClose, validateForm, selectedUserId, agenceId, modeCalculPaie]);
+  }, [formData, onSave, onClose, validateForm, selectedUserId, agenceId, modeCalculPaie, selectedJobPositionId]);
 
   const updateField = (field: keyof EmployeFormData, value: string | null) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Convertir null en string vide pour éviter les warnings React controlled/uncontrolled
+    setFormData(prev => ({ ...prev, [field]: value ?? '' }));
   };
 
-  // Mise à jour de la référence et reset du formulaire quand initialData change
+  // Mise à jour de la référence et reset du formulaire quand le modal s'ouvre ou l'employé change
+  // On utilise editingEmploye?.id pour éviter de se déclencher à chaque render
   useEffect(() => {
+    if (!isOpen) return; // Ne rien faire si le modal est fermé
+
     setFormData(initialData);
     setPhotoPreview(initialData.photoProfile || editingEmploye?.photoProfile || null);
     initialDataRef.current = JSON.stringify(initialData);
     setValidationErrors({});
+
     // Reset user selection for new employee
     if (!editingEmploye) {
       setSelectedUserId(null);
       setSelectedUser(null);
       setAgenceId('');
       setModeCalculPaie('MONTHLY');
+      setSelectedDepartmentId(null);
+      setSelectedJobPositionId(null);
+    } else {
+      // En mode édition, charger les valeurs existantes depuis initialData
+      setAgenceId(initialData.agenceId || '');
+      setModeCalculPaie(initialData.modeCalculPaie || 'MONTHLY');
+      // Charger le département et le poste existants
+      const jobPosId = initialData.jobPositionId;
+      if (jobPosId) {
+        setSelectedJobPositionId(jobPosId);
+        // Le département sera défini quand les jobPositions seront chargés
+      } else {
+        setSelectedJobPositionId(null);
+        setSelectedDepartmentId(null);
+      }
     }
-  }, [initialData, editingEmploye]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editingEmploye?.id]);
 
   // Charger les agences
   useEffect(() => {
@@ -311,6 +347,44 @@ export default function EmployeeForm({
     };
     loadAgences();
   }, []);
+
+  // Charger les départements et postes
+  useEffect(() => {
+    const loadDepartmentsAndPositions = async () => {
+      try {
+        // Charger les départements
+        const deptRes = await fetch('/api/departments', { credentials: 'include' });
+        if (deptRes.ok) {
+          const depts = await deptRes.json();
+          setDepartments(depts.filter((d: Department) => d.isActive !== false));
+        }
+
+        // Charger les postes
+        const posRes = await fetch('/api/job-positions', { credentials: 'include' });
+        if (posRes.ok) {
+          const positions = await posRes.json();
+          setJobPositions(positions.filter((p: JobPosition) => p.isActive !== false));
+        }
+      } catch (error) {
+        console.error('Erreur chargement départements/postes:', error);
+      }
+    };
+    loadDepartmentsAndPositions();
+  }, []);
+
+  // Définir le département quand le poste est sélectionné (utile en mode édition pour charger le département initial)
+  // Cet effet ne doit s'exécuter que lorsque:
+  // 1. Un poste est sélectionné ET
+  // 2. Le département correspondant n'est pas déjà sélectionné (pour éviter boucle infinie)
+  useEffect(() => {
+    if (selectedJobPositionId && jobPositions.length > 0) {
+      const position = jobPositions.find(p => p.id === selectedJobPositionId);
+      if (position && position.departmentId !== selectedDepartmentId) {
+        setSelectedDepartmentId(position.departmentId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJobPositionId, jobPositions]);
 
   // Charger les users non liés à un employé (uniquement en mode création)
   useEffect(() => {
@@ -412,26 +486,19 @@ export default function EmployeeForm({
         // Auto-peupler l'agence depuis l'affectation de l'utilisateur
         if (user.agenceId) {
           setAgenceId(user.agenceId);
-          // Générer automatiquement le matricule
-          const newMatricule = generateMatricule(user.agenceCode || user.agenceNom || 'XXX');
-          updateField('matricule', newMatricule);
         } else {
           // L'utilisateur n'a pas d'agence affectée - afficher un warning
           setAgenceId('');
-          updateField('matricule', '');
         }
       }
     } else {
       setSelectedUser(null);
-      // Reset agence et matricule quand aucun user n'est sélectionné
+      // Reset agence quand aucun user n'est sélectionné
       if (!editingEmploye) {
         setAgenceId('');
-        updateField('matricule', '');
       }
     }
   }, [selectedUserId, unlinkedUsers, editingEmploye]);
-
-  // Note: Le matricule est maintenant généré automatiquement dans le useEffect de sélection du user
 
   // Libellé dynamique pour le taux de paiement
   const tauxPaiementLabel = useMemo(() => {
@@ -552,7 +619,7 @@ export default function EmployeeForm({
             {!editingEmploye ? (
               <div className="space-y-1">
                 <label className="block text-sm font-medium text-slate-300">
-                  Agence d'affectation
+                  Agence d'affectation <span className="text-red-500">*</span>
                   <span className="ml-1 text-xs text-slate-500">(définie par l'Admin)</span>
                 </label>
                 {selectedUser ? (
@@ -580,7 +647,7 @@ export default function EmployeeForm({
             ) : (
               /* En mode édition: permettre de changer l'agence */
               <SelectField
-                label="Agence d'affectation *"
+                label="Agence d'affectation"
                 name="agenceId"
                 value={agenceId}
                 onChange={(e) => setAgenceId(e.target.value)}
@@ -593,18 +660,28 @@ export default function EmployeeForm({
               />
             )}
 
-            <FormField
-              label="Matricule (auto-généré)"
-              name="matricule"
-              type="text"
-              value={formData.matricule}
-              onChange={(e) => updateField('matricule', e.target.value)}
-              required
-              readOnly={!editingEmploye}
-              error={validationErrors.matricule}
-              className={!editingEmploye ? 'bg-slate-700/50 cursor-not-allowed' : ''}
-              helperText={editingEmploye ? 'Modifiable en édition' : 'Généré automatiquement à partir de l\'agence'}
-            />
+            {/* Matricule: affiché uniquement s'il existe (mode édition) */}
+            {editingEmploye && formData.matricule ? (
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-300">
+                  Matricule
+                </label>
+                <div className="flex items-center gap-2 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
+                  <span className="text-white font-mono font-medium">{formData.matricule}</span>
+                </div>
+                <p className="text-xs text-slate-500">Généré automatiquement à la création</p>
+              </div>
+            ) : !editingEmploye ? (
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-300">
+                  Matricule
+                </label>
+                <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700 text-slate-500 text-sm">
+                  Sera généré automatiquement
+                </div>
+                <p className="text-xs text-slate-500">Format: EMP-{'{CODE_AGENCE}'}-{'{ANNÉE}'}-{'{HEX}'}</p>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -625,7 +702,7 @@ export default function EmployeeForm({
             <div className="relative">
               {photoPreview ? (
                 <img
-                  src={photoPreview}
+                  src={resolveStorageUrl(photoPreview)}
                   alt="Photo de profil"
                   className="w-24 h-24 rounded-full object-cover border-4 border-slate-600 shadow-lg"
                 />
@@ -667,7 +744,7 @@ export default function EmployeeForm({
               label="Nom"
               name="nom"
               type="text"
-              value={formData.nom}
+              value={formData.nom || ''}
               onChange={(e) => updateField('nom', e.target.value)}
               required
               readOnly={!!selectedUser && !editingEmploye}
@@ -678,7 +755,7 @@ export default function EmployeeForm({
               label="Prénom"
               name="prenom"
               type="text"
-              value={formData.prenom}
+              value={formData.prenom || ''}
               onChange={(e) => updateField('prenom', e.target.value)}
               required
               readOnly={!!selectedUser && !editingEmploye}
@@ -688,7 +765,7 @@ export default function EmployeeForm({
             <SelectField
               label="Sexe"
               name="sexe"
-              value={formData.sexe}
+              value={formData.sexe || 'M'}
               onChange={(e) => updateField('sexe', e.target.value as 'M' | 'F')}
               options={[
                 { value: 'M', label: 'Masculin' },
@@ -702,11 +779,10 @@ export default function EmployeeForm({
               label="Email"
               name="email"
               type="email"
-              value={formData.email}
+              value={formData.email || ''}
               onChange={(e) => updateField('email', e.target.value)}
               readOnly={!!selectedUser && !editingEmploye}
               className={selectedUser && !editingEmploye ? 'bg-slate-700/50 cursor-not-allowed' : ''}
-              pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
               error={validationErrors.email}
               placeholder="nom@domaine.com"
             />
@@ -715,7 +791,7 @@ export default function EmployeeForm({
               label="Téléphone"
               name="phone"
               type="tel"
-              value={formData.phone}
+              value={formData.phone || ''}
               onChange={(e) => updateField('phone', e.target.value)}
               readOnly={!!selectedUser && !editingEmploye}
               className={selectedUser && !editingEmploye ? 'bg-slate-700/50 cursor-not-allowed' : ''}
@@ -728,7 +804,7 @@ export default function EmployeeForm({
               label="Date de Naissance"
               name="dateNaissance"
               type="date"
-              value={formData.dateNaissance}
+              value={formData.dateNaissance || ''}
               onChange={(e) => updateField('dateNaissance', e.target.value)}
               error={validationErrors.dateNaissance}
             />
@@ -737,7 +813,7 @@ export default function EmployeeForm({
               label="Adresse"
               name="adresse"
               type="text"
-              value={formData.adresse}
+              value={formData.adresse || ''}
               onChange={(e) => updateField('adresse', e.target.value)}
             />
 
@@ -745,7 +821,7 @@ export default function EmployeeForm({
               label="Ville"
               name="ville"
               type="text"
-              value={formData.ville}
+              value={formData.ville || ''}
               onChange={(e) => updateField('ville', e.target.value)}
             />
           </div>
@@ -762,19 +838,19 @@ export default function EmployeeForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
-              label="Date d'Embauche *"
+              label="Date d'Embauche"
               name="dateEmbauche"
               type="date"
-              value={formData.dateEmbauche}
+              value={formData.dateEmbauche || ''}
               onChange={(e) => updateField('dateEmbauche', e.target.value)}
               required
               error={validationErrors.dateEmbauche}
             />
 
             <SelectField
-              label="Type de Contrat *"
+              label="Type de Contrat"
               name="typeContrat"
-              value={formData.typeContrat}
+              value={formData.typeContrat || 'CDI'}
               onChange={(e) => updateField('typeContrat', e.target.value)}
               options={[
                 { value: 'CDI', label: 'CDI - Contrat à Durée Indéterminée' },
@@ -784,27 +860,40 @@ export default function EmployeeForm({
               required
             />
 
-            <FormField
+            <SelectField
               label="Département"
-              name="departement"
-              type="text"
-              value={formData.departement}
-              onChange={(e) => updateField('departement', e.target.value)}
-              placeholder="Ex: Finance, IT, Commercial..."
-            />
-
-            <FormField
-              label="Poste *"
-              name="poste"
-              type="text"
-              value={formData.poste}
-              onChange={(e) => updateField('poste', e.target.value)}
-              required
-              placeholder="Ex: Caissier Principal, Agent Commercial..."
+              name="departmentId"
+              value={selectedDepartmentId || ''}
+              onChange={(e) => {
+                const deptId = e.target.value || null;
+                setSelectedDepartmentId(deptId);
+                // Reset job position when department changes
+                setSelectedJobPositionId(null);
+              }}
+              options={[
+                { value: '', label: '-- Sélectionner un département --' },
+                ...departments.map(d => ({ value: d.id, label: d.name }))
+              ]}
             />
 
             <SelectField
-              label="Mode de Calcul Paie *"
+              label="Poste"
+              name="jobPositionId"
+              value={selectedJobPositionId || ''}
+              onChange={(e) => setSelectedJobPositionId(e.target.value || null)}
+              options={[
+                { value: '', label: selectedDepartmentId ? '-- Sélectionner un poste --' : '-- Sélectionnez d\'abord un département --' },
+                ...jobPositions
+                  .filter(p => !selectedDepartmentId || p.departmentId === selectedDepartmentId)
+                  .map(p => ({ value: p.id, label: p.name }))
+              ]}
+              required
+              disabled={!selectedDepartmentId}
+              error={validationErrors.jobPositionId}
+            />
+
+            <SelectField
+              label="Mode de Calcul Paie"
               name="modeCalculPaie"
               value={modeCalculPaie}
               onChange={(e) => setModeCalculPaie(e.target.value as 'MONTHLY' | 'HOURLY' | 'DAILY')}
@@ -814,12 +903,11 @@ export default function EmployeeForm({
             />
 
             <FormField
-              label={tauxPaiementLabel + ' *'}
+              label={tauxPaiementLabel}
               name="salaireBase"
               type="number"
-              value={formData.salaireBase}
+              value={formData.salaireBase || ''}
               onChange={(e) => updateField('salaireBase', e.target.value)}
-              required
               min="0"
               error={validationErrors.salaireBase}
               placeholder={modeCalculPaie === 'HOURLY' ? '2500' : modeCalculPaie === 'DAILY' ? '15000' : '150000'}
@@ -829,7 +917,7 @@ export default function EmployeeForm({
               label="Numéro CNSS"
               name="numeroCnss"
               type="text"
-              value={formData.numeroCnss}
+              value={formData.numeroCnss || ''}
               onChange={(e) => updateField('numeroCnss', e.target.value.toUpperCase())}
               pattern="[A-Za-z0-9]{6,20}"
               error={validationErrors.numeroCnss}

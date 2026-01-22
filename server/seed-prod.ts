@@ -43,6 +43,9 @@ import {
   versementsAutomatiques,
   virementsProgrammes,
   decaissementsProgrammes,
+  // HR tables
+  departments,
+  jobPositions,
 } from '@shared/schema';
 import {
   agencyMigrations,
@@ -258,6 +261,9 @@ async function seedProd() {
     // Users are tricky, we definitely need an admin.
     await db.delete(userRoles); // Auth V3: Clear roles before users
     await db.delete(users);
+    // HR tables
+    await db.delete(jobPositions);
+    await db.delete(departments);
 
     console.log('   ✅ cleanup complete');
 
@@ -284,6 +290,64 @@ async function seedProd() {
       insertedAgences[a.nom] = inserted.id;
     }
     console.log('   ✅ Zones and Agencies created');
+
+    // 2a. SEED DEPARTMENTS & JOB POSITIONS
+    console.log('   👔 Seeding Departments & Job Positions...');
+
+    const DEPARTMENTS_DATA = [
+      { code: 'DIR', name: 'Direction Générale', description: 'Direction et administration générale' },
+      { code: 'FIN', name: 'Finance & Comptabilité', description: 'Gestion financière et comptable' },
+      { code: 'RH', name: 'Ressources Humaines', description: 'Gestion du personnel' },
+      { code: 'OPS', name: 'Opérations', description: 'Opérations terrain et caisse' },
+      { code: 'COM', name: 'Commercial', description: 'Vente et relation client' },
+      { code: 'IT', name: 'Informatique', description: 'Systèmes d\'information' },
+      { code: 'RISK', name: 'Risques & Conformité', description: 'Gestion des risques et conformité' },
+    ];
+
+    const deptMap: Record<string, string> = {}; // UUID strings
+    for (const dept of DEPARTMENTS_DATA) {
+      const [inserted] = await db.insert(departments).values(dept).returning();
+      deptMap[dept.code] = inserted.id;
+    }
+
+    const JOB_POSITIONS_DATA = [
+      // Direction
+      { departmentId: deptMap['DIR'], code: 'DG', name: 'Directeur Général' },
+      { departmentId: deptMap['DIR'], code: 'DGA', name: 'Directeur Général Adjoint' },
+      { departmentId: deptMap['DIR'], code: 'SEC', name: 'Secrétaire de Direction' },
+      // Finance
+      { departmentId: deptMap['FIN'], code: 'DAF', name: 'Directeur Administratif et Financier' },
+      { departmentId: deptMap['FIN'], code: 'COMPT', name: 'Comptable' },
+      { departmentId: deptMap['FIN'], code: 'TRESO', name: 'Trésorier' },
+      { departmentId: deptMap['FIN'], code: 'AUDIT', name: 'Auditeur Interne' },
+      // RH
+      { departmentId: deptMap['RH'], code: 'DRH', name: 'Directeur des Ressources Humaines' },
+      { departmentId: deptMap['RH'], code: 'GPERSO', name: 'Gestionnaire du Personnel' },
+      { departmentId: deptMap['RH'], code: 'FORM', name: 'Responsable Formation' },
+      // Opérations
+      { departmentId: deptMap['OPS'], code: 'DOPS', name: 'Directeur des Opérations' },
+      { departmentId: deptMap['OPS'], code: 'CAGENCE', name: 'Chef d\'Agence' },
+      { departmentId: deptMap['OPS'], code: 'CAISS', name: 'Caissier' },
+      { departmentId: deptMap['OPS'], code: 'AGTER', name: 'Agent Terrain' },
+      { departmentId: deptMap['OPS'], code: 'SUPV', name: 'Superviseur' },
+      // Commercial
+      { departmentId: deptMap['COM'], code: 'DCOM', name: 'Directeur Commercial' },
+      { departmentId: deptMap['COM'], code: 'CCONS', name: 'Chargé de Clientèle' },
+      { departmentId: deptMap['COM'], code: 'ACRED', name: 'Analyste Crédit' },
+      // IT
+      { departmentId: deptMap['IT'], code: 'DSI', name: 'Directeur des Systèmes d\'Information' },
+      { departmentId: deptMap['IT'], code: 'DEV', name: 'Développeur' },
+      { departmentId: deptMap['IT'], code: 'ADMIN', name: 'Administrateur Système' },
+      // Risques
+      { departmentId: deptMap['RISK'], code: 'DRISK', name: 'Directeur des Risques' },
+      { departmentId: deptMap['RISK'], code: 'ARISK', name: 'Analyste Risques' },
+      { departmentId: deptMap['RISK'], code: 'CONF', name: 'Responsable Conformité' },
+    ];
+
+    for (const pos of JOB_POSITIONS_DATA) {
+      await db.insert(jobPositions).values(pos);
+    }
+    console.log('   ✅ Departments and Job Positions created');
 
     // 2b. SEED COFFRE CONFIG FOR AGENCIES
     console.log('   🛡️ Seeding Coffre Configuration...');

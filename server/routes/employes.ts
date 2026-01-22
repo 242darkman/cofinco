@@ -9,6 +9,30 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, hashPassword } from "../auth";
 import { logAudit } from "../audit";
 
+// Helper pour accepter string ou number et convertir en number
+const numericString = z.union([z.number(), z.string()]).transform((val) => {
+  if (typeof val === 'number') return val;
+  const parsed = parseFloat(val.replace(/\s/g, '').replace(/,/g, '.'));
+  return isNaN(parsed) ? 0 : parsed;
+});
+
+// Mapping modeCalculPaie: accepter les deux formats (MONTHLY/Mensuel)
+const modeCalculPaieSchema = z.enum(['MONTHLY', 'HOURLY', 'DAILY', 'Mensuel', 'Horaire', 'Journalier']).transform((val) => {
+  const mapping: Record<string, string> = {
+    'MONTHLY': 'MONTHLY', 'Mensuel': 'MONTHLY',
+    'HOURLY': 'HOURLY', 'Horaire': 'HOURLY',
+    'DAILY': 'DAILY', 'Journalier': 'DAILY',
+  };
+  return mapping[val] || 'MONTHLY';
+});
+
+// UUID optionnel qui accepte les chaînes vides et les convertit en null
+const optionalUuid = z.union([
+  z.string().uuid(),
+  z.literal(''),
+  z.null(),
+]).transform((val) => (val === '' ? null : val)).nullable();
+
 // Schéma de validation pour la création d'un employé complet (user + employe)
 const createEmployeWithUserSchema = z.object({
   // Données utilisateur (identité)
@@ -17,6 +41,9 @@ const createEmployeWithUserSchema = z.object({
   email: z.string().email("Email invalide").optional().nullable(),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
+  dateNaissance: z.string().optional().nullable(), // Format: YYYY-MM-DD
+  adresse: z.string().optional().nullable(),
+  ville: z.string().optional().nullable(),
   photoProfile: z.string().optional().nullable(),
 
   // Authentification (optionnel)
@@ -25,24 +52,22 @@ const createEmployeWithUserSchema = z.object({
 
   // Données employé (RH)
   matricule: z.string().optional().nullable(),
-  poste: z.string().optional().nullable(),
-  departement: z.string().optional().nullable(),
+  jobPositionId: optionalUuid.optional(),
   dateEmbauche: z.string().optional().nullable(),
   typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim']).optional(),
-  agenceId: z.string().uuid().optional().nullable(),
-  managerId: z.string().uuid().optional().nullable(),
+  agenceId: optionalUuid.optional(),
+  managerId: optionalUuid.optional(),
   // Rôle via userRoles table (Architecture V3)
   role: z.nativeEnum(SystemRole).optional(),
-  salaireBase: z.number().optional(),
-  tauxHoraire: z.number().optional(),
-  tauxJournalier: z.number().optional(),
-  modeCalculPaie: z.enum(['Mensuel', 'Horaire', 'Journalier']).optional(),
+  salaireBase: numericString.optional(),
+  tauxHoraire: numericString.optional(),
+  tauxJournalier: numericString.optional(),
+  modeCalculPaie: modeCalculPaieSchema.optional(),
   // Agent Terrain specific fields (optional, used when role === AGENT_TERRAIN)
   zonesAffectation: z.array(z.string()).optional(),
   objectifMensuel: z.string().optional(),
 });
 
-// Schéma pour mise à jour
 const updateEmployeWithUserSchema = z.object({
   // Données utilisateur
   nom: z.string().optional(),
@@ -50,23 +75,25 @@ const updateEmployeWithUserSchema = z.object({
   email: z.string().email().optional().nullable(),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
+  dateNaissance: z.string().optional().nullable(), // Format: YYYY-MM-DD
+  adresse: z.string().optional().nullable(),
+  ville: z.string().optional().nullable(),
   photoProfile: z.string().optional().nullable(),
   statut: z.enum([StatutUser.ACTIVE, StatutUser.INACTIVE, StatutUser.SUSPENDED]).optional(),
 
   // Données employé (RH - sans rôle, géré par userRoles)
   matricule: z.string().optional().nullable(),
-  poste: z.string().optional().nullable(),
-  departement: z.string().optional().nullable(),
+  jobPositionId: optionalUuid.optional(),
   dateEmbauche: z.string().optional().nullable(),
   typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim']).optional(),
-  agenceId: z.string().uuid().optional().nullable(),
-  managerId: z.string().uuid().optional().nullable(),
+  agenceId: optionalUuid.optional(),
+  managerId: optionalUuid.optional(),
   // Rôle géré via userRoles table (Architecture V3) - passé séparément à updateEmployeWithUser
   role: z.nativeEnum(SystemRole).optional(),
-  salaireBase: z.number().optional(),
-  tauxHoraire: z.number().optional(),
-  tauxJournalier: z.number().optional(),
-  modeCalculPaie: z.enum(['Mensuel', 'Horaire', 'Journalier']).optional(),
+  salaireBase: numericString.optional(),
+  tauxHoraire: numericString.optional(),
+  tauxJournalier: numericString.optional(),
+  modeCalculPaie: modeCalculPaieSchema.optional(),
 });
 
 export function registerEmployesRoutes(app: Express) {
@@ -253,6 +280,9 @@ export function registerEmployesRoutes(app: Express) {
           email: data.email || null,
           telephone: data.telephone || null,
           sexe: data.sexe || null,
+          dateNaissance: data.dateNaissance || null,
+          adresse: data.adresse || null,
+          ville: data.ville || null,
           photoProfile: data.photoProfile || null,
           username: data.username || null,
           password: hashedPassword,
@@ -265,8 +295,7 @@ export function registerEmployesRoutes(app: Express) {
         const [employe] = await tx.insert(employes).values({
           userId: user.id,
           matricule: data.matricule || null,
-          poste: data.poste || null,
-          departement: data.departement || null,
+          jobPositionId: data.jobPositionId || null,
           dateEmbauche: data.dateEmbauche || null,
           typeContrat: data.typeContrat || 'CDI',
           agenceId: data.agenceId || null,
@@ -360,13 +389,15 @@ export function registerEmployesRoutes(app: Express) {
       if (data.email !== undefined) userData.email = data.email;
       if (data.telephone !== undefined) userData.telephone = data.telephone;
       if (data.sexe !== undefined) userData.sexe = data.sexe;
+      if (data.dateNaissance !== undefined) userData.dateNaissance = data.dateNaissance;
+      if (data.adresse !== undefined) userData.adresse = data.adresse;
+      if (data.ville !== undefined) userData.ville = data.ville;
       if (data.photoProfile !== undefined) userData.photoProfile = data.photoProfile;
       if (data.statut !== undefined) userData.statut = data.statut;
 
       // Données employe (sans roleSystem - géré par userRoles)
       if (data.matricule !== undefined) employeData.matricule = data.matricule;
-      if (data.poste !== undefined) employeData.poste = data.poste;
-      if (data.departement !== undefined) employeData.departement = data.departement;
+      if (data.jobPositionId !== undefined) employeData.jobPositionId = data.jobPositionId;
       if (data.dateEmbauche !== undefined) employeData.dateEmbauche = data.dateEmbauche;
       if (data.typeContrat !== undefined) employeData.typeContrat = data.typeContrat;
       if (data.agenceId !== undefined) employeData.agenceId = data.agenceId;

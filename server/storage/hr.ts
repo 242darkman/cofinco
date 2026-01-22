@@ -8,7 +8,8 @@ import {
   bulletinsPaie, InsertBulletinPaie,
   avantages, Avantage,
   avantagesEmployes, InsertAvantageEmploye, AvantageEmploye,
-  presences, Presence, users, horairesTravail, employes
+  presences, Presence, users, horairesTravail, employes,
+  jobPositions, departments
 } from "@shared/schema";
 import { StatutUser, StatutConge, StatutCandidature, StatutPresence, StatutBulletin, ModeCalculPaie } from "@shared/enum/status-constants";
 
@@ -368,6 +369,7 @@ interface OrgNode {
 
 export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
     // Fetch all active employees with user data, filtered by agency if provided
+    // Join with jobPositions and departments to get poste and departement names
     const employeesData = await db.select({
         employeId: employes.id,
         userId: users.id,
@@ -375,25 +377,27 @@ export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
         prenom: users.prenom,
         email: users.email,
         photoProfile: users.photoProfile,
-        poste: employes.poste,
-        departement: employes.departement,
+        poste: jobPositions.name,
+        departement: departments.name,
         managerId: employes.managerId,
         agenceId: employes.agenceId,
     })
     .from(employes)
     .innerJoin(users, eq(employes.userId, users.id))
-    .where(agenceId 
+    .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
+    .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
+    .where(agenceId
         ? and(eq(users.statut, StatutUser.ACTIVE), eq(employes.agenceId, agenceId))
         : eq(users.statut, StatutUser.ACTIVE)
     );
-    
+
     // Build map for quick lookup
     const employeeMap = new Map<string, any>();
     employeesData.forEach(emp => employeeMap.set(emp.employeId, { ...emp, subordinates: [] }));
-    
+
     // Find top-level employees (no manager) and build tree
     const topLevel: OrgNode[] = [];
-    
+
     employeesData.forEach(emp => {
         const node: OrgNode = {
             id: emp.employeId,
@@ -405,7 +409,7 @@ export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
             photoProfile: emp.photoProfile || undefined,
             subordinates: []
         };
-        
+
         if (!emp.managerId) {
             // Top-level employee
             topLevel.push(node);
@@ -422,7 +426,7 @@ export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
             employeeMap.set(emp.employeId, node);
         }
     });
-    
+
     return topLevel;
 }
 

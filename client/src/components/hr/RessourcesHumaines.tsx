@@ -283,7 +283,7 @@ export default function RessourcesHumaines() {
         editingEmploye={editingEmploye}
         allEmployes={employes}
         initialData={editingEmploye ? {
-          matricule: editingEmploye.matricule,
+          matricule: editingEmploye.matricule || '',
           nom: editingEmploye.nom,
           prenom: editingEmploye.prenom,
           sexe: editingEmploye.sexe,
@@ -299,7 +299,10 @@ export default function RessourcesHumaines() {
           salaireBase: editingEmploye.salaireBase,
           numeroCnss: editingEmploye.numeroCnss || '',
           photoProfile: editingEmploye.photoProfile || '',
-          managerId: editingEmploye.managerId || null
+          managerId: editingEmploye.managerId || null,
+          agenceId: editingEmploye.agenceId || null,
+          jobPositionId: editingEmploye.jobPositionId || null,
+          modeCalculPaie: editingEmploye.modeCalculPaie || 'MONTHLY',
         } : {
           matricule: '',
           nom: '',
@@ -316,7 +319,10 @@ export default function RessourcesHumaines() {
           typeContrat: 'CDI',
           salaireBase: '',
           numeroCnss: '',
-          managerId: null
+          managerId: null,
+          agenceId: null,
+          jobPositionId: null,
+          modeCalculPaie: 'MONTHLY',
         }}
       />
 

@@ -129,6 +129,9 @@ import {
   decaissementsProgrammes,
   configTransfertInterCoffres,
   activeSessions,
+  // HR tables
+  departments,
+  jobPositions,
 } from '@shared/schema';
 import { hashPassword } from './auth';
 import { eq } from 'drizzle-orm';
@@ -383,6 +386,9 @@ async function seedDemoSimple() {
     await db.delete(agentsTerrain);
     await db.delete(clients);
     await db.delete(employes);
+    // HR tables (job_position_id in employes references jobPositions)
+    await db.delete(jobPositions);
+    await db.delete(departments);
     await db.delete(posDevices); // MUST be before caisses
     await db.delete(caisses);
     await db.delete(caisseSecurityCodes);
@@ -453,6 +459,64 @@ async function seedDemoSimple() {
       agencyMap[a.nom] = inserted.id; // Store ID for strict referencing
       console.log(`   -> Created Agency: ${a.nom} (ID: ${inserted.id})`);
     }
+
+    // 2b. SEED DEPARTMENTS & JOB POSITIONS
+    console.log('   👔 Seeding Departments & Job Positions...');
+
+    const DEPARTMENTS_DATA = [
+      { code: 'DIR', name: 'Direction Générale', description: 'Direction et administration générale' },
+      { code: 'FIN', name: 'Finance & Comptabilité', description: 'Gestion financière et comptable' },
+      { code: 'RH', name: 'Ressources Humaines', description: 'Gestion du personnel' },
+      { code: 'OPS', name: 'Opérations', description: 'Opérations terrain et caisse' },
+      { code: 'COM', name: 'Commercial', description: 'Vente et relation client' },
+      { code: 'IT', name: 'Informatique', description: 'Systèmes d\'information' },
+      { code: 'RISK', name: 'Risques & Conformité', description: 'Gestion des risques et conformité' },
+    ];
+
+    const deptMap: Record<string, string> = {}; // UUID strings
+    for (const dept of DEPARTMENTS_DATA) {
+      const [inserted] = await db.insert(departments).values(dept).returning();
+      deptMap[dept.code] = inserted.id;
+    }
+
+    const JOB_POSITIONS_DATA = [
+      // Direction
+      { departmentId: deptMap['DIR'], code: 'DG', name: 'Directeur Général' },
+      { departmentId: deptMap['DIR'], code: 'DGA', name: 'Directeur Général Adjoint' },
+      { departmentId: deptMap['DIR'], code: 'SEC', name: 'Secrétaire de Direction' },
+      // Finance
+      { departmentId: deptMap['FIN'], code: 'DAF', name: 'Directeur Administratif et Financier' },
+      { departmentId: deptMap['FIN'], code: 'COMPT', name: 'Comptable' },
+      { departmentId: deptMap['FIN'], code: 'TRESO', name: 'Trésorier' },
+      { departmentId: deptMap['FIN'], code: 'AUDIT', name: 'Auditeur Interne' },
+      // RH
+      { departmentId: deptMap['RH'], code: 'DRH', name: 'Directeur des Ressources Humaines' },
+      { departmentId: deptMap['RH'], code: 'GPERSO', name: 'Gestionnaire du Personnel' },
+      { departmentId: deptMap['RH'], code: 'FORM', name: 'Responsable Formation' },
+      // Opérations
+      { departmentId: deptMap['OPS'], code: 'DOPS', name: 'Directeur des Opérations' },
+      { departmentId: deptMap['OPS'], code: 'CAGENCE', name: 'Chef d\'Agence' },
+      { departmentId: deptMap['OPS'], code: 'CAISS', name: 'Caissier' },
+      { departmentId: deptMap['OPS'], code: 'AGTER', name: 'Agent Terrain' },
+      { departmentId: deptMap['OPS'], code: 'SUPV', name: 'Superviseur' },
+      // Commercial
+      { departmentId: deptMap['COM'], code: 'DCOM', name: 'Directeur Commercial' },
+      { departmentId: deptMap['COM'], code: 'CCONS', name: 'Chargé de Clientèle' },
+      { departmentId: deptMap['COM'], code: 'ACRED', name: 'Analyste Crédit' },
+      // IT
+      { departmentId: deptMap['IT'], code: 'DSI', name: 'Directeur des Systèmes d\'Information' },
+      { departmentId: deptMap['IT'], code: 'DEV', name: 'Développeur' },
+      { departmentId: deptMap['IT'], code: 'ADMIN', name: 'Administrateur Système' },
+      // Risques
+      { departmentId: deptMap['RISK'], code: 'DRISK', name: 'Directeur des Risques' },
+      { departmentId: deptMap['RISK'], code: 'ARISK', name: 'Analyste Risques' },
+      { departmentId: deptMap['RISK'], code: 'CONF', name: 'Responsable Conformité' },
+    ];
+
+    for (const pos of JOB_POSITIONS_DATA) {
+      await db.insert(jobPositions).values(pos);
+    }
+    console.log('   ✅ Departments and Job Positions created');
 
     // 3. SEED COFFRES-FORTS (VAULTS) & CAISSES Using AgencyMap
     console.log('   🔐 Seeding Vaults & Cashboxes...');

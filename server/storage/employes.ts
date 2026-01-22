@@ -12,13 +12,43 @@
  * - deleteEmploye: soft delete user + suppression rôles
  */
 
-import { employes, users, userRoles } from "@shared/schema";
+import { employes, users, userRoles, jobPositions, departments, agences } from "@shared/schema";
 import { type Employe, type InsertEmploye, type User, type EmployeWithUser } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser } from "@shared/enum/status-constants";
 import { db } from "../db";
 import { eq, desc, and, isNull, asc } from "drizzle-orm";
 import { StorageService } from "../services/storage-service";
+import crypto from "crypto";
+
+/**
+ * Génère un matricule unique pour un employé
+ * Format: EMP-{CODE_AGENCE}-{ANNÉE}-{HEX}
+ * Exemple: EMP-BZV-2026-A7F2
+ */
+async function generateMatricule(agenceId: string | null | undefined): Promise<string> {
+  let agenceCode = "XXX"; // Valeur par défaut si pas d'agence
+
+  if (agenceId) {
+    const [agence] = await db.select({ codeAgence: agences.codeAgence, nom: agences.nom })
+      .from(agences)
+      .where(eq(agences.id, agenceId));
+
+    if (agence) {
+      // Utiliser le code de l'agence, ou les 3 premières lettres du nom
+      agenceCode = (agence.codeAgence || agence.nom || "XXX")
+        .replace(/[^A-Za-z]/g, "")
+        .substring(0, 3)
+        .toUpperCase()
+        .padEnd(3, "X");
+    }
+  }
+
+  const year = new Date().getFullYear();
+  const randomHex = crypto.randomBytes(2).toString("hex").toUpperCase();
+
+  return `EMP-${agenceCode}-${year}-${randomHex}`;
+}
 
 // ============================================
 // Types pour l'architecture V3
@@ -38,8 +68,7 @@ export interface CreateEmployeData {
 export interface CreateEmployeRHData {
   // Données RH (sans userId ni roleSystem)
   matricule?: string;
-  poste?: string;
-  departement?: string;
+  jobPositionId?: string; // UUID
   dateEmbauche?: string;
   typeContrat?: string;
   agenceId?: string;
@@ -81,7 +110,7 @@ export async function getEmployeByUserId(userId: string): Promise<Employe | unde
 }
 
 /**
- * Récupérer un employé avec ses données utilisateur
+ * Récupérer un employé avec ses données utilisateur, poste et département
  */
 export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | undefined> {
   const result = await db.select({
@@ -96,17 +125,40 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
       sexe: users.sexe,
       photoProfile: users.photoProfile,
       statut: users.statut,
-    }
+    },
+    jobPosition: {
+      id: jobPositions.id,
+      departmentId: jobPositions.departmentId,
+      code: jobPositions.code,
+      name: jobPositions.name,
+      description: jobPositions.description,
+      isActive: jobPositions.isActive,
+      createdAt: jobPositions.createdAt,
+      updatedAt: jobPositions.updatedAt,
+    },
+    department: {
+      id: departments.id,
+      code: departments.code,
+      name: departments.name,
+      description: departments.description,
+      isActive: departments.isActive,
+      createdAt: departments.createdAt,
+      updatedAt: departments.updatedAt,
+    },
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
+  .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
   .where(eq(employes.id, id));
 
   if (result.length === 0) return undefined;
 
   return {
     ...result[0].employe,
-    user: result[0].user
+    user: result[0].user,
+    jobPosition: result[0].jobPosition?.id ? result[0].jobPosition : null,
+    department: result[0].department?.id ? result[0].department : null,
   };
 }
 
@@ -137,7 +189,7 @@ export async function getEmployeWithRoles(id: string): Promise<EmployeWithRoles 
 }
 
 /**
- * Récupérer tous les employés avec leurs données utilisateur et rôle principal
+ * Récupérer tous les employés avec leurs données utilisateur, rôle principal, poste et département
  */
 export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
   const result = await db.select({
@@ -154,10 +206,31 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
       statut: users.statut,
     },
     role: userRoles.role,
+    jobPosition: {
+      id: jobPositions.id,
+      departmentId: jobPositions.departmentId,
+      code: jobPositions.code,
+      name: jobPositions.name,
+      description: jobPositions.description,
+      isActive: jobPositions.isActive,
+      createdAt: jobPositions.createdAt,
+      updatedAt: jobPositions.updatedAt,
+    },
+    department: {
+      id: departments.id,
+      code: departments.code,
+      name: departments.name,
+      description: departments.description,
+      isActive: departments.isActive,
+      createdAt: departments.createdAt,
+      updatedAt: departments.updatedAt,
+    },
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
   .leftJoin(userRoles, eq(users.id, userRoles.userId))
+  .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
+  .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
   .where(isNull(users.deletedAt))
   .orderBy(desc(users.createdAt));
 
@@ -166,12 +239,14 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
     user: {
       ...r.user,
       role: r.role || null,
-    }
+    },
+    jobPosition: r.jobPosition?.id ? r.jobPosition : null,
+    department: r.department?.id ? r.department : null,
   }));
 }
 
 /**
- * Récupérer les employés d'une agence avec rôle principal
+ * Récupérer les employés d'une agence avec rôle principal, poste et département
  */
 export async function getEmployesByAgence(agenceId: string): Promise<EmployeWithUser[]> {
   const result = await db.select({
@@ -188,10 +263,31 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
       statut: users.statut,
     },
     role: userRoles.role,
+    jobPosition: {
+      id: jobPositions.id,
+      departmentId: jobPositions.departmentId,
+      code: jobPositions.code,
+      name: jobPositions.name,
+      description: jobPositions.description,
+      isActive: jobPositions.isActive,
+      createdAt: jobPositions.createdAt,
+      updatedAt: jobPositions.updatedAt,
+    },
+    department: {
+      id: departments.id,
+      code: departments.code,
+      name: departments.name,
+      description: departments.description,
+      isActive: departments.isActive,
+      createdAt: departments.createdAt,
+      updatedAt: departments.updatedAt,
+    },
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
   .leftJoin(userRoles, eq(users.id, userRoles.userId))
+  .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
+  .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
   .where(and(
     eq(employes.agenceId, agenceId),
     isNull(users.deletedAt)
@@ -203,7 +299,9 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
     user: {
       ...r.user,
       role: r.role || null,
-    }
+    },
+    jobPosition: r.jobPosition?.id ? r.jobPosition : null,
+    department: r.department?.id ? r.department : null,
   }));
 }
 
@@ -235,6 +333,9 @@ export async function createEmployeWithUser(
   employeData: CreateEmployeRHData,
   role: SystemRole = SystemRole.AGENT_TERRAIN
 ): Promise<{ user: User; employe: Employe }> {
+  // Générer le matricule automatiquement s'il n'est pas fourni
+  const matricule = employeData.matricule || await generateMatricule(employeData.agenceId);
+
   return await db.transaction(async (tx) => {
     // 1. Créer l'utilisateur
     const [user] = await tx.insert(users).values({
@@ -253,9 +354,8 @@ export async function createEmployeWithUser(
     // 2. Créer l'employé
     const [employe] = await tx.insert(employes).values({
       userId: user.id,
-      matricule: employeData.matricule,
-      poste: employeData.poste,
-      departement: employeData.departement,
+      matricule,
+      jobPositionId: employeData.jobPositionId,
       dateEmbauche: employeData.dateEmbauche,
       typeContrat: employeData.typeContrat,
       agenceId: employeData.agenceId,
@@ -288,13 +388,15 @@ export async function createEmployeForUser(
   employeData: CreateEmployeRHData,
   role: SystemRole = SystemRole.AGENT_TERRAIN
 ): Promise<Employe> {
+  // Générer le matricule automatiquement s'il n'est pas fourni
+  const matricule = employeData.matricule || await generateMatricule(employeData.agenceId);
+
   return await db.transaction(async (tx) => {
     // Créer l'employé
     const [employe] = await tx.insert(employes).values({
       userId,
-      matricule: employeData.matricule,
-      poste: employeData.poste,
-      departement: employeData.departement,
+      matricule,
+      jobPositionId: employeData.jobPositionId,
       dateEmbauche: employeData.dateEmbauche,
       typeContrat: employeData.typeContrat,
       agenceId: employeData.agenceId,

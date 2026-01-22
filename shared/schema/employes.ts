@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { agences } from "./agences";
+import { jobPositions, departments, type JobPosition, type Department } from "./departments";
 
 /**
  * Table des employés - Données métier RH
@@ -19,8 +20,7 @@ export const employes = pgTable("employes", {
 
   // Identité RH
   matricule: varchar("matricule", { length: 50 }).unique(),
-  poste: varchar("poste", { length: 100 }),
-  departement: varchar("departement", { length: 100 }),
+  jobPositionId: uuid("job_position_id").references(() => jobPositions.id, { onDelete: "set null" }),
   dateEmbauche: date("date_embauche"),
   typeContrat: varchar("type_contrat", { length: 20 }).default("CDI"), // 'CDI', 'CDD', 'Stage', 'Intérim'
 
@@ -62,4 +62,6 @@ export interface EmployeWithUser extends Employe {
     statut: string;
     role?: string | null; // Rôle principal depuis userRoles
   };
+  jobPosition?: JobPosition | null;
+  department?: Department | null;
 }

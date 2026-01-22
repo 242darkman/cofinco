@@ -23,6 +23,19 @@ export interface Employe {
   photoProfile?: string | null;
   managerId?: string | null; // ID du supérieur hiérarchique
   managerNom?: string | null; // Nom complet du manager (pour affichage)
+  agenceId?: string | null; // UUID de l'agence
+  modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY'; // Mode de calcul paie
+  jobPositionId?: string | null; // UUID du poste
+  jobPosition?: {
+    id: string;
+    code: string;
+    name: string;
+    department: {
+      id: string;
+      code: string;
+      name: string;
+    };
+  } | null;
 }
 
 export interface EmployeFormData {
@@ -47,6 +60,7 @@ export interface EmployeFormData {
   userId?: string | null; // Liaison avec un User existant
   agenceId?: string | null; // Agence d'affectation
   modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY'; // Mode de calcul de paie
+  jobPositionId?: string | null; // UUID du poste (remplace poste/departement)
 }
 
 export function useEmployes() {
@@ -62,13 +76,14 @@ export function useEmployes() {
       if (!response.ok) throw new Error('Erreur chargement');
       const data = await response.json();
       
-      // L'API retourne EmployeWithUser { ...employe, user: { nom, prenom, statut, ... } }
+      // L'API retourne EmployeWithUser { ...employe, user: { nom, prenom, statut, ... }, jobPosition, department }
       // On aplatit les données pour correspondre au type Employe attendu par le composant
       const flattenedData = (data || []).map((item: any) => ({
         id: item.id,
         matricule: item.matricule,
-        poste: item.poste,
-        departement: item.departement,
+        // Utiliser les données du jobPosition/department si disponibles, sinon fallback sur les anciens champs
+        poste: item.jobPosition?.name || item.poste || '',
+        departement: item.department?.name || item.departement || '',
         dateEmbauche: item.dateEmbauche,
         typeContrat: item.typeContrat,
         salaireBase: item.salaireBase ? String(item.salaireBase) : '0',
@@ -76,6 +91,11 @@ export function useEmployes() {
         createdAt: item.createdAt,
         managerId: item.managerId || null,
         managerNom: null, // Sera calculé après
+        // Nouveaux champs
+        agenceId: item.agenceId || null,
+        jobPositionId: item.jobPositionId || null,
+        jobPosition: item.jobPosition || null,
+        modeCalculPaie: item.modeCalculPaie || 'MONTHLY',
         // Données utilisateur aplaties depuis item.user
         nom: item.user?.nom || '',
         prenom: item.user?.prenom || '',
@@ -117,8 +137,11 @@ export function useEmployes() {
         .replace(/,/g, '.')
         .replace(/[^\d.]/g, '');
       
+      // Normaliser phone -> telephone pour le backend
+      const { phone, ...rest } = formData;
       const payload = {
-        ...formData,
+        ...rest,
+        telephone: phone, // Le backend attend "telephone"
         salaireBase: normalizedSalary || '0'
       };
 
@@ -149,13 +172,16 @@ export function useEmployes() {
         .replace(/,/g, '.')
         .replace(/[^\d.]/g, '');
       
+      // Normaliser phone -> telephone pour le backend
+      const { phone, ...rest } = formData;
       const payload = {
-        ...formData,
+        ...rest,
+        telephone: phone, // Le backend attend "telephone"
         salaireBase: normalizedSalary || '0'
       };
 
       const response = await fetch(`/api/employes/${id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload)

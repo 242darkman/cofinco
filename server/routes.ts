@@ -16,6 +16,7 @@ import { registerAccountingRoutes } from "./routes/accounting";
 import { registerRbacRoutes } from "./routes/rbac";
 import { registerAgencesRoutes } from "./routes/agences";
 import { registerEmployesRoutes } from "./routes/employes";
+import { registerDepartmentsRoutes } from "./routes/departments";
 import loyaltyRouter from "./routes/loyalty";
 import { registerOtpRoutes } from "./routes/otp";
 import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/config";
@@ -77,7 +78,10 @@ export function registerRoutes(app: Express): Server {
 
   // Employes Module (nouvelle architecture users/employes)
   registerEmployesRoutes(app);
-  
+
+  // Departments & Job Positions Module
+  registerDepartmentsRoutes(app);
+
   // OTP Module
   registerOtpRoutes(app);
 
