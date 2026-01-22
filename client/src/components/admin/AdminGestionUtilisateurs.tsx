@@ -73,7 +73,7 @@ export default function AdminGestionUtilisateurs() {
   };
 
   const getPhotoUrl = (user: User) => {
-    const raw = user.photoProfile || user.photo_profile || '';
+    const raw = user.photoProfile || '';
     return resolveStorageUrl(raw);
   };
 

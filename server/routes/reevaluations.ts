@@ -736,7 +736,7 @@ export function registerReevaluationRoutes(app: Express) {
         client: {
           nom: users.nom,
           prenom: users.prenom,
-          photo_url: users.photoProfile
+          photoProfile: users.photoProfile
         }
       })
       .from(reevaluationsCredit)

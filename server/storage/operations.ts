@@ -139,12 +139,9 @@ export async function getAgentsTerrainPaginated(
       prenom: user?.prenom || "",
       telephone: user?.telephone || null,
       photoUrl: user?.photoProfile || null,
-      photo_url: user?.photoProfile || null, // Alias snake_case pour le frontend
       nombreClients: clientsCount[0]?.count || 0,
       collectesJour: collectesCount[0]?.count || 0,
       performance: perf,
-      nombre_clients: clientsCount[0]?.count || 0,
-      collectes_jour: collectesCount[0]?.count || 0,
     };
   }));
 

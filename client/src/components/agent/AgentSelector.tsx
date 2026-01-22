@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, User, ChevronDown, Check, X, MapPin, Phone } from 'lucide-react';
 import { StatutUser } from '@shared/enum/status-constants';
+import { resolveStorageUrl } from '../../lib/format';
 
 interface Agent {
   id: string;
@@ -41,6 +42,11 @@ export default function AgentSelector({
     const firstInitial = agent.nom?.charAt(0) || '';
     const secondInitial = agent.prenom?.charAt(0) || '';
     return (firstInitial + secondInitial).toUpperCase();
+  };
+
+  // Resolve photo URL for storage
+  const getPhotoUrl = (agent: Agent) => {
+    return resolveStorageUrl(agent.photoUrl);
   };
 
   // Find selected agent
@@ -115,9 +121,9 @@ export default function AgentSelector({
             <>
               {/* Avatar avec photo ou initiales */}
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border-2 border-cyan-500/40 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                {selectedAgent.photoUrl ? (
+                {getPhotoUrl(selectedAgent) ? (
                   <img
-                    src={selectedAgent.photoUrl}
+                    src={getPhotoUrl(selectedAgent)}
                     alt={`${selectedAgent.nom} ${selectedAgent.prenom}`}
                     className="w-full h-full rounded-full object-cover"
                   />
@@ -205,9 +211,9 @@ export default function AgentSelector({
                   >
                     {/* Avatar avec photo ou initiales */}
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border-2 border-cyan-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {agent.photoUrl ? (
+                      {getPhotoUrl(agent) ? (
                         <img
-                          src={agent.photoUrl}
+                          src={getPhotoUrl(agent)}
                           alt={`${agent.nom} ${agent.prenom}`}
                           className="w-full h-full rounded-full object-cover"
                         />

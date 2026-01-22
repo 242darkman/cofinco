@@ -201,8 +201,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       clients: client ? {
         nom: client.nom,
         prenom: client.prenom,
-        phone: client.telephone,
-        photo_url: client.photoProfile
+        telephone: client.telephone,
+        photoProfile: client.photoProfile
       } : undefined
     };
   }
@@ -356,13 +356,13 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     return results.map(({ demande, client, user, agence }) => ({
       ...demande,
-      numero_demande: demande.numeroDemande,
-      montant_demande: Number(demande.montantDemande),
+      numeroDemande: demande.numeroDemande,
+      montantDemande: Number(demande.montantDemande),
       clients: client ? {
         nom: user?.nom,
         prenom: user?.prenom,
-        phone: user?.telephone,
-        photo_url: user?.photoProfile,
+        telephone: user?.telephone,
+        photoProfile: user?.photoProfile,
         agence: agence?.nom,
         agenceId: client.agenceId
       } : undefined
@@ -482,12 +482,12 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     
     return results.map(({ enquete, client, user }) => ({
       ...enquete,
-      montant_demande: Number(enquete.montantDemande),
+      montantDemande: Number(enquete.montantDemande),
       clients: client ? {
         nom: user?.nom,
         prenom: user?.prenom,
-        phone: user?.telephone,
-        photo_url: user?.photoProfile
+        telephone: user?.telephone,
+        photoProfile: user?.photoProfile
       } : undefined
     }));
   }
@@ -687,10 +687,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         nom: user?.nom,
         prenom: user?.prenom,
         telephone: user?.telephone,
-        phone: user?.telephone, // Alias
         email: user?.email,
         agence: agence?.nom,
-        photo_url: user?.photoProfile
+        photoProfile: user?.photoProfile
       } : null
       };
     });
