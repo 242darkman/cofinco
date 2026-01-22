@@ -64,14 +64,16 @@ export default function AdminGestionCaisses() {
     queryFn: async () => {
         const res = await api.get<any[]>(`/employes?agenceId=${targetAgenceId}`);
         return (res || []).filter((emp: any) => {
-          const normalizedRole = normalizeRole(emp.role);
+          // Le rôle est dans user.role (Architecture V3)
+          const role = emp.user?.role || emp.role;
+          const normalizedRole = normalizeRole(role);
           return !isAdminRole(normalizedRole);
         }).map((emp: any) => ({
           id: emp.user?.id,
           nom: emp.user?.nom,
           prenom: emp.user?.prenom,
           username: emp.user?.username,
-          role: emp.role,
+          role: emp.user?.role || emp.role || 'Agent',
           photoProfile: emp.user?.photoProfile
         }));
     },

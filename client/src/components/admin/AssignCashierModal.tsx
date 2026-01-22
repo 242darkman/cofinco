@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Search, User, CheckCircle, X, Loader2, Users } from 'lucide-react';
 import { resolveStorageUrl } from '../../lib/format';
+import { getRoleLabel } from '@shared/types/roles';
 
 interface AssignableUser {
   id: string;
@@ -184,7 +185,7 @@ export default function AssignCashierModal({
                       <span>@{user.username || 'N/A'}</span>
                       <span className="text-slate-600">•</span>
                       <span className="text-slate-400 text-[10px]">
-                        {user.role || 'Agent'}
+                        {getRoleLabel(user.role)}
                       </span>
                     </div>
                   </div>
