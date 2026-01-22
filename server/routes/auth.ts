@@ -536,22 +536,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // User Management
-  app.patch("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
-    try {
-      const { id } = req.params;
-      const updateData = normalizeUserPayload(req.body);
-      
-      const updatedUser = await storage.updateUser(id, updateData);
-      if (!updatedUser) {
-        return res.status(404).json({ message: "Utilisateur non trouvé" });
-      }
-      
-      res.json(updatedUser);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
+  // User Management - REMOVED DUPLICATE (see consolidated handler below)
 
   app.get("/api/users", requireRole(SystemRole.ADMIN), async (req, res) => {
     const allUsers = await storage.getAllUsers();
@@ -586,7 +571,52 @@ export function registerAuthRoutes(app: Express) {
     try {
       const userId = req.params.id;
       const updateData = normalizeUserPayload(req.body);
-      const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
+
+      // Extract role from payload - it's stored in userRoles, not users table
+      const { role: newRole, ...userUpdateData } = updateData;
+
+      // Update user data in users table (exclude role)
+      const [updated] = await db.update(users).set(userUpdateData).where(eq(users.id, userId)).returning();
+
+      // Handle role update in userRoles table
+      if (newRole && updated) {
+        // Check for existing primary role
+        const [existingRole] = await db.select()
+          .from(userRoles)
+          .where(and(
+            eq(userRoles.userId, userId),
+            eq(userRoles.isPrimary, true)
+          ));
+
+        if (existingRole) {
+          // Update existing primary role
+          await db.update(userRoles)
+            .set({ role: newRole, updatedAt: new Date() })
+            .where(eq(userRoles.id, existingRole.id));
+        } else {
+          // Create new primary role
+          await db.insert(userRoles).values({
+            userId: userId,
+            role: newRole,
+            isPrimary: true,
+          });
+        }
+
+        // Broadcast role change for real-time RBAC update
+        const { getWsInstance } = await import("../ws-server");
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+          wsInstance.broadcast({
+            type: "RBAC_UPDATE",
+            payload: {
+              entity: 'user_role',
+              userId,
+              role: newRole
+            }
+          });
+          console.log(`🔄 RBAC: Broadcasted role change for user ${userId} -> ${newRole}`);
+        }
+      }
 
       if (updated) {
         await logAudit(
@@ -600,7 +630,7 @@ export function registerAuthRoutes(app: Express) {
         );
 
         // 🛡️ Kill Switch: Broadcast user status change for real-time logout
-        if (updateData.statut && updateData.statut !== StatutUser.ACTIVE) {
+        if (userUpdateData.statut && userUpdateData.statut !== StatutUser.ACTIVE) {
           const { getWsInstance } = await import("../ws-server");
           const wsInstance = getWsInstance();
           if (wsInstance) {
@@ -609,16 +639,19 @@ export function registerAuthRoutes(app: Express) {
               payload: {
                 entity: 'user_status',
                 userId,
-                status: updateData.statut
+                status: userUpdateData.statut
               }
             });
-            console.log(`🚨 SECURITY: Broadcasted user_status change for user ${userId} -> ${updateData.statut}`);
+            console.log(`🚨 SECURITY: Broadcasted user_status change for user ${userId} -> ${userUpdateData.statut}`);
           }
         }
       }
 
-      res.json(updated);
+      // Return user with updated role
+      const effectiveRole = await getEffectiveRole(userId);
+      res.json({ ...updated, role: effectiveRole });
     } catch (e) {
+      console.error("Update user failed:", e);
       res.status(500).json({ message: "Update failed" });
     }
   });
