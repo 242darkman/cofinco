@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Monitor, Lock, MoreVertical, User, XCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -7,6 +7,7 @@ import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
 import { ForceCloseModal } from './ForceCloseModal';
+import AssignCashierModal from './AssignCashierModal';
 import { isAdminRole, normalizeRole } from '@shared/types/roles';
 import { StatutClient, StatutCaisseAgent, StatutCaisse, StatutCaisseType } from '@shared/enum/status-constants';
 
@@ -49,7 +50,7 @@ export default function AdminGestionCaisses() {
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedCaisseForAssign, setSelectedCaisseForAssign] = useState<Caisse | null>(null);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [currentAssigneeIds, setCurrentAssigneeIds] = useState<string[]>([]);
   
   const [isForceCloseModalOpen, setIsForceCloseModalOpen] = useState(false);
   const [selectedCaisseForClose, setSelectedCaisseForClose] = useState<Caisse | null>(null);
@@ -58,7 +59,7 @@ export default function AdminGestionCaisses() {
   // Utiliser l'agenceId de la caisse sélectionnée pour récupérer les employés de cette agence
   const targetAgenceId = selectedCaisseForAssign?.agenceId || user?.agenceId;
 
-  const { data: employees = [] } = useQuery<any[]>({
+  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery<any[]>({
     queryKey: ['employes-agence', targetAgenceId],
     queryFn: async () => {
         const res = await api.get<any[]>(`/employes?agenceId=${targetAgenceId}`);
@@ -70,7 +71,8 @@ export default function AdminGestionCaisses() {
           nom: emp.user?.nom,
           prenom: emp.user?.prenom,
           username: emp.user?.username,
-          role: emp.role
+          role: emp.role,
+          photoProfile: emp.user?.photoProfile
         }));
     },
     enabled: isAssignModalOpen && !!targetAgenceId
@@ -80,27 +82,28 @@ export default function AdminGestionCaisses() {
       mutationFn: async ({ caisseId, userIds }: { caisseId: string, userIds: string[] }) => {
           return await api.post(`/caisses/${caisseId}/assign`, { userIds });
       },
-      onSuccess: () => {
+      onSuccess: (_data, variables) => {
           queryClient.invalidateQueries({ queryKey: ['caisses'] });
           setIsAssignModalOpen(false);
-          toast.success('Assignations mises à jour');
+          const count = variables.userIds.length;
+          toast.success(count > 0 ? `${count} agent${count > 1 ? 's' : ''} assigné${count > 1 ? 's' : ''}` : 'Caisse libérée');
           setSelectedCaisseForAssign(null);
-          setSelectedUserIds([]);
+          setCurrentAssigneeIds([]);
       },
       onError: () => toast.error("Erreur lors de l'assignation")
   });
 
   const handleOpenAssign = (caisse: Caisse) => {
       setSelectedCaisseForAssign(caisse);
+      // Récupérer les assignés actuels depuis la BDD
       const existing = (caisse as any).assignments || [];
-      setSelectedUserIds(existing);
+      setCurrentAssigneeIds(existing);
       setIsAssignModalOpen(true);
   };
 
-  const toggleUserSelection = (userId: string) => {
-      setSelectedUserIds(prev => 
-          prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-      );
+  const handleAssignSave = (userIds: string[]) => {
+      if (!selectedCaisseForAssign) return;
+      assignMutation.mutate({ caisseId: selectedCaisseForAssign.id, userIds });
   };
 
   const { data: caisses = [], isLoading } = useQuery<Caisse[]>({
@@ -115,7 +118,22 @@ export default function AdminGestionCaisses() {
     refetchInterval: 30000, // Refresh every 30 seconds instead of using unstable WebSocket
   });
 
-  // WebSocket removed as per user request to avoid unnecessary connection errors
+  // Récupérer les caisses occupées pour détecter les agents busy
+  const busyUserIds = useMemo(() => {
+    const selectedCaisseId = selectedCaisseForAssign?.id;
+    return caisses
+      .filter(c => c.isOccupied && c.id !== selectedCaisseId)
+      .map(c => (c as any).occupiedById)
+      .filter(Boolean);
+  }, [caisses, selectedCaisseForAssign]);
+
+  // Enrichir les employés avec le statut busy
+  const employeesWithBusyStatus = useMemo(() => {
+    return employees.map(emp => ({
+      ...emp,
+      isBusy: busyUserIds.includes(emp.id)
+    }));
+  }, [employees, busyUserIds]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => await api.post('/caisses', data),
@@ -429,38 +447,20 @@ export default function AdminGestionCaisses() {
         </div>
       </Modal>
 
-      <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title={`Assigner - ${selectedCaisseForAssign?.nom}`}>
-        <div className="p-6 pt-2 space-y-4">
-            <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
-                {employees.map(emp => (
-                    <label key={emp.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-700/30 rounded cursor-pointer">
-                        <input 
-                            type="checkbox"
-                            checked={selectedUserIds.includes(emp.id)}
-                            onChange={() => toggleUserSelection(emp.id)}
-                            className="rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <div>
-                            <div className="text-sm font-medium">{emp.nom} {emp.prenom}</div>
-                            <div className="text-xs text-gray-500">@{emp.username}</div>
-                        </div>
-                    </label>
-                ))}
-                {employees.length === 0 && (
-                    <p className="text-center text-sm text-gray-500 py-4">Aucun agent</p>
-                )}
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="ghost" onClick={() => setIsAssignModalOpen(false)}>Annuler</Button>
-              <Button 
-                onClick={() => assignMutation.mutate({ caisseId: selectedCaisseForAssign!.id, userIds: selectedUserIds })} 
-                isLoading={assignMutation.isPending}
-              >
-                Sauvegarder
-              </Button>
-            </div>
-        </div>
-      </Modal>
+      <AssignCashierModal
+        isOpen={isAssignModalOpen}
+        onClose={() => {
+          setIsAssignModalOpen(false);
+          setSelectedCaisseForAssign(null);
+          setCurrentAssigneeIds([]);
+        }}
+        onSave={handleAssignSave}
+        users={employeesWithBusyStatus}
+        caisseName={selectedCaisseForAssign?.nom || ''}
+        currentAssigneeIds={currentAssigneeIds}
+        isLoading={isLoadingEmployees}
+        isSaving={assignMutation.isPending}
+      />
 
       <ForceCloseModal
         isOpen={isForceCloseModalOpen}
