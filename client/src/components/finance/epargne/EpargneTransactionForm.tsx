@@ -8,14 +8,22 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { StatutCompte } from '@shared/enum/status-constants';
 
+// Mapping EN -> FR pour les types de compte
+const TYPE_COMPTE_LABELS: Record<string, string> = {
+  'CURRENT': 'Courant',
+  'SAVINGS': 'Épargne',
+  'BLOCKED': 'Bloqué',
+};
+
+const getTypeCompteLabel = (type: string): string => {
+  return TYPE_COMPTE_LABELS[type] || type;
+};
+
 interface Compte {
   id: string;
   numero_compte: string;
   type_compte: string;
-  typeCompte?: string;
   solde: number;
-  soldeCourant?: number;
-  solde_courant?: number;
   statut?: string;
   clients: {
     nom: string;
@@ -52,11 +60,9 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
 
   // Detect if this is a PENDING_ACTIVATION account (initial deposit)
   const isPendingActivation = compte.statut === StatutCompte.PENDING_ACTIVATION;
-  const pendingDepositAmount = isPendingActivation
-    ? (compte.solde ?? compte.soldeCourant ?? compte.solde_courant ?? 0)
-    : 0;
+  const pendingDepositAmount = isPendingActivation ? (compte.solde ?? 0) : 0;
   // For pending accounts, actual balance is 0
-  const actualBalance = isPendingActivation ? 0 : (compte.solde ?? compte.soldeCourant ?? compte.solde_courant ?? 0);
+  const actualBalance = isPendingActivation ? 0 : (compte.solde ?? 0);
 
   const [formData, setFormData] = useState({
     // Pre-fill amount for pending activation deposits
@@ -278,7 +284,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               </div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-slate-400 text-sm">Type de compte</span>
-                <span className="text-white">{compte.type_compte || compte.typeCompte}</span>
+                <span className="text-white">{getTypeCompteLabel(compte.type_compte)}</span>
               </div>
               {isPendingActivation ? (
                 <>

@@ -21,6 +21,17 @@ import StatementExportModal from './StatementExportModal';
 import { formatClientName } from '../../../lib/format';
 import { useLocation } from 'wouter';
 
+// Mapping EN -> FR pour les types de compte
+const TYPE_COMPTE_LABELS: Record<string, string> = {
+  'CURRENT': 'Courant',
+  'SAVINGS': 'Épargne',
+  'BLOCKED': 'Bloqué',
+};
+
+const getTypeCompteLabel = (type: string): string => {
+  return TYPE_COMPTE_LABELS[type] || type;
+};
+
 interface AccountDetailSlideOverProps {
   compteId: string | null;
   isOpen: boolean;
@@ -182,7 +193,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
                   <SheetDescription className="sr-only">
                     Détails du compte et historique des transactions
                   </SheetDescription>
-                  <div className="text-xs text-slate-400">{compte?.type_compte}</div>
+                  <div className="text-xs text-slate-400">{getTypeCompteLabel(compte?.type_compte || '')}</div>
                </div>
                {compte && (
                  <Badge 
