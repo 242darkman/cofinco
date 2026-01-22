@@ -31,7 +31,6 @@ const AgentValidations = lazy(() => import('./components/agent/AgentValidations'
 // Admin modules
 const AdminModuleComplet = lazy(() => import('./components/admin/AdminModuleComplet'));
 const AdminVirementsProgrammes = lazy(() => import('./components/admin/AdminVirementsProgrammes'));
-const ParametresModule = lazy(() => import('./components/admin/settings/ParametresModule'));
 
 // Shared modules
 const ReportGenerator = lazy(() => import('./components/shared/ReportGenerator'));
@@ -325,12 +324,6 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
             <ReportGenerator />
           </Suspense>
         );
-      case 'parametres':
-        return (
-          <Suspense fallback={<ModuleLoadingFallback moduleName="Paramètres" />}>
-            <ParametresModule activeView={currentSubModule} />
-          </Suspense>
-        );
       case 'administrateur':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Administration" />}>
@@ -410,7 +403,6 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
             onMessagesClick={() => setCurrentModule('messages')}
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
             onProfileClick={() => setCurrentModule('profil')}
-            onSettingsClick={() => setCurrentModule('parametres')}
             onLogout={onLogout}
             user={{
               nom: currentUser?.nom,

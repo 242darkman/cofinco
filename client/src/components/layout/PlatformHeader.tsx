@@ -14,11 +14,10 @@ interface PlatformHeaderProps {
   onMessagesClick: () => void;
   onMenuToggle: () => void;
   onProfileClick: () => void;
-  onSettingsClick: () => void;
   onLogout: () => void;
   user: {
     nom?: string;
-    prenom?: string; // Add prenom to interface
+    prenom?: string;
     email?: string;
     role?: string;
   };
@@ -30,7 +29,6 @@ export default function PlatformHeader({
   onMessagesClick,
   onMenuToggle,
   onProfileClick,
-  onSettingsClick,
   onLogout,
   user
 }: PlatformHeaderProps) {
@@ -107,10 +105,9 @@ export default function PlatformHeader({
 
 
         <div className="relative xl:ml-auto">
-          <UserProfileDropdown 
+          <UserProfileDropdown
             user={user}
             onProfileClick={onProfileClick}
-            onSettingsClick={onSettingsClick}
             onLogout={onLogout}
           />
         </div>

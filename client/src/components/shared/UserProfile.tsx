@@ -76,8 +76,9 @@ export default function UserProfile() {
         getRoleLabel={getRoleLabel}
       />
 
-      <SecuritySection 
+      <SecuritySection
         onChangePasswordClick={() => setShowPasswordModal(true)}
+        user={user}
       />
 
       <PasswordChangeModal 

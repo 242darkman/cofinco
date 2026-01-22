@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { User, Settings, LogOut, ChevronDown, Activity, Building2 } from 'lucide-react';
+import { User, LogOut, ChevronDown, Activity, Building2 } from 'lucide-react';
 import { getRoleLabel } from '@shared/types/roles';
 
 interface UserProfileDropdownProps {
@@ -13,7 +13,6 @@ interface UserProfileDropdownProps {
     agence?: string;
   };
   onProfileClick: () => void;
-  onSettingsClick: () => void;
   onActivityClick?: () => void;
   onLogout: () => void;
   className?: string;
@@ -39,7 +38,6 @@ const MenuItem: React.FC<MenuItemProps> = ({ icon: Icon, label, onClick }) => (
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   user,
   onProfileClick,
-  onSettingsClick,
   onActivityClick,
   onLogout,
   className = ''
@@ -178,14 +176,6 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
           onClick={() => {
             setIsOpen(false);
             onProfileClick();
-          }}
-        />
-        <MenuItem
-          icon={Settings}
-          label="Paramètres"
-          onClick={() => {
-            setIsOpen(false);
-            onSettingsClick();
           }}
         />
         {onActivityClick && (

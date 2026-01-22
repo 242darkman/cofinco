@@ -18,7 +18,6 @@ const TransfertArgent = lazy(() => import('@/components/finance/transfert/Transf
 const BourseModule = lazy(() => import('@/components/finance/bourse/BourseModule'));
 const ReportGenerator = lazy(() => import('@/components/shared/ReportGenerator'));
 const AdminModuleComplet = lazy(() => import('@/components/admin/AdminModuleComplet'));
-const ParametresModule = lazy(() => import('@/components/admin/settings/ParametresModule'));
 const MessagesModule = lazy(() => import('@/components/shared/MessagesModule'));
 const UserProfile = lazy(() => import('@/components/shared/UserProfile'));
 const ExcelModule = lazy(() => import('@/components/shared/ExcelModule'));
@@ -214,15 +213,6 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Administration',
     label: 'Administration',
     labelKey: 'menuAdmin',
-    group: 'Système',
-  },
-  {
-    key: 'parametres',
-    path: '/parametres',
-    component: ParametresModule,
-    requiredModule: 'Paramètres',
-    label: 'Paramètres',
-    labelKey: 'menuParametres',
     group: 'Système',
   },
   {
