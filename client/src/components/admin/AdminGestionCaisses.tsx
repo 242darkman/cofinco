@@ -55,16 +55,25 @@ export default function AdminGestionCaisses() {
   const [selectedCaisseForClose, setSelectedCaisseForClose] = useState<Caisse | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   
+  // Utiliser l'agenceId de la caisse sélectionnée pour récupérer les employés de cette agence
+  const targetAgenceId = selectedCaisseForAssign?.agenceId || user?.agenceId;
+
   const { data: employees = [] } = useQuery<any[]>({
-    queryKey: ['employees', user?.agence],
+    queryKey: ['employes-agence', targetAgenceId],
     queryFn: async () => {
-        const res = await api.get<any[]>('/users'); 
-        return (res || []).filter((u: any) => {
-          const normalizedRole = normalizeRole(u.role);
-          return u.agence === user?.agence && !isAdminRole(normalizedRole);
-        });
+        const res = await api.get<any[]>(`/employes?agenceId=${targetAgenceId}`);
+        return (res || []).filter((emp: any) => {
+          const normalizedRole = normalizeRole(emp.role);
+          return !isAdminRole(normalizedRole);
+        }).map((emp: any) => ({
+          id: emp.user?.id,
+          nom: emp.user?.nom,
+          prenom: emp.user?.prenom,
+          username: emp.user?.username,
+          role: emp.role
+        }));
     },
-    enabled: isAssignModalOpen
+    enabled: isAssignModalOpen && !!targetAgenceId
   });
 
   const assignMutation = useMutation({
