@@ -1,10 +1,10 @@
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState } from 'react';
 import { Phone, Mail, MessageSquare, Send, X, Copy, Check } from 'lucide-react';
 import { Card, Badge, IconButton } from '../ui';
 
 interface ClientActionsProps {
-  client: Client;
+  client: ClientWithIdentity;
   onActionComplete?: () => void;
 }
 

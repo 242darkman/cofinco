@@ -1,16 +1,24 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
-import { createServer } from "http";
 import { setupAuth, hashPassword } from "./auth";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { log, logError, logWarn } from "./logger";
 import { scheduleAuditPurge } from "./audit";
 import { sessionActivityMiddleware, scheduleSessionCleanup } from "./session-tracker";
+import { setDbContext } from "./middleware/db-context";
+import {
+  helmetConfig,
+  authLimiter,
+  apiLimiter,
+  sensitiveOpsLimiter,
+  uploadLimiter,
+  hideServerInfo,
+  additionalSecurityHeaders,
+} from "./middleware/security";
 import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
 import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
 import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
@@ -34,84 +42,52 @@ declare module "http" {
   }
 }
 
-// ========== SECURITY HEADERS (Bank-grade) ==========
-// Note: In development, unsafe-inline/unsafe-eval are needed for React/Vite HMR
-// In production builds, CSP can be stricter with nonce-based policies
-const isProduction = process.env.NODE_ENV === 'production';
+// ========== SECURITY MIDDLEWARE (Bank-grade) ==========
+// All security configuration is centralized in ./middleware/security.ts
 
-app.use(helmet({
-  contentSecurityPolicy: isProduction ? {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com", "https://unpkg.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "https:", "wss:"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-      baseUri: ["'self'"],
-      formAction: ["'self'"],
-      upgradeInsecureRequests: [],
-    },
-  } : {
-    // Development mode - allow inline for HMR
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com", "https://unpkg.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      connectSrc: ["'self'", "https:", "wss:"],
-      frameSrc: ["'none'"],
-      objectSrc: ["'none'"],
-      upgradeInsecureRequests: [],
-    },
-  },
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  // Additional security headers
-  hsts: {
-    maxAge: 31536000, // 1 year
-    includeSubDomains: true,
-    preload: true,
-  },
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  noSniff: true,
-  xssFilter: true,
+// 1. Hide server info (remove X-Powered-By, Server headers)
+app.use(hideServerInfo);
+
+// 2. Helmet security headers (CSP, HSTS, XSS protection, etc.)
+app.use(helmetConfig);
+
+// 3. Additional security headers (Permissions-Policy, Cache-Control for API)
+app.use(additionalSecurityHeaders);
+
+// ========== COMPRESSION (Gzip/Brotli for slow connections) ==========
+// Reduces payload size by 60-80% - Critical for 3G/slow networks
+app.use(compression({
+  level: 6, // Good balance between speed and compression ratio
+  threshold: 1024, // Only compress responses > 1KB
+  filter: (req, _res) => {
+    // Don't compress WebSocket upgrade requests
+    if (req.headers.upgrade === 'websocket') {
+      return false;
+    }
+    // Don't compress already compressed content types
+    const contentType = req.headers['accept'] || '';
+    if (contentType.includes('image/') || contentType.includes('video/')) {
+      return false;
+    }
+    // Use compression's default filter for everything else
+    return compression.filter(req, _res);
+  }
 }));
 
-// ========== RATE LIMITING (Protection against brute force) ==========
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // 500 requests per window
-  message: { error: "Trop de requêtes, veuillez réessayer plus tard" },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// ========== RATE LIMITING (Protection against brute force & DDoS) ==========
+// Limiters configured in ./middleware/security.ts with the following limits:
+// - authLimiter: 5 attempts / 15 min (login endpoints)
+// - apiLimiter: 200 requests / 15 min (general API)
+// - sensitiveOpsLimiter: 20 ops / min (financial transactions)
+// - uploadLimiter: 30 uploads / min (file uploads)
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 login attempts per window
-  message: { error: "Trop de tentatives de connexion, veuillez réessayer dans 15 minutes" },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true,
-});
-
-const sensitiveOperationsLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // 10 sensitive operations per minute
-  message: { error: "Opération trop fréquente, veuillez patienter" },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use("/api/", generalLimiter);
+app.use("/api/", apiLimiter);
 app.use("/api/auth/login", authLimiter);
-app.use("/api/credits", sensitiveOperationsLimiter);
-app.use("/api/remboursements", sensitiveOperationsLimiter);
-app.use("/api/transactions-epargne", sensitiveOperationsLimiter);
+app.use("/api/credits", sensitiveOpsLimiter);
+app.use("/api/remboursements", sensitiveOpsLimiter);
+app.use("/api/transactions-epargne", sensitiveOpsLimiter);
+app.use("/api/transferts", sensitiveOpsLimiter);
+app.use("/api/storage/upload", uploadLimiter);
 
 app.use(
   express.json({
@@ -172,6 +148,11 @@ app.use((req, res, next) => {
 
   // Session activity tracking middleware (must be after auth setup)
   app.use(sessionActivityMiddleware);
+
+  // RLS Database Context middleware (builds context for Row Level Security)
+  // Note: The actual RLS enforcement requires using withDbContext() or withDbContextTransaction()
+  // in route handlers for critical operations. This middleware just prepares the context.
+  app.use(setDbContext);
 
   // Schedule automatic audit log purge (every 3 months retention)
   scheduleAuditPurge();

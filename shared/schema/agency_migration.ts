@@ -47,7 +47,7 @@ export const agencyMigrations = pgTable("agency_migrations", {
   targetTreasuryAgencyId: uuid("target_treasury_agency_id").references(() => agences.id),
 
   // Statut et progression
-  status: text("status").notNull().default(MIGRATION_STATUS.DRAFT),
+  statut: text("statut").notNull().default(MIGRATION_STATUS.DRAFT),
   progress: integer("progress").notNull().default(0), // 0-100
   currentStep: text("current_step"), // Étape en cours (clients, comptes, credits, etc.)
 
@@ -91,7 +91,7 @@ export const agencyMigrations = pgTable("agency_migrations", {
   // Metadata extensible
   metadata: jsonb("metadata")
 }, (table) => ({
-  idxMigrationStatus: index("idx_agency_migration_status").on(table.status),
+  idxMigrationStatus: index("idx_agency_migration_status").on(table.statut),
   idxMigrationSourceAgency: index("idx_agency_migration_source").on(table.sourceAgencyId),
   idxMigrationScheduledAt: index("idx_agency_migration_scheduled").on(table.scheduledAt),
   idxMigrationCreatedAt: index("idx_agency_migration_created").on(table.createdAt),
@@ -166,8 +166,8 @@ export const migrationAuditLogs = pgTable("migration_audit_logs", {
   action: text("action").notNull(), // CREATED, SCHEDULED, APPROVED, STARTED, STEP_COMPLETED, FAILED, COMPLETED, CANCELLED, ROLLBACK
 
   // État avant/après
-  statusBefore: text("status_before"),
-  statusAfter: text("status_after"),
+  statutAvant: text("statut_avant"),
+  statutApres: text("statut_apres"),
 
   // Détails
   details: jsonb("details").notNull(),
@@ -199,7 +199,7 @@ export const insertAgencyMigrationSchema = createInsertSchema(agencyMigrations).
   updatedAt: true,
   completedAt: true,
   progress: true,
-  status: true,
+  statut: true,
   logs: true,
   error: true,
   errorDetails: true,

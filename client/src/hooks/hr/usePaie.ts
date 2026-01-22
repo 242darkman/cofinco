@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from '../../lib/toast';
 
 export interface BulletinPaie {
   id: number;
@@ -64,21 +65,11 @@ export function usePaie() {
         return res.json();
     },
     onSuccess: (data) => {
-        // toast({
-        //     title: "Génération réussie",
-        //     description: data.message,
-        //     variant: "default" 
-        // });
-        alert(data.message);
+        toast.success(data.message || 'Génération de paie réussie');
         queryClient.invalidateQueries({ queryKey: ['all-bulletins'] });
     },
     onError: (error: Error) => {
-        // toast({
-        //     title: "Erreur",
-        //     description: error.message,
-        //     variant: "destructive"
-        // });
-        alert(error.message);
+        toast.error(error.message || 'Erreur lors de la génération de paie');
     }
   });
 

@@ -6,18 +6,47 @@ import { useUserProfile } from '../../hooks/useUserProfile';
 import { hrPresenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 
+// Interfaces typées pour remplacer les `any`
+interface PresenceRecord {
+  id: number;
+  employeId: string;
+  nom?: string;
+  prenom?: string;
+  poste?: string;
+  statut: string;
+  heureArrivee: string | null;
+  heureDepart: string | null;
+  pauseDebut: string | null;
+  pauseFin: string | null;
+}
+
+interface PresenceStats {
+  totalEmployes: number;
+  presents: number;
+  retards: number;
+  absents: number;
+  tauxPresence: number;
+  liste: PresenceRecord[];
+}
+
+interface EmployePresenceData extends Employe {
+  presenceStatus: string;
+  presenceColor: 'success' | 'warning' | 'danger' | 'neutral';
+  arrivalTime: string;
+}
+
 interface PresenceTrackerProps {
   employes: Employe[];
 }
 
 export default function PresenceTracker({ employes }: PresenceTrackerProps) {
   const { user } = useUserProfile();
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<PresenceStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalStatus, setModalStatus] = useState('');
-  const [modalEmployees, setModalEmployees] = useState<any[]>([]);
-  const [userPresence, setUserPresence] = useState<any>(null); // Current user's presence state
+  const [modalEmployees, setModalEmployees] = useState<PresenceRecord[]>([]);
+  const [userPresence, setUserPresence] = useState<PresenceRecord | null>(null);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,11 +67,11 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
   const fetchPresenceStats = useCallback(async () => {
     setLoading(true);
     try {
-        const data = await hrPresenceApi.getToday();
+        const data = await hrPresenceApi.getToday() as PresenceStats;
         setStats(data);
         // Find current user's presence using authenticated user ID
-        const myPresence = data.liste?.find((p: any) => p.employeId === user?.id);
-        setUserPresence(myPresence);
+        const myPresence = data.liste?.find((p: PresenceRecord) => p.employeId === user?.id);
+        setUserPresence(myPresence || null);
     } catch (error) {
         toast.error(handleApiError(error, 'Erreur lors du chargement des présences'));
     } finally {
@@ -103,18 +132,18 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
 
   if(!stats) return <div className="p-4 text-center text-slate-400">Chargement des présences...</div>;
 
-  const getPresenceStatus = (empId: string) => {
-      const record = stats.liste?.find((p: any) => p.employeId === empId);
+  const getPresenceStatus = (empId: string): { status: string; color: 'success' | 'warning' | 'danger' | 'neutral'; time: string } => {
+      const record = stats?.liste?.find((p: PresenceRecord) => p.employeId === empId);
       if (!record) return { status: 'Non pointé', color: 'neutral', time: '-' };
-      return { 
-          status: record.statut, 
+      return {
+          status: record.statut,
           color: record.statut === 'Présent' ? 'success' : record.statut === 'Retard' ? 'warning' : 'danger',
           time: record.heureArrivee ? new Date(record.heureArrivee).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '-'
       };
   };
 
   // Merge employees with presence data
-  const presenceData = employes.map(emp => {
+  const presenceData: EmployePresenceData[] = employes.map(emp => {
       const statusData = getPresenceStatus(emp.id);
       return {
           ...emp,
@@ -132,9 +161,9 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
   );
 
   const columns = [
-      { 
+      {
           label: 'Employé', key: 'nom', primary: true,
-          format: (val: string, item: any) => (
+          format: (val: string, item: EmployePresenceData) => (
               <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
                       {item.nom?.charAt(0)}{item.prenom?.charAt(0)}
@@ -152,8 +181,8 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
       },
       {
           label: 'Statut', key: 'presenceStatus',
-          format: (val: string, item: any) => (
-              <Badge variant={item.presenceColor as any} value={val} size="sm" />
+          format: (val: string, item: EmployePresenceData) => (
+              <Badge variant={item.presenceColor} value={val} size="sm" />
           )
       }
   ];

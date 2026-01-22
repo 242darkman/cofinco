@@ -2,14 +2,15 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { authService } from '../lib/auth';
 import { setCurrentAgenceId } from '../lib/api-client';
 import { isAdminRole } from '@shared/types/roles';
+import { StatutCoffre, TypeAgence, TypeAgenceType } from '@shared/enum/status-constants';
 
 export interface Agence {
   id: string;
   codeAgence: string;
   nom: string;
-  typeAgence: 'Principale' | 'Secondaire' | 'Kiosque';
+  typeAgence: TypeAgenceType;
   ville?: string;
-  statut: 'Actif' | 'Suspendu' | 'Fermé';
+  statut: 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
 }
 
 export interface UserAgence {
@@ -72,8 +73,8 @@ export function AgenceProvider({ children }: { children: ReactNode }) {
           data = allAgences.map(a => ({
             id: `admin-${a.id}`,
             agenceId: a.id,
-            isPrimary: a.typeAgence === 'Principale',
-            actif: a.statut === 'Actif',
+            isPrimary: a.typeAgence === TypeAgence.MAIN,
+            actif: a.statut === StatutCoffre.ACTIVE,
             agence: a
           }));
 
@@ -87,8 +88,8 @@ export function AgenceProvider({ children }: { children: ReactNode }) {
               id: 'all',
               codeAgence: 'ALL',
               nom: 'Toutes les agences',
-              typeAgence: 'Principale',
-              statut: 'Actif'
+              typeAgence: TypeAgence.MAIN,
+              statut: StatutCoffre.ACTIVE
             }
           };
           data = [allOption, ...data];

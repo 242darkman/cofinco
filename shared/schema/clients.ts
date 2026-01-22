@@ -61,19 +61,7 @@ export const clients = pgTable("clients", {
   // Lien vers la table users (source de vérité pour l'identité)
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
 
-  // ===== CHAMPS LEGACY (à migrer vers users) =====
-  // Ces champs sont conservés temporairement pour la rétro-compatibilité
-  // Ils seront supprimés après migration complète vers users
-  nom: text("nom"), // LEGACY: Déplacé vers users.nom (temporairement nullable)
-  prenom: text("prenom"), // LEGACY: Déplacé vers users.prenom
-  email: text("email"), // LEGACY: Déplacé vers users.email
-  telephone: text("telephone"), // LEGACY: Déplacé vers users.telephone
-  photoUrl: text("photo_url"), // LEGACY: Déplacé vers users.photoProfile
-  photoProfile: text("photo_profile"), // LEGACY: Déplacé vers users.photoProfile
-  // ===== FIN CHAMPS LEGACY =====
-
   // Adresses
-  adresse: text("adresse"),
   adresseDomicile: text("adresse_domicile"),
   lieuActivite: text("lieu_activite"),
   ville: text("ville"),
@@ -87,16 +75,16 @@ export const clients = pgTable("clients", {
   // Situation professionnelle
   profession: text("profession"),
   employeur: text("employeur"),
-  typeActivite: text("type_activite"), // Added missing column
+  typeActivite: text("type_activite"),
   revenuMensuel: numeric("revenu_mensuel"),
   
   // KYC Documents
-  documents: jsonb("documents"), // Stockage documents KYC et Contrats format JSON
+  documents: jsonb("documents"),
 
   // Classification
   typeMarcheId: uuid("type_marche_id").references(() => typesMarches.id),
-  segment: text("segment").notNull().default("Standard"), // 'Standard', 'Premium', 'VIP'
-  frequenceCarte: text("frequence_carte").default("Journalier"),
+  segment: text("segment").notNull().default("STANDARD"),
+  frequenceCarte: text("frequence_carte").default("DAILY"),
 
   // Géolocalisation
   latitude: numeric("latitude"),
@@ -113,16 +101,12 @@ export const clients = pgTable("clients", {
 
   // Fidélité & Engagement
   pointsFidelite: integer("points_fidelite").default(0),
-  scoreEngagement: integer("score_engagement").default(0), // 0-100
+  scoreEngagement: integer("score_engagement").default(0),
   derniereActivite: timestamp("derniere_activite"),
 
   // Organisation
-  agence: text("agence"), // LEGACY: Champ pour isolation par agence (nom texte)
   agenceId: uuid("agence_id").references(() => agences.id),
   agentReferentId: uuid("agent_referent_id").references(() => employes.id), // Agent commercial référent
-
-  // Statut (LEGACY - le statut principal est dans users.statut)
-  status: text("status").notNull().default("Actif"),
 
   // Dates
   dateAdhesion: timestamp("date_adhesion").defaultNow(),
@@ -164,6 +148,24 @@ export const insertClientSchema = createInsertSchema(clients, {
 }).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
+
+/**
+ * Type Client avec données d'identité fusionnées depuis users
+ * Utilisé par l'API et le frontend pour avoir une vue complète
+ */
+export interface ClientWithIdentity extends Client {
+  // Champs d'identité (proviennent de users)
+  nom: string;
+  prenom: string | null;
+  email: string | null;
+  telephone: string | null;
+  photoProfile: string | null;
+  statut: string;
+  // Champs enrichis (jointures)
+  type_marche_nom?: string | null;
+  agence_nom?: string | null;
+  photoUrl?: string | null;
+}
 
 // Tags definition
 export const tags = pgTable("tags", {

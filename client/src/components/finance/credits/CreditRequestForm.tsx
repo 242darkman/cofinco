@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { DollarSign, Calendar, FileText, TrendingUp, AlertCircle, Save, RefreshCw } from 'lucide-react';
 import { clientSearchApi, demandeCreditApi, creditPlanApi, clientApi } from '../../../lib/api-client';
 import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../ui';
-import { formatClientName } from '../../../lib/format';
+import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { StatutDemande } from '@shared/enum/status-constants';
 import useSmartDuration from '../../../hooks/credits/useSmartDuration';
 import DurationSelector from './DurationSelector';
 
@@ -55,7 +56,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     credit_plan_id: '',
     montant_demande: '',
     duree_valeur: '',
-    duree_unite: 'Mois' as 'Jour' | 'Semaine' | 'Mois',
+    duree_unite: 'MONTH' as 'DAY' | 'WEEK' | 'MONTH',
     taux_interet: '',
     frequence_remboursement: '',
     type_credit: 'Personnel',
@@ -108,27 +109,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     tauxEndettement: 0
   });
 
-  // Helper to normalize photo URLs (same logic as ClientModule)
-  const getPhotoUrl = (rawUrl: string | undefined | null): string => {
-    if (!rawUrl) return '';
-    if (rawUrl.startsWith('data:')) return rawUrl;
-    if (rawUrl.startsWith('/api/')) return rawUrl;
-    if (rawUrl.startsWith('/')) return rawUrl;
-    if (rawUrl.startsWith('http')) {
-      try {
-        const url = new URL(rawUrl);
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        if (pathParts.length >= 2) {
-          const key = pathParts.slice(1).join('/');
-          return `/api/uploads/files/${key}`;
-        }
-        return rawUrl;
-      } catch {
-        return rawUrl;
-      }
-    }
-    return `/api/uploads/files/${rawUrl}`;
-  };
+  // Alias pour la résolution des URLs de photos
+  const getPhotoUrl = resolveStorageUrl;
 
   useEffect(() => {
     // Initial load: fetch some clients or at least verify initial clientId
@@ -188,9 +170,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   // Convertir duree en jours pour les calculs
   const convertirDureeEnJours = useCallback((valeur: number, unite: string): number => {
     switch (unite) {
-      case 'Jour': return valeur;
-      case 'Semaine': return valeur * 7;
-      case 'Mois': return valeur * 30;
+      case 'DAY': return valeur;
+      case 'WEEK': return valeur * 7;
+      case 'MONTH': return valeur * 30;
       default: return valeur;
     }
   }, []);
@@ -199,11 +181,11 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   const calculerNombreEcheances = useCallback((frequence: string, dureeValeur: number, dureeUnite: string): number => {
     const joursTotal = convertirDureeEnJours(dureeValeur, dureeUnite);
     switch (frequence) {
-      case 'Journalier': return joursTotal;
-      case 'Hebdomadaire': return Math.ceil(joursTotal / 7);
-      case 'Mensuel': return Math.ceil(joursTotal / 30);
-      case 'Bimensuel': return Math.ceil(joursTotal / 15);
-      case 'Trimestriel': return Math.ceil(joursTotal / 90);
+      case 'DAILY': return joursTotal;
+      case 'WEEKLY': return Math.ceil(joursTotal / 7);
+      case 'MONTHLY': return Math.ceil(joursTotal / 30);
+      case 'BI_MONTHLY': return Math.ceil(joursTotal / 15);
+      case 'QUARTERLY': return Math.ceil(joursTotal / 90);
       default: return joursTotal;
     }
   }, [convertirDureeEnJours]);
@@ -292,13 +274,13 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
       // Calcul du montant mensuel equivalent pour le taux d'endettement
       let montantEcheanceMensuel = montantEcheance;
-      if (formData.frequence_remboursement === 'Journalier') {
+      if (formData.frequence_remboursement === 'DAILY') {
         montantEcheanceMensuel = montantEcheance * 30;
-      } else if (formData.frequence_remboursement === 'Hebdomadaire') {
+      } else if (formData.frequence_remboursement === 'WEEKLY') {
         montantEcheanceMensuel = montantEcheance * 4;
-      } else if (formData.frequence_remboursement === 'Bimensuel') {
+      } else if (formData.frequence_remboursement === 'BI_MONTHLY') {
         montantEcheanceMensuel = montantEcheance * 2;
-      } else if (formData.frequence_remboursement === 'Trimestriel') {
+      } else if (formData.frequence_remboursement === 'QUARTERLY') {
         montantEcheanceMensuel = montantEcheance / 3;
       }
 
@@ -415,7 +397,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         typeRevenu: formData.type_revenu,
         revenuJournalier: formData.revenu_journalier,
         chargesMensuelles: formData.charges_mensuelles,
-        statut: 'En attente',
+        statut: StatutDemande.PENDING_FEES,
         montantFraisEngagement,
         ...overridePayload,
       });
@@ -450,29 +432,29 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
   const frequenceOptions = [
     { value: '', label: 'Selectionner une frequence...' },
-    { value: 'Journalier', label: 'Journalier (chaque jour)' },
-    { value: 'Hebdomadaire', label: 'Hebdomadaire (chaque semaine)' },
-    { value: 'Mensuel', label: 'Mensuel (chaque mois)' },
-    { value: 'Bimensuel', label: 'Bimensuel (2 fois par mois)' },
-    { value: 'Trimestriel', label: 'Trimestriel (tous les 3 mois)' }
+    { value: 'DAILY', label: 'Journalier (chaque jour)' },
+    { value: 'WEEKLY', label: 'Hebdomadaire (chaque semaine)' },
+    { value: 'MONTHLY', label: 'Mensuel (chaque mois)' },
+    { value: 'BI_MONTHLY', label: 'Bimensuel (2 fois par mois)' },
+    { value: 'QUARTERLY', label: 'Trimestriel (tous les 3 mois)' }
   ];
 
   const getUniteLabel = (unite: string) => {
     switch (unite) {
-      case 'Jour': return 'jours';
-      case 'Semaine': return 'semaines';
-      case 'Mois': return 'mois';
+      case 'DAY': return 'jours';
+      case 'WEEK': return 'semaines';
+      case 'MONTH': return 'mois';
       default: return unite;
     }
   };
 
   const getFrequenceEcheanceLabel = () => {
     switch (formData.frequence_remboursement) {
-      case 'Journalier': return 'Jour';
-      case 'Hebdomadaire': return 'Semaine';
-      case 'Mensuel': return 'Mois';
-      case 'Bimensuel': return 'Quinzaine';
-      case 'Trimestriel': return 'Trimestre';
+      case 'DAILY': return 'Jour';
+      case 'WEEKLY': return 'Semaine';
+      case 'MONTHLY': return 'Mois';
+      case 'BI_MONTHLY': return 'Quinzaine';
+      case 'QUARTERLY': return 'Trimestre';
       default: return 'Echeance';
     }
   };
@@ -646,7 +628,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                   frequence_remboursement: newFrequence,
                   // Reset duree when frequence changes
                   duree_valeur: '',
-                  duree_unite: 'Mois'
+                  duree_unite: 'MONTH'
                 });
               }}
               options={frequenceOptions}
@@ -666,15 +648,15 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 amount={parseFloat(formData.montant_demande) || 0}
                 interestRate={parseFloat(formData.taux_interet) || suggestedRate}
                 frequence={formData.frequence_remboursement}
-                onSelect={(val, unit) => setFormData(prev => ({ 
-                  ...prev, 
-                  duree_valeur: String(val), 
-                  duree_unite: unit as 'Jour' | 'Semaine' | 'Mois' 
+                onSelect={(val, unit) => setFormData(prev => ({
+                  ...prev,
+                  duree_valeur: String(val),
+                  duree_unite: unit as 'DAY' | 'WEEK' | 'MONTH'
                 }))}
                 manualValue={formData.duree_valeur}
                 onManualChange={(val) => setFormData(prev => ({ ...prev, duree_valeur: val }))}
                 manualUnit={formData.duree_unite}
-                onUnitChange={(unit) => setFormData(prev => ({ ...prev, duree_unite: unit as 'Jour' | 'Semaine' | 'Mois' }))}
+                onUnitChange={(unit) => setFormData(prev => ({ ...prev, duree_unite: unit as 'DAY' | 'WEEK' | 'MONTH' }))}
                 validationResult={durationValidation}
                 calculateInstallment={calculateInstallment}
                 planColor={selectedPlan ? 'border-teal-500 bg-teal-600' : undefined}

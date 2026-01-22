@@ -4,7 +4,7 @@ import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, Clipboar
 import { usePermissions } from '../auth/ProtectedFeature';
 
 // Hooks
-import { useEmployes } from '../../hooks/hr/useEmployes';
+import { useEmployes, Employe, EmployeFormData } from '../../hooks/hr/useEmployes';
 import { useConges } from '../../hooks/hr/useConges';
 import { useFormations } from '../../hooks/hr/useFormations';
 import { useAvantages } from '../../hooks/hr/useAvantages';
@@ -47,7 +47,7 @@ export default function RessourcesHumaines() {
   const [activeTab, setActiveTab] = useState<TabKey>('list');
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingEmploye, setEditingEmploye] = useState<any>(null);
+  const [editingEmploye, setEditingEmploye] = useState<Employe | null>(null);
 
   // Hooks
   const {
@@ -100,7 +100,7 @@ export default function RessourcesHumaines() {
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
   // Handlers
-  const handleEdit = (employe: any) => {
+  const handleEdit = (employe: Employe) => {
     setEditingEmploye(employe);
     setShowForm(true);
   };
@@ -117,7 +117,7 @@ export default function RessourcesHumaines() {
     });
   };
 
-  const handleSave = async (data: any) => {
+  const handleSave = async (data: EmployeFormData) => {
     if (editingEmploye) {
       return await updateEmploye(editingEmploye.id, data);
     } else {
@@ -125,11 +125,26 @@ export default function RessourcesHumaines() {
     }
   };
 
-  const handleCreateSanction = async (data: any) => {
+  const handleCreateSanction = async (data: {
+    employeId: string;
+    employeNom: string;
+    type: string;
+    motif: string;
+    date: string;
+    gravite: string;
+  }) => {
     return await createSanction(data);
   };
 
-  const handleCreateCandidat = async (data: any) => {
+  const handleCreateCandidat = async (data: {
+    nom: string;
+    prenom: string;
+    email: string;
+    telephone?: string;
+    posteVise: string;
+    experience?: string;
+    formation?: string;
+  }) => {
     return await createCandidature(data);
   };
 
@@ -266,7 +281,26 @@ export default function RessourcesHumaines() {
         }}
         onSave={handleSave}
         editingEmploye={editingEmploye}
-        initialData={editingEmploye || {
+        allEmployes={employes}
+        initialData={editingEmploye ? {
+          matricule: editingEmploye.matricule,
+          nom: editingEmploye.nom,
+          prenom: editingEmploye.prenom,
+          sexe: editingEmploye.sexe,
+          email: editingEmploye.email || '',
+          phone: editingEmploye.phone || '',
+          dateNaissance: editingEmploye.dateNaissance || '',
+          dateEmbauche: editingEmploye.dateEmbauche,
+          adresse: editingEmploye.adresse || '',
+          ville: editingEmploye.ville || '',
+          departement: editingEmploye.departement || '',
+          poste: editingEmploye.poste,
+          typeContrat: editingEmploye.typeContrat,
+          salaireBase: editingEmploye.salaireBase,
+          numeroCnss: editingEmploye.numeroCnss || '',
+          photoProfile: editingEmploye.photoProfile || '',
+          managerId: editingEmploye.managerId || null
+        } : {
           matricule: '',
           nom: '',
           prenom: '',
@@ -281,7 +315,8 @@ export default function RessourcesHumaines() {
           poste: '',
           typeContrat: 'CDI',
           salaireBase: '',
-          numeroCnss: ''
+          numeroCnss: '',
+          managerId: null
         }}
       />
 

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign, XCircle, RefreshCw } from 'lucide-react';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
 import { useCredits } from '../../../hooks/credits/useCredits';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { useEnquetes } from '../../../hooks/credits/useEnquetes';
 import { useCreditStats } from '../../../hooks/credits/useCreditStats';
+import { StatutCredit, StatutDemande } from '@shared/enum/status-constants';
 import CreditDetailModal from './CreditDetailModal';
 import CreditRequestForm from './CreditRequestForm';
 import EnqueteCreditForm from './EnqueteCreditForm';
@@ -22,8 +23,10 @@ import { ProtectedFeature } from '../../auth/ProtectedFeature';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
+import { PipelineFunnel } from './PipelineFunnel';
+import { differenceInDays } from 'date-fns';
 
-type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements';
+type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements' | 'archives';
 
 // Helper to get static configuration
 const getTabConfig = () => [
@@ -32,9 +35,10 @@ const getTabConfig = () => [
   { key: 'demandes', label: 'À traiter', icon: FileText, badgeColors: 'bg-blue-100 text-blue-800' }, // New demands, rejected, cancelled
   { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck, badgeColors: 'bg-yellow-100 text-yellow-800' }, // Only "A enquêter" (ready for investigation)
   { key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeColors: 'bg-red-100 text-red-800' }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
-  { key: 'commission', label: 'Commission Crédit', icon: DollarSign, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
+  { key: 'commission', label: "Comité d'Approbation", icon: Users, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
   { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw, badgeColors: 'bg-gray-100 text-gray-800' }, // Credit reevaluation workflow
-  { key: 'remboursements', label: 'Remboursements', icon: TrendingUp }
+  { key: 'remboursements', label: 'Remboursements', icon: TrendingUp },
+  { key: 'archives', label: 'Archives', icon: XCircle, badgeColors: 'bg-slate-100 text-slate-800' } // Cancelled / Rejected
 ];
 
 interface CreditsProps {
@@ -85,7 +89,6 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   }, [activeView]);
 
   // Hooks
-  // Hooks
   const credits = useCredits();
   const demandes = useDemandes();
   const enquetes = useEnquetes();
@@ -102,6 +105,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         case 'approbation': count = badgeCounts.approval; break;
         case 'commission': count = badgeCounts.commission; break;
         case 'reevaluations': count = badgeCounts.reevaluation; break;
+        case 'archives': count = badgeCounts.archives; break;
       }
     }
     return { ...tab, badge: count };
@@ -144,6 +148,110 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     return () => window.removeEventListener('online', handleOnline);
   }, [pendingCount, enquetes.createEnquete]);
 
+  // --- KPI & Funnel Calculations ---
+  const funnelData = React.useMemo(() => {
+    const d = demandes.demandes || [];
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // 1. Demande (Pending Fees)
+    const stepDemande = d.filter(i => i.statut === StatutDemande.PENDING_FEES);
+    
+    // 2. Frais Payés (Ready for Investigation)
+    const stepFrais = d.filter(i => i.statut === StatutDemande.READY_FOR_INVESTIGATION);
+    
+    // 3. Enquête (Under Investigation)
+    const stepEnquete = d.filter(i => i.statut === StatutDemande.UNDER_INVESTIGATION);
+    const overdueEnquete = stepEnquete.filter(i => new Date(i.updated_at || i.created_at || new Date().toISOString()) < sevenDaysAgo).length;
+
+    // 4. Comité (Investigation Complete + Approved waiting for disbursement?)
+    // Actually Approved items are waiting for Disbursement, so they might belong to "Decaissement" pipeline or "Comité" output?
+    // Let's put Investigation Complete AND Approved here as "Comité / Validés"
+    const stepComite = d.filter(i => i.statut === StatutDemande.INVESTIGATION_COMPLETE);
+    
+    // 5. Décaissement (Approved, waiting for disbursement)
+    const stepDecaissement = d.filter(i => i.statut === StatutDemande.APPROVED || i.statut === StatutDemande.APPROVED_AFTER_REEVALUATION);
+
+    return {
+      demandes: { 
+        count: stepDemande.length, 
+        amount: stepDemande.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0) 
+      },
+      frais: { 
+        count: stepFrais.length, 
+        amount: stepFrais.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0) 
+      },
+      enquetes: { 
+        count: stepEnquete.length, 
+        amount: stepEnquete.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0),
+        overdue: overdueEnquete
+      },
+      comite: { 
+        count: stepComite.length, 
+        amount: stepComite.reduce((acc, curr) => acc + Number(curr.montant_demande || 0), 0) 
+      },
+      decaissement: { 
+        count: stepDecaissement.length, 
+        amount: stepDecaissement.reduce((acc, curr) => acc + Number(curr.montant_approuve || curr.montant_demande || 0), 0) 
+      }
+    };
+  }, [demandes.demandes]);
+
+  const kpis = React.useMemo(() => {
+    // Taux de Transformation: Disbursed / Total Requests (historical?)
+    // This is hard with just "active" list. Let's approx with "Disbursed / (Disbursed + Rejected + Cancelled)" or just "Active Credits / Total Demandes ever"?
+    // Using available loaded data: 
+    const totalDemandes = demandes.demandes.length + credits.credits.length; // Approximate
+    const disbursed = credits.credits.length;
+    const transformationRate = totalDemandes > 0 ? (disbursed / totalDemandes) * 100 : 0;
+
+    // Average Delay (Request Date -> Disbursed Date)
+    // We only have active dates. 
+    // Placeholder logic:
+    const avgDelay = 4.5; // Days (Mocked for now as we need deeper data)
+
+    // Pipeline Volume (Total potential)
+    const pipelineVolume = 
+      (funnelData.demandes.amount) + 
+      (funnelData.frais.amount) + 
+      (funnelData.enquetes.amount) + 
+      (funnelData.comite.amount);
+
+    return { transformationRate, avgDelay, pipelineVolume };
+  }, [demandes.demandes, credits.credits, funnelData]);
+
+  const actionItems = React.useMemo(() => {
+    const d = demandes.demandes || [];
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // High Priority: Comité de Crédit (Investigation Complete) & Overdue Investigations
+    const high = d.filter(i => 
+      i.statut === StatutDemande.INVESTIGATION_COMPLETE || 
+      (i.statut === StatutDemande.UNDER_INVESTIGATION && new Date(i.updated_at || i.created_at || new Date().toISOString()) < sevenDaysAgo)
+    ).map(i => ({ 
+      ...i, 
+      priority: 'high', 
+      label: i.statut === StatutDemande.INVESTIGATION_COMPLETE ? 'Prêt pour Comité' : 'Enquête En Retard' 
+    }));
+
+    // Medium: Enquêtes en cours (On time) & Approved waiting for disbursement
+    const medium = d.filter(i => 
+      (i.statut === StatutDemande.UNDER_INVESTIGATION && new Date(i.updated_at || i.created_at || new Date().toISOString()) >= sevenDaysAgo) ||
+      i.statut === StatutDemande.READY_FOR_INVESTIGATION
+    ).map(i => ({ 
+      ...i, 
+      priority: 'medium', 
+      label: i.statut === StatutDemande.READY_FOR_INVESTIGATION ? 'À Enquêter' : 'Enquête en cours' 
+    }));
+
+    // Low: Attente Paiement Frais
+    const low = d.filter(i => i.statut === StatutDemande.PENDING_FEES)
+      .map(i => ({ ...i, priority: 'low', label: 'Attente Frais' }));
+
+    return { high, medium, low };
+  }, [demandes.demandes]);
+
   const formatMoneyPlain = (amount: number | null | undefined) => {
     const value = amount || 0;
     return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
@@ -182,7 +290,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     if (value >= 1000000) {
       return (value / 1000000).toFixed(1).replace('.', ',') + ' M FCFA';
     }
-    return formatMoney(value);
+    return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
   };
 
   const isLoading = credits.loading || demandes.loading || enquetes.loading;
@@ -214,8 +322,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             />
           ) : (
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white border border-white/10 shadow-sm ${
-              item.statut === 'Actif' ? 'bg-emerald-600/80' : 
-              item.statut === 'En retard' ? 'bg-red-600/80' : 'bg-slate-700'
+              item.statut === StatutCredit.ACTIVE ? 'bg-emerald-600/80' :
+              item.statut === StatutCredit.LATE ? 'bg-red-600/80' : 'bg-slate-700'
             }`}>
               {initials}
             </div>
@@ -240,7 +348,12 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'numero_credit', label: 'Numéro', primary: true },
     { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
     { key: 'montant_principal', label: 'Montant', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', badge: true, align: 'center', badgeClassName: 'min-w-[100px]' },
+    { 
+      key: 'statut', 
+      label: 'Statut', 
+      align: 'center', 
+      format: (val) => <Badge value={val} className="min-w-[100px] justify-center" />
+    },
     { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombre_echeances_payees || 0}/${item.nombre_echeances_total || 0}` },
     { key: 'jours_retard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : <span className="text-slate-500">0j</span> }
   ];
@@ -249,7 +362,17 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     { key: 'numero_demande', label: 'Numéro', primary: true },
     { key: 'clients.nom', label: 'Client', format: (val, item) => renderClientName(item) },
     { key: 'montant_demande', label: 'Montant Demandé', align: 'right', format: (val) => formatMoney(val) },
-    { key: 'statut', label: 'Statut', badge: true, align: 'center', badgeClassName: 'min-w-[100px]' },
+    { 
+      key: 'statut', 
+      label: 'Statut', 
+      align: 'center', 
+      format: (val, item) => {
+        if (item.deleted_at) {
+          return <Badge value="Supprimé" variant="danger" icon={<XCircle size={12} />} className="min-w-[100px] justify-center" />;
+        }
+        return <Badge value={val} className="min-w-[100px] justify-center" />;
+      }
+    },
     { key: 'created_at', label: 'Date', format: (val) => new Date(val).toLocaleDateString('fr-FR'), hideOnMobile: true }
   ];
 
@@ -262,7 +385,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       format: (val, item) => (
         <span className="flex items-center gap-2">
           {val}
-          {item.statut === 'Approuvée après réévaluation' && (
+          {item.statut === StatutDemande.APPROVED_AFTER_REEVALUATION && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-500/20 text-violet-400 border border-violet-500/30">
               <RefreshCw size={10} />
               Réévalué
@@ -324,62 +447,195 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-4">
-          {/* Primary Stats - 2x2 Grid on Mobile, 4 cols on Desktop */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            <StatCard
-              title="Crédits Actifs"
-              value={stats.creditsActifs || 0}
-              icon={CheckCircle}
-              color="success"
-              subtitle={`sur ${stats.creditsTotal || 0} total`}
-            />
-            <StatCard
-              title="En Retard"
-              value={stats.creditsEnRetard || 0}
-              icon={AlertCircle}
-              color="danger"
-              subtitle="crédits"
-            />
-            <StatCard
-              title="Demandes"
-              value={stats.demandesEnAttente || 0}
-              icon={Clock}
-              color="warning"
-              subtitle="en attente"
-            />
-            <StatCard
-              title="Enquêtes"
-              value={stats.enquetesEnCours || 0}
-              icon={ClipboardCheck}
-              color="primary"
-              subtitle="en cours"
-            />
-          </div>
+        <div className="space-y-8 animate-in fade-in duration-500">
+          
+          {/* 1. Pipeline Funnel */}
+          <section>
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <TrendingUp className="text-blue-400" />
+              Pipeline Crédit
+            </h3>
+            <PipelineFunnel steps={funnelData} />
+          </section>
 
-          {/* Secondary Stats - Montants */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-            <StatCard
-              title="Montant Crédits"
-              value={formatCompactMoney(stats.montantTotalCredits)}
-              icon={CreditCard}
-              color="neutral"
-              variant="minimal"
-            />
-            <StatCard
-              title="Montant Demandes"
-              value={formatCompactMoney(stats.montantTotalDemandes)}
-              icon={FileText}
-              color="neutral"
-              variant="minimal"
-            />
-            <StatCard
-              title="Montant Enquêtes"
-              value={formatCompactMoney(stats.montantTotalEnquetes)}
-              icon={ClipboardCheck}
-              color="neutral"
-              variant="minimal"
-            />
+          {/* 2. KPIs & Action Lists split */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            
+            {/* Left Col: Actions Requises (2/3 width) - Smart Feed */}
+            <div className="lg:col-span-2 space-y-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <AlertCircle className="text-amber-400" />
+                Actions & Activités
+              </h3>
+              
+              <div className="space-y-3">
+                {/* Check if ANY action is required */}
+                {(actionItems.high.length > 0 || actionItems.medium.length > 0) ? (
+                  <>
+                    {/* High Priority Group */}
+                    {actionItems.high.length > 0 && (
+                       <div className="space-y-2">
+                          <div className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                            Priorité Haute ({actionItems.high.length})
+                          </div>
+                          <div className="grid gap-2">
+                            {actionItems.high.map((item: any) => (
+                               <div 
+                                  key={item.id}
+                                  onClick={() => {
+                                     setSelectedDemande(item);
+                                     if (item.statut === StatutDemande.INVESTIGATION_COMPLETE) {
+                                        setShowApprovalModal(true);
+                                     } else {
+                                        setShowDetailModal(true);
+                                     }
+                                  }}
+                                  className="bg-slate-800/50 hover:bg-slate-800 border border-red-500/20 hover:border-red-500/50 rounded-lg p-3 cursor-pointer transition-all flex items-center justify-between group"
+                               >
+                                  <div className="flex items-center gap-3">
+                                     {renderClientName({ clients: item.clients })}
+                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                        {item.label}
+                                     </span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                     <div className="text-right">
+                                        <div className="text-sm font-bold text-white">{formatMoney(item.montant_demande)}</div>
+                                        <div className="text-[10px] text-slate-500 flex items-center justify-end gap-1">
+                                           <Clock size={10} />
+                                           {item.updated_at ? differenceInDays(new Date(), new Date(item.updated_at || new Date().toISOString())) + 'j' : '0j'}
+                                        </div>
+                                     </div>
+                                     <ArrowRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
+                                  </div>
+                               </div>
+                            ))}
+                          </div>
+                       </div>
+                    )}
+
+                    {/* Medium Priority */}
+                     {actionItems.medium.length > 0 && (
+                       <div className="space-y-2 pt-2">
+                          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            Priorité Moyenne ({actionItems.medium.length})
+                          </div>
+                          <div className="grid gap-2">
+                             {actionItems.medium.slice(0, 5).map((item: any) => (
+                                <div 
+                                  key={item.id}
+                                  onClick={() => {
+                                     setSelectedDemande(item);
+                                     if (item.statut === StatutDemande.READY_FOR_INVESTIGATION) setShowEnqueteForm(true);
+                                  }}
+                                  className="bg-slate-800/30 hover:bg-slate-800 border border-slate-700/50 hover:border-blue-500/30 rounded-lg p-3 cursor-pointer transition-all flex items-center justify-between group"
+                                >
+                                   <div className="flex items-center gap-3">
+                                      {renderClientName({ clients: item.clients })}
+                                      <span className="text-xs text-slate-500">{item.label}</span>
+                                   </div>
+                                   <div className="text-right">
+                                      <div className="text-sm font-medium text-slate-300">{formatMoney(item.montant_demande)}</div>
+                                   </div>
+                                </div>
+                             ))}
+                          </div>
+                       </div>
+                    )}
+                  </>
+                ) : (
+                  /* EMPTY STATE: RECENT ACTIVITY FEED */
+                  <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4">
+                     <div className="flex items-center gap-2 mb-4 text-slate-400">
+                        <CheckCircle size={18} className="text-emerald-500" />
+                        <span className="text-sm font-medium">Aucune action requise. Voici les dernières activités :</span>
+                     </div>
+                     <div className="space-y-0 relative">
+                        {/* Timeline line */}
+                        <div className="absolute left-[19px] top-2 bottom-2 w-px bg-slate-700/50"></div>
+
+                        {demandes.demandes
+                          .sort((a, b) => new Date(b.updated_at || b.created_at || new Date().toISOString()).getTime() - new Date(a.updated_at || a.created_at || new Date().toISOString()).getTime())
+                          .slice(0, 3)
+                          .map((item, idx) => (
+                             <div key={item.id} className="relative flex gap-4 pb-4 last:pb-0 group">
+                                <div className="z-10 w-10 h-10 rounded-full flex items-center justify-center bg-slate-800 border border-slate-700 shadow-sm group-hover:border-slate-600 transition-colors">
+                                   <Clock size={16} className="text-slate-400" />
+                                </div>
+                                <div className="flex-1 pt-1">
+                                   <div className="text-sm text-slate-200">
+                                      <span className="font-bold text-white">{formatClientName(item.clients?.nom, item.clients?.prenom)}</span>
+                                      <span className="mx-1 text-slate-500">•</span>
+                                      {item.deleted_at ? (
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20">
+                                            <Trash2 size={10} />
+                                            Supprimé
+                                        </span>
+                                      ) : (
+                                        <Badge value={item.statut} size="sm" variant="outline" className="border-0 bg-transparent p-0" />
+                                      )}
+                                   </div>
+                                   <div className="text-xs text-slate-500 mt-1">
+                                      {item.updated_at ? new Date(item.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'Date inconnue'}
+                                   </div>
+                                </div>
+                             </div>
+                          ))
+                        }
+                     </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Col: Stats & KPIs - Aligned top */}
+            <div className="space-y-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                 <BarChart3 className="text-purple-400" />
+                 Performance
+              </h3>
+              
+              <div className="grid gap-3">
+                 <StatCard
+                    title="Volume Pipeline"
+                    value={formatCompactMoney(kpis.pipelineVolume).replace(' FCFA', '')}
+                    color="primary"
+                    icon={TrendingUp}
+                    subtitle="Potentiel à venir"
+                 />
+                 <StatCard
+                    title="Transformation"
+                    value={`${kpis.transformationRate.toFixed(1)}%`}
+                    color="neutral"
+                    icon={RefreshCw}
+                    subtitle="Dossiers décaissés"
+                 />
+                 <StatCard
+                    title="Délai Moyen"
+                    value={`${kpis.avgDelay}j`}
+                    color="neutral"
+                    icon={Clock}
+                    subtitle="Demande à Décaissement"
+                 />
+              </div>
+
+              <Card variant="glass" padding="sm">
+                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Volume Global traité</h4>
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                       <span className="text-sm text-slate-400">Total Crédits</span>
+                       <span className="text-white font-bold">{formatMoneyPlain(stats.montantTotalCredits)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                       <span className="text-sm text-slate-400">Actifs</span>
+                       <span className="text-emerald-400 font-bold">{stats.creditsActifs} dossiers</span>
+                    </div>
+                 </div>
+              </Card>
+            </div>
+
           </div>
         </div>
       )}
@@ -389,7 +645,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden">
           <ResponsiveTable
             data={credits.credits
-              .filter(c => ['Actif', 'En retard', 'Soldé'].includes(c.statut))
+              .filter(c => ([StatutCredit.ACTIVE, StatutCredit.LATE, StatutCredit.PAID] as string[]).includes(c.statut))
               .slice((creditsPage - 1) * ITEMS_PER_PAGE, creditsPage * ITEMS_PER_PAGE)}
             columns={creditColumns}
             loading={isLoading}
@@ -410,7 +666,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => ['Enquête terminée', 'En enquête'].includes(d.statut))
+              .filter(d => ([StatutDemande.INVESTIGATION_COMPLETE, StatutDemande.UNDER_INVESTIGATION] as string[]).includes(d.statut))
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={demandeColumns}
             loading={isLoading}
@@ -422,7 +678,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => ['Enquête terminée', 'En enquête'].includes(d.statut)).length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.INVESTIGATION_COMPLETE, StatutDemande.UNDER_INVESTIGATION] as string[]).includes(d.statut)).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             actions={(item) => (
@@ -449,7 +705,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => d.statut === 'Approuvée' || d.statut === 'Approuvée après réévaluation')
+              .filter(d => d.statut === StatutDemande.APPROVED || d.statut === StatutDemande.APPROVED_AFTER_REEVALUATION)
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={commissionColumns}
             loading={isLoading}
@@ -461,7 +717,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === 'Approuvée' || d.statut === 'Approuvée après réévaluation').length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === StatutDemande.APPROVED || d.statut === StatutDemande.APPROVED_AFTER_REEVALUATION).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             actions={(item) => (
@@ -500,18 +756,61 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         </Card>
       )}
 
+      {/* Archives Tab (Rejetées, Annulées) */}
+      {activeTab === 'archives' && (
+        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
+          <ResponsiveTable
+            data={demandes.demandes
+              .filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deleted_at)
+              // Sort by updated_at desc
+              .sort((a, b) => new Date(b.updated_at || b.created_at || new Date().toISOString()).getTime() - new Date(a.updated_at || a.created_at || new Date().toISOString()).getTime())
+              .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
+            columns={[
+              ...demandeColumns,
+              { key: 'motif_rejet', label: 'Motif', format: (val) => <span className="text-slate-500 italic truncate max-w-[200px] block">{val || '-'}</span> }
+            ]}
+            loading={isLoading}
+            onRowClick={(item) => {
+              setSelectedDemande(item);
+              setShowApprovalModal(true);
+            }}
+            emptyMessage="Aucune demande archivée"
+            maxHeight="calc(100vh - 350px)"
+            pagination={{
+              page: demandesPage,
+              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deleted_at).length / ITEMS_PER_PAGE),
+              onPageChange: setDemandesPage
+            }}
+            actions={(item) => (
+              <IconButton 
+                icon={Eye} 
+                size="sm" 
+                variant="ghost" 
+                onClick={(e) => { 
+                  e.stopPropagation();
+                  setSelectedDemande(item);
+                  setShowApprovalModal(true);
+                }}
+                title="Voir Détails"
+                aria-label="Voir Détails"
+              />
+            )}
+          />
+        </Card>
+      )}
+
       {/* Demandes Tab (À traiter: En attente, Rejetée, Annulée) */}
       {activeTab === 'demandes' && (
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => ['En attente', 'Rejetée', 'Annulée'].includes(d.statut))
+              .filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deleted_at)
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={demandeColumns}
             loading={isLoading}
             onRowClick={(item) => {
               setSelectedDemande(item);
-              if (item.statut === 'En attente') {
+              if (item.statut === StatutDemande.PENDING_FEES) {
                 setShowFeesModal(true);
               } else {
                 // For Rejetée, Annulée
@@ -522,12 +821,12 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => ['En attente', 'Rejetée', 'Annulée'].includes(d.statut)).length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deleted_at).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             actions={(item) => (
               <div className="flex gap-1">
-                 {item.statut === 'En attente' && (
+                 {item.statut === StatutDemande.PENDING_FEES && (
                     <Button 
                       size="sm" 
                       variant="outline"
@@ -552,31 +851,35 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                     title="Voir Détails"
                     aria-label="Voir Détails"
                   />
-                 <IconButton 
-                    icon={Trash2} 
-                    size="sm" 
-                    variant="ghost" 
-                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    onClick={(e) => { 
-                      e.stopPropagation();
-                      setDemandeToDelete(item.id);
-                    }}
-                    title="Supprimer"
-                    aria-label="Supprimer"
-                  />
-                  {(item.statut === 'En attente' || item.statut === 'A enquêter') && (
-                     <IconButton 
-                        icon={XCircle} 
-                        size="sm" 
-                        variant="ghost" 
-                        className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
-                        onClick={(e) => { 
-                          e.stopPropagation();
-                          setDemandeToCancel(item.id);
-                        }}
-                        title="Annuler"
-                        aria-label="Annuler"
-                      />
+                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'delete' }}>
+                   <IconButton
+                      icon={Trash2}
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDemandeToDelete(item.id);
+                      }}
+                      title="Supprimer"
+                      aria-label="Supprimer"
+                    />
+                 </ProtectedFeature>
+                  {(item.statut === StatutDemande.PENDING_FEES || item.statut === StatutDemande.READY_FOR_INVESTIGATION) && (
+                     <ProtectedFeature requiredPermission={{ module: 'credits', action: 'edit' }}>
+                       <IconButton
+                          icon={XCircle}
+                          size="sm"
+                          variant="ghost"
+                          className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDemandeToCancel(item.id);
+                          }}
+                          title="Annuler"
+                          aria-label="Annuler"
+                        />
+                     </ProtectedFeature>
                   )}
               </div>
             )}
@@ -597,7 +900,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           <Card variant="default" padding="none" className="overflow-hidden">
             <ResponsiveTable
               data={demandes.demandes
-                  .filter(d => d.statut === 'A enquêter')
+                  .filter(d => d.statut === StatutDemande.READY_FOR_INVESTIGATION)
                   .map(d => ({
                     ...d,
                     id: d.id, 

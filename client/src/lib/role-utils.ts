@@ -1,4 +1,5 @@
 import { ROLE_LABELS, SystemRole, normalizeRole } from '@shared/types/roles';
+import { StatutUser } from '@shared/enum/status-constants';
 
 const ROLE_CLASSES: Record<SystemRole, string> = {
   [SystemRole.ADMIN]: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
@@ -49,14 +50,14 @@ export const STATUS_STYLES: Record<string, { label: string; classes: string }> =
 export const getStatusBadgeStyle = (status: string) => {
   const s = (status || '').trim();
   const lower = s.toLowerCase();
-  
-  if (lower === 'actif' || lower === 'active') {
+
+  if (s === StatutUser.ACTIVE || lower === 'actif' || lower === 'active') {
     return STATUS_STYLES['Actif'];
   }
-  if (lower === 'inactif' || lower === 'inactive' || lower === 'bloqué' || lower === 'bloque') {
+  if (s === StatutUser.INACTIVE || s === StatutUser.SUSPENDED || lower === 'inactif' || lower === 'inactive' || lower === 'bloqué' || lower === 'bloque') {
     return STATUS_STYLES['Inactif'];
   }
-  
+
   return {
     label: s || 'N/A',
     classes: 'bg-slate-500/10 text-slate-400 border-slate-700/50'

@@ -7,12 +7,13 @@ import { agenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { AgencyMigrationWizard } from '../agences/AgencyMigrationWizard';
+import { TypeAgence, TypeAgenceType, StatutAgence, StatutAgenceType } from '@shared/enum/status-constants';
 
 interface Agence {
   id: string;
   codeAgence: string;
   nom: string;
-  typeAgence: 'Principale' | 'Secondaire' | 'Kiosque';
+  typeAgence: TypeAgenceType;
   adresse?: string;
   ville?: string;
   region?: string;
@@ -21,7 +22,7 @@ interface Agence {
   email?: string;
   responsableNom?: string;
   responsablePhone?: string;
-  statut: 'Actif' | 'Suspendu' | 'Fermé';
+  statut: StatutAgenceType;
   dateOuverture?: string;
   nombreEmployes: number;
   nombreClients: number;
@@ -56,7 +57,7 @@ export default function AdminGestionAgences() {
   const [formData, setFormData] = useState({
     codeAgence: '',
     nom: '',
-    typeAgence: 'Secondaire' as 'Principale' | 'Secondaire' | 'Kiosque',
+    typeAgence: TypeAgence.SECONDARY as TypeAgenceType,
     adresse: '',
     ville: '',
     region: '',
@@ -65,7 +66,7 @@ export default function AdminGestionAgences() {
     email: '',
     responsableNom: '',
     responsablePhone: '',
-    statut: 'Actif' as 'Actif' | 'Suspendu' | 'Fermé',
+    statut: StatutAgence.ACTIVE as StatutAgenceType,
     dateOuverture: new Date().toISOString().split('T')[0],
     nombreEmployes: 0,
     nombreClients: 0,
@@ -174,7 +175,7 @@ export default function AdminGestionAgences() {
     setFormData({
       codeAgence: '',
       nom: '',
-      typeAgence: 'Secondaire',
+      typeAgence: TypeAgence.SECONDARY as TypeAgenceType,
       adresse: '',
       ville: '',
       region: '',
@@ -183,7 +184,7 @@ export default function AdminGestionAgences() {
       email: '',
       responsableNom: '',
       responsablePhone: '',
-      statut: 'Actif',
+      statut: StatutAgence.ACTIVE,
       dateOuverture: new Date().toISOString().split('T')[0],
       nombreEmployes: 0,
       nombreClients: 0,
@@ -264,9 +265,9 @@ export default function AdminGestionAgences() {
               onChange={(e) => setFilterStatut(e.target.value)}
               options={[
                 { value: 'all', label: 'Tous les statuts' },
-                { value: 'Actif', label: 'Actif' },
-                { value: 'Suspendu', label: 'Suspendu' },
-                { value: 'Fermé', label: 'Fermé' }
+                { value: StatutAgence.ACTIVE, label: 'Actif' },
+                { value: StatutAgence.INACTIVE, label: 'Suspendu' },
+                { value: StatutAgence.CLOSED, label: 'Fermé' }
               ]}
               className="w-full sm:w-44"
             />
@@ -277,9 +278,9 @@ export default function AdminGestionAgences() {
               onChange={(e) => setFilterType(e.target.value)}
               options={[
                 { value: 'all', label: 'Tous les types' },
-                { value: 'Principale', label: 'Principale' },
-                { value: 'Secondaire', label: 'Secondaire' },
-                { value: 'Kiosque', label: 'Kiosque' }
+                { value: TypeAgence.MAIN, label: 'Principale' },
+                { value: TypeAgence.SECONDARY, label: 'Secondaire' },
+                { value: TypeAgence.KIOSK, label: 'Kiosque' }
               ]}
               className="w-full sm:w-44"
             />
@@ -507,9 +508,9 @@ export default function AdminGestionAgences() {
               value={formData.typeAgence}
               onChange={(e) => setFormData({ ...formData, typeAgence: e.target.value as any })}
               options={[
-                { value: 'Principale', label: 'Principale' },
-                { value: 'Secondaire', label: 'Secondaire' },
-                { value: 'Kiosque', label: 'Kiosque' }
+                { value: TypeAgence.MAIN, label: 'Principale' },
+                { value: TypeAgence.SECONDARY, label: 'Secondaire' },
+                { value: TypeAgence.KIOSK, label: 'Kiosque' }
               ]}
             />
             <div className="sm:col-span-2">
@@ -574,9 +575,9 @@ export default function AdminGestionAgences() {
               value={formData.statut}
               onChange={(e) => setFormData({ ...formData, statut: e.target.value as any })}
               options={[
-                { value: 'Actif', label: 'Actif' },
-                { value: 'Suspendu', label: 'Suspendu' },
-                { value: 'Fermé', label: 'Fermé' }
+                { value: StatutAgence.ACTIVE, label: 'Actif' },
+                { value: StatutAgence.INACTIVE, label: 'Suspendu' },
+                { value: StatutAgence.CLOSED, label: 'Fermé' }
               ]}
             />
           </div>

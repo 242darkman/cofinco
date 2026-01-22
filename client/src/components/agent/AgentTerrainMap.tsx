@@ -4,7 +4,8 @@ import SatelliteMap from '../maps/SatelliteMap';
 import useGeolocation from '../../hooks/useGeolocation';
 import { requestAllPages } from '../../lib/api-client';
 import { Card, Button, Badge } from '../ui';
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
+import { StatutUser } from '@shared/enum/status-constants';
 
 interface Agent {
   id: string;
@@ -27,7 +28,7 @@ interface Visit {
 
 export default function AgentTerrainMap() {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<ClientWithIdentity[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAgents, setShowAgents] = useState(true);
@@ -58,7 +59,7 @@ export default function AgentTerrainMap() {
     try {
       const [agentsRes, clientsRes] = await Promise.all([
         fetch('/api/agent-locations/latest', { credentials: 'include' }),
-        requestAllPages<Client>('/clients/with-location'),
+        requestAllPages<ClientWithIdentity>('/clients/with-location'),
       ]);
 
       if (agentsRes.ok) {
@@ -226,7 +227,7 @@ export default function AgentTerrainMap() {
                       <h4 className="font-bold text-content-primary">
                         {selectedAgent.prenom} {selectedAgent.nom}
                       </h4>
-                      <Badge value={selectedAgent.statut || 'Actif'} size="sm" variant={selectedAgent.statut === 'Actif' ? 'success' : 'neutral'} />
+                      <Badge value={selectedAgent.statut || StatutUser.ACTIVE} size="sm" variant={(selectedAgent.statut === StatutUser.ACTIVE) ? 'success' : 'neutral'} />
                     </div>
                   </div>
                   <button

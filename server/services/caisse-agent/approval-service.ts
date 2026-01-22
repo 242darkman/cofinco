@@ -30,6 +30,7 @@ import {
   remboursements,
   transactionsCompte,
 } from "@shared/schema";
+import { StatutTransaction, TypeCompte, TypeOperationCaisse, type TypeOperationCaisseType } from "@shared/enum/status-constants";
 import { eq, sql } from "drizzle-orm";
 import { generateReference, updateCreditSolde, type MouvementFinancier } from "../ledger";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -157,9 +158,9 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Débit", // Débit = Augmente la créance envers l'agent
-        statut: "Posté",
-        methodePaiement: "Espèces",
+        sens: "DEBIT", // Débit = Augmente la créance envers l'agent
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
         reference: refCaisseAgent,
         agentId: operation.agentId,
         clientId: operation.clientId,
@@ -236,14 +237,14 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Crédit", // Crédit = réduit la dette
-        statut: "Posté",
-        methodePaiement: "Espèces",
+        sens: "CREDIT", // Crédit = réduit la dette
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
         reference: refCredit,
         agentId: operation.agentId,
         clientId: operation.clientId,
         creditId: metadata.creditId,
-        typePaiement: "Remboursement Crédit",
+        typePaiement: TypeOperationCaisse.CREDIT_REPAYMENT,
         sourceModule: "CREDIT",
         sourceTable: "operations_terrain",
         sourceId: operation.id,
@@ -262,8 +263,8 @@ export class ApprovalService {
       mouvementId: mouvementCredit.id,
       montant: operation.montant,
       dateRemboursement: new Date(),
-      statut: "Posté",
-      methodePaiement: "Espèces",
+      statut: StatutTransaction.POSTED,
+      methodePaiement: "CASH",
       observations: metadata.observations,
       createdBy: approvedBy,
     });
@@ -275,13 +276,13 @@ export class ApprovalService {
       .values({
         agentId: operation.agentId,
         clientId: operation.clientId!,
-        typePaiement: "Remboursement Crédit",
+        typePaiement: TypeOperationCaisse.CREDIT_REPAYMENT,
         montant: operation.montant,
-        methodePaiement: "Espèces",
+        methodePaiement: "CASH",
         reference: refPaiement,
         mouvementId: mouvementCredit.id,
         creditId: metadata.creditId,
-        statut: "Posté",
+        statut: StatutTransaction.POSTED,
         observations: metadata.observations,
         latitude: metadata.latitude?.toString(),
         longitude: metadata.longitude?.toString(),
@@ -315,9 +316,9 @@ export class ApprovalService {
     }
 
     // Déterminer le type de paiement selon le type de compte
-    let typePaiement: "Dépôt Épargne" | "Dépôt Courant" | "Dépôt Bloqué" = "Dépôt Épargne";
-    if (compte.typeCompte === "Courant") typePaiement = "Dépôt Courant";
-    if (compte.typeCompte === "Bloqué") typePaiement = "Dépôt Bloqué";
+    let typePaiement: TypeOperationCaisseType = TypeOperationCaisse.DEPOSIT_SAVINGS;
+    if (compte.typeCompte === TypeCompte.CURRENT) typePaiement = TypeOperationCaisse.DEPOSIT_CURRENT;
+    if (compte.typeCompte === TypeCompte.BLOCKED) typePaiement = TypeOperationCaisse.DEPOSIT_BLOCKED;
 
     // Créer mouvement sur le compte (crédite le compte)
     const refCompte = generateReference("EPARGNE");
@@ -326,9 +327,9 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Crédit",
-        statut: "Posté",
-        methodePaiement: "Espèces",
+        sens: "CREDIT",
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
         reference: refCompte,
         agentId: operation.agentId,
         clientId: operation.clientId,
@@ -356,9 +357,9 @@ export class ApprovalService {
       compteId: metadata.compteId!,
       mouvementId: mouvementCompte.id,
       typePaiement,
-      statut: "Posté",
+      statut: StatutTransaction.POSTED,
       montant: operation.montant,
-      methodePaiement: "Espèces",
+      methodePaiement: "CASH",
       observations: metadata.observations,
       createdBy: approvedBy,
     });
@@ -372,11 +373,11 @@ export class ApprovalService {
         clientId: operation.clientId!,
         typePaiement,
         montant: operation.montant,
-        methodePaiement: "Espèces",
+        methodePaiement: "CASH",
         reference: refPaiement,
         mouvementId: mouvementCompte.id,
         compteId: metadata.compteId,
-        statut: "Posté",
+        statut: StatutTransaction.POSTED,
         observations: metadata.observations,
         latitude: metadata.latitude?.toString(),
         longitude: metadata.longitude?.toString(),
@@ -403,14 +404,14 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Crédit",
-        statut: "Posté",
-        methodePaiement: "Espèces",
+        sens: "CREDIT",
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
         reference: refTontine,
         agentId: operation.agentId,
         clientId: operation.clientId,
         tontineId: metadata.tontineId,
-        typePaiement: "Versement Tontine",
+        typePaiement: TypeOperationCaisse.TONTINE_CONTRIBUTION,
         sourceModule: "TONTINE",
         sourceTable: "operations_terrain",
         sourceId: operation.id,
@@ -425,10 +426,10 @@ export class ApprovalService {
       tontineId: metadata.tontineId!,
       clientId: operation.clientId,
       mouvementId: mouvementTontine.id,
-      typeOperation: "Versement",
+      typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
       montant: operation.montant,
-      methodePaiement: "Espèces",
-      statutTransaction: "Posté",
+      methodePaiement: "CASH",
+      statutTransaction: StatutTransaction.POSTED,
       reference: refContribution,
       observations: metadata.observations,
       createdBy: approvedBy,
@@ -441,13 +442,13 @@ export class ApprovalService {
       .values({
         agentId: operation.agentId,
         clientId: operation.clientId!,
-        typePaiement: "Versement Tontine",
+        typePaiement: TypeOperationCaisse.TONTINE_CONTRIBUTION,
         montant: operation.montant,
-        methodePaiement: "Espèces",
+        methodePaiement: "CASH",
         reference: refPaiement,
         mouvementId: mouvementTontine.id,
         tontineId: metadata.tontineId,
-        statut: "Posté",
+        statut: StatutTransaction.POSTED,
         observations: metadata.observations,
         latitude: metadata.latitude?.toString(),
         longitude: metadata.longitude?.toString(),
@@ -490,9 +491,9 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Crédit", // Crédit = Réduit la créance de l'agent
-        statut: "Posté",
-        methodePaiement: "Espèces",
+        sens: "CREDIT", // Crédit = Réduit la créance de l'agent
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
         reference: refCaisseAgent,
         agentId: operation.agentId,
         sourceModule: "CAISSE_AGENT" as any,
@@ -522,9 +523,9 @@ export class ApprovalService {
       .values({
         dateOperation: new Date(),
         montant: operation.montant,
-        sens: "Débit", // Débit = Entrée en caisse physique
-        statut: "Posté",
-        methodePaiement: "Espèces",
+        sens: "DEBIT", // Débit = Entrée en caisse physique
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
         reference: refCaisse,
         agentId: operation.agentId,
         sourceModule: "CAISSE",

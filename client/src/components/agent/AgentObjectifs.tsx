@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Target, TrendingUp, Award, Plus, Check, X, BarChart3, DollarSign } from 'lucide-react';
+import { StatutObjectif, STATUT_OBJECTIF_LABELS } from '@shared/enum/status-constants';
 
 interface Objectif {
   id: string;
@@ -72,7 +73,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         body: JSON.stringify({
           ...formData,
           valeur_realisee: 0,
-          statut: 'En cours'
+          statut: 'IN_PROGRESS'
         })
       });
 
@@ -341,7 +342,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 </div>
               </div>
 
-              {objectif.statut === 'En cours' && (
+              {objectif.statut === StatutObjectif.IN_PROGRESS && (
                 <div className="flex gap-2">
                   <input
                     type="number"

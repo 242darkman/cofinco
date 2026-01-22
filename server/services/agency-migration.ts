@@ -24,10 +24,12 @@ import {
   mouvementsFinanciers,
   sessionsCaisse,
   caisses,
-  employes
+  employes,
+  users
 } from "@shared/schema";
 import { transfertsInterCoffres } from "@shared/schema/coffres-forts";
-import { eq, sql, and, isNull, ne, inArray } from "drizzle-orm";
+import { eq, sql, and, isNull, ne, inArray, or } from "drizzle-orm";
+import { StatutCompte, StatutCredit, StatutDemande, StatutTransaction } from "@shared/enum/status-constants";
 import { createHash } from "crypto";
 
 // ============================================
@@ -99,15 +101,15 @@ export class AgencyMigrationService {
   private async logAudit(
     ctx: MigrationContext,
     action: string,
-    statusBefore: string | null,
-    statusAfter: string | null,
+    statutAvant: string | null,
+    statutApres: string | null,
     details: any
   ): Promise<void> {
     await db.insert(migrationAuditLogs).values({
       migrationId: ctx.migration.id,
       action,
-      statusBefore,
-      statusAfter,
+      statutAvant,
+      statutApres,
       details,
       userId: ctx.userId,
       ipAddress: ctx.ipAddress,
@@ -120,7 +122,7 @@ export class AgencyMigrationService {
    */
   private async updateMigrationStatus(
     migrationId: string,
-    status: string,
+    statut: string,
     progress: number,
     logs: StepLog[],
     currentStep?: string,
@@ -130,7 +132,7 @@ export class AgencyMigrationService {
     await db
       .update(agencyMigrations)
       .set({
-        status,
+        statut,
         progress,
         logs,
         currentStep,
@@ -159,7 +161,7 @@ export class AgencyMigrationService {
         id: sessionsCaisse.id,
         caissierId: sessionsCaisse.caissierId,
         openedAt: sessionsCaisse.openedAt,
-        soldeTheorique: sessionsCaisse.soldeTheorique,
+        montantFermetureTheorique: sessionsCaisse.montantFermetureTheorique,
       })
       .from(sessionsCaisse)
       .where(
@@ -211,7 +213,7 @@ export class AgencyMigrationService {
     }
 
     // Vérifier les transferts en attente (non finalisés)
-    const pendingStatuses = ["Brouillon", "Demandé", "Validé", "En transit"];
+    const pendingStatuses = ["DRAFT", "SUBMITTED", "APPROVED_L1", "APPROVED_L2", "IN_TRANSIT"];
     const pendingTransfers = await db
       .select({
         id: transfertsInterCoffres.id,
@@ -259,10 +261,11 @@ export class AgencyMigrationService {
       return { passed: true, message: "Pas de migration de clients", details: null };
     }
 
-    // Récupérer les clients de l'agence source
+    // Récupérer les clients de l'agence source (nom/prenom proviennent de users)
     const sourceClients = await db
-      .select({ id: clients.id, nom: clients.nom, prenom: clients.prenom })
+      .select({ id: clients.id, nom: users.nom, prenom: users.prenom })
       .from(clients)
+      .leftJoin(users, eq(clients.userId, users.id))
       .where(
         and(
           eq(clients.agenceId, sourceAgencyId),
@@ -402,7 +405,7 @@ export class AgencyMigrationService {
         .from(agences)
         .where(eq(agences.id, migration.targetClientsAgencyId))
         .limit(1);
-      if (!targetClients || targetClients.statut !== "Actif") {
+      if (!targetClients || (targetClients.statut !== StatutCompte.ACTIVE && targetClients.statut !== "ACTIVE")) {
         warnings.push("L'agence cible pour les clients n'est pas active");
       }
     }
@@ -506,7 +509,7 @@ export class AgencyMigrationService {
         and(
           eq(credits.agenceId, sourceAgencyId),
           isNull(credits.deletedAt),
-          ne(credits.statut, "Soldé")
+          ne(credits.statut, StatutCredit.PAID)
         )
       );
 
@@ -517,7 +520,7 @@ export class AgencyMigrationService {
       .where(
         and(
           eq(demandesCredit.agenceId, sourceAgencyId),
-          eq(demandesCredit.statut, "En attente"),
+          eq(demandesCredit.statut, StatutDemande.PENDING_FEES),
           isNull(demandesCredit.deletedAt)
         )
       );
@@ -552,9 +555,9 @@ export class AgencyMigrationService {
       throw new MigrationError("Migration non trouvée", "NOT_FOUND");
     }
 
-    if (migration.status !== MIGRATION_STATUS.PENDING && migration.status !== MIGRATION_STATUS.SCHEDULED) {
+    if (migration.statut !== MIGRATION_STATUS.PENDING && migration.statut !== MIGRATION_STATUS.SCHEDULED) {
       throw new MigrationError(
-        `Migration ne peut pas être exécutée (statut actuel: ${migration.status})`,
+        `Migration ne peut pas être exécutée (statut actuel: ${migration.statut})`,
         "INVALID_STATUS"
       );
     }
@@ -602,7 +605,7 @@ export class AgencyMigrationService {
       await db
         .update(agencyMigrations)
         .set({
-          status: MIGRATION_STATUS.PRE_FLIGHT_CHECK,
+          statut: MIGRATION_STATUS.PRE_FLIGHT_CHECK,
           locked: true,
           lockedAt: new Date(),
           executionStartedAt: new Date(),
@@ -610,7 +613,7 @@ export class AgencyMigrationService {
         })
         .where(eq(agencyMigrations.id, migrationId));
 
-      await this.logAudit(context, "STARTED", migration.status, MIGRATION_STATUS.PRE_FLIGHT_CHECK, {
+      await this.logAudit(context, "STARTED", migration.statut, MIGRATION_STATUS.PRE_FLIGHT_CHECK, {
         startTime: new Date().toISOString(),
       });
 
@@ -655,10 +658,11 @@ export class AgencyMigrationService {
           const stepStartClients = Date.now();
           await this.updateMigrationStatus(migrationId, MIGRATION_STATUS.PROCESSING, 10, logs, "Migration clients");
 
-          // Récupérer les clients à migrer
+          // Récupérer les clients à migrer (nom provient de users via userId)
           const clientsToMigrate = await tx
-            .select({ id: clients.id, nom: clients.nom })
+            .select({ id: clients.id, nom: users.nom })
             .from(clients)
+            .leftJoin(users, eq(clients.userId, users.id))
             .where(and(eq(clients.agenceId, migration.sourceAgencyId), isNull(clients.deletedAt)));
 
           // Migrer les clients
@@ -902,8 +906,8 @@ export class AgencyMigrationService {
               reference,
               dateOperation: new Date(),
               montant: amount.toString(),
-              sens: "Crédit",
-              statut: "Posté",
+              sens: "CREDIT",
+              statut: StatutTransaction.POSTED,
               sourceModule: "SYSTEME",
               agenceId: migration.targetTreasuryAgencyId,
               createdBy: ctx?.userId,
@@ -974,7 +978,7 @@ export class AgencyMigrationService {
       await db
         .update(agencyMigrations)
         .set({
-          status: MIGRATION_STATUS.COMPLETED,
+          statut: MIGRATION_STATUS.COMPLETED,
           progress: 100,
           logs,
           report,
@@ -998,7 +1002,7 @@ export class AgencyMigrationService {
       await db
         .update(agencyMigrations)
         .set({
-          status: MIGRATION_STATUS.FAILED,
+          statut: MIGRATION_STATUS.FAILED,
           error: error.message,
           errorDetails: {
             code: error.code,
@@ -1048,7 +1052,7 @@ export class AgencyMigrationService {
         targetEmployeesAgencyId: params.targetEmployeesAgencyId,
         targetTreasuryAgencyId: params.targetTreasuryAgencyId,
         scheduledAt: params.scheduledAt,
-        status: params.scheduledAt ? MIGRATION_STATUS.SCHEDULED : MIGRATION_STATUS.DRAFT,
+        statut: params.scheduledAt ? MIGRATION_STATUS.SCHEDULED : MIGRATION_STATUS.DRAFT,
         createdBy: params.createdBy,
       })
       .returning();
@@ -1057,8 +1061,8 @@ export class AgencyMigrationService {
     await db.insert(migrationAuditLogs).values({
       migrationId: migration.id,
       action: "CREATED",
-      statusBefore: null,
-      statusAfter: migration.status,
+      statutAvant: null,
+      statutApres: migration.statut,
       details: { ...params, reference },
       userId: params.createdBy,
     });
@@ -1092,7 +1096,7 @@ export class AgencyMigrationService {
       throw new MigrationError("Migration non trouvée", "NOT_FOUND");
     }
 
-    if (migration.status !== MIGRATION_STATUS.DRAFT) {
+    if (migration.statut !== MIGRATION_STATUS.DRAFT) {
       throw new MigrationError("Seuls les brouillons peuvent être soumis", "INVALID_STATUS");
     }
 
@@ -1101,7 +1105,7 @@ export class AgencyMigrationService {
     await db
       .update(agencyMigrations)
       .set({
-        status: newStatus,
+        statut: newStatus,
         executedBy: userId,
         updatedAt: new Date(),
       })
@@ -1110,8 +1114,8 @@ export class AgencyMigrationService {
     await db.insert(migrationAuditLogs).values({
       migrationId,
       action: "SUBMITTED",
-      statusBefore: MIGRATION_STATUS.DRAFT,
-      statusAfter: newStatus,
+      statutAvant: MIGRATION_STATUS.DRAFT,
+      statutApres: newStatus,
       details: { executedBy: userId },
       userId,
     });
@@ -1141,14 +1145,14 @@ export class AgencyMigrationService {
     }
 
     const cancelableStatuses = [MIGRATION_STATUS.DRAFT, MIGRATION_STATUS.PENDING, MIGRATION_STATUS.SCHEDULED];
-    if (!cancelableStatuses.includes(migration.status as any)) {
+    if (!cancelableStatuses.includes(migration.statut as any)) {
       throw new MigrationError("Cette migration ne peut plus être annulée", "INVALID_STATUS");
     }
 
     await db
       .update(agencyMigrations)
       .set({
-        status: MIGRATION_STATUS.CANCELLED,
+        statut: MIGRATION_STATUS.CANCELLED,
         error: reason,
         completedAt: new Date(),
         updatedAt: new Date(),
@@ -1158,8 +1162,8 @@ export class AgencyMigrationService {
     await db.insert(migrationAuditLogs).values({
       migrationId,
       action: "CANCELLED",
-      statusBefore: migration.status,
-      statusAfter: MIGRATION_STATUS.CANCELLED,
+      statutAvant: migration.statut,
+      statutApres: MIGRATION_STATUS.CANCELLED,
       details: { reason },
       userId,
     });
@@ -1184,7 +1188,7 @@ export class AgencyMigrationService {
       .from(agencyMigrations)
       .where(
         and(
-          eq(agencyMigrations.status, MIGRATION_STATUS.SCHEDULED),
+          eq(agencyMigrations.statut, MIGRATION_STATUS.SCHEDULED),
           sql`${agencyMigrations.scheduledAt} <= NOW()`
         )
       );
@@ -1229,16 +1233,17 @@ export class AgencyMigrationService {
    * Récupérer les entités migrées
    */
   async getMigrationEntityLogs(migrationId: string, entityType?: string) {
-    let query = db
-      .select()
-      .from(migrationEntityLogs)
-      .where(eq(migrationEntityLogs.migrationId, migrationId));
+    const conditions = [eq(migrationEntityLogs.migrationId, migrationId)];
 
     if (entityType) {
-      query = query.where(eq(migrationEntityLogs.entityType, entityType)) as any;
+      conditions.push(eq(migrationEntityLogs.entityType, entityType));
     }
 
-    return query.orderBy(migrationEntityLogs.migratedAt);
+    return db
+      .select()
+      .from(migrationEntityLogs)
+      .where(and(...conditions))
+      .orderBy(migrationEntityLogs.migratedAt);
   }
 }
 

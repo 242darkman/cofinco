@@ -3,6 +3,7 @@ import { Users, Activity, Shield, AlertCircle, CheckCircle, Clock, Database, Loc
 import { Card, LoadingSpinner } from '../ui';
 import { userApi, auditApi, healthApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import { StatutUser } from '@shared/enum/status-constants';
 
 interface DashboardStats {
   totalUsers: number;
@@ -55,7 +56,7 @@ export default function AdminDashboard() {
       ]);
 
       const totalUsers = users.length;
-      const activeUsers = users.filter((u: any) => u.statut === 'Actif').length;
+      const activeUsers = users.filter((u: any) => u.statut === StatutUser.ACTIVE).length;
       const inactiveUsers = totalUsers - activeUsers;
 
       const activeRoles: Record<string, number> = {};

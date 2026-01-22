@@ -12,13 +12,17 @@ import {
   TrendingUp, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Card, StatCard, Button, Badge, EmptyState, TabGroup } from '../../ui';
+import { Card, StatCard, Button, Badge, EmptyState, TabGroup, Modal, Input } from '../../ui';
 import { caisseAgentApi, agentTerrainApi } from '../../../lib/api-client';
 import type { CaisseAgentSummary, OperationTerrainWithRelations } from '@shared/schema';
 import CollectCashModal from './CollectCashModal';
 import SettlementCashModal from './SettlementCashModal';
 import OperationDetailModal from './OperationDetailModal';
 import { formatClientName } from '../../../lib/format';
+import {
+  StatutCaisseAgent,
+  StatutOperationTerrain
+} from '@shared/enum/status-constants';
 
 interface CaisseAgentDashboardProps {
   agentId: string;
@@ -43,14 +47,16 @@ const formatDate = (date: string) => {
 
 const getStatutBadge = (statut: string) => {
   switch (statut) {
-    case 'SUBMITTED':
+    case StatutOperationTerrain.SUBMITTED:
       return <Badge variant="warning" size="sm" value="En attente" />;
-    case 'APPROVED':
+    case StatutOperationTerrain.APPROVED:
       return <Badge variant="success" size="sm" value="Approuvée" />;
-    case 'REJECTED':
+    case StatutOperationTerrain.REJECTED:
       return <Badge variant="danger" size="sm" value="Rejetée" />;
-    case 'CANCELLED':
+    case StatutOperationTerrain.CANCELLED:
       return <Badge variant="neutral" size="sm" value="Annulée" />;
+    case StatutOperationTerrain.SETTLED:
+      return <Badge variant="success" size="sm" value="Remise" />;
     default:
       return <Badge variant="neutral" size="sm" value={statut} />;
   }
@@ -80,6 +86,11 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
   const [showCollectModal, setShowCollectModal] = useState(false);
   const [showSettlementModal, setShowSettlementModal] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState<OperationTerrainWithRelations | null>(null);
+  // Modal d'annulation (remplace le prompt() bloquant)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelOperationId, setCancelOperationId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const loadData = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -99,7 +110,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
       setOperations(opsResponse.data || []);
 
       // Charger les opérations en attente
-      const pendingResponse = await caisseAgentApi.getAgentOperations(agentId, { statut: 'SUBMITTED' });
+      const pendingResponse = await caisseAgentApi.getAgentOperations(agentId, { statut: StatutOperationTerrain.SUBMITTED });
       setPendingOperations(pendingResponse.data || []);
 
     } catch (error: any) {
@@ -136,19 +147,35 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
     });
   };
 
-  const handleCancelOperation = async (operationId: string) => {
-    const reason = prompt('Raison de l\'annulation:');
-    if (!reason) return;
+  // Ouvrir le modal d'annulation
+  const openCancelModal = (operationId: string) => {
+    setCancelOperationId(operationId);
+    setCancelReason('');
+    setCancelModalOpen(true);
+  };
 
+  // Exécuter l'annulation
+  const handleCancelOperation = async () => {
+    if (!cancelOperationId || !cancelReason.trim()) {
+      toast.error('Veuillez saisir une raison');
+      return;
+    }
+
+    setCancelLoading(true);
     try {
-      await caisseAgentApi.cancelOperation(operationId, reason);
+      await caisseAgentApi.cancelOperation(cancelOperationId, cancelReason.trim());
       toast.success('Opération annulée');
       loadData(false);
       setSelectedOperation(null);
+      setCancelModalOpen(false);
+      setCancelOperationId(null);
+      setCancelReason('');
     } catch (error: any) {
       toast.error('Erreur lors de l\'annulation', {
         description: error.message
       });
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -216,7 +243,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
             size="sm"
             icon={Send}
             onClick={() => setShowSettlementModal(true)}
-            disabled={parseFloat(caisseSummary?.disponible || '0') <= 0 || caisseSummary?.statut !== 'Active'}
+            disabled={parseFloat(caisseSummary?.disponible || '0') <= 0 || caisseSummary?.statut !== StatutCaisseAgent.ACTIVE}
           >
             Remettre
           </Button>
@@ -233,11 +260,11 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
             variant="default"
             padding="sm"
             className={`cursor-pointer transition-all group ${
-              caisseSummary?.statut === 'Active'
+              caisseSummary?.statut === StatutCaisseAgent.ACTIVE
                 ? 'hover:border-cyan-500/50 hover:bg-cyan-500/5'
                 : 'opacity-50 cursor-not-allowed'
             }`}
-            onClick={() => caisseSummary?.statut === 'Active' && setShowCollectModal(true)}
+            onClick={() => caisseSummary?.statut === StatutCaisseAgent.ACTIVE && setShowCollectModal(true)}
           >
             <div className="flex flex-col items-center gap-3 py-4">
               <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
@@ -253,12 +280,12 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
             variant="default"
             padding="sm"
             className={`cursor-pointer transition-all group ${
-              caisseSummary?.statut === 'Active' && parseFloat(caisseSummary?.disponible || '0') > 0
+              caisseSummary?.statut === StatutCaisseAgent.ACTIVE && parseFloat(caisseSummary?.disponible || '0') > 0
                 ? 'hover:border-emerald-500/50 hover:bg-emerald-500/5'
                 : 'opacity-50 cursor-not-allowed'
             }`}
             onClick={() => {
-              if (caisseSummary?.statut === 'Active' && parseFloat(caisseSummary?.disponible || '0') > 0) {
+              if (caisseSummary?.statut === StatutCaisseAgent.ACTIVE && parseFloat(caisseSummary?.disponible || '0') > 0) {
                 setShowSettlementModal(true);
               }
             }}
@@ -276,7 +303,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
       </div>
 
       {/* Caisse Status Alert */}
-      {caisseSummary?.statut === 'Suspendue' && (
+      {caisseSummary?.statut === StatutCaisseAgent.SUSPENDED && (
         <Card variant="default" padding="md" className="border-red-500/20 bg-red-500/5">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-red-400" />
@@ -423,7 +450,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                   icon={XCircle}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleCancelOperation(op.id);
+                    openCancelModal(op.id);
                   }}
                 >
                   Annuler
@@ -525,13 +552,13 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-white leading-none mb-0.5">Ma Caisse</h1>
-                {caisseSummary?.statut === 'Active' ? (
+                {caisseSummary?.statut === StatutCaisseAgent.ACTIVE ? (
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">
                     Active
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider border border-red-500/20">
-                    {caisseSummary?.statut || 'Inactive'}
+                    {caisseSummary?.statut === StatutCaisseAgent.SUSPENDED ? 'Suspendue' : caisseSummary?.statut || 'Inactive'}
                   </span>
                 )}
               </div>
@@ -597,12 +624,63 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
           operation={selectedOperation}
           onClose={() => setSelectedOperation(null)}
           onCancel={
-            selectedOperation.statut === 'SUBMITTED'
-              ? () => handleCancelOperation(selectedOperation.id)
+            selectedOperation.statut === StatutOperationTerrain.SUBMITTED
+              ? () => openCancelModal(selectedOperation.id)
               : undefined
           }
         />
       )}
+
+      {/* Modal d'annulation */}
+      <Modal
+        isOpen={cancelModalOpen}
+        onClose={() => {
+          setCancelModalOpen(false);
+          setCancelOperationId(null);
+          setCancelReason('');
+        }}
+        title="Annuler l'opération"
+        subtitle="Veuillez indiquer la raison de l'annulation"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCancelModalOpen(false);
+                setCancelOperationId(null);
+                setCancelReason('');
+              }}
+              disabled={cancelLoading}
+            >
+              Fermer
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleCancelOperation}
+              isLoading={cancelLoading}
+              disabled={!cancelReason.trim()}
+            >
+              Confirmer l'annulation
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-400 mb-2">Raison de l'annulation</label>
+            <Input
+              placeholder="Ex: Erreur de saisie du montant..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              required
+            />
+          </div>
+          <p className="text-xs text-slate-500">
+            Cette action est irréversible. L'opération sera marquée comme annulée.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

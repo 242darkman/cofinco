@@ -12,7 +12,7 @@ export function registerOperationsRoutes(app: Express) {
       const { page, perPage } = parsePagination(req.query);
       const { data, total } = await storage.getAgentsTerrainPaginated(page, perPage);
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+        paginateResponse(addSnakeCaseAliasesDeep(data) as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
         })
@@ -20,7 +20,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create agent terrain (roles: admin, chef)
-  app.post("/api/agents-terrain", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+  app.post("/api/agents-terrain", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertAgentTerrainSchema.parse(data);
       const agent = await storage.createAgentTerrain(parsed);
@@ -52,7 +52,7 @@ export function registerOperationsRoutes(app: Express) {
       const { page, perPage } = parsePagination(req.query);
       const { data, total } = await storage.getProspectionsPaginated(page, perPage);
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+        paginateResponse(addSnakeCaseAliasesDeep(data) as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
         })
@@ -60,7 +60,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create prospection (roles: admin, chef, terrain, superviseur)
-  app.post("/api/prospections", requireAuth, requireRole('admin', 'chef', 'terrain', 'superviseur'), async (req, res) => {
+  app.post("/api/prospections", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.AGENT_TERRAIN, SystemRole.SUPERVISEUR), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertProspectionSchema.parse(data);
       const prospection = await storage.createProspection(parsed);
@@ -79,7 +79,7 @@ export function registerOperationsRoutes(app: Express) {
       const { page, perPage } = parsePagination(req.query);
       const { data, total } = await storage.getVisitesTerrainPaginated(page, perPage);
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+        paginateResponse(addSnakeCaseAliasesDeep(data) as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
         })
@@ -89,7 +89,7 @@ export function registerOperationsRoutes(app: Express) {
 
   // Create Paiement Terrain (roles: admin, chef, terrain, superviseur)
   // Now creates a PENDING payment that needs validation
-  app.post("/api/paiements-terrain", requireAuth, requireRole('admin', 'chef', 'terrain', 'superviseur'), async (req, res) => {
+  app.post("/api/paiements-terrain", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.AGENT_TERRAIN, SystemRole.SUPERVISEUR), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user;
@@ -131,7 +131,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Validate Paiement Terrain (roles: admin, chef, superviseur)
-  app.post("/api/paiements-terrain/:id/validate", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/paiements-terrain/:id/validate", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     try {
       const { id } = req.params;
       const user = req.session.user;
@@ -156,7 +156,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Reject Paiement Terrain
-  app.post("/api/paiements-terrain/:id/reject", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/paiements-terrain/:id/reject", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     try {
       const { id } = req.params;
       const { reason } = req.body;
@@ -198,7 +198,7 @@ export function registerOperationsRoutes(app: Express) {
         const { page, perPage } = parsePagination(req.query);
         const { data, total } = await storage.getPendingPaiementsByAgencePaginated(agenceId, page, perPage);
         res.json(
-          paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+          paginateResponse(addSnakeCaseAliasesDeep(data) as unknown[], total, page, perPage, {
             path: `${req.baseUrl}${req.path}`,
             query: req.query,
             filters: agenceId ? { agenceId } : {},
@@ -211,7 +211,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // POS Devices
-  app.get("/api/pos-devices", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+  app.get("/api/pos-devices", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
       try {
         const user = req.session.user;
         const normalizedRole = normalizeRole(user?.role);
@@ -224,7 +224,7 @@ export function registerOperationsRoutes(app: Express) {
         const { data, total } = await storage.getPosDevicesPaginated({ agenceId, assignedTo }, page, perPage);
 
         res.json(
-          paginateResponse(addSnakeCaseAliasesDeep(data), total, page, perPage, {
+          paginateResponse(addSnakeCaseAliasesDeep(data) as unknown[], total, page, perPage, {
             path: `${req.baseUrl}${req.path}`,
             query: req.query,
             filters: {
@@ -246,7 +246,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create zone (roles: admin, chef)
-  app.post("/api/zones", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+  app.post("/api/zones", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertZoneSchema.parse(data);
     const zone = await storage.createZone(parsed);
@@ -279,7 +279,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create/update objectif mensuel (roles: admin, chef, superviseur)
-  app.post("/api/objectifs-mensuels", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/objectifs-mensuels", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertObjectifMensuelSchema.parse(data);
     const objectif = await storage.createOrUpdateObjectifMensuel(parsed);

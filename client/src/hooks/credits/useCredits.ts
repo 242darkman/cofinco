@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useWebSocket } from '../useWebSocket';
+import { StatutCredit } from '@shared/enum/status-constants';
 
 export interface Credit {
   id: string;
@@ -57,16 +58,17 @@ export function useCredits() {
 
   const getStatutColor = (statut: string) => {
     const colors: Record<string, string> = {
-      'actif': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      'en_cours': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      'cloture': 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-      'en_retard': 'bg-red-500/20 text-red-400 border-red-500/30',
-      'suspendu': 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+      [StatutCredit.ACTIVE]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      [StatutCredit.CLOSED]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+      [StatutCredit.LATE]: 'bg-red-500/20 text-red-400 border-red-500/30',
+      [StatutCredit.PENDING]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      [StatutCredit.PAID]: 'bg-green-500/20 text-green-400 border-green-500/30',
+      [StatutCredit.CANCELLED]: 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     };
-    return colors[statut.toLowerCase()] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    return colors[statut] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
   };
 
-  const getActiveCredits = () => credits.filter(c => c.statut === 'actif' || c.statut === 'en_cours');
+  const getActiveCredits = () => credits.filter(c => c.statut === StatutCredit.ACTIVE);
   
   const getCreditsEnRetard = () => credits.filter(c => c.jours_retard && c.jours_retard > 0);
 

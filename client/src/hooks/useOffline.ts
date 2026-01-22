@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { connectivityService } from '../lib/connectivityService';
 import { syncService, SyncStats } from '../lib/syncService';
-import { 
-  addOfflineOperation, 
+import {
+  addOfflineOperation,
   getOperationStats,
-  OperationType 
-} from '../lib/offlineDb';
+  OperationType
+} from '../lib/offline-db';
 
 export interface UseOfflineResult {
   isOnline: boolean;

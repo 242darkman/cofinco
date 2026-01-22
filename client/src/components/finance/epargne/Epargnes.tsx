@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Search, Eye, TrendingUp, TrendingDown, Users, DollarSign, Percent, PiggyBank, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Plus, Search, Users, DollarSign, Filter, Activity } from 'lucide-react';
 import { compteEpargneApi } from '../../../lib/api-client';
 import EpargneAccountForm from './EpargneAccountForm';
 import EpargneTransactionForm from './EpargneTransactionForm';
-import EpargneDetailModal from './EpargneDetailModal';
+import AccountDetailSlideOver from './AccountDetailSlideOver';
+import AccountsList from './AccountsList';
 import EpargneInterestCalculator from './EpargneInterestCalculator';
 import EpargneSavingsGoals from './EpargneSavingsGoals';
 import ComptesBloquesSection from '../operations/ComptesBloquesSection';
 import PageHeader from '../../ui/PageHeader';
 import StatCard from '../../ui/StatCard';
 import TabGroup from '../../ui/TabGroup';
-import ResponsiveTable, { TableColumn } from '../../ui/ResponsiveTable';
-import Badge from '../../ui/Badge';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
-import { formatClientName } from '../../../lib/format';
-import { getAccountBalance, getAccountUiConfig, getMonthlyInterestEstimate } from '../../../lib/account-config';
+import { getAccountBalance } from '../../../lib/account-config';
+import { TypeCompte, type TypeCompteType } from '@shared/enum/status-constants';
 
 
 interface Compte {
@@ -58,7 +57,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   const [showGoals, setShowGoals] = useState(false);
   const [interestCompte, setInterestCompte] = useState<Compte | null>(null);
   const [goalsCompte, setGoalsCompte] = useState<Compte | null>(null);
-  const [activeTab, setActiveTab] = useState<'courant' | 'epargne' | 'bloques'>('courant');
+  const [activeTab, setActiveTab] = useState<TypeCompteType>(TypeCompte.CURRENT);
 
   // Pagination & Search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,7 +67,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   const [totalComptes, setTotalComptes] = useState(0);
   const ITEMS_PER_PAGE = 15;
 
-  // RBAC permissions
+  // Permissions
   const { hasPermission } = usePermissions();
 
   // Debounce search
@@ -82,7 +81,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
 
   // Load comptes when tab, page, or search changes
   useEffect(() => {
-    if (activeTab !== 'bloques') {
+    if (activeTab !== TypeCompte.BLOCKED) {
       loadComptes();
     }
   }, [activeTab, currentPage, debouncedSearch]);
@@ -90,23 +89,22 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   useEffect(() => {
     if (activeView) {
       if (activeView === 'epargnes-list') {
-        setActiveTab('courant');
+        setActiveTab(TypeCompte.CURRENT);
       } else if (activeView === 'epargnes-transactions') {
-        setActiveTab('courant');
+        setActiveTab(TypeCompte.CURRENT);
       }
     }
   }, [activeView]);
 
-  // Debug: log when detailCompteId changes
-  useEffect(() => {
-    console.log('detailCompteId changed:', detailCompteId);
-  }, [detailCompteId]);
-
   const loadComptes = useCallback(async () => {
     setLoading(true);
     try {
-      // Map tab to typeCompte filter
-      const typeCompte = activeTab === 'courant' ? 'Courant' : activeTab === 'epargne' ? 'Épargne' : undefined;
+      // Map tab key to typeCompte value using enums
+      const typeCompte = activeTab === TypeCompte.CURRENT
+        ? TypeCompte.CURRENT
+        : activeTab === TypeCompte.SAVINGS
+          ? TypeCompte.SAVINGS
+          : undefined;
       
       const result = await compteEpargneApi.getAll({
         search: debouncedSearch || undefined,
@@ -115,7 +113,6 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         typeCompte
       });
 
-      // API now returns { data, total, page, limit, totalPages }
       const safeData = Array.isArray(result.data) ? result.data : [];
       setComptes(safeData);
       setTotalPages(result.totalPages || 1);
@@ -130,40 +127,6 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     }
   }, [activeTab, currentPage, debouncedSearch]);
 
-  // Comptes are already filtered server-side
-  const comptesFiltered = comptes;
-
-  const formatCompactMoney = (amount: number) => {
-    if (amount >= 1000000000) return (amount / 1000000000).toFixed(1) + ' Md FCFA';
-    if (amount >= 1000000) return (amount / 1000000).toFixed(1) + ' M FCFA';
-    return amount.toLocaleString('fr-FR') + ' FCFA';
-  };
-
-  // Helper to get solde value from various property names
-  const getSolde = (c: Compte): number => getAccountBalance(c);
-
-  // Helper to get client display name
-  const getClientName = (c: Compte): string => {
-    if (!c.clients) return 'Client inconnu';
-    return formatClientName(c.clients.nom, c.clients.prenom) || 'Client inconnu';
-  };
-
-  // Helper to get phone
-  const getClientPhone = (c: Compte): string => {
-    return c.clients?.phone || c.clients?.telephone || 'N/A';
-  };
-
-  // Helper to format date
-  const formatDate = (c: Compte): string => {
-    const dateStr = c.date_ouverture || c.created_at || c.createdAt;
-    if (!dateStr) return 'N/A';
-    try {
-      return new Date(dateStr).toLocaleDateString('fr-FR');
-    } catch {
-      return 'N/A';
-    }
-  };
-
   const [accountStats, setAccountStats] = useState({
     total: 0,
     epargne: 0,
@@ -174,13 +137,23 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     tauxMoyenEpargne: 0,
     tauxMoyenCourant: 0,
     tauxMoyenBloque: 0,
+    // Flux journaliers (si disponibles via API dédiée)
+    fluxEntrees: 0,
+    fluxSorties: 0,
   });
   
-  // Load stats separately
+  // Load stats
   const loadStats = useCallback(async () => {
     try {
       const stats = await compteEpargneApi.getStats();
-      setAccountStats(stats);
+      // Merge API response with default flux values (API may not provide flux data yet)
+      setAccountStats(prev => ({
+        ...prev,
+        ...stats,
+        // Keep flux values at 0 until backend provides them
+        fluxEntrees: 0,
+        fluxSorties: 0,
+      }));
     } catch (error) {
       console.error('Error loading stats:', error);
     }
@@ -190,44 +163,40 @@ export default function Epargnes({ activeView }: EpargnesProps) {
     loadStats();
   }, [loadStats]);
 
-  // Refresh stats when accounts change (e.g. after create/update)
   useEffect(() => {
     if (!loading) loadStats();
   }, [loading, loadStats]);
 
   const stats = useMemo(() => {
+    // Dynamic KPI Logic based on tab selection
     let activeTotal = accountStats.total;
     let activeLabel = 'actifs';
-    let tauxMoyen = accountStats.tauxMoyenGlobal;
 
-    // Context-aware total based on active tab
-    if (activeTab === 'courant') {
+    if (activeTab === TypeCompte.CURRENT) {
       activeTotal = accountStats.courant;
       activeLabel = 'courants';
-      tauxMoyen = accountStats.tauxMoyenCourant;
-    } else if (activeTab === 'epargne') {
+    } else if (activeTab === TypeCompte.SAVINGS) {
       activeTotal = accountStats.epargne;
       activeLabel = 'épargnes';
-      tauxMoyen = accountStats.tauxMoyenEpargne;
-    } else if (activeTab === 'bloques') {
+    } else if (activeTab === TypeCompte.BLOCKED) {
       activeTotal = accountStats.bloque;
       activeLabel = 'bloqués';
-      tauxMoyen = accountStats.tauxMoyenBloque;
     }
-    
+
+    // Flux du jour - using real stats from API if available
+    const fluxNet = accountStats.fluxEntrees - accountStats.fluxSorties;
+
     return {
       totalComptes: activeTotal,
       activeLabel: activeLabel,
-      comptesActifs: 0, 
       soldeTotal: accountStats.totalSolde,
-      comptesEpargne: accountStats.epargne,
-      comptesCourant: accountStats.courant,
-      tauxMoyen
+      fluxNet: fluxNet,
+      fluxEntrees: accountStats.fluxEntrees,
+      fluxSorties: accountStats.fluxSorties,
     };
   }, [accountStats, activeTab]);
 
   const handleTransaction = (compte: Compte, type: 'Dépôt' | 'Retrait') => {
-    // Ensure the compte has valid client data before proceeding
     if (!compte.clients) {
       console.error('Cannot process transaction: compte has no associated client');
       return;
@@ -243,150 +212,15 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   };
 
   const tabs = [
-    { key: 'courant', label: 'Comptes Courants', icon: DollarSign },
-    { key: 'epargne', label: 'Comptes Epargne', icon: PiggyBank },
-    { key: 'bloques', label: 'Comptes Bloqués', icon: Lock },
+    { key: TypeCompte.CURRENT, label: 'Comptes Courants' },
+    { key: TypeCompte.SAVINGS, label: 'Comptes Epargne' },
+    { key: TypeCompte.BLOCKED, label: 'Comptes Bloqués' },
   ];
-
-  // Column definitions matching ResponsiveTable interface
-  const columns: TableColumn<Compte>[] = [
-    {
-      label: 'Compte',
-      key: 'numero_compte',
-      primary: true,
-      format: (_value: any, row: Compte) => (
-        <div>
-          <div className="font-mono font-bold text-cyan-400">{row.numero_compte || row.numeroCompte}</div>
-          <div className="text-xs text-slate-400">{row.type_compte || row.typeCompte}</div>
-          {(() => {
-            const uiConfig = getAccountUiConfig(row, 'staff');
-            const monthlyEstimate = getMonthlyInterestEstimate(getSolde(row), uiConfig.interestRate);
-            if (!uiConfig.interestRate || monthlyEstimate <= 0) return null;
-            return (
-              <div className="text-[11px] text-amber-300 font-semibold mt-1">
-                Profits estimés: +{monthlyEstimate.toLocaleString('fr-FR')} FCFA/mois
-              </div>
-            );
-          })()}
-        </div>
-      ),
-      mobileFormat: (_value: any, row: Compte) => {
-        const uiConfig = getAccountUiConfig(row, 'staff');
-        const Icon = uiConfig.icon;
-        const balance = getSolde(row);
-        const monthlyEstimate = getMonthlyInterestEstimate(balance, uiConfig.interestRate);
-
-        return (
-          <div className="space-y-2">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-base font-semibold text-white truncate">{getClientName(row)}</div>
-                <div className="text-xs text-slate-400 font-mono">{row.numero_compte || row.numeroCompte}</div>
-              </div>
-              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold ${uiConfig.badgeClassName}`}>
-                <Icon size={12} />
-                {uiConfig.type}
-              </span>
-            </div>
-            <div className="text-2xl font-bold text-white">{balance.toLocaleString('fr-FR')} FCFA</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                value={uiConfig.statusLabel}
-                size="sm"
-                icon={uiConfig.isLocked ? <Lock size={12} /> : undefined}
-              />
-              {uiConfig.interestRate > 0 && monthlyEstimate > 0 && (
-                <span className="text-[11px] font-semibold text-amber-300">
-                  Profits estimés: +{monthlyEstimate.toLocaleString('fr-FR')} FCFA/mois
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      }
-    },
-    {
-      label: 'Client',
-      key: 'clients',
-      hideOnMobile: true,
-      format: (_value: any, row: Compte) => (
-        <div>
-          <div className="font-medium text-white">{getClientName(row)}</div>
-          <div className="text-xs text-slate-500">{getClientPhone(row)}</div>
-        </div>
-      )
-    },
-    {
-      label: 'Ouverture',
-      key: 'created_at',
-      hideOnMobile: true,
-      format: (_value: any, row: Compte) => (
-        <div className="text-sm text-slate-300">{formatDate(row)}</div>
-      )
-    },
-    {
-      label: 'Solde',
-      key: 'solde',
-      hideOnMobile: true,
-      format: (_value: any, row: Compte) => (
-        <span className={`font-bold ${getAccountUiConfig(row, 'staff').accentClassName}`}>
-          {getSolde(row).toLocaleString('fr-FR')} FCFA
-        </span>
-      )
-    },
-    {
-      label: 'Statut',
-      key: 'statut',
-      hideOnMobile: true,
-      format: (_value: any, row: Compte) => {
-         const uiConfig = getAccountUiConfig(row, 'staff');
-         return <Badge value={uiConfig.statusLabel} icon={uiConfig.isLocked ? <Lock size={12} /> : undefined} />;
-      }
-    }
-  ];
-
-  const canEditEpargnes = hasPermission('epargnes', 'edit');
-
-  const handleActions = (row: Compte) => {
-    const uiConfig = getAccountUiConfig(row, 'staff');
-
-    return (
-      <div className="flex gap-2">
-        {canEditEpargnes && (
-          <>
-            <button
-               onClick={(e) => { e.stopPropagation(); handleTransaction(row, 'Dépôt'); }}
-               className="p-1.5 hover:bg-emerald-500/20 text-emerald-400 rounded transition"
-               title="Dépôt"
-               disabled={!uiConfig.canReceive}
-            >
-              <TrendingUp size={16} />
-            </button>
-            <button
-               onClick={(e) => { e.stopPropagation(); handleTransaction(row, 'Retrait'); }}
-               className="p-1.5 hover:bg-blue-500/20 text-blue-400 rounded transition"
-               title="Retrait"
-               disabled={!uiConfig.canTransferOut}
-            >
-              <TrendingDown size={16} />
-            </button>
-          </>
-        )}
-        <button
-           onClick={(e) => { e.stopPropagation(); setDetailCompteId(row.id); }}
-           className="p-1.5 hover:bg-slate-500/20 text-slate-400 rounded transition"
-           title="Détails"
-        >
-          <Eye size={16} />
-        </button>
-      </div>
-    );
-  };
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-20 md:pb-0">
+    <div className="space-y-6 pb-20 md:pb-0 font-sans">
 
-
+      {/* Header & Title */}
       <PageHeader
         title="Gestion des Comptes"
         description="Comptes d'épargne et placements"
@@ -394,164 +228,122 @@ export default function Epargnes({ activeView }: EpargnesProps) {
           <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>
             <button
               onClick={() => setShowAccountForm(true)}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-lg transition flex items-center gap-2 font-semibold text-sm"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-lg shadow-blue-900/20 flex items-center gap-2 font-medium text-sm"
             >
-              <Plus size={16} />
+              <Plus size={18} />
               Nouveau Compte
             </button>
           </ProtectedFeature>
         }
       />
 
-      <div className="px-1">
-        <TabGroup 
-          tabs={tabs} 
-          activeTab={activeTab} 
-          onTabChange={(id: string) => { setActiveTab(id as any); setCurrentPage(1); }} 
+      {/* 2. KPIs (Simplified) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard 
+          title="Solde Total Encours" 
+          value={stats.soldeTotal.toLocaleString() + ' FCFA'} 
+          icon={DollarSign} 
+          color="success"
+          subtitle="Tous comptes confondus"
+          className="border-emerald-500/20"
         />
+        <StatCard 
+          title="Nombre de Comptes" 
+          value={stats.totalComptes} 
+          icon={Users} 
+          color="primary"
+          subtitle={`${stats.activeLabel}`}
+        />
+        <div className="bg-surface-base p-4 rounded-xl border border-edge shadow-sm flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+               <div>
+                  <p className="text-content-muted text-xs font-medium uppercase tracking-wider">Flux du jour</p>
+                  <h3 className={`text-2xl font-bold mt-1 ${stats.fluxNet >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {stats.fluxNet >= 0 ? '+' : ''}{stats.fluxNet.toLocaleString('fr-FR')}
+                  </h3>
+               </div>
+               <div className={`p-2 rounded-lg ${stats.fluxNet >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                  <Activity size={20} />
+               </div>
+            </div>
+            <div className="mt-4 h-1 bg-surface-muted rounded-full overflow-hidden">
+               {stats.fluxEntrees + stats.fluxSorties > 0 ? (
+                 <div
+                   className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                   style={{ width: `${(stats.fluxEntrees / (stats.fluxEntrees + stats.fluxSorties)) * 100}%` }}
+                 />
+               ) : (
+                 <div className="h-full bg-slate-600 w-full rounded-full" />
+               )}
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-content-muted">
+               <span className="text-emerald-400">Entrées: +{stats.fluxEntrees.toLocaleString('fr-FR')}</span>
+               <span className="text-red-400">Sorties: -{stats.fluxSorties.toLocaleString('fr-FR')}</span>
+            </div>
+        </div>
       </div>
 
-      {/* Search Bar */}
-      {activeTab !== 'bloques' && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            placeholder="Rechercher par nom client ou numéro de compte..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition"
-          />
-        </div>
-      )}
+      {/* 3. NAVIGATION PERSISTANTE */}
+      <div className="border-b border-slate-700">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
+              className={`
+                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200
+                ${activeTab === tab.key
+                  ? 'border-emerald-500 text-emerald-400 bg-white/5' // Style Actif
+                  : 'border-transparent text-slate-400 hover:text-white hover:border-slate-700' // Style Inactif
+                }
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-      {activeTab === 'bloques' ? (
-        <ComptesBloquesSection />
-      ) : (
-        <>
-          {/* Stats Carousel */}
-          <div className="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 no-scrollbar">
-            <div className="flex md:grid md:grid-cols-4 gap-3 min-w-[max-content] md:min-w-0">
-              <div className="w-[200px] md:w-auto">
-                <StatCard 
-                  title="Total Comptes" 
-                  value={stats.totalComptes} 
-                  icon={Users} 
-                  color="primary"
-                  subtitle={`${stats.totalComptes} ${stats.activeLabel}`}
-                />
-              </div>
-              <div className="w-[220px] md:w-auto">
-                <StatCard 
-                  title="Solde Total" 
-                  value={formatCompactMoney(stats.soldeTotal)} 
-                  icon={DollarSign} 
-                  color="success"
-                  subtitle="Tous les comptes"
-                />
-              </div>
-              <div className="w-[200px] md:w-auto">
-                <StatCard 
-                  title="Comptes Épargne" 
-                  value={stats.comptesEpargne} 
-                  icon={PiggyBank} 
-                  color="warning"
-                  subtitle={`${stats.comptesCourant} courants`}
-                />
-              </div>
-              <div className="w-[200px] md:w-auto">
-                <StatCard 
-                  title="Taux Moyen" 
-                  value={stats.tauxMoyen.toFixed(1) + '%'} 
-                  icon={Percent} 
-                  color="neutral"
-                  subtitle="Intérêt annuel"
-                />
-              </div>
+      {/* 4. CONTENU DYNAMIQUE */}
+      <div className="mt-6">
+        {activeTab === TypeCompte.BLOCKED ? (
+          <ComptesBloquesSection />
+        ) : (
+          <>
+            {/* Search Toolbar (Tabs removed) */}
+            <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-surface-base p-2 rounded-2xl border border-edge shadow-sm mb-6">
+               <div className="relative flex-1 group">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={20} />
+                  <input
+                    type="text"
+                    placeholder="Rechercher un client..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-transparent border-none text-content-primary placeholder-slate-500 focus:ring-0 px-10 py-2.5 text-sm font-medium"
+                  />
+               </div>
+
+               <div className="hidden md:flex items-center border-l border-edge pl-4">
+                  <button className="flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:text-white hover:bg-surface-muted rounded-lg transition">
+                     <Filter size={16} />
+                     <span>Tous les statuts</span>
+                  </button>
+               </div>
             </div>
-          </div>
 
-          <ResponsiveTable
-            data={comptesFiltered}
-            columns={columns}
-            loading={loading}
-            emptyMessage={debouncedSearch ? `Aucun compte trouvé pour "${debouncedSearch}"` : "Aucun compte trouvé"}
-            onRowClick={(row) => {
-              console.log('Row clicked:', row.id);
-              setDetailCompteId(row.id);
-              console.log('DetailCompteId set to:', row.id);
-            }}
-            actions={handleActions}
-          />
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-2 py-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
-              <div className="text-sm text-slate-400">
-                Page {currentPage} sur {totalPages} ({totalComptes} comptes)
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
-                  title="Première page"
-                >
-                  <ChevronsLeft size={18} />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
-                  title="Page précédente"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                
-                {/* Page Numbers */}
-                <div className="flex items-center gap-1 px-2">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum = currentPage - 2 + i;
-                    if (currentPage <= 2) pageNum = i + 1;
-                    if (currentPage >= totalPages - 1) pageNum = totalPages - 4 + i;
-                    if (pageNum < 1 || pageNum > totalPages) return null;
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-8 h-8 rounded text-sm font-medium transition ${
-                          pageNum === currentPage
-                            ? 'bg-cyan-600 text-white'
-                            : 'text-slate-400 hover:bg-slate-700 hover:text-white'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
-                  title="Page suivante"
-                >
-                  <ChevronRight size={18} />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
-                  title="Dernière page"
-                >
-                  <ChevronsRight size={18} />
-                </button>
-              </div>
+            {/* Account List */}
+            <div className="bg-surface-base rounded-2xl border border-edge overflow-hidden shadow-theme-sm p-4">
+               <AccountsList
+                  data={comptes}
+                  type={activeTab === TypeCompte.SAVINGS ? TypeCompte.SAVINGS : TypeCompte.CURRENT}
+                  loading={loading}
+                  onManage={(c) => setDetailCompteId(c.id)}
+                  onTransaction={handleTransaction}
+               />
             </div>
-          )}
-        </>
-      )}
+          </>
+        )}
+      </div>
 
       {showAccountForm && (
         <EpargneAccountForm
@@ -576,8 +368,9 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       )}
 
       {detailCompteId && (
-        <EpargneDetailModal
+        <AccountDetailSlideOver
           compteId={detailCompteId}
+          isOpen={!!detailCompteId}
           onClose={() => setDetailCompteId(null)}
         />
       )}

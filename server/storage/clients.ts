@@ -1,11 +1,22 @@
-import { clients, typesMarches, tags, clientTags, clientActivities, users, agences, historiquePoints } from "@shared/schema";
+import { clients, typesMarches, tags, clientTags, clientActivities, users, agences, historiquePoints, userRoles } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
+import { StatutUser } from "@shared/enum/status-constants";
 import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User, type InsertHistoriquePoints } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, isNull, sql } from "drizzle-orm";
+import { z } from "zod";
+import { StorageService } from "../services/storage-service";
 
-// Type pour client avec données utilisateur
+// ============================================
+// TYPES ET SCHEMAS API
+// ============================================
+
+/**
+ * Type pour client avec données utilisateur (pour les lectures)
+ * Les champs d'identité viennent de la table users (source de vérité)
+ */
 export interface ClientWithUser extends Client {
+  statut?: string;
   user?: {
     id: string;
     nom: string;
@@ -14,23 +25,128 @@ export interface ClientWithUser extends Client {
     telephone: string | null;
     sexe: string | null;
     photoProfile: string | null;
+    statut?: string;
   } | null;
 }
 
-// Clients
-export async function getClient(id: string): Promise<Client | undefined> {
-  const [client] = await db.select().from(clients).where(eq(clients.id, id));
-  return client || undefined;
+/**
+ * Type étendu retourné par les fonctions de lecture
+ * Fusionne les données client + user pour l'API
+ */
+export interface ClientFull extends Client {
+  // Champs d'identité (depuis users)
+  nom: string;
+  prenom: string | null;
+  email: string | null;
+  telephone: string | null;
+  photoProfile: string | null;
+  statut: string;
+  // Champs enrichis
+  type_marche_nom?: string | null;
+  agence_nom?: string | null;
+  photoUrl?: string | null;
 }
 
-export async function getAllClients(filter: { agence?: string; agenceId?: string } = {}): Promise<(Client & { type_marche_nom?: string | null; agence_nom?: string | null; photoUrl?: string | null })[]> {
+/**
+ * Schema API pour la création de client
+ * Sépare les données user (identité) des données client (métier)
+ */
+export const createClientApiSchema = z.object({
+  // Données d'identité (iront dans users)
+  nom: z.string().min(1, "Le nom est requis"),
+  prenom: z.string().optional().nullable(),
+  email: z.string().email("Email invalide").optional().nullable(),
+  telephone: z.string().optional().nullable(),
+  sexe: z.enum(['M', 'F']).optional().nullable(),
+  photoProfile: z.string().optional().nullable(),
+
+  // Données métier client
+  adresseDomicile: z.string().optional().nullable(),
+  lieuActivite: z.string().optional().nullable(),
+  ville: z.string().optional().nullable(),
+  pays: z.string().optional().nullable(),
+  dateNaissance: z.string().optional().nullable(),
+  numeroPiece: z.string().optional().nullable(),
+  typePiece: z.string().optional().nullable(),
+  profession: z.string().optional().nullable(),
+  employeur: z.string().optional().nullable(),
+  typeActivite: z.string().optional().nullable(),
+  revenuMensuel: z.string().optional().nullable(),
+  documents: z.any().optional().nullable(),
+  typeMarcheId: z.string().uuid().optional().nullable(),
+  segment: z.string().optional().default("STANDARD"),
+  frequenceCarte: z.string().optional().nullable(),
+  latitude: z.string().optional().nullable(),
+  longitude: z.string().optional().nullable(),
+  agenceId: z.string().uuid().optional().nullable(),
+  agentReferentId: z.string().uuid().optional().nullable(),
+  statut: z.string().optional().default(StatutUser.ACTIVE),
+});
+
+export type CreateClientApiInput = z.infer<typeof createClientApiSchema>;
+
+/**
+ * Schema API pour la mise à jour partielle de client
+ * Tous les champs sont optionnels, sépare identité et métier
+ */
+export const updateClientApiSchema = createClientApiSchema.partial();
+export type UpdateClientApiInput = z.infer<typeof updateClientApiSchema>;
+
+// ============================================
+// FONCTIONS DE LECTURE
+// ============================================
+
+/**
+ * Récupérer un client par son ID avec données utilisateur fusionnées
+ * Retourne un objet unifié avec les champs d'identité depuis users
+ */
+export async function getClient(id: string): Promise<ClientFull | undefined> {
+  const result = await db
+    .select({
+      client: clients,
+      user_nom: users.nom,
+      user_prenom: users.prenom,
+      user_email: users.email,
+      user_telephone: users.telephone,
+      user_photo_profile: users.photoProfile,
+      user_statut: users.statut,
+      agence_nom: agences.nom,
+      type_marche_nom: typesMarches.nom,
+    })
+    .from(clients)
+    .leftJoin(users, eq(clients.userId, users.id))
+    .leftJoin(agences, eq(clients.agenceId, agences.id))
+    .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
+    .where(eq(clients.id, id));
+
+  if (result.length === 0) return undefined;
+
+  const r = result[0];
+  return {
+    ...r.client,
+    // Champs d'identité depuis users (source de vérité)
+    nom: r.user_nom || "Client",
+    prenom: r.user_prenom,
+    email: r.user_email,
+    telephone: r.user_telephone,
+    photoProfile: r.user_photo_profile,
+    statut: r.user_statut || StatutUser.ACTIVE,
+    // Champs enrichis
+    type_marche_nom: r.type_marche_nom,
+    agence_nom: r.agence_nom,
+    photoUrl: r.user_photo_profile,
+  };
+}
+
+/**
+ * Récupérer tous les clients avec données utilisateur fusionnées
+ */
+export async function getAllClients(filter: { agence?: string; agenceId?: string } = {}): Promise<ClientFull[]> {
   const conditions = [];
 
-  // Filtrer par agenceId (prioritaire) ou par agence (legacy)
+  // Filtrer par agenceId (prioritaire)
   if (filter.agenceId && filter.agenceId !== "all") {
     conditions.push(eq(clients.agenceId, filter.agenceId));
-  } else if (filter.agence && filter.agence !== "all") {
-    conditions.push(eq(clients.agence, filter.agence));
   }
 
   let query = db
@@ -38,10 +154,13 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
       client: clients,
       type_marche_nom: typesMarches.nom,
       agence_nom: agences.nom,
+      // Source de vérité: users
       user_nom: users.nom,
       user_prenom: users.prenom,
+      user_email: users.email,
       user_telephone: users.telephone,
       user_photo_profile: users.photoProfile,
+      user_statut: users.statut,
     })
     .from(clients)
     .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
@@ -57,28 +176,40 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
 
   return results.map(r => ({
     ...r.client,
-    // Use user data as source of truth for identity, fallback to legacy fields
-    nom: r.user_nom || r.client.nom,
-    prenom: r.user_prenom || r.client.prenom,
-    telephone: r.user_telephone || r.client.telephone,
+    // Champs d'identité depuis users (source de vérité)
+    nom: r.user_nom || "Client",
+    prenom: r.user_prenom,
+    email: r.user_email,
+    telephone: r.user_telephone,
+    photoProfile: r.user_photo_profile,
+    statut: r.user_statut || StatutUser.ACTIVE,
     type_marche_nom: r.type_marche_nom,
     agence_nom: r.agence_nom,
-    // Photo: prioritize user.photoProfile, fallback to legacy client fields
-    photoUrl: r.user_photo_profile || r.client.photoProfile || r.client.photoUrl
+    photoUrl: (() => {
+      const url = r.user_photo_profile;
+      if (url && url.trim().startsWith('[')) {
+          try {
+              const parsed = JSON.parse(url);
+              if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+          } catch (e) { /* ignore */ }
+      }
+      return url;
+    })()
   }));
 }
 
+/**
+ * Récupérer les clients paginés avec données utilisateur fusionnées
+ */
 export async function getClientsPaginated(
   filter: { agence?: string; agenceId?: string } = {},
   page: number = 1,
   perPage: number = 25
-): Promise<{ data: (Client & { type_marche_nom?: string | null; agence_nom?: string | null; photoUrl?: string | null })[]; total: number }> {
+): Promise<{ data: ClientFull[]; total: number }> {
   const conditions = [];
 
   if (filter.agenceId && filter.agenceId !== "all") {
     conditions.push(eq(clients.agenceId, filter.agenceId));
-  } else if (filter.agence && filter.agence !== "all") {
-    conditions.push(eq(clients.agence, filter.agence));
   }
 
   const totalResult = await db
@@ -95,8 +226,10 @@ export async function getClientsPaginated(
       agence_nom: agences.nom,
       user_nom: users.nom,
       user_prenom: users.prenom,
+      user_email: users.email,
       user_telephone: users.telephone,
       user_photo_profile: users.photoProfile,
+      user_statut: users.statut,
     })
     .from(clients)
     .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
@@ -116,41 +249,270 @@ export async function getClientsPaginated(
   return {
     data: results.map((r) => ({
       ...r.client,
-      nom: r.user_nom || r.client.nom,
-      prenom: r.user_prenom || r.client.prenom,
-      telephone: r.user_telephone || r.client.telephone,
+      nom: r.user_nom || "Client",
+      prenom: r.user_prenom,
+      email: r.user_email,
+      telephone: r.user_telephone,
+      photoProfile: r.user_photo_profile,
+      statut: r.user_statut || StatutUser.ACTIVE,
       type_marche_nom: r.type_marche_nom,
       agence_nom: r.agence_nom,
-      photoUrl: r.user_photo_profile || r.client.photoProfile || r.client.photoUrl,
+      photoUrl: (() => {
+        const url = r.user_photo_profile;
+        if (url && url.trim().startsWith('[')) {
+            try {
+                const parsed = JSON.parse(url);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+            } catch (e) { /* ignore */ }
+        }
+        return url;
+      })(),
     })),
     total,
   };
 }
 
-export async function createClient(insertClient: InsertClient): Promise<Client> {
-  const [client] = await db.insert(clients).values(insertClient).returning();
-  return client;
+// ============================================
+// FONCTIONS DE CRÉATION
+// ============================================
+
+/**
+ * Créer un client avec création automatique du user associé
+ *
+ * @param input - Données API combinées (identité + métier)
+ * @returns Client créé
+ *
+ * FLUX:
+ * 1. Créer le user avec les données d'identité (nom, prenom, email, telephone)
+ * 2. Créer le rôle CLIENT dans userRoles (Architecture V3)
+ * 3. Créer le client avec référence userId et données métier
+ */
+export async function createClient(input: CreateClientApiInput): Promise<Client> {
+  return await db.transaction(async (tx) => {
+    // 1. Créer le user avec les données d'identité
+    const [user] = await tx.insert(users).values({
+      nom: input.nom,
+      prenom: input.prenom,
+      email: input.email,
+      telephone: input.telephone,
+      photoProfile: input.photoProfile,
+      sexe: input.sexe,
+      typeCompte: "client",
+      canLogin: false, // Par défaut, pas d'accès portail
+      statut: input.statut || StatutUser.ACTIVE,
+      mustChangePassword: true,
+    }).returning();
+
+    // 2. Créer le rôle CLIENT dans userRoles (Architecture V3)
+    await tx.insert(userRoles).values({
+      userId: user.id,
+      role: SystemRole.CLIENT,
+      agenceId: input.agenceId || null,
+      isPrimary: true,
+    });
+
+    // 3. Créer le client avec les données métier (sans champs d'identité)
+    const [client] = await tx.insert(clients).values({
+      userId: user.id,
+      adresseDomicile: input.adresseDomicile,
+      lieuActivite: input.lieuActivite,
+      ville: input.ville,
+      pays: input.pays,
+      dateNaissance: input.dateNaissance,
+      numeroPiece: input.numeroPiece,
+      typePiece: input.typePiece,
+      profession: input.profession,
+      employeur: input.employeur,
+      typeActivite: input.typeActivite,
+      revenuMensuel: input.revenuMensuel,
+      documents: input.documents,
+      typeMarcheId: input.typeMarcheId,
+      segment: input.segment || "STANDARD",
+      frequenceCarte: input.frequenceCarte,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      agenceId: input.agenceId,
+      agentReferentId: input.agentReferentId,
+    }).returning();
+
+    return client;
+  });
 }
 
-export async function updateClient(id: string, updateData: Partial<InsertClient>): Promise<Client | undefined> {
-  const [client] = await db
-    .update(clients)
-    .set({ ...updateData, updatedAt: new Date() })
-    .where(eq(clients.id, id))
-    .returning();
-  return client || undefined;
+/**
+ * Créer un client pour un user existant (sans créer de nouveau user)
+ * Utilisé quand on veut ajouter un profil client à un user déjà existant
+ */
+export async function createClientWithExistingUser(userId: string, input: Omit<CreateClientApiInput, 'nom' | 'prenom' | 'email' | 'telephone' | 'photoProfile' | 'sexe'>): Promise<Client> {
+  return await db.transaction(async (tx) => {
+    // Vérifier que le user existe
+    const [user] = await tx.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      throw new Error("Utilisateur non trouvé");
+    }
+
+    // Vérifier si le rôle CLIENT existe déjà
+    const [existingRole] = await tx.select()
+      .from(userRoles)
+      .where(and(
+        eq(userRoles.userId, userId),
+        eq(userRoles.role, SystemRole.CLIENT)
+      ));
+
+    // Ajouter le rôle CLIENT si non existant
+    if (!existingRole) {
+      const [anyRole] = await tx.select().from(userRoles).where(eq(userRoles.userId, userId));
+      await tx.insert(userRoles).values({
+        userId,
+        role: SystemRole.CLIENT,
+        agenceId: input.agenceId || null,
+        isPrimary: !anyRole,
+      });
+    }
+
+    // Créer le client
+    const [client] = await tx.insert(clients).values({
+      userId,
+      adresseDomicile: input.adresseDomicile,
+      lieuActivite: input.lieuActivite,
+      ville: input.ville,
+      pays: input.pays,
+      dateNaissance: input.dateNaissance,
+      numeroPiece: input.numeroPiece,
+      typePiece: input.typePiece,
+      profession: input.profession,
+      employeur: input.employeur,
+      typeActivite: input.typeActivite,
+      revenuMensuel: input.revenuMensuel,
+      documents: input.documents,
+      typeMarcheId: input.typeMarcheId,
+      segment: input.segment || "STANDARD",
+      frequenceCarte: input.frequenceCarte,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      agenceId: input.agenceId,
+      agentReferentId: input.agentReferentId,
+    }).returning();
+
+    // Mettre à jour typeCompte si nécessaire
+    if (user.typeCompte === 'employe') {
+      await tx.update(users).set({ typeCompte: 'both' }).where(eq(users.id, userId));
+    }
+
+    return client;
+  });
+}
+
+// ============================================
+// FONCTIONS DE MISE À JOUR
+// ============================================
+
+/**
+ * Mettre à jour un client et son user associé
+ *
+ * Les données d'identité (nom, prenom, email, telephone, photoProfile, sexe)
+ * sont mises à jour dans la table users (source de vérité).
+ * Les données métier sont mises à jour dans clients.
+ */
+export async function updateClient(id: string, updateData: Partial<CreateClientApiInput>): Promise<ClientFull | undefined> {
+  // Séparer les champs d'identité des champs métier
+  const identityFields = ['nom', 'prenom', 'email', 'telephone', 'photoProfile', 'sexe', 'statut'] as const;
+
+  const identityData: Record<string, any> = {};
+  const businessData: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(updateData)) {
+    if (identityFields.includes(key as any) && value !== undefined) {
+      identityData[key] = value;
+    } else if (value !== undefined) {
+      businessData[key] = value;
+    }
+  }
+
+  return await db.transaction(async (tx) => {
+    // Récupérer le client pour avoir le userId
+    const [currentClient] = await tx.select().from(clients).where(eq(clients.id, id));
+    if (!currentClient) return undefined;
+
+    // Si le client a un userId, mettre à jour le user pour les champs d'identité
+    if (currentClient.userId && Object.keys(identityData).length > 0) {
+      await tx.update(users)
+        .set({ ...identityData, updatedAt: new Date() })
+        .where(eq(users.id, currentClient.userId));
+    }
+
+    // Mettre à jour le client (données métier uniquement)
+    if (Object.keys(businessData).length > 0) {
+      await tx
+        .update(clients)
+        .set({ ...businessData, updatedAt: new Date() })
+        .where(eq(clients.id, id));
+    }
+
+    // Retourner le client mis à jour avec les données fusionnées
+    const result = await tx
+      .select({
+        client: clients,
+        user_nom: users.nom,
+        user_prenom: users.prenom,
+        user_email: users.email,
+        user_telephone: users.telephone,
+        user_photo_profile: users.photoProfile,
+        user_statut: users.statut,
+        agence_nom: agences.nom,
+        type_marche_nom: typesMarches.nom,
+      })
+      .from(clients)
+      .leftJoin(users, eq(clients.userId, users.id))
+      .leftJoin(agences, eq(clients.agenceId, agences.id))
+      .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
+      .where(eq(clients.id, id));
+
+    if (result.length === 0) return undefined;
+
+    const r = result[0];
+    return {
+      ...r.client,
+      nom: r.user_nom || "Client",
+      prenom: r.user_prenom,
+      email: r.user_email,
+      telephone: r.user_telephone,
+      photoProfile: r.user_photo_profile,
+      statut: r.user_statut || StatutUser.ACTIVE,
+      type_marche_nom: r.type_marche_nom,
+      agence_nom: r.agence_nom,
+      photoUrl: r.user_photo_profile,
+    };
+  });
 }
 
 export async function deleteClient(id: string): Promise<boolean> {
   try {
+    // Récupérer le client pour avoir le userId
+    const [currentClient] = await db.select().from(clients).where(eq(clients.id, id));
+    if (!currentClient) return false;
+
+    // Supprimer les fichiers MinIO associés au client (CASCADE)
+    try {
+      const { publicDeleted, privateDeleted } = await StorageService.deleteEntityFiles('client', id);
+      if (publicDeleted > 0 || privateDeleted > 0) {
+        console.log(`🗑️  Client ${id}: suppression cascade MinIO (${publicDeleted} publics, ${privateDeleted} privés)`);
+      }
+    } catch (storageError) {
+      // Log l'erreur mais continue la suppression du client
+      console.error(`⚠️  Erreur suppression fichiers MinIO pour client ${id}:`, storageError);
+    }
+
     const result = await db.delete(clients).where(eq(clients.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   } catch (error: any) {
-    if (error?.code === "23503") { // Foreign key violation
+    // Si on ne peut pas supprimer (FK violation), on marque le user comme supprimé
+    const [currentClient] = await db.select().from(clients).where(eq(clients.id, id));
+    if (currentClient && currentClient.userId) {
       const [updated] = await db
-        .update(clients)
-        .set({ status: "Supprimé", updatedAt: new Date() })
-        .where(eq(clients.id, id))
+        .update(users)
+        .set({ statut: StatutUser.INACTIVE, updatedAt: new Date() })
+        .where(eq(users.id, currentClient.userId))
         .returning();
       return !!updated;
     }
@@ -319,6 +681,7 @@ export async function getClientWithUser(id: string): Promise<ClientWithUser | un
 
 /**
  * Créer un client avec un user associé (pour portail client futur)
+ * Architecture V3: utilise userRoles
  */
 export async function createClientWithUser(
   userData: {
@@ -329,11 +692,12 @@ export async function createClientWithUser(
     sexe?: 'M' | 'F';
     username?: string;
     password?: string;
+    statut?: string;
   },
-  clientData: Omit<InsertClient, 'userId' | 'nom' | 'prenom' | 'email' | 'telephone'>
+  clientData: Omit<CreateClientApiInput, 'nom' | 'prenom' | 'email' | 'telephone' | 'sexe' | 'photoProfile'>
 ): Promise<{ user: User; client: Client }> {
   return await db.transaction(async (tx) => {
-    // Créer l'utilisateur
+    // 1. Créer l'utilisateur
     const [user] = await tx.insert(users).values({
       nom: userData.nom,
       prenom: userData.prenom,
@@ -343,20 +707,40 @@ export async function createClientWithUser(
       username: userData.username,
       password: userData.password,
       typeCompte: 'client',
-      role: SystemRole.CLIENT,
-      canLogin: !!userData.username, // Peut se connecter seulement si username est fourni
-      statut: 'Actif',
+      canLogin: !!userData.username,
+      statut: userData.statut || StatutUser.ACTIVE,
     }).returning();
 
-    // Créer le client lié
-    const [client] = await tx.insert(clients).values({
-      ...clientData,
+    // 2. Créer le rôle CLIENT dans userRoles (Architecture V3)
+    await tx.insert(userRoles).values({
       userId: user.id,
-      // Champs legacy - copiés depuis user pour rétro-compatibilité
-      nom: userData.nom,
-      prenom: userData.prenom,
-      email: userData.email,
-      telephone: userData.telephone,
+      role: SystemRole.CLIENT,
+      agenceId: clientData.agenceId || null,
+      isPrimary: true,
+    });
+
+    // 3. Créer le client lié (données métier uniquement)
+    const [client] = await tx.insert(clients).values({
+      userId: user.id,
+      adresseDomicile: clientData.adresseDomicile,
+      lieuActivite: clientData.lieuActivite,
+      ville: clientData.ville,
+      pays: clientData.pays,
+      dateNaissance: clientData.dateNaissance,
+      numeroPiece: clientData.numeroPiece,
+      typePiece: clientData.typePiece,
+      profession: clientData.profession,
+      employeur: clientData.employeur,
+      typeActivite: clientData.typeActivite,
+      revenuMensuel: clientData.revenuMensuel,
+      documents: clientData.documents,
+      typeMarcheId: clientData.typeMarcheId,
+      segment: clientData.segment || "STANDARD",
+      frequenceCarte: clientData.frequenceCarte,
+      latitude: clientData.latitude,
+      longitude: clientData.longitude,
+      agenceId: clientData.agenceId,
+      agentReferentId: clientData.agentReferentId,
     }).returning();
 
     return { user, client };
@@ -376,31 +760,228 @@ export async function linkClientToUser(clientId: string, userId: string): Promis
 
 /**
  * Créer un profil client pour un user existant
+ * Architecture V3: ajoute le rôle CLIENT si non existant
  */
-export async function createClientForUser(userId: string, clientData: Omit<InsertClient, 'userId'>): Promise<Client> {
-  // Récupérer les données user pour les champs legacy
-  const [user] = await db.select().from(users).where(eq(users.id, userId));
+export async function createClientForUser(userId: string, clientData: Omit<CreateClientApiInput, 'nom' | 'prenom' | 'email' | 'telephone' | 'sexe' | 'photoProfile'>): Promise<Client> {
+  return await db.transaction(async (tx) => {
+    // Récupérer les données user
+    const [user] = await tx.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      throw new Error("Utilisateur non trouvé");
+    }
 
-  const [client] = await db.insert(clients).values({
-    ...clientData,
-    userId,
-    // Champs legacy copiés depuis user
-    nom: clientData.nom || user?.nom,
-    prenom: clientData.prenom || user?.prenom,
-    email: clientData.email || user?.email,
-    telephone: clientData.telephone || user?.telephone,
-  }).returning();
+    // 1. Créer le client (données métier uniquement)
+    const [client] = await tx.insert(clients).values({
+      userId,
+      adresseDomicile: clientData.adresseDomicile,
+      lieuActivite: clientData.lieuActivite,
+      ville: clientData.ville,
+      pays: clientData.pays,
+      dateNaissance: clientData.dateNaissance,
+      numeroPiece: clientData.numeroPiece,
+      typePiece: clientData.typePiece,
+      profession: clientData.profession,
+      employeur: clientData.employeur,
+      typeActivite: clientData.typeActivite,
+      revenuMensuel: clientData.revenuMensuel,
+      documents: clientData.documents,
+      typeMarcheId: clientData.typeMarcheId,
+      segment: clientData.segment || "STANDARD",
+      frequenceCarte: clientData.frequenceCarte,
+      latitude: clientData.latitude,
+      longitude: clientData.longitude,
+      agenceId: clientData.agenceId,
+      agentReferentId: clientData.agentReferentId,
+    }).returning();
 
-  // Mettre à jour le type_compte du user si nécessaire
-  if (user && user.typeCompte === 'employe') {
-    await db.update(users)
-      .set({ typeCompte: 'both' })
-      .where(eq(users.id, userId));
-  } else if (user && user.typeCompte === 'client') {
-    await db.update(users)
-      .set({ role: SystemRole.CLIENT })
-      .where(eq(users.id, userId));
+    // 2. Vérifier si le rôle CLIENT existe déjà dans userRoles
+    const [existingClientRole] = await tx.select()
+      .from(userRoles)
+      .where(and(
+        eq(userRoles.userId, userId),
+        eq(userRoles.role, SystemRole.CLIENT)
+      ));
+
+    // 3. Si pas de rôle CLIENT, l'ajouter (non-primary si d'autres rôles existent)
+    if (!existingClientRole) {
+      const [anyRole] = await tx.select()
+        .from(userRoles)
+        .where(eq(userRoles.userId, userId));
+
+      await tx.insert(userRoles).values({
+        userId,
+        role: SystemRole.CLIENT,
+        agenceId: clientData.agenceId || null,
+        isPrimary: !anyRole,
+      });
+    }
+
+    // 4. Mettre à jour le type_compte du user si nécessaire
+    if (user.typeCompte === 'employe') {
+      await tx.update(users)
+        .set({ typeCompte: 'both' })
+        .where(eq(users.id, userId));
+    }
+
+    return client;
+  });
+}
+
+// ============================================
+// STATISTIQUES CLIENTS (AGRÉGATION SQL)
+// ============================================
+
+export interface ClientStats {
+  totalClients: number;
+  activeClients: number;
+  inactiveClients: number;
+  suspendedClients: number;
+  newClientsThisMonth: number;
+  segmentDistribution: {
+    vip: number;
+    premium: number;
+    standard: number;
+  };
+  financialSummary: {
+    totalCredit: number;
+    totalEpargne: number;
+    avgRepaymentRate: number;
+    totalLoyaltyPoints: number;
+  };
+}
+
+/**
+ * Récupère les statistiques agrégées des clients via SQL COUNT
+ * Optimisé pour éviter de charger tous les objets en mémoire
+ */
+export async function getClientStats(filter: { agenceId?: string } = {}): Promise<ClientStats> {
+  const conditions = [];
+
+  if (filter.agenceId && filter.agenceId !== "all") {
+    conditions.push(eq(clients.agenceId, filter.agenceId));
   }
 
-  return client;
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // Requête unique avec agrégation SQL
+  const [stats] = await db
+    .select({
+      totalClients: sql<number>`count(*)`,
+      activeClients: sql<number>`count(*) filter (where ${users.statut} = 'ACTIVE')`,
+      inactiveClients: sql<number>`count(*) filter (where ${users.statut} = 'INACTIVE')`,
+      suspendedClients: sql<number>`count(*) filter (where ${users.statut} = 'SUSPENDED')`,
+      vipCount: sql<number>`count(*) filter (where ${clients.segment} = 'VIP')`,
+      premiumCount: sql<number>`count(*) filter (where ${clients.segment} = 'Premium')`,
+      standardCount: sql<number>`count(*) filter (where ${clients.segment} = 'Standard')`,
+      totalCredit: sql<number>`coalesce(sum(cast(${clients.creditTotal} as numeric)), 0)`,
+      totalEpargne: sql<number>`coalesce(sum(cast(${clients.epargneTotal} as numeric)), 0)`,
+      avgRepaymentRate: sql<number>`coalesce(avg(cast(${clients.tauxRemboursement} as numeric)), 0)`,
+      totalLoyaltyPoints: sql<number>`coalesce(sum(${clients.pointsFidelite}), 0)`,
+    })
+    .from(clients)
+    .leftJoin(users, eq(clients.userId, users.id))
+    .where(whereClause);
+
+  // Comptage des nouveaux clients ce mois-ci (requête séparée pour clarté)
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const newClientsConditions = [...conditions];
+  newClientsConditions.push(sql`${clients.dateInscription} >= ${startOfMonth}`);
+
+  const [newClientsResult] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(clients)
+    .where(and(...newClientsConditions));
+
+  return {
+    totalClients: Number(stats?.totalClients) || 0,
+    activeClients: Number(stats?.activeClients) || 0,
+    inactiveClients: Number(stats?.inactiveClients) || 0,
+    suspendedClients: Number(stats?.suspendedClients) || 0,
+    newClientsThisMonth: Number(newClientsResult?.count) || 0,
+    segmentDistribution: {
+      vip: Number(stats?.vipCount) || 0,
+      premium: Number(stats?.premiumCount) || 0,
+      standard: Number(stats?.standardCount) || 0,
+    },
+    financialSummary: {
+      totalCredit: Number(stats?.totalCredit) || 0,
+      totalEpargne: Number(stats?.totalEpargne) || 0,
+      avgRepaymentRate: Math.round(Number(stats?.avgRepaymentRate) || 0),
+      totalLoyaltyPoints: Number(stats?.totalLoyaltyPoints) || 0,
+    },
+  };
+}
+
+// ============================================
+// BULK OPERATIONS
+// ============================================
+
+/**
+ * Création de clients en masse (Bulk Insert)
+ * Utilise une transaction pour l'atomicité.
+ *
+ * @param clientsData - Tableau de données API (identité + métier combinées)
+ * @returns Tableau de clients créés
+ */
+export async function createClientsBulk(clientsData: CreateClientApiInput[]): Promise<Client[]> {
+  return await db.transaction(async (tx) => {
+    if (clientsData.length === 0) return [];
+
+    const results: Client[] = [];
+
+    for (const data of clientsData) {
+       // 1. Créer le user avec les données d'identité
+       const [user] = await tx.insert(users).values({
+         nom: data.nom,
+         prenom: data.prenom,
+         email: data.email,
+         telephone: data.telephone,
+         photoProfile: data.photoProfile,
+         sexe: data.sexe,
+         typeCompte: "client",
+         statut: data.statut || StatutUser.ACTIVE,
+         canLogin: false,
+         mustChangePassword: true
+       }).returning();
+
+       // 2. Créer le rôle CLIENT dans userRoles (Architecture V3)
+       await tx.insert(userRoles).values({
+         userId: user.id,
+         role: SystemRole.CLIENT,
+         agenceId: data.agenceId || null,
+         isPrimary: true,
+       });
+
+       // 3. Créer le client avec les données métier
+       const [client] = await tx.insert(clients).values({
+         userId: user.id,
+         adresseDomicile: data.adresseDomicile,
+         lieuActivite: data.lieuActivite,
+         ville: data.ville,
+         pays: data.pays,
+         dateNaissance: data.dateNaissance,
+         numeroPiece: data.numeroPiece,
+         typePiece: data.typePiece,
+         profession: data.profession,
+         employeur: data.employeur,
+         typeActivite: data.typeActivite,
+         revenuMensuel: data.revenuMensuel,
+         documents: data.documents,
+         typeMarcheId: data.typeMarcheId,
+         segment: data.segment || "STANDARD",
+         frequenceCarte: data.frequenceCarte,
+         latitude: data.latitude,
+         longitude: data.longitude,
+         agenceId: data.agenceId,
+         agentReferentId: data.agentReferentId,
+       }).returning();
+
+       results.push(client);
+    }
+
+    return results;
+  });
 }

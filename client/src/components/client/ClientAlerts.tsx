@@ -1,4 +1,4 @@
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, AlertCircle, Info, CheckCircle, X, ShieldAlert, BadgeCheck } from 'lucide-react';
 import { Card, Badge } from '../ui';
@@ -15,7 +15,7 @@ interface ClientAlert {
 }
 
 interface ClientAlertsProps {
-  client: Client;
+  client: ClientWithIdentity;
   onUpdate?: () => void;
 }
 

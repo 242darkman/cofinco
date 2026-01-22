@@ -1,13 +1,98 @@
 import type { Express } from "express";
-import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences } from "@shared/schema";
+import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences, userRoles, employes } from "@shared/schema";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
 import { loginUser, registerUser, requireAuth, requireRole, hashPassword, comparePasswords } from "../auth";
 import { logAudit, logLoginAttempt, isAccountLocked, validatePassword, getPasswordRequirements, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
 import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions } from "../session-tracker";
+import { getPermissionsForUser } from "../services/permissions-service";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db";
+import { StatutUser } from "@shared/enum/status-constants";
+
+/**
+ * Récupérer le caissePin d'un utilisateur depuis la table employes.
+ * Architecture V3: caissePin est stocké dans employes, pas users.
+ */
+async function getUserCaissePin(userId: string): Promise<string | null> {
+  const [employe] = await db.select({ caissePin: employes.caissePin })
+    .from(employes)
+    .where(eq(employes.userId, userId));
+  return employe?.caissePin || null;
+}
+
+/**
+ * Mettre à jour le caissePin d'un utilisateur dans la table employes.
+ */
+async function setUserCaissePin(userId: string, hashedPin: string): Promise<void> {
+  await db.update(employes)
+    .set({ caissePin: hashedPin, updatedAt: new Date() })
+    .where(eq(employes.userId, userId));
+}
+
+/**
+ * Récupère le rôle effectif d'un utilisateur.
+ *
+ * Architecture V3 - Source unique: userRoles
+ * 1. Rôle principal (isPrimary = true)
+ * 2. Premier rôle disponible (par date de création)
+ * 3. CLIENT (fallback par défaut)
+ *
+ * @param userId - ID de l'utilisateur
+ * @param agenceId - (optionnel) Si fourni, cherche un rôle scopé à cette agence
+ * @returns Le rôle effectif de l'utilisateur
+ */
+async function getEffectiveRole(userId: string, agenceId?: string): Promise<SystemRole> {
+  // 1. Chercher le rôle principal
+  const [primaryRole] = await db.select({ role: userRoles.role })
+    .from(userRoles)
+    .where(
+      agenceId
+        ? and(eq(userRoles.userId, userId), eq(userRoles.isPrimary, true), eq(userRoles.agenceId, agenceId))
+        : and(eq(userRoles.userId, userId), eq(userRoles.isPrimary, true))
+    )
+    .limit(1);
+
+  if (primaryRole?.role) {
+    return primaryRole.role as SystemRole;
+  }
+
+  // 2. Si pas de rôle principal, prendre le premier rôle disponible
+  const [anyRole] = await db.select({ role: userRoles.role })
+    .from(userRoles)
+    .where(eq(userRoles.userId, userId))
+    .orderBy(asc(userRoles.createdAt))
+    .limit(1);
+
+  if (anyRole?.role) {
+    return anyRole.role as SystemRole;
+  }
+
+  // 3. Fallback: CLIENT
+  return SystemRole.CLIENT;
+}
+
+/**
+ * Récupère tous les rôles d'un utilisateur (pour l'architecture multi-rôles)
+ * @param userId - ID de l'utilisateur
+ * @returns Liste des rôles avec leur scope agence
+ */
+async function getUserRoles(userId: string): Promise<Array<{ role: SystemRole; agenceId: string | null; isPrimary: boolean }>> {
+  const roles = await db.select({
+    role: userRoles.role,
+    agenceId: userRoles.agenceId,
+    isPrimary: userRoles.isPrimary,
+  })
+  .from(userRoles)
+  .where(eq(userRoles.userId, userId));
+
+  return roles.map(r => ({
+    role: r.role as SystemRole,
+    agenceId: r.agenceId,
+    isPrimary: r.isPrimary,
+  }));
+}
 
 const normalizeUserPayload = (payload: any) => {
   if (!payload || typeof payload !== "object") return payload;
@@ -41,7 +126,7 @@ const normalizeUserPayload = (payload: any) => {
   return data;
 };
 
-async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string; agenceNom: string } | null> {
+async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string; agenceNom: string | null } | null> {
   const [primaryAgence] = await db
     .select({
       agenceId: userAgences.agenceId,
@@ -97,7 +182,7 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
-      if (user.statut !== "Actif") {
+      if (user.statut !== StatutUser.ACTIVE) {
         await logLoginAttempt(username, req, false, "account_disabled");
         return res.status(403).json({ message: "Account disabled" });
       }
@@ -138,7 +223,8 @@ export function registerAuthRoutes(app: Express) {
         console.error("Failed to fallback to WS notification:", e);
       }
       
-      const normalizedRole = normalizeRole(user.role) || SystemRole.CLIENT;
+      // Récupérer le rôle effectif depuis userRoles (Architecture V3)
+      const effectiveRole = await getEffectiveRole(user.id, primaryAgence?.agenceId);
 
       req.session.userId = user.id;
       req.session.user = {
@@ -146,7 +232,7 @@ export function registerAuthRoutes(app: Express) {
           username: user.username || user.nom,
           nom: user.nom,
           prenom: user.prenom,
-          role: normalizedRole,
+          role: effectiveRole,
           agence: primaryAgence?.agenceNom || null,
           agenceId: primaryAgence?.agenceId,
           email: user.email || undefined,
@@ -186,10 +272,14 @@ export function registerAuthRoutes(app: Express) {
         "low"
       );
 
+      // Charger les permissions pour inclure dans la réponse (évite race condition)
+      const permissionsData = await getPermissionsForUser(user.id, effectiveRole);
+
       res.json({
         user: req.session.user,
         message: "Login successful",
-        mustChangePassword: user.mustChangePassword || false
+        mustChangePassword: user.mustChangePassword || false,
+        permissions: permissionsData // Inclus pour éviter un second appel API
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -251,25 +341,31 @@ export function registerAuthRoutes(app: Express) {
       const { pin } = req.body;
       if (!pin) return res.status(400).json({ error: "PIN requis" });
 
-      const user = await storage.getUser(req.session.user!.id);
+      const userId = req.session.user!.id;
+      const user = await storage.getUser(userId);
       if (!user) return res.status(401).json({ error: "Session invalide. Veuillez vous reconnecter." });
 
-      if (!user.caissePin) {
+      // Architecture V3: caissePin est dans employes, pas users
+      const caissePin = await getUserCaissePin(userId);
+
+      if (!caissePin) {
          return res.status(400).json({ error: "Aucun PIN configuré", requirePinSetup: true });
       }
 
-      const isValid = await comparePasswords(pin, user.caissePin);
-      
+      const isValid = await comparePasswords(pin, caissePin);
+
       if (!isValid) {
           return res.status(401).json({ error: "PIN incorrect" });
       }
-      
-      // Return same structure as verify-supervisor
+
+      // Architecture V3: Rôle via getEffectiveRole
+      const effectiveRole = await getEffectiveRole(userId);
+
       return res.json({
           id: user.id,
           username: user.username,
-          name: `${user.prenom} ${user.nom}`, // Format name properly
-          role: user.role,
+          name: `${user.prenom || ''} ${user.nom}`.trim(),
+          role: effectiveRole,
           hasPinConfigured: true
       });
 
@@ -395,7 +491,7 @@ export function registerAuthRoutes(app: Express) {
     res.json({ message: "Password updated successfully" });
   });
 
-  app.post("/api/auth/register", requireRole("admin"), async (req, res) => {
+  app.post("/api/auth/register", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const normalizedBody = normalizeUserPayload(req.body);
 
@@ -421,13 +517,14 @@ export function registerAuthRoutes(app: Express) {
       }
 
       const user = await registerUser(parsed.data as any);
-      
+
+      // Architecture V3: Le rôle sera attribué via userRoles, pas dans user
       await logAudit(
         req,
         "CREATE_USER",
         "user",
         user.id,
-        { username: user.username, role: user.role },
+        { username: user.username },
         "success",
         "medium"
       );
@@ -440,7 +537,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // User Management
-  app.patch("/api/users/:id", requireRole("admin"), async (req, res) => {
+  app.patch("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const updateData = normalizeUserPayload(req.body);
@@ -456,54 +553,93 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  app.get("/api/users", requireRole("admin"), async (req, res) => {
-    const users = await storage.getAllUsers();
-    res.json(users);
+  app.get("/api/users", requireRole(SystemRole.ADMIN), async (req, res) => {
+    const allUsers = await storage.getAllUsers();
+
+    // Architecture V3: Enrichir chaque utilisateur avec son rôle effectif depuis userRoles
+    const usersWithRoles = await Promise.all(
+      allUsers.map(async (user) => {
+        const effectiveRole = await getEffectiveRole(user.id);
+        return {
+          ...user,
+          role: effectiveRole
+        };
+      })
+    );
+
+    res.json(usersWithRoles);
   });
 
-  app.get("/api/users/:id", requireRole("admin"), async (req, res) => {
+  app.get("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+
+    // Architecture V3: Enrichir avec le rôle effectif depuis userRoles
+    const effectiveRole = await getEffectiveRole(user.id);
+    res.json({
+      ...user,
+      role: effectiveRole
+    });
   });
 
-  app.patch("/api/users/:id", requireRole("admin"), async (req, res) => {
+  app.patch("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const userId = req.params.id;
       const updateData = normalizeUserPayload(req.body);
       const [updated] = await db.update(users).set(updateData).where(eq(users.id, userId)).returning();
-      
+
       if (updated) {
-         await logAudit(
-            req,
-            "UPDATE_USER",
-            "user",
-            userId,
-            updateData,
-            "success",
-            "medium"
-         );
+        await logAudit(
+          req,
+          "UPDATE_USER",
+          "user",
+          userId,
+          updateData,
+          "success",
+          "medium"
+        );
+
+        // 🛡️ Kill Switch: Broadcast user status change for real-time logout
+        if (updateData.statut && updateData.statut !== StatutUser.ACTIVE) {
+          const { getWsInstance } = await import("../ws-server");
+          const wsInstance = getWsInstance();
+          if (wsInstance) {
+            wsInstance.broadcast({
+              type: "RBAC_UPDATE",
+              payload: {
+                entity: 'user_status',
+                userId,
+                status: updateData.statut
+              }
+            });
+            console.log(`🚨 SECURITY: Broadcasted user_status change for user ${userId} -> ${updateData.statut}`);
+          }
+        }
       }
-      
+
       res.json(updated);
     } catch (e) {
       res.status(500).json({ message: "Update failed" });
     }
   });
 
-  app.delete("/api/users/:id", requireRole("admin"), async (req, res) => {
+  app.delete("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
-      const userToDelete = await storage.getUser(req.params.id);
+      const userId = req.params.id;
+      const userToDelete = await storage.getUser(userId);
 
       await db.update(users)
-        .set({ deletedAt: new Date(), statut: 'Inactif' })
-        .where(eq(users.id, req.params.id));
-      
+        .set({ deletedAt: new Date(), statut: StatutUser.INACTIVE })
+        .where(eq(users.id, userId));
+
+      // Architecture V3: Rôle via userRoles (pas dans userToDelete)
+      const deletedUserRole = userToDelete ? await getEffectiveRole(userToDelete.id) : null;
+
       await logAudit(
         req,
         "DELETE_USER",
         "user",
-        req.params.id,
+        userId,
         userToDelete ? {
           deletedUser: {
             id: userToDelete.id,
@@ -511,12 +647,27 @@ export function registerAuthRoutes(app: Express) {
             email: userToDelete.email,
             nom: userToDelete.nom,
             prenom: userToDelete.prenom,
-            role: userToDelete.role
+            role: deletedUserRole
           }
         } : undefined,
         "success",
         "high"
       );
+
+      // 🛡️ Kill Switch: Broadcast user deletion for immediate logout
+      const { getWsInstance } = await import("../ws-server");
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "RBAC_UPDATE",
+          payload: {
+            entity: 'user_status',
+            userId,
+            status: StatutUser.INACTIVE
+          }
+        });
+        console.log(`🚨 SECURITY: Broadcasted user deletion (INACTIVE) for user ${userId}`);
+      }
 
       res.sendStatus(200);
     } catch (error) {
@@ -525,7 +676,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  app.post("/api/users/:id/reset-password", requireRole("admin"), async (req, res) => {
+  app.post("/api/users/:id/reset-password", requireRole(SystemRole.ADMIN), async (req, res) => {
      const { password } = req.body; 
      const passToUse = password || req.body.temporaryPassword;
      
@@ -548,13 +699,13 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Audit Logs
-  app.get("/api/audit-logs", requireRole("admin"), async (req, res) => {
+  app.get("/api/audit-logs", requireRole(SystemRole.ADMIN), async (req, res) => {
     const logs = await getAuditLogs();
     res.json(logs);
   });
 
   // Audit Logs Statistics
-  app.get("/api/audit-logs/stats", requireRole("admin"), async (req, res) => {
+  app.get("/api/audit-logs/stats", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const stats = await getAuditLogStats();
       res.json(stats);
@@ -565,7 +716,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Manual Purge Audit Logs (admin only)
-  app.post("/api/audit-logs/purge", requireRole("admin"), async (req, res) => {
+  app.post("/api/audit-logs/purge", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const result = await purgeOldAuditLogs();
 
@@ -597,7 +748,7 @@ export function registerAuthRoutes(app: Express) {
   // SESSION MANAGEMENT - Force logout a user
   // ============================================
 
-  app.post("/api/sessions/:userId/terminate", requireRole("admin"), async (req, res) => {
+  app.post("/api/sessions/:userId/terminate", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
       const adminUser = req.session.user;
@@ -661,7 +812,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Get active sessions (from active_sessions table with real-time tracking)
-  app.get("/api/sessions/active", requireRole("admin"), async (req, res) => {
+  app.get("/api/sessions/active", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const sessions = await getActiveSessions();
 
@@ -712,7 +863,7 @@ export function registerAuthRoutes(app: Express) {
   // ============================================
 
   // Get all permissions for a user
-  app.get("/api/users/:userId/permissions", requireRole("admin"), async (req, res) => {
+  app.get("/api/users/:userId/permissions", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
       
@@ -781,7 +932,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Save/Update permissions for a user (batch update - Legacy Adapter)
-  app.put("/api/users/:userId/permissions", requireRole("admin"), async (req, res) => {
+  app.put("/api/users/:userId/permissions", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
       const permissionsData: Record<string, {
@@ -926,7 +1077,7 @@ export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/verify-supervisor", async (req, res) => {
     try {
       const { username, password, pin } = req.body;
-      
+
       if (!username || !password) {
         return res.status(400).json({ message: "Identifiants requis" });
       }
@@ -937,19 +1088,22 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: "Identifiants incorrects" });
       }
 
-      // Check if user has supervisor role
-      const normalizedRole = normalizeRole(user.role);
+      // Check if user has supervisor role (Architecture V3: via userRoles)
+      const effectiveRole = await getEffectiveRole(user.id);
       const supervisorRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE];
-      if (!normalizedRole || !supervisorRoles.includes(normalizedRole)) {
+      if (!supervisorRoles.includes(effectiveRole)) {
         return res.status(403).json({ message: "Rôle insuffisant. Seul un superviseur peut autoriser l'ouverture." });
       }
 
+      // Architecture V3: caissePin est dans employes
+      const caissePin = await getUserCaissePin(user.id);
+
       // If PIN provided, verify it
       if (pin) {
-        if (!user.caissePin) {
+        if (!caissePin) {
           return res.status(400).json({ message: "Aucun PIN configuré. Veuillez définir votre PIN caisse.", requirePinSetup: true });
         }
-        const pinValid = await comparePasswords(pin, user.caissePin);
+        const pinValid = await comparePasswords(pin, caissePin);
         if (!pinValid) {
           return res.status(401).json({ message: "PIN incorrect" });
         }
@@ -960,8 +1114,8 @@ export function registerAuthRoutes(app: Express) {
         id: user.id,
         name: `${user.prenom || ''} ${user.nom}`.trim(),
         phone: user.telephone,
-        role: user.role,
-        hasPinConfigured: !!user.caissePin
+        role: effectiveRole,
+        hasPinConfigured: !!caissePin
       });
 
     } catch (error) {
@@ -1002,9 +1156,9 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: "Mot de passe incorrect" });
       }
 
-      // Hash and save the new PIN
+      // Architecture V3: caissePin dans employes
       const hashedPin = await hashPassword(newPin);
-      await db.update(users).set({ caissePin: hashedPin }).where(eq(users.id, userId));
+      await setUserCaissePin(userId, hashedPin);
 
       await logAudit(req, "SET_OWN_CAISSE_PIN", "user", userId, undefined, "success", "high");
 
@@ -1039,9 +1193,9 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Le PIN doit contenir exactement 6 chiffres" });
       }
 
-      // Hash and save the new PIN
+      // Architecture V3: caissePin dans employes
       const hashedPin = await hashPassword(pin);
-      await db.update(users).set({ caissePin: hashedPin }).where(eq(users.id, targetId));
+      await setUserCaissePin(targetId, hashedPin);
 
       await logAudit(req, "SET_USER_CAISSE_PIN", "user", targetId, { adminId }, "success", "critical");
 
@@ -1049,6 +1203,216 @@ export function registerAuthRoutes(app: Express) {
     } catch (error) {
       console.error("Set user caisse PIN error:", error);
       res.status(500).json({ message: "Erreur lors de la configuration du PIN utilisateur" });
+    }
+  });
+
+  // ============================================
+  // User Roles Management (Architecture V3)
+  // ============================================
+
+  /**
+   * GET /api/users/:userId/roles - Récupérer tous les rôles d'un utilisateur
+   */
+  app.get("/api/users/:userId/roles", requireAuth, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const requesterId = req.session.user!.id;
+      const requesterRole = req.session.user!.role;
+
+      // Un utilisateur peut voir ses propres rôles, sinon il faut être admin/chef
+      if (userId !== requesterId) {
+        const normalizedRole = normalizeRole(requesterRole);
+        const authorizedRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR];
+        if (!normalizedRole || !authorizedRoles.includes(normalizedRole)) {
+          return res.status(403).json({ error: "Non autorisé à voir les rôles de cet utilisateur" });
+        }
+      }
+
+      const roles = await db.select({
+        id: userRoles.id,
+        role: userRoles.role,
+        agenceId: userRoles.agenceId,
+        isPrimary: userRoles.isPrimary,
+        createdAt: userRoles.createdAt,
+      })
+      .from(userRoles)
+      .where(eq(userRoles.userId, userId));
+
+      // Enrichir avec le nom de l'agence si disponible
+      const enrichedRoles = await Promise.all(roles.map(async (r) => {
+        let agenceNom = null;
+        if (r.agenceId) {
+          const [agence] = await db.select({ nom: agences.nom }).from(agences).where(eq(agences.id, r.agenceId));
+          agenceNom = agence?.nom || null;
+        }
+        return {
+          ...r,
+          agenceNom,
+        };
+      }));
+
+      res.json(enrichedRoles);
+    } catch (error) {
+      console.error("Get user roles error:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération des rôles" });
+    }
+  });
+
+  /**
+   * POST /api/users/:userId/roles - Ajouter un rôle à un utilisateur
+   */
+  app.post("/api/users/:userId/roles", requireAuth, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { role, agenceId, isPrimary } = req.body;
+      const adminRole = req.session.user!.role;
+
+      // Seuls les admins peuvent ajouter des rôles
+      const normalizedRole = normalizeRole(adminRole);
+      if (!normalizedRole || !isAdminRole(normalizedRole)) {
+        return res.status(403).json({ error: "Seuls les administrateurs peuvent ajouter des rôles" });
+      }
+
+      if (!role || !Object.values(SystemRole).includes(role)) {
+        return res.status(400).json({ error: "Rôle invalide" });
+      }
+
+      // Vérifier que l'utilisateur existe
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) {
+        return res.status(404).json({ error: "Utilisateur non trouvé" });
+      }
+
+      // Ajouter le rôle
+      const [newRole] = await db.insert(userRoles).values({
+        userId,
+        role,
+        agenceId: agenceId || null,
+        isPrimary: isPrimary || false,
+      }).returning();
+
+      await logAudit(req, "ADD_USER_ROLE", "user", userId, { role, agenceId }, "success", "high");
+
+      res.status(201).json(newRole);
+    } catch (error: any) {
+      if (error.code === '23505') { // Unique violation
+        return res.status(409).json({ error: "Ce rôle existe déjà pour cet utilisateur et cette agence" });
+      }
+      console.error("Add user role error:", error);
+      res.status(500).json({ error: "Erreur lors de l'ajout du rôle" });
+    }
+  });
+
+  /**
+   * DELETE /api/users/:userId/roles/:roleId - Supprimer un rôle
+   */
+  app.delete("/api/users/:userId/roles/:roleId", requireAuth, async (req, res) => {
+    try {
+      const { userId, roleId } = req.params;
+      const adminRole = req.session.user!.role;
+
+      // Seuls les admins peuvent supprimer des rôles
+      const normalizedRole = normalizeRole(adminRole);
+      if (!normalizedRole || !isAdminRole(normalizedRole)) {
+        return res.status(403).json({ error: "Seuls les administrateurs peuvent supprimer des rôles" });
+      }
+
+      // Vérifier que le rôle appartient bien à l'utilisateur
+      const [existingRole] = await db.select()
+        .from(userRoles)
+        .where(and(eq(userRoles.id, roleId), eq(userRoles.userId, userId)));
+
+      if (!existingRole) {
+        return res.status(404).json({ error: "Rôle non trouvé" });
+      }
+
+      // Ne pas permettre de supprimer le dernier rôle
+      const [roleCount] = await db.select({ count: userRoles.id })
+        .from(userRoles)
+        .where(eq(userRoles.userId, userId));
+
+      // @ts-ignore - count returns a string
+      if (parseInt(roleCount?.count || '0') <= 1) {
+        return res.status(400).json({ error: "Impossible de supprimer le dernier rôle d'un utilisateur" });
+      }
+
+      await db.delete(userRoles).where(eq(userRoles.id, roleId));
+
+      await logAudit(req, "REMOVE_USER_ROLE", "user", userId, { roleId, role: existingRole.role }, "success", "high");
+
+      res.json({ message: "Rôle supprimé avec succès" });
+    } catch (error) {
+      console.error("Delete user role error:", error);
+      res.status(500).json({ error: "Erreur lors de la suppression du rôle" });
+    }
+  });
+
+  /**
+   * PUT /api/users/:userId/roles/:roleId/primary - Définir un rôle comme principal
+   */
+  app.put("/api/users/:userId/roles/:roleId/primary", requireAuth, async (req, res) => {
+    try {
+      const { userId, roleId } = req.params;
+      const requesterId = req.session.user!.id;
+      const requesterRole = req.session.user!.role;
+
+      // Un utilisateur peut changer son propre rôle principal, sinon il faut être admin
+      if (userId !== requesterId) {
+        const normalizedRole = normalizeRole(requesterRole);
+        if (!normalizedRole || !isAdminRole(normalizedRole)) {
+          return res.status(403).json({ error: "Non autorisé à modifier les rôles de cet utilisateur" });
+        }
+      }
+
+      // Vérifier que le rôle appartient à l'utilisateur
+      const [existingRole] = await db.select()
+        .from(userRoles)
+        .where(and(eq(userRoles.id, roleId), eq(userRoles.userId, userId)));
+
+      if (!existingRole) {
+        return res.status(404).json({ error: "Rôle non trouvé" });
+      }
+
+      // Transaction: désactiver les autres rôles principaux et activer celui-ci
+      await db.transaction(async (tx) => {
+        await tx.update(userRoles)
+          .set({ isPrimary: false, updatedAt: new Date() })
+          .where(and(eq(userRoles.userId, userId), eq(userRoles.isPrimary, true)));
+
+        await tx.update(userRoles)
+          .set({ isPrimary: true, updatedAt: new Date() })
+          .where(eq(userRoles.id, roleId));
+      });
+
+      await logAudit(req, "SET_PRIMARY_ROLE", "user", userId, { roleId, role: existingRole.role }, "success", "medium");
+
+      res.json({ message: "Rôle principal mis à jour" });
+    } catch (error) {
+      console.error("Set primary role error:", error);
+      res.status(500).json({ error: "Erreur lors de la mise à jour du rôle principal" });
+    }
+  });
+
+  /**
+   * GET /api/my-roles - Récupérer ses propres rôles (raccourci)
+   */
+  app.get("/api/my-roles", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+
+      const roles = await db.select({
+        id: userRoles.id,
+        role: userRoles.role,
+        agenceId: userRoles.agenceId,
+        isPrimary: userRoles.isPrimary,
+      })
+      .from(userRoles)
+      .where(eq(userRoles.userId, userId));
+
+      res.json(roles);
+    } catch (error) {
+      console.error("Get my roles error:", error);
+      res.status(500).json({ error: "Erreur lors de la récupération des rôles" });
     }
   });
 }

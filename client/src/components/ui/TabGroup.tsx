@@ -1,5 +1,5 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, Lock } from 'lucide-react';
 
 /**
  * TabGroup Component - COFIN Platform
@@ -151,6 +151,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
           >
             {Icon && <Icon size={sizeConfig.icon} />}
             <span>{tab.label}</span>
+            {tab.disabled && <Lock size={12} className="ml-1 opacity-50" />}
             {tab.badge !== undefined && valOrZero(tab.badge) && (
               <span
                 className={`

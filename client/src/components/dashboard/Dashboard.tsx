@@ -1,414 +1,313 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Users, CreditCard, PiggyBank, DollarSign, UserCheck, Briefcase,
-  AlertTriangle, Clock, PieChart as PieChartIcon, BarChart3, Award,
-  Activity, Banknote, Wallet
+
+import React, { useState, useEffect, Suspense } from 'react';
+import { 
+  Building2, 
+  Wifi, 
+  WifiOff, 
+  UserPlus, 
+  Wallet, 
+  Banknote, 
+  Users, 
+  ChevronDown, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Clock,
+  TrendingDown,
+  TrendingUp,
+  Activity,
+  ArrowUpRight
 } from 'lucide-react';
-import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend
-} from 'recharts';
-import { Button, Card, StatCard } from '../ui';
-import AnimatedBalance from '../finance/accounting/AnimatedBalance';
-import BalanceHistoryChart from '../finance/accounting/BalanceHistoryChart';
-import TransactionSearch from '../finance/operations/TransactionSearch';
+
+import { Button, Card, Badge, ProgressBar } from '../ui';
+import { useAgence } from '../../contexts/AgenceContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useDashboardStats } from '../../hooks/dashboard/useDashboardStats';
-import DashboardQuickActions from './DashboardQuickActions';
-import DashboardHeader from './DashboardHeader';
-import AdminStatsGrid from './AdminStatsGrid';
-import PerformanceIndicators from './PerformanceIndicators';
-import { SystemRole, getRoleLabel as getSystemRoleLabel, normalizeRole } from '@shared/types/roles';
-import {
-  AlertsWidget,
-  PerformanceGauge,
-  QuickStats,
-  UpcomingPayments,
-  ObjectivesWidget,
-  LiveActivityFeed,
-  TopClientsWidget
-} from './DashboardGadgets';
+import { useWebSocketContext } from '../../contexts/WebSocketContext';
+
+
+import AgencySelector from './AgencySelector';
+import AnalyticsGrid from './AnalyticsGrid';
 
 interface DashboardProps {
-  userRole?: SystemRole | string;
+  userRole?: string;
   userName?: string;
   onModuleChange?: (module: string) => void;
-  onLogout?: () => void;
   onQuickAction?: (action: string) => void;
+  onLogout?: () => void;
 }
 
 export default function Dashboard({ 
-  userRole = 'agent', 
-  userName = 'Utilisateur', 
-  onModuleChange, 
-  onLogout,
+  userRole = 'user', 
+  userName = 'Utilisateur',
+  onModuleChange,
   onQuickAction
 }: DashboardProps) {
-  const { t, language } = useLanguage();
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const normalizedRole = normalizeRole(userRole) || SystemRole.CLIENT;
-  const { stats, loading, error, refresh } = useDashboardStats(normalizedRole);
+  const { t } = useLanguage();
+  const { selectedAgence, agences, selectAgence, isAdmin } = useAgence();
+  const { isConnected } = useWebSocketContext();
+  const { stats, loading, refresh } = useDashboardStats(userRole);
 
+  // Real-time update trigger
   useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(interval);
-  }, []);
+    const handleRefresh = () => {
+      refresh();
+    };
+    
+    // Listen for any activity to refresh stats
+    window.addEventListener('live-activity', handleRefresh);
+    window.addEventListener('transaction-created', handleRefresh);
+    window.addEventListener('refresh-dashboard', handleRefresh);
+    
+    return () => {
+      window.removeEventListener('live-activity', handleRefresh);
+      window.removeEventListener('transaction-created', handleRefresh);
+      window.removeEventListener('refresh-dashboard', handleRefresh);
+    };
+  }, [refresh]);
+
+
+  // -- Derived State and Data --
+  
+  // Treasury Indicator (KPI #1)
+  // Combine safe and cash balances if available, otherwise fallback to stats
+  // Combine safe and cash balances if available, otherwise fallback to stats
+  const totalTreasury = stats?.global?.tresorerieDispo || 0;
+  const isLowTreasury = totalTreasury < 500000; // Example threshold
+
+  // Smart Feeds Data
+  // Smart Feeds Data
+  const pendingCredits = stats?.global?.creditsEnAttente || 0;
+  const overdueInstallments = stats?.global?.creditsRetard || 0;
+  
+  // CORRECTION: Use backend calculated KPIs (Value-based PAR30)
+  const par30 = stats?.global?.par30 ?? 0;
+  const liquidityRatio = stats?.global?.liquidityRatio ?? 100;
+
+  // -- Render Helpers --
 
   const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat(language === 'en' ? 'en-US' : 'fr-FR').format(amount) + ' FCFA';
+    return new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA';
   };
-
-  const getGreeting = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return t('bonjour');
-    if (hour < 18) return t('bonApresMidi');
-    return t('bonsoir');
-  };
-
-  const getRoleLabel = (role: string) => {
-    const normalized = normalizeRole(role);
-    if (!normalized) return getSystemRoleLabel(role);
-
-    const roleLabels: Record<SystemRole, string> = {
-      [SystemRole.ADMIN]: t('administrateur'),
-      [SystemRole.CHEF_AGENCE]: t('chefAgence'),
-      [SystemRole.SUPERVISEUR]: t('superviseur'),
-      [SystemRole.COMPTABLE]: t('comptable'),
-      [SystemRole.CAISSIER]: t('agentCaisse'),
-      [SystemRole.GESTIONNAIRE_CREDIT]: t('gestionnaireCredit'),
-      [SystemRole.AGENT_TERRAIN]: t('agent'),
-      [SystemRole.CLIENT]: t('client')
-    };
-
-    return roleLabels[normalized] || getSystemRoleLabel(normalized);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
-
-  if (error || !stats) {
-    return (
-      <Card variant="default" padding="lg">
-        <div className="text-center" data-testid="dashboard-error">
-          <AlertTriangle className="mx-auto text-amber-400 mb-4" size={48} />
-          <h2 className="text-xl font-semibold text-white mb-2">{t('tableauBordIndisponible')}</h2>
-          <p className="text-slate-400 mb-4">{error}</p>
-          <Button variant="success" size="md" onClick={refresh} data-testid="button-retry">
-            {t('reessayer')}
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  const g = stats.global;
-  const d = stats.daily || { nouveauxClients: 0, nouveauxCredits: 0 };  // Today's data
-  const w = stats.weekly || { nouveauxClients: 0, nouveauxCredits: 0 }; // Last 7 days data
-  const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
 
   return (
-    <div className="space-y-4 sm:space-y-6" data-testid="dashboard-container">
-      {/* Quick Actions Bar */}
-      <Card variant="default" padding="md">
-        <DashboardQuickActions onModuleChange={onModuleChange} onQuickAction={onQuickAction} t={t} />
-      </Card>
-
-      {/* Header with Greeting */}
-      <DashboardHeader
-        userName={userName}
-        userRole={userRole}
-        currentTime={currentTime}
-        language={language}
-        onRefresh={refresh}
-        isRefreshing={loading}
-        getGreeting={getGreeting}
-        getRoleLabel={getRoleLabel}
-        t={t}
-      />
-
-      {/* Admin View */}
-      {isAdmin && (
-        <>
-          <AdminStatsGrid stats={g} recent={w} t={t} />
-
-          {/* Financial Cards - Compact Mobile-First */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {/* Volume des Crédits */}
-            <Card variant="default" padding="sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1.5 bg-emerald-500/20 rounded-lg">
-                  <DollarSign className="text-emerald-400" size={14} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xs sm:text-sm font-semibold text-white truncate">{t('volumeCredits')}</h3>
-                  <p className="text-slate-500 text-[9px] sm:text-[10px]">{t('totalMontantsOctroyes')}</p>
-                </div>
-              </div>
-              <AnimatedBalance
-                value={g.montantCreditsTotal || 0}
-                previousValue={(g.montantCreditsTotal || 0) * 0.95}
-                size="md"
-                colorScheme="success"
-              />
-            </Card>
-
-            {/* Agents Terrain */}
-            <Card variant="default" padding="sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1.5 bg-cyan-500/20 rounded-lg">
-                  <Briefcase className="text-cyan-400" size={14} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xs sm:text-sm font-semibold text-white truncate">{t('agentsTerrain')}</h3>
-                  <p className="text-slate-500 text-[9px] sm:text-[10px]">{t('performanceEquipe')}</p>
-                </div>
-              </div>
-              <p className="text-lg sm:text-xl font-bold text-cyan-400" data-testid="text-agents-actifs">
-                {g.agentsActifs || 0} <span className="text-sm text-slate-500">/ {g.totalAgents || 0}</span>
-              </p>
-              <p className="text-[9px] sm:text-[10px] text-slate-500">{t('agentsActifs')}</p>
-            </Card>
-
-            {/* Alertes */}
-            <Card variant="default" padding="sm">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-1.5 bg-amber-500/20 rounded-lg">
-                  <AlertTriangle className="text-amber-400" size={14} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xs sm:text-sm font-semibold text-white truncate">{t('alertes')}</h3>
-                  <p className="text-slate-500 text-[9px] sm:text-[10px]">{t('situationsASurveiller')}</p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 text-[10px] sm:text-xs">{t('creditsEnRetard')}</span>
-                  <span className="text-amber-400 font-bold text-sm" data-testid="text-credits-retard">
-                    {g.creditsRetard || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 text-[10px] sm:text-xs">{t('sessionsOuvertes')}</span>
-                  <span className="text-cyan-400 font-bold text-sm">{g.sessionsOuvertes || 0}</span>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          <BalanceHistoryChart title={t('evolutionSoldes')} />
-
-          {/* Charts Grid - Mobile First */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {/* Product Distribution Chart */}
-            <Card variant="default" padding="md">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-emerald-500/20 rounded-lg">
-                    <PieChartIcon className="text-emerald-400" size={16} />
-                  </div>
-                  <h3 className="text-sm sm:text-base font-semibold text-white">{t('repartitionProduits')}</h3>
-                </div>
-              </div>
-              <div className="h-40 sm:h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stats.charts.productSplit}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={35}
-                      outerRadius={55}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {stats.charts.productSplit.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => [`${value}%`, '']}
-                      contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '1px solid #475569',
-                        borderRadius: '8px',
-                        fontSize: '12px'
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Inline Stats */}
-              <div className="flex justify-around pt-3 border-t border-slate-700/50">
-                {stats.charts.productSplit.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-[10px] sm:text-xs text-slate-400">{item.name}</span>
-                    <span className="text-[10px] sm:text-xs font-bold" style={{ color: item.color }}>{item.value}%</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Credit Status Chart */}
-            <Card variant="default" padding="md">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-cyan-500/20 rounded-lg">
-                    <BarChart3 className="text-cyan-400" size={16} />
-                  </div>
-                  <h3 className="text-sm sm:text-base font-semibold text-white">{t('statutCredits')}</h3>
-                </div>
-              </div>
-              <div className="h-40 sm:h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={stats.charts.creditStatus}
-                    layout="vertical"
-                    margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
-                    <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      stroke="#64748b" 
-                      width={60} 
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      formatter={(value: number) => [`${value}%`, '']}
-                      contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '1px solid #475569',
-                        borderRadius: '8px',
-                        fontSize: '12px'
-                      }}
-                    />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
-                      {stats.charts.creditStatus.map((entry, index) => (
-                        <Cell key={`bar-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              {/* Inline Stats */}
-              <div className="flex justify-around pt-3 border-t border-slate-700/50">
-                {stats.charts.creditStatus.map((item, idx) => (
-                  <div key={idx} className="flex flex-col items-center">
-                    <span className="text-[10px] text-slate-400">{item.name}</span>
-                    <span className="text-xs font-bold" style={{ color: item.color }}>{item.value}%</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-
-          <PerformanceIndicators stats={g} t={t} />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
-            <AlertsWidget alerts={stats.widgets.alerts} />
-            <UpcomingPayments payments={stats.widgets.upcomingPayments} />
-            <LiveActivityFeed activities={stats.widgets.recentActivity} />
-            <TopClientsWidget clients={stats.widgets.topClients} />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
-            <PerformanceGauge
-              value={g.tauxRecouvrement ?? 0}
-              label="Taux de Recouvrement"
-            />
-            <ObjectivesWidget 
-              objectif={stats.objectives?.monthlyGoal || 30} 
-              actuel={stats.objectives?.monthlyCredits || 0} 
-            />
-            <QuickStats stats={[
-              { icon: Users, label: t('activeClients') || 'Clients actifs', value: g.clientsActifs?.toString() || '0', trend: `+${w.nouveauxClients || 0}`, up: true },
-              { icon: CreditCard, label: t('creditsActifs') || 'Crédits actifs', value: g.creditsEnCours?.toString() || '0', trend: `+${w.nouveauxCredits || 0}`, up: true },
-              { icon: Wallet, label: t('epargnes') || 'Épargnes', value: (g.montantEpargneTotal ? (g.montantEpargneTotal / 1000000).toFixed(1) + 'M' : '0'), trend: '+0%', up: true },
-              { 
-                icon: Activity, 
-                label: 'Tontines', 
-                value: g.tontinesActives > 0 ? g.tontinesActives.toString() : '—', 
-                trend: g.tontinesActives > 0 ? `${g.tontinesActives}/${g.totalTontines}` : 'Aucune', 
-                up: g.tontinesActives > 0 
-              }
-            ]} />
-          </div>
-
-          {/* Résumé Journalier - Compact Mobile-First */}
-          <Card variant="default" padding="sm">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <div className="flex items-center gap-1.5">
-                <div className="p-1 bg-emerald-500/20 rounded">
-                  <Activity className="text-emerald-400" size={12} />
-                </div>
-                <span className="text-slate-300 text-xs font-medium">Aujourd'hui</span>
-              </div>
-              <span className="text-[10px] text-slate-500">
-                {currentTime.toLocaleDateString(language === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short' })}
-              </span>
+    <div className="space-y-4 pb-20 sm:pb-0 py-6">
+      
+      {/* 1. Header Intelligent */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 bg-slate-900/95 backdrop-blur-sm z-40 py-2 -mx-4 px-4 sm:mx-0 sm:px-0 border-b sm:border-none border-slate-800">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              {formatMoney(totalTreasury)}
+            </h1>
+            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+              totalTreasury > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+            }`}>
+              {t('encaisseDisponible')}
             </div>
-            <div className="flex flex-row justify-around gap-1">
-              <div className="flex flex-col items-center p-2 rounded bg-emerald-500/10 flex-1">
-                <div className="text-base sm:text-lg font-bold text-emerald-400">{d.nouveauxClients || 0}</div>
-                <div className="text-[9px] sm:text-[10px] text-slate-400">Clients</div>
-              </div>
-              <div className="flex flex-col items-center p-2 rounded bg-cyan-500/10 flex-1">
-                <div className="text-base sm:text-lg font-bold text-cyan-400">{d.nouveauxCredits || 0}</div>
-                <div className="text-[9px] sm:text-[10px] text-slate-400">Crédits</div>
-              </div>
-              <div className="flex flex-col items-center p-2 rounded bg-purple-500/10 flex-1">
-                <div className="text-base sm:text-lg font-bold text-purple-400">{g.sessionsOuvertes || 0}</div>
-                <div className="text-[9px] sm:text-[10px] text-slate-400">Sessions</div>
-              </div>
-            </div>
-          </Card>
-        </>
-      )}
-
-      {/* Comptable View */}
-      {normalizedRole === SystemRole.COMPTABLE && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            <StatCard title={t('volumeCredits')} value={formatMoney(g.montantCreditsTotal || 0)} subtitle={`${g.creditsEnCours || 0} ${t('creditsActifs')}`} icon={DollarSign} color="success" />
-            <StatCard title={t('volumeEpargnes')} value={formatMoney(g.montantEpargneTotal || 0)} subtitle={`${g.totalEpargnes || 0} ${t('comptes')}`} icon={PiggyBank} color="warning" />
-            <StatCard title={t('creditsEnRetard')} value={g.creditsRetard || 0} subtitle={t('aRecouvrer')} icon={AlertTriangle} color="warning" />
           </div>
-          <BalanceHistoryChart title={t('evolutionFinanciere')} />
-          <TransactionSearch />
-        </>
-      )}
-
-      {/* Other roles views - simplified */}
-      {(normalizedRole === SystemRole.CAISSIER || normalizedRole === SystemRole.AGENT_TERRAIN) && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            <StatCard title={t('clients')} value={g.totalClients || 0} subtitle={`${g.clientsActifs || 0} ${t('activeClients')}`} icon={Users} color="primary" />
-            <StatCard title={t('credits')} value={g.creditsEnCours || 0} subtitle={`${g.creditsEnAttente || 0} ${t('enAttente')}`} icon={CreditCard} color="success" />
-            <StatCard        title={t('epargnes')}
-        value={g.totalEpargnes || 0} subtitle={t('comptesActifs')} icon={PiggyBank} color="warning" />
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+             <span className={isConnected ? "text-emerald-500" : "text-slate-500"}>
+               {isConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+             </span>
+             <span>{isConnected ? t('enLigne') : t('horsLigne')}</span>
+             <span className="w-1 h-1 bg-slate-700 rounded-full" />
+             <span className="capitalize">{userName}</span>
           </div>
-          <Card variant="default" padding="md">
-            <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-              <Activity className="text-emerald-400" size={24} />
-              {t('accesRapide')}
-            </h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <Button variant="secondary" size="md" icon={Users} iconPosition="left" className="justify-start">{t('nouveauClient')}</Button>
-              <Button variant="secondary" size="md" icon={PiggyBank} iconPosition="left" className="justify-start">{t('nouvelleEpargne')}</Button>
-              <Button variant="secondary" size="md" icon={CreditCard} iconPosition="left" className="justify-start">{t('nouveauCredit')}</Button>
-            </div>
-          </Card>
-        </>
-      )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <AgencySelector 
+            agences={agences}
+            selectedAgence={selectedAgence}
+            onSelect={selectAgence}
+            isAdmin={isAdmin}
+          />
+        </div>
+      </header>
+
+      {/* 2. Quick Actions Grid */}
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Button 
+          variant="secondary"
+          className="h-auto py-4 flex flex-col gap-2 items-center justify-center bg-blue-600/10 hover:bg-blue-600/20 border-blue-600/20 text-blue-400"
+          onClick={() => onQuickAction?.('new-client')}
+        >
+          <div className="p-2 bg-blue-500 rounded-xl text-white shadow-lg shadow-blue-500/30">
+            <UserPlus size={24} />
+          </div>
+          <span className="text-xs font-semibold">{t('nouveauClient')}</span>
+        </Button>
+
+        <Button 
+          variant="secondary"
+          className="h-auto py-4 flex flex-col gap-2 items-center justify-center bg-emerald-600/10 hover:bg-emerald-600/20 border-emerald-600/20 text-emerald-400"
+          onClick={() => onQuickAction?.('new-payment')}
+        >
+          <div className="p-2 bg-emerald-500 rounded-xl text-white shadow-lg shadow-emerald-500/30">
+            <Wallet size={24} />
+          </div>
+          <span className="text-xs font-semibold">{t('operationCaisse')}</span>
+        </Button>
+
+        <Button 
+          variant="secondary"
+          className="h-auto py-4 flex flex-col gap-2 items-center justify-center bg-indigo-600/10 hover:bg-indigo-600/20 border-indigo-600/20 text-indigo-400"
+          onClick={() => onQuickAction?.('new-credit')}
+        >
+          <div className="p-2 bg-indigo-500 rounded-xl text-white shadow-lg shadow-indigo-500/30">
+            <Banknote size={24} />
+          </div>
+          <span className="text-xs font-semibold">{t('creditRapide')}</span>
+        </Button>
+
+        <Button 
+          variant="secondary"
+          className="h-auto py-4 flex flex-col gap-2 items-center justify-center bg-purple-600/10 hover:bg-purple-600/20 border-purple-600/20 text-purple-400"
+          onClick={() => onModuleChange?.('tontines')}
+        >
+          <div className="p-2 bg-purple-500 rounded-xl text-white shadow-lg shadow-purple-500/30">
+            <Users size={24} />
+          </div>
+          <span className="text-xs font-semibold">{t('collecteTontine')}</span>
+        </Button>
+      </section>
+
+      {/* 3. Zone de Pilotage "Smart Feeds" */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        
+        {/* Colonne Gauche: Gestion Opérationnelle */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <Activity size={14} />
+            {t('aTraiter')}
+          </h3>
+
+          {pendingCredits > 0 ? (
+            <Card variant="default" className="border-l-4 border-l-amber-500 bg-slate-800/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500">
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-sm">
+                      {pendingCredits} {t('demandesAttente')}
+                    </h4>
+                    <p className="text-xs text-slate-400">{t('validationRequise')}</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')}>
+                  {t('voir')}
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+
+          {overdueInstallments > 0 ? (
+            <Card variant="default" className="border-l-4 border-l-rose-500 bg-slate-800/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-rose-500/20 rounded-lg text-rose-500">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-sm">
+                      {overdueInstallments} {t('echeancesRetard')}
+                    </h4>
+                    <p className="text-xs text-slate-400">{t('aRelancer')}</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')}>
+                  {t('relancer') || 'Relancer'}
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+
+          {pendingCredits === 0 && overdueInstallments === 0 && (
+             <Card variant="default" className="bg-emerald-500/10 border-emerald-500/20 border-dashed py-4">
+               <div className="flex flex-col items-center justify-center text-center">
+                 <div className="flex items-center gap-2 mb-1">
+                   <div className="p-1.5 bg-emerald-500/20 rounded-full">
+                     <CheckCircle2 size={16} className="text-emerald-400" />
+                   </div>
+                   <h4 className="text-emerald-400 font-bold text-sm">{t('aucuneUrgence')}</h4>
+                 </div>
+                 <p className="text-[10px] text-emerald-400/70">{t('momentIdealProspecter')}</p>
+               </div>
+             </Card>
+          )}
+        </div>
+
+        {/* Colonne Droite: Santé & Risque */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <Activity size={14} />
+            {t('santeFinanciere')}
+          </h3>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Jauge Risque PAR 30 */}
+            <Card variant="default" padding="sm" className="bg-slate-800/50">
+               <div className="flex items-center justify-between mb-2">
+                 <span className="text-xs text-slate-400">{t('risquePar30')}</span>
+                 <AlertTriangle size={14} className={par30 > 5 ? 'text-rose-500' : 'text-slate-600'} />
+               </div>
+               <div className="text-2xl font-bold text-white mb-2">{par30.toFixed(1)}%</div>
+               <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                 <div 
+                    className={`h-full rounded-full ${par30 > 5 ? 'bg-rose-500' : par30 > 3 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                    style={{ width: `${Math.min(par30 * 10, 100)}%` }} 
+                 />
+               </div>
+               <p className="text-xs text-slate-500 mt-2">{t('ciblePar30')}</p>
+            </Card>
+
+            {/* Jauge Liquidité */}
+            <Card variant="default" padding="sm" className="bg-slate-800/50">
+               <div className="flex items-center justify-between mb-2">
+                 <span className="text-xs text-slate-400">{t('liquidite')}</span>
+                 <TrendingUp size={14} className="text-blue-500" />
+               </div>
+               <div className="text-2xl font-bold text-white mb-2">{liquidityRatio}%</div>
+               <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                 <div 
+                    className="h-full rounded-full bg-blue-500"
+                    style={{ width: `${liquidityRatio}%` }} 
+                 />
+               </div>
+               <p className="text-xs text-slate-500 mt-2">{t('ratioLiquidite')}</p>
+            </Card>
+          </div>
+          
+          {/* Section Agent Terrain / Staff Performance */}
+           <Card variant="default" className="flex items-center justify-between p-4 bg-slate-800/50">
+             <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300 border-2 border-slate-600">
+                 {stats?.global?.agentsActifs || 0}
+               </div>
+               <div>
+                 <div className="text-sm font-medium text-white">{t('activiteAgents')}</div>
+                 <div className="text-xs text-slate-500">
+                   {stats?.global?.totalAgents ? `${stats.global.agentsActifs || 0} / ${stats.global.totalAgents} ${t('actifs')}` : '-'}
+                 </div>
+               </div>
+             </div>
+             <div className="h-8 w-[1px] bg-slate-700 mx-2"></div>
+             <div>
+               <div className="text-sm font-bold text-white text-right">{stats?.daily.nouveauxClients || 0}</div>
+               <div className="text-xs text-slate-500 text-right">{t('nouveauxClients')}</div>
+             </div>
+           </Card>
+        </div>
+      </div>
+
+      {/* 4. Zone Analytique (Lazy Loaded) */}
+      <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-widest mt-6 mb-4">
+        {t('analytique')}
+      </h3>
+      
+      <AnalyticsGrid stats={stats} />
     </div>
   );
 }

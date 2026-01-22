@@ -9,11 +9,14 @@ interface UploadMetadata {
 
 interface UploadResponse {
   uploadURL: string;
-  objectPath: string;
+  key: string;  // Object key (à stocker en DB)
+  objectPath?: string; // Alias pour rétro-compatibilité
   metadata: UploadMetadata;
 }
 
 interface UseUploadOptions {
+  path?: string;
+  isPublic?: boolean;
   onSuccess?: (response: UploadResponse) => void;
   onError?: (error: Error) => void;
 }
@@ -29,8 +32,10 @@ interface UseUploadOptions {
  * ```tsx
  * function FileUploader() {
  *   const { uploadFile, isUploading, error } = useUpload({
+ *     path: 'profiles',
+ *     isPublic: true,
  *     onSuccess: (response) => {
- *       console.log("Uploaded to:", response.objectPath);
+ *       console.log("Uploaded key:", response.key);
  *     },
  *   });
  *
@@ -61,16 +66,18 @@ export function useUpload(options: UseUploadOptions = {}) {
    * IMPORTANT: Send JSON metadata, NOT the file itself.
    */
   const requestUploadUrl = useCallback(
-    async (file: File): Promise<UploadResponse> => {
-      const response = await fetch("/api/uploads/request-url", {
+    async (file: File): Promise<{ uploadUrl: string; key: string }> => {
+      const response = await fetch("/api/storage/presigned-url", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
-          name: file.name,
-          size: file.size,
+          filename: file.name,
           contentType: file.type || "application/octet-stream",
+          path: options.path || "misc",
+          isPublic: options.isPublic ?? false,
         }),
       });
 
@@ -81,7 +88,7 @@ export function useUpload(options: UseUploadOptions = {}) {
 
       return response.json();
     },
-    []
+    [options.path, options.isPublic]
   );
 
   /**
@@ -108,7 +115,7 @@ export function useUpload(options: UseUploadOptions = {}) {
    * Upload a file using the presigned URL flow.
    *
    * @param file - The file to upload
-   * @returns The upload response containing the object path
+   * @returns The upload response containing the object key
    */
   const uploadFile = useCallback(
     async (file: File): Promise<UploadResponse | null> => {
@@ -119,15 +126,27 @@ export function useUpload(options: UseUploadOptions = {}) {
       try {
         // Step 1: Request presigned URL (send metadata as JSON)
         setProgress(10);
-        const uploadResponse = await requestUploadUrl(file);
+        const { uploadUrl, key } = await requestUploadUrl(file);
 
         // Step 2: Upload file directly to presigned URL
         setProgress(30);
-        await uploadToPresignedUrl(file, uploadResponse.uploadURL);
+        await uploadToPresignedUrl(file, uploadUrl);
 
         setProgress(100);
-        options.onSuccess?.(uploadResponse);
-        return uploadResponse;
+
+        const response: UploadResponse = {
+          uploadURL: uploadUrl,
+          key,
+          objectPath: key, // Alias pour rétro-compatibilité
+          metadata: {
+            name: file.name,
+            size: file.size,
+            contentType: file.type || "application/octet-stream",
+          },
+        };
+
+        options.onSuccess?.(response);
+        return response;
       } catch (err) {
         const error = err instanceof Error ? err : new Error("Upload failed");
         setError(error);
@@ -162,15 +181,17 @@ export function useUpload(options: UseUploadOptions = {}) {
       headers?: Record<string, string>;
     }> => {
       // Use the actual file properties to request a per-file presigned URL
-      const response = await fetch("/api/uploads/request-url", {
+      const response = await fetch("/api/storage/presigned-url", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
-          name: file.name,
-          size: file.size,
+          filename: file.name,
           contentType: file.type || "application/octet-stream",
+          path: options.path || "misc",
+          isPublic: options.isPublic ?? false,
         }),
       });
 
@@ -181,11 +202,11 @@ export function useUpload(options: UseUploadOptions = {}) {
       const data = await response.json();
       return {
         method: "PUT",
-        url: data.uploadURL,
+        url: data.uploadUrl,
         headers: { "Content-Type": file.type || "application/octet-stream" },
       };
     },
-    []
+    [options.path, options.isPublic]
   );
 
   return {
@@ -196,4 +217,3 @@ export function useUpload(options: UseUploadOptions = {}) {
     progress,
   };
 }
-

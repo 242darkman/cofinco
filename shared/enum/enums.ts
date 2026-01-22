@@ -1,11 +1,15 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
+// ============================================
+// TRANSFERT COFFRE
+// ============================================
+
 export const statutTransfertCoffreEnum = pgEnum("statut_transfert_coffre_enum", [
-  "Demandé",
-  "Validé",
-  "Exécuté",
-  "Rejeté",
-  "Annulé",
+  "REQUESTED",
+  "VALIDATED",
+  "EXECUTED",
+  "REJECTED",
+  "CANCELLED",
 ]);
 
 export const typeTransfertCoffreEnum = pgEnum("type_transfert_coffre_enum", [
@@ -13,143 +17,160 @@ export const typeTransfertCoffreEnum = pgEnum("type_transfert_coffre_enum", [
   "CAISSE_VERS_COFFRE",
 ]);
 
+// ============================================
+// CREDIT
+// ============================================
+
 export const frequenceRemboursementEnum = pgEnum("frequence_remboursement_enum", [
-  "Journalier",
-  "Hebdomadaire",
-  "Mensuel",
-  "Bimensuel",
-  "Trimestriel",
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "BI_MONTHLY",
+  "QUARTERLY",
 ]);
 
 export const dureeUniteEnum = pgEnum("duree_unite_enum", [
-  "Jour",
-  "Semaine",
-  "Mois",
+  "DAY",
+  "WEEK",
+  "MONTH",
 ]);
 
 export const statutDemandeEnum = pgEnum("statut_demande_enum", [
-  "En attente",       // Attente paiement frais
-  "A enquêter",       // Frais payés, prêt pour enquête
-  "En enquête",        // En cours d'enquête
-  "Enquête terminée",  // Enquête soumise, attente validation investigation
-  "Approuvée",        // Investigation validée, prêt pour décision finale
-  "Rejetée",
-  "Annulée",
-  "Décaissée",
-  "Clôturée",
-  // Reevaluation workflow states
-  "Réévaluation en cours",      // Reevaluation in progress
-  "Approuvée après réévaluation", // Approved after reevaluation
-  "Rejetée définitivement",     // Definitively rejected (no more reevaluation possible)
+  "PENDING_FEES",
+  "READY_FOR_INVESTIGATION",
+  "UNDER_INVESTIGATION",
+  "INVESTIGATION_COMPLETE",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
+  "DISBURSED",
+  "CLOSED",
+  "REEVALUATION_IN_PROGRESS",
+  "APPROVED_AFTER_REEVALUATION",
+  "DEFINITIVELY_REJECTED",
+  "DELETED",
 ]);
 
 // ========== REEVALUATION WORKFLOW ENUMS ==========
 
 export const statutReevaluationEnum = pgEnum("statut_reevaluation_enum", [
-  "Demandée",                    // Client/Agent a initié la demande
-  "Éligibilité en cours",        // Vérification automatique
-  "Autorisée",                   // Éligible, peut procéder
-  "Refusée",                     // Non éligible (délai, max atteint, motif blacklisté)
-  "Enquête complémentaire",      // Enquête terrain en cours
-  "Enquête terminée",            // Enquête complémentaire soumise
-  "En comité",                   // Soumis au comité de décision
-  "Approuvée",                   // Comité approuve la réévaluation
-  "Rejetée définitivement",      // Comité rejette définitivement
-  "Annulée",                     // Annulée par le demandeur
+  "REQUESTED",
+  "ELIGIBILITY_CHECK",
+  "AUTHORIZED",
+  "REFUSED",
+  "ADDITIONAL_INVESTIGATION",
+  "INVESTIGATION_COMPLETE",
+  "IN_COMMITTEE",
+  "APPROVED",
+  "DEFINITIVELY_REJECTED",
+  "CANCELLED",
 ]);
 
 export const typeElementNouveauEnum = pgEnum("type_element_nouveau_enum", [
-  "Garantie supplémentaire",
-  "Co-emprunteur",
-  "Justificatif de revenus",
-  "Réduction montant demandé",
-  "Ajustement durée",
-  "Amélioration situation",
-  "Document manquant",
-  "Autre",
+  "ADDITIONAL_COLLATERAL",
+  "CO_BORROWER",
+  "INCOME_PROOF",
+  "AMOUNT_REDUCTION",
+  "DURATION_ADJUSTMENT",
+  "SITUATION_IMPROVEMENT",
+  "MISSING_DOCUMENT",
+  "OTHER",
 ]);
 
 export const typeRevenuEnum = pgEnum("type_revenu_enum", [
-  "Mensuel",
-  "Journalier",
+  "MONTHLY",
+  "DAILY",
 ]);
 
 export const typeCreditEnum = pgEnum("type_credit_enum", [
-  "Personnel",
-  "Immobilier",
-  "Commercial",
+  "PERSONAL",
+  "REAL_ESTATE",
+  "COMMERCIAL",
 ]);
 
 export const methodePaiementEnum = pgEnum("methode_paiement_enum", [
-  "Espèces",
-  "Mobile Money",
-  "Virement",
-  "Carte",
-  "Chèque",
-  "Autre",
+  "CASH",
+  "MOBILE_MONEY",
+  "TRANSFER",
+  "CARD",
+  "CHECK",
+  "OTHER",
 ]);
-
 
 export const statutCreditEnum = pgEnum("statut_credit_enum", [
-  "En attente",
-  "Actif",
-  "En retard",
-  "Soldé",
-  "Clôturé",
-  "Annulé",
+  "PENDING",
+  "ACTIVE",
+  "LATE",
+  "PAID",
+  "CLOSED",
+  "CANCELLED",
 ]);
 
+// ============================================
+// TRANSACTIONS
+// ============================================
+
 export const typeTransactionEpargneEnum = pgEnum("type_transaction_epargne_enum", [
-  "Dépôt",
-  "Retrait",
-  "Intérêt",
-  "Frais",
-  "Ajustement",
+  "DEPOSIT",
+  "WITHDRAWAL",
+  "INTEREST",
+  "FEE",
+  "ADJUSTMENT",
 ]);
 
 export const statutTransactionEnum = pgEnum("statut_transaction_enum", [
-  "Pending",
-  "Posté",
-  "Annulé",
-  "Reversé",
+  "PENDING",
+  "POSTED",
+  "CANCELLED",
+  "REVERSED",
 ]);
 
+// ============================================
+// OPERATIONS CAISSE
+// ============================================
+
 export const typeOperationCaisseEnum = pgEnum("type_operation_caisse", [
-  "Dépôt épargne",
-  "Retrait épargne",
-  "Décaissement crédit",
-  "Remboursement crédit",
-  "Frais Engagement",
-  "Frais",
-  "Ajustement",
-  "Transfert caisse",
-  "Approvisionnement coffre",
-  "Versement coffre",
-  // Added for CaissePaiementModal compatibility
-  "Versement Épargne",
-  "Versement Courant",
-  "Retrait Courant",
-  "Versement Bloqué",
-  "Retrait Bloqué",
-  "Encaissement Divers",
-  "Décaissement Divers",
-  "Frais Bancaires",
-  // Tontine specific (often handled separately but good to have)
-  "Cotisation Tontine",
-  "Retrait Tontine",
+  "SAVINGS_DEPOSIT",
+  "SAVINGS_WITHDRAWAL",
+  "CREDIT_DISBURSEMENT",
+  "CREDIT_REPAYMENT",
+  "ENGAGEMENT_FEE",
+  "FEE",
+  "ADJUSTMENT",
+  "CASH_TRANSFER",
+  "SAFE_SUPPLY",
+  "SAFE_DEPOSIT",
+  // CaissePaiementModal compatibility
+  "DEPOSIT_SAVINGS",
+  "DEPOSIT_CURRENT",
+  "WITHDRAWAL_CURRENT",
+  "DEPOSIT_BLOCKED",
+  "WITHDRAWAL_BLOCKED",
+  "MISC_COLLECTION",
+  "MISC_DISBURSEMENT",
+  "BANK_FEE",
+  // Tontine specific
+  "TONTINE_CONTRIBUTION",
+  "TONTINE_WITHDRAWAL",
   // Aliases for robustness
-  "Remboursement Prêt",
-  "Décaissement Prêt",
-  "Retrait Épargne"
+  "LOAN_REPAYMENT",
+  "LOAN_DISBURSEMENT",
+  "WITHDRAWAL_SAVINGS",
+  // Account activation
+  "INITIAL_DEPOSIT"
 ]);
 
 export const statutTransfertCaisseEnum = pgEnum("statut_transfert_caisse_enum", [
-  "En attente",
-  "Validé",
-  "Rejeté",
-  "Annulé",
-  "Reçu",
+  "PENDING",
+  "VALIDATED",
+  "REJECTED",
+  "CANCELLED",
+  "RECEIVED",
 ]);
+
+// ============================================
+// TAUX D'INTÉRÊT
+// ============================================
 
 export const interestRateTypeEnum = pgEnum("interest_rate_type_enum", [
   "credit",
@@ -157,7 +178,17 @@ export const interestRateTypeEnum = pgEnum("interest_rate_type_enum", [
   "autre",
 ]);
 
-export const sensMouvementEnum = pgEnum("sens_mouvement_enum", ["Débit", "Crédit"]);
+export const typeTauxInteretEnum = pgEnum("type_taux_interet_enum", [
+  "credit",
+  "epargne",
+  "autre",
+]);
+
+// ============================================
+// MOUVEMENTS FINANCIERS
+// ============================================
+
+export const sensMouvementEnum = pgEnum("sens_mouvement_enum", ["DEBIT", "CREDIT"]);
 
 export const sourceModuleEnum = pgEnum("source_module_enum", [
   "CAISSE",
@@ -167,11 +198,11 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "TERRAIN",
   "TRANSFERT",
   "SYSTEME",
-  "CAISSE_AGENT", // Nouveau module pour les opérations de caisse agent
-  "VERSEMENT_AUTO", // Module pour les versements automatiques
-  "DECAISSEMENT_PROGRAMME", // Module pour les décaissements programmés
-  "COMPTE", // Module pour les opérations de compte (ex: transfert, frais)
-  "COFFRE", // Module pour les opérations de coffre-fort
+  "CAISSE_AGENT",
+  "VERSEMENT_AUTO",
+  "DECAISSEMENT_PROGRAMME",
+  "COMPTE",
+  "COFFRE",
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -198,85 +229,88 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "CAISSE_LIQUIDATED",
 ]);
 
-export const typeTauxInteretEnum = pgEnum("type_taux_interet_enum", [
-  "credit",
-  "epargne",
-  "autre",
-]);
+// ============================================
+// PAIEMENT TERRAIN
+// ============================================
 
 export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   // Dépôts (par type de compte)
-  "Dépôt Épargne",
-  "Dépôt Courant",
-  "Dépôt Bloqué",
-
+  "DEPOSIT_SAVINGS",
+  "DEPOSIT_CURRENT",
+  "DEPOSIT_BLOCKED",
   // Retraits (par type de compte)
-  "Retrait Épargne",
-  "Retrait Courant",
-  "Retrait Bloqué",
-
+  "WITHDRAWAL_SAVINGS",
+  "WITHDRAWAL_CURRENT",
+  "WITHDRAWAL_BLOCKED",
   // Crédit
-  "Remboursement Crédit",
-  "Frais Engagement",
-  "Décaissement Crédit",
-
+  "CREDIT_REPAYMENT",
+  "ENGAGEMENT_FEE",
+  "CREDIT_DISBURSEMENT",
   // Tontine
-  "Versement Tontine",
-  "Retrait Tontine",
-
+  "TONTINE_CONTRIBUTION",
+  "TONTINE_WITHDRAWAL",
   // Coffre
-  "Approvisionnement coffre",
-  "Versement coffre",
-
+  "SAFE_SUPPLY",
+  "SAFE_DEPOSIT",
   // Transferts Auto & Virement
-  "Transfert Entrant",
-  "Transfert Sortant",
-  "Dépôt Initial",
-  "Virement Interne",
+  "TRANSFER_IN",
+  "TRANSFER_OUT",
+  "INITIAL_DEPOSIT",
+  "INTERNAL_TRANSFER",
 ]);
+
+// ============================================
+// COMPTES
+// ============================================
 
 export const typeCompteEnum = pgEnum("type_compte_enum", [
-  "Épargne",
-  "Courant",
-  "Bloqué",
+  "SAVINGS",
+  "CURRENT",
+  "BLOCKED",
 ]);
 
+/**
+ * Statut des comptes
+ * Convention:
+ * - Valeurs en base: ANGLAIS (SCREAMING_SNAKE_CASE)
+ * - Labels UI: Mappings côté client (français)
+ */
 export const statutCompteEnum = pgEnum("statut_compte_enum", [
-  "Actif",
-  "Suspendu",
-  "Clôturé",
-  "EN_ATTENTE_PAIEMENT",
-  "Annulé",
+  "ACTIVE",
+  "SUSPENDED",
+  "CLOSED",
+  "PENDING_ACTIVATION",
+  "CANCELLED",
 ]);
 
 export const motifBlocageEnum = pgEnum("motif_blocage_enum", [
-  "Garantie crédit",
-  "Garantie tontine",
-  "Épargne forcée",
-  "Décision interne",
-  "Litige",
-  "Autre",
+  "LOAN_GUARANTEE",
+  "TONTINE_GUARANTEE",
+  "FORCED_SAVINGS",
+  "INTERNAL_DECISION",
+  "DISPUTE",
+  "OTHER",
 ]);
 
 // ========== CAISSE AGENT ENUMS ==========
 
 export const statutCaisseAgentEnum = pgEnum("statut_caisse_agent_enum", [
-  "Active",
-  "Suspendue",
-  "Clôturée",
+  "ACTIVE",
+  "SUSPENDED",
+  "CLOSED",
 ]);
 
 export const typeOperationTerrainEnum = pgEnum("type_operation_terrain_enum", [
-  "COLLECT_CASH",      // Agent collecte cash d'un client
-  "SETTLEMENT_CASH",   // Agent remet cash à l'agence/coffre
+  "COLLECT_CASH",
+  "SETTLEMENT_CASH",
 ]);
 
 export const statutOperationTerrainEnum = pgEnum("statut_operation_terrain_enum", [
-  "SUBMITTED",   // Soumise, en attente de validation
-  "APPROVED",    // Approuvée, écritures postées
-  "REJECTED",    // Rejetée, aucune écriture
-  "CANCELLED",   // Annulée par l'agent/admin
-  "SETTLED",     // Apurée/Versée (finalisé)
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
+  "SETTLED",
 ]);
 
 // ========== TRANSFERTS INTER-COFFRES ENUMS ==========
@@ -287,9 +321,9 @@ export const ownerTypeCoffreEnum = pgEnum("owner_type_coffre_enum", [
 ]);
 
 export const statutCoffreEnum = pgEnum("statut_coffre_enum", [
-  "Actif",
-  "Suspendu",
-  "Fermé",
+  "ACTIVE",
+  "SUSPENDED",
+  "CLOSED",
 ]);
 
 export const typeTransfertInterCoffreEnum = pgEnum("type_transfert_inter_coffre_enum", [
@@ -299,15 +333,15 @@ export const typeTransfertInterCoffreEnum = pgEnum("type_transfert_inter_coffre_
 ]);
 
 export const statutTransfertInterCoffreEnum = pgEnum("statut_transfert_inter_coffre_enum", [
-  "Brouillon",           // Draft - éditable
-  "Soumis",              // Submitted - en attente approbation N1
-  "Approuvé N1",         // Approved Level 1 - en attente approbation N2
-  "Approuvé N2",         // Approved Level 2 - prêt pour dispatch
-  "En transit",          // In Transit - fonds en route
-  "Reçu",                // Received - conforme
-  "Reçu avec écart",     // Received with discrepancy
-  "Rejeté",              // Rejected - terminal
-  "Annulé",              // Cancelled - terminal
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED_L1",
+  "APPROVED_L2",
+  "IN_TRANSIT",
+  "RECEIVED",
+  "RECEIVED_WITH_DISCREPANCY",
+  "REJECTED",
+  "CANCELLED",
 ]);
 
 export const typeConditionnementEnum = pgEnum("type_conditionnement_enum", [
@@ -324,28 +358,31 @@ export const typeDocumentTransfertEnum = pgEnum("type_document_transfert_enum", 
 ]);
 
 export const statutReconciliationEnum = pgEnum("statut_reconciliation_enum", [
-  "En attente",
-  "Rapproché",
-  "Écart détecté",
+  "PENDING",
+  "RECONCILED",
+  "DISCREPANCY_DETECTED",
 ]);
 
 export const typeTacheRegularisationEnum = pgEnum("type_tache_regularisation_enum", [
   "ECART_RECEPTION",
   "RECONCILIATION_EN_ATTENTE",
+  "VIREMENT_PROG_ECHEC",
+  "VIREMENT_AUTO_ECHEC",
+  "ECART_COFFRE_CAISSE",
 ]);
 
 export const statutTacheRegularisationEnum = pgEnum("statut_tache_regularisation_enum", [
-  "Ouverte",
-  "En cours",
-  "Résolue",
-  "Escaladée",
+  "OPEN",
+  "IN_PROGRESS",
+  "RESOLVED",
+  "ESCALATED",
 ]);
 
 export const prioriteTacheEnum = pgEnum("priorite_tache_enum", [
-  "Basse",
-  "Normale",
-  "Haute",
-  "Critique",
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "CRITICAL",
 ]);
 
 export const actionAuditTransfertEnum = pgEnum("action_audit_transfert_enum", [
@@ -357,5 +394,129 @@ export const actionAuditTransfertEnum = pgEnum("action_audit_transfert_enum", [
   "DISPATCHED",
   "RECEIVED",
   "RECEIVED_WITH_DISCREPANCY",
+  "CANCELLED",
+]);
+export const typeAgenceEnum = pgEnum("type_agence_enum", [
+  "MAIN",
+  "SECONDARY",
+  "KIOSK",
+]);
+
+export const statutAgenceEnum = pgEnum("statut_agence_enum", [
+  "ACTIVE",
+  "INACTIVE",
+  "CLOSED",
+]);
+
+// ============================================
+// CAISSE (Main Caisse status - OPEN/CLOSED)
+// ============================================
+
+export const statutCaisseMainEnum = pgEnum("statut_caisse_main_enum", [
+  "OPEN",
+  "CLOSED",
+]);
+
+// ============================================
+// SESSION CAISSE
+// ============================================
+
+export const statutSessionCaisseEnum = pgEnum("statut_session_caisse_enum", [
+  "OPEN",
+  "CLOSED",
+]);
+
+// ============================================
+// ENQUETE CREDIT
+// ============================================
+
+export const statutEnqueteCreditEnum = pgEnum("statut_enquete_credit_enum", [
+  "PENDING",
+  "IN_PROGRESS",
+  "APPROVED",
+  "REJECTED",
+  "REDUCED",
+]);
+
+// ============================================
+// PLAN EPARGNE
+// ============================================
+
+export const statutPlanEpargneEnum = pgEnum("statut_plan_epargne_enum", [
+  "ACTIVE",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
+// ============================================
+// OBJECTIF EPARGNE
+// ============================================
+
+export const statutObjectifEpargneEnum = pgEnum("statut_objectif_epargne_enum", [
+  "IN_PROGRESS",
+  "ACHIEVED",
+  "ABANDONED",
+]);
+
+// ============================================
+// VERSEMENT AUTOMATIQUE
+// ============================================
+
+export const statutVersementAutoEnum = pgEnum("statut_versement_auto_enum", [
+  "PENDING",
+  "SUCCESS",
+  "FAILED",
+]);
+
+// ============================================
+// DECAISSEMENT PROGRAMME
+// ============================================
+
+export const statutDecaissementProgEnum = pgEnum("statut_decaissement_prog_enum", [
+  "PENDING",
+  "SUCCESS",
+  "FAILED",
+]);
+
+// ============================================
+// FREQUENCE VIREMENT PROGRAMME
+// ============================================
+
+export const frequenceVirementEnum = pgEnum("frequence_virement_enum", [
+  "ONCE",
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+]);
+
+// ============================================
+// STATUT AUDIT VIREMENT
+// ============================================
+
+export const statutAuditVirementEnum = pgEnum("statut_audit_virement_enum", [
+  "SUCCESS",
+  "FAILED",
+]);
+
+// ============================================
+// ENQUETE COMPLEMENTAIRE
+// ============================================
+
+export const statutEnqueteComplementaireEnum = pgEnum("statut_enquete_complementaire_enum", [
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
+// ============================================
+// CREDIT REFUND REQUEST
+// ============================================
+
+export const statutRefundRequestEnum = pgEnum("statut_refund_request_enum", [
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+  "PAID",
   "CANCELLED",
 ]);

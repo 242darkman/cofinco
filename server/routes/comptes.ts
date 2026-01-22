@@ -17,6 +17,7 @@
 
 import type { Express } from "express";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { requireAgenceAccess, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
@@ -28,33 +29,32 @@ import { aliasedTable, and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
+import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage } from "@shared/enum/status-constants";
 
 // Validation schemas
 const createCompteSchema = z.object({
   clientId: z.string().uuid(),
-  typeCompte: z.enum(["Épargne", "Courant", "Bloqué"]),
+  typeCompte: z.enum([TypeCompte.SAVINGS, TypeCompte.CURRENT, TypeCompte.BLOCKED]),
   agenceId: z.string().uuid(),
   produitId: z.string().uuid().optional(),
   soldeInitial: z.number().min(0).optional().default(0),
-  modePaiement: z.enum(["Espèces", "Virement"]).default("Espèces"),
+  modePaiement: z.enum([MethodePaiement.CASH, MethodePaiement.TRANSFER]).default(MethodePaiement.CASH),
   compteSourceId: z.string().uuid().optional(), // requis si Virement
   blocageActif: z.boolean().optional(),
-  blocageMotif: z
-    .enum([
-      "Garantie crédit",
-      "Garantie tontine",
-      "Épargne forcée",
-      "Décision interne",
-      "Litige",
-      "Autre",
-    ])
-    .optional(),
+  blocageMotif: z.enum([
+    MotifBlocage.LOAN_GUARANTEE,
+    MotifBlocage.TONTINE_GUARANTEE,
+    MotifBlocage.FORCED_SAVINGS,
+    MotifBlocage.INTERNAL_DECISION,
+    MotifBlocage.DISPUTE,
+    MotifBlocage.OTHER,
+  ]).optional(),
   blocageReference: z.string().optional(),
 });
 
 const depotRetraitSchema = z.object({
   montant: z.number().positive("Le montant doit être positif"),
-  methodePaiement: z.string().default("Espèces"),
+  methodePaiement: z.string().default(MethodePaiement.CASH),
   sessionCaisseId: z.string().uuid().optional(),
   observations: z.string().optional(),
   idempotencyKey: z.string().optional(),
@@ -62,12 +62,12 @@ const depotRetraitSchema = z.object({
 
 const blocageSchema = z.object({
   motif: z.enum([
-    "Garantie crédit",
-    "Garantie tontine",
-    "Épargne forcée",
-    "Décision interne",
-    "Litige",
-    "Autre",
+    MotifBlocage.LOAN_GUARANTEE,
+    MotifBlocage.TONTINE_GUARANTEE,
+    MotifBlocage.FORCED_SAVINGS,
+    MotifBlocage.INTERNAL_DECISION,
+    MotifBlocage.DISPUTE,
+    MotifBlocage.OTHER,
   ]),
   reference: z.string().optional(),
   dateFin: z.string().datetime().optional(),
@@ -88,7 +88,7 @@ const virementCompteSchema = z.object({
   destinationAccountNumber: z.string().min(3).optional(),
   montant: z.coerce.number().positive("Le montant doit etre positif"),
   scheduled: z.boolean().optional().default(false),
-  frequence: z.enum(["once", "daily", "weekly", "monthly"]).optional().default("once"),
+  frequence: z.enum(["ONCE", "DAILY", "WEEKLY", "MONTHLY"]).optional().default("ONCE"),
 });
 
 const updateVirementProgrammeSchema = z.object({
@@ -118,7 +118,7 @@ export function registerComptesRoutes(app: Express) {
       try {
         const agenceId = req.selectedAgenceId;
         
-        const conditions = [eq(comptes.statut, "Actif")];
+        const conditions = [eq(comptes.statut, StatutCompte.ACTIVE)];
         
         if (agenceId) {
            conditions.push(eq(comptes.agenceId, agenceId));
@@ -157,14 +157,14 @@ export function registerComptesRoutes(app: Express) {
 
         const result = {
           total: allStats.reduce((sum, s) => sum + s.count, 0),
-          epargne: allStats.find(s => s.typeCompte === "Épargne")?.count || 0,
-          courant: allStats.find(s => s.typeCompte === "Courant")?.count || 0,
-          bloque: allStats.find(s => s.typeCompte === "Bloqué")?.count || 0,
+          epargne: allStats.find(s => s.typeCompte === TypeCompte.SAVINGS)?.count || 0,
+          courant: allStats.find(s => s.typeCompte === TypeCompte.CURRENT)?.count || 0,
+          bloque: allStats.find(s => s.typeCompte === TypeCompte.BLOCKED)?.count || 0,
           totalSolde: allStats.reduce((sum, s) => sum + (s.totalSolde || 0), 0),
           tauxMoyenGlobal,
-          tauxMoyenEpargne: tauxByType["Épargne"] || 0,
-          tauxMoyenCourant: tauxByType["Courant"] || 0,
-          tauxMoyenBloque: tauxByType["Bloqué"] || 0,
+          tauxMoyenEpargne: tauxByType[TypeCompte.SAVINGS] || 0,
+          tauxMoyenCourant: tauxByType[TypeCompte.CURRENT] || 0,
+          tauxMoyenBloque: tauxByType[TypeCompte.BLOCKED] || 0,
         };
 
         res.json(result);
@@ -186,7 +186,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -338,16 +338,14 @@ export function registerComptesRoutes(app: Express) {
           return res.status(400).json({ message: "Numéro de compte requis" });
         }
 
-        const agenceFilter = req.agenceFilter as { agence?: string } | null;
+        const agenceId = req.selectedAgenceId;
         const conditions: any[] = [eq(comptes.numeroCompte, accountNumber)];
-        if (agenceFilter?.agence && agenceFilter.agence !== 'all') {
-          conditions.push(eq(clients.agence, agenceFilter.agence));
+        if (agenceId) {
+          conditions.push(eq(comptes.agenceId, agenceId));
         }
 
         const [result] = await db
           .select({
-            clientNom: clients.nom,
-            clientPrenom: clients.prenom,
             userNom: users.nom,
             userPrenom: users.prenom,
           })
@@ -361,7 +359,7 @@ export function registerComptesRoutes(app: Express) {
           return res.status(404).json({ message: "Compte introuvable" });
         }
 
-        const ownerName = `${result.userNom || result.clientNom || ''} ${result.userPrenom || result.clientPrenom || ''}`.trim();
+        const ownerName = `${result.userNom || ''} ${result.userPrenom || ''}`.trim();
         return res.json({
           found: true,
           accountNumber,
@@ -381,16 +379,27 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes/pending-activation",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     requireAgenceIdAccess(),
     async (req, res) => {
         try {
             const agenceId = req.selectedAgenceId;
-            const conditions: any[] = [eq(comptes.statut, 'EN_ATTENTE_PAIEMENT')];
-            
+            const conditions: any[] = [eq(comptes.statut, StatutCompte.PENDING_ACTIVATION)];
+
             if (agenceId) {
-                conditions.push(eq(comptes.agenceId, agenceId));
+                // Robust agency check: either the account is explicitly assigned to this agency
+                // OR the account has no agency set but the client belongs to this agency
+                conditions.push(
+                    or(
+                        eq(comptes.agenceId, agenceId),
+                        and(
+                            sql`${comptes.agenceId} IS NULL`,
+                            eq(clients.agenceId, agenceId)
+                        )
+                    )
+                );
             }
+
 
             const results = await db
                 .select({
@@ -400,9 +409,9 @@ export function registerComptesRoutes(app: Express) {
                     montantInitial: comptes.soldeCourant,
                     createdAt: comptes.createdAt,
                     clientId: clients.id,
-                    clientNom: clients.nom,
-                    clientPrenom: clients.prenom,
-                    clientPhoto: clients.photoUrl,
+                    // Architecture V3: nom/prenom proviennent de users
+                    userNom: users.nom,
+                    userPrenom: users.prenom,
                     userPhoto: users.photoProfile,
                 })
                 .from(comptes)
@@ -411,19 +420,40 @@ export function registerComptesRoutes(app: Express) {
                 .where(and(...conditions))
                 .orderBy(comptes.createdAt);
 
-            const formatted = results.map(r => ({
-                id: r.id,
-                numeroCompte: r.numeroCompte,
-                typeCompte: r.typeCompte,
-                montantInitial: parseFloat(r.montantInitial || '0'),
-                createdAt: r.createdAt,
-                client: {
-                    id: r.clientId,
-                    nom: r.clientNom,
-                    prenom: r.clientPrenom,
-                    photoUrl: r.clientPhoto || r.userPhoto
+            const formatted = results.map(r => {
+                // WARNING: Dirty Data Fix
+                // r.userPhoto sometimes contains a JSON stringified array of URLs (legacy artifact)
+                // We must parse it to extract a single valid URL string
+                let photoUrl = r.userPhoto;
+                if (photoUrl && typeof photoUrl === 'string') {
+                    // Check if it looks like a JSON array
+                    if (photoUrl.trim().startsWith('[')) {
+                        try {
+                            const parsed = JSON.parse(photoUrl);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                                // Extract first item
+                                photoUrl = parsed[0];
+                            }
+                        } catch (e) {
+                            // Not valid JSON, keep original string
+                        }
+                    }
                 }
-            }));
+
+                return {
+                    id: r.id,
+                    numeroCompte: r.numeroCompte,
+                    typeCompte: r.typeCompte,
+                    montantInitial: parseFloat(r.montantInitial || '0'),
+                    createdAt: r.createdAt,
+                    client: {
+                        id: r.clientId,
+                        nom: r.userNom,
+                        prenom: r.userPrenom,
+                        photoUrl: photoUrl // Use cleaned photoUrl
+                    }
+                };
+            });
 
             res.json(formatted);
         } catch (error) {
@@ -464,7 +494,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/transferts",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     requireAgenceAccess(),
     async (req, res) => {
       try {
@@ -540,7 +570,7 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes/transferts-programmes/stats",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -641,7 +671,7 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes/transferts-programmes",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -672,13 +702,10 @@ export function registerComptesRoutes(app: Express) {
 
         if (search) {
           const pattern = `%${search}%`;
+          // Architecture V3: nom/prenom sont dans users, pas dans clients
           conditions.push(or(
             ilike(sourceCompte.numeroCompte, pattern),
             ilike(destCompte.numeroCompte, pattern),
-            ilike(sql`COALESCE(${sourceClient.nom}, '')`, pattern),
-            ilike(sql`COALESCE(${sourceClient.prenom}, '')`, pattern),
-            ilike(sql`COALESCE(${destClient.nom}, '')`, pattern),
-            ilike(sql`COALESCE(${destClient.prenom}, '')`, pattern),
             ilike(sql`COALESCE(${sourceUser.nom}, '')`, pattern),
             ilike(sql`COALESCE(${sourceUser.prenom}, '')`, pattern),
             ilike(sql`COALESCE(${destUser.nom}, '')`, pattern),
@@ -699,6 +726,7 @@ export function registerComptesRoutes(app: Express) {
           .leftJoin(destUser, eq(destClient.userId, destUser.id))
           .where(whereClause);
 
+        // Architecture V3: nom/prenom proviennent de users, pas de clients
         const schedules = await db
           .select({
             id: virementsProgrammes.id,
@@ -720,12 +748,8 @@ export function registerComptesRoutes(app: Express) {
             destNumero: destCompte.numeroCompte,
             destType: destCompte.typeCompte,
             destAgenceId: destCompte.agenceId,
-            sourceClientNom: sourceClient.nom,
-            sourceClientPrenom: sourceClient.prenom,
             sourceUserNom: sourceUser.nom,
             sourceUserPrenom: sourceUser.prenom,
-            destClientNom: destClient.nom,
-            destClientPrenom: destClient.prenom,
             destUserNom: destUser.nom,
             destUserPrenom: destUser.prenom,
           })
@@ -765,7 +789,7 @@ export function registerComptesRoutes(app: Express) {
   app.patch(
     "/api/comptes/transferts-programmes/:id",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -892,7 +916,7 @@ export function registerComptesRoutes(app: Express) {
 
         // Get all blocked accounts
         const result = await storage.getAllComptesWithClients(filter, {
-          typeCompte: "Bloqué",
+          typeCompte: TypeCompte.BLOCKED,
           page: 1,
           limit: 100, // Get all blocked accounts
         });
@@ -914,6 +938,59 @@ export function registerComptesRoutes(app: Express) {
         res.json(addSnakeCaseAliasesDeep(comptesTransformed));
       } catch (error: any) {
         console.error("Error listing comptes bloqués:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  /**
+   * GET /api/comptes-bloques/:id - Détail d'un compte bloqué
+   * Utilise le format spécifique attendu par le frontend (CompteBloqueDetail)
+   */
+  app.get(
+    "/api/comptes-bloques/:id",
+    requireAuth,
+    requireAgenceAccess(),
+    async (req, res) => {
+      try {
+        const compte = await storage.getCompte(req.params.id);
+        if (!compte) {
+          return res.status(404).json({ message: "Compte non trouvé" });
+        }
+
+        // Vérifier si c'est bien un compte bloqué ?
+        // if (compte.typeCompte !== 'Bloqué') ... (Optionnel mais sécurisé)
+
+        const client = await storage.getClient(compte.clientId);
+        
+        // Structure alignée avec CompteBloqueDetail.tsx
+        // Note: tauxInteret et description ne sont pas dans la table comptes,
+        // ils viendraient de produitsCompte si un produit est lié
+        const transformed = {
+          id: compte.id,
+          numero_compte: compte.numeroCompte,
+          montant_initial: parseFloat(compte.soldeCourant || '0'),
+          montant_actuel: parseFloat(compte.soldeCourant || '0'),
+          taux_interet: 0, // TODO: récupérer depuis produit si compte.produitId existe
+          date_ouverture: compte.createdAt,
+          date_echeance: compte.blocageFin || null,
+          duree_mois: compte.blocageFin
+            ? Math.round((new Date(compte.blocageFin).getTime() - new Date(compte.createdAt!).getTime()) / (1000 * 60 * 60 * 24 * 30))
+            : 0,
+          statut: compte.statut,
+          penalite_retrait_anticipe: 5, // Default penalty
+          clients: client ? {
+             id: client.id,
+             nom: client.nom,
+             prenom: client.prenom,
+             phone: client.telephone,
+          } : null,
+          description: compte.blocageMotif || null // Use blocageMotif as description
+        };
+
+        res.json(addSnakeCaseAliasesDeep(transformed));
+      } catch (error: any) {
+        console.error("Error getting compte bloque detail:", error);
         res.status(500).json({ message: error.message });
       }
     }
@@ -961,7 +1038,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/depot",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1050,7 +1127,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/depot-initial",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     requireAgenceAccess(),
     async (req, res) => {
         try {
@@ -1118,7 +1195,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/retrait",
     requireAuth,
-    requireRole("admin", "chef", "caisse"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1223,7 +1300,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/bloquer",
     requireAuth,
-    requireRole("admin", "chef"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1274,7 +1351,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/debloquer",
     requireAuth,
-    requireRole("admin", "chef"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1341,7 +1418,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/transfert-agence",
     requireAuth,
-    requireRole("admin", "chef"),
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1450,7 +1527,7 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/cloturer",
     requireAuth,
-    requireRole("admin", "chef"), // Action critique
+    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), // Action critique
     async (req, res) => {
       try {
         const user = req.session.user;
@@ -1522,9 +1599,9 @@ export function registerComptesRoutes(app: Express) {
     async (req, res) => {
       try {
         const { id, type } = req.params;
-        const typeCompte = type as "Épargne" | "Courant" | "Bloqué";
+        const validTypes = [TypeCompte.SAVINGS, TypeCompte.CURRENT, TypeCompte.BLOCKED];
 
-        if (!["Épargne", "Courant", "Bloqué"].includes(typeCompte)) {
+        if (!validTypes.includes(type as any)) {
           return res.status(400).json({
             message: "Type de compte invalide",
             allowed: false,
@@ -1533,13 +1610,13 @@ export function registerComptesRoutes(app: Express) {
 
         const hasExisting = await comptesService.clientHasCompteOfType(
           id,
-          typeCompte
+          type as typeof TypeCompte[keyof typeof TypeCompte]
         );
 
         res.json({
           allowed: !hasExisting,
           reason: hasExisting
-            ? `Le client possède déjà un compte ${typeCompte}`
+            ? `Le client possède déjà un compte ${type}`
             : null,
         });
       } catch (error: any) {

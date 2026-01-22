@@ -6,6 +6,21 @@ import { useCompteSubscription } from '../../hooks/useRealTimeSubscription';
 import { toast, handleApiError } from '../../lib/toast';
 import AccountCard from './AccountCard';
 import AccountHistory from './AccountHistory';
+import { StatutCompte, type StatutCompteType, TypeCompte, MethodePaiement } from '@shared/enum/status-constants';
+
+// Mapping FR → EN pour envoi backend
+const TYPE_COMPTE_TO_EN: Record<string, string> = {
+  'Courant': TypeCompte.CURRENT,
+  'Épargne': TypeCompte.SAVINGS,
+  'Bloqué': TypeCompte.BLOCKED,
+};
+
+// Mapping EN → FR pour affichage UI
+const TYPE_COMPTE_TO_FR: Record<string, string> = {
+  [TypeCompte.CURRENT]: 'Courant',
+  [TypeCompte.SAVINGS]: 'Épargne',
+  [TypeCompte.BLOCKED]: 'Bloqué',
+};
 
 interface CompteBancaire {
   id: string;
@@ -21,7 +36,7 @@ interface CompteBancaire {
   taux_interet?: number;
   dateOuverture?: string;
   date_ouverture?: string;
-  statut: 'Actif' | 'Fermé' | 'Suspendu' | 'Clôturé' | 'EN_ATTENTE_PAIEMENT';
+  statut: StatutCompteType; // Strict EN only
   blocageActif?: boolean;
   blocage_actif?: boolean;
   blocageMotif?: string;
@@ -41,15 +56,19 @@ interface ClientAccountsProps {
 
 // Helper to normalize snake_case to camelCase response
 function normalizeCompte(c: any): CompteBancaire {
+  // Convert EN typeCompte from backend to FR for UI display
+  const rawType = c.typeCompte || c.type_compte || '';
+  const typeCompte = TYPE_COMPTE_TO_FR[rawType] || rawType;
+
   return {
     id: c.id,
     clientId: c.clientId || c.client_id,
-    typeCompte: c.typeCompte || c.type_compte,
+    typeCompte: typeCompte as 'Courant' | 'Épargne' | 'Bloqué',
     numeroCompte: c.numeroCompte || c.numero_compte || '',
     soldeCourant: c.soldeCourant || c.solde_courant || '0',
     tauxInteret: c.tauxInteret || c.taux_interet || 0,
     dateOuverture: c.dateOuverture || c.date_ouverture,
-    statut: c.statut || 'Actif',
+    statut: c.statut || StatutCompte.ACTIVE,
     blocageActif: c.blocageActif || c.blocage_actif || false,
     blocageMotif: c.blocageMotif || c.blocage_motif,
     blocageFin: c.blocageFin || c.blocage_fin,
@@ -84,7 +103,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
     typeCompte: 'Courant' as 'Courant' | 'Épargne' | 'Bloqué',
     soldeInitial: 0,
     tauxInteret: 0,
-    statut: 'Actif' as 'Actif' | 'Fermé' | 'Suspendu',
+    statut: StatutCompte.ACTIVE as StatutCompteType,
     methodePaiement: 'Espèces' as 'Espèces' | 'Mobile Money' | 'Virement' | 'Carte'
   });
 
@@ -140,7 +159,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       const payload = {
         clientId,
         agenceId: targetAgenceId,
-        typeCompte: formData.typeCompte,
+        typeCompte: TYPE_COMPTE_TO_EN[formData.typeCompte] || formData.typeCompte, // Convert FR to EN
         soldeInitial: formData.soldeInitial,
         tauxInteret: formData.tauxInteret,
       };
@@ -192,7 +211,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       setSelectedAccount(compte);
       
       if (action === 'suspend') {
-          setPendingAction(compte.statut === 'Suspendu' ? 'reactivate' : 'suspend');
+          setPendingAction(compte.statut === StatutCompte.SUSPENDED ? 'reactivate' : 'suspend');
           setShowActionConfirm(true);
       } else if (action === 'close') {
           setPendingAction('close');
@@ -257,7 +276,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
       typeCompte: 'Courant',
       soldeInitial: 0,
       tauxInteret: 0,
-      statut: 'Actif',
+      statut: StatutCompte.ACTIVE,
       methodePaiement: 'Espèces'
     });
   };
@@ -410,8 +429,9 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                         return !comptes.some(c => {
                              const cType = (c.typeCompte || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                              const isSameType = cType === normalizedType;
-                             // Tout statut qui n'est pas explicitement fermé/clôturé est considéré comme actif/en cours
-                             const isActive = !['clôturé', 'fermé', 'cloture', 'ferme'].includes((c.statut || '').toLowerCase());
+                             // Only closed/cancelled accounts are excluded
+                             const closedStatuses: string[] = [StatutCompte.CLOSED, StatutCompte.CANCELLED];
+                             const isActive = !closedStatuses.includes(c.statut);
                              return isSameType && isActive;
                         });
                     })

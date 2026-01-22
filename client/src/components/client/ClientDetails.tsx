@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
 import { useLocation } from 'wouter';
 import { DollarSign, Award, MapPin, Phone, Mail, User, Building2, ChevronRight, TrendingUp, Wallet, AlertTriangle } from 'lucide-react';
 import { Card, Modal, Button, Skeleton } from '../ui';
@@ -7,7 +7,7 @@ import ClientTags from './ClientTags';
 import { useQuery } from '@tanstack/react-query';
 
 interface ClientDetailsProps {
-    client: Client;
+    client: ClientWithIdentity;
 }
 
 interface AnalyticsData {
@@ -60,13 +60,13 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
   return (
     <>
     {/* ====== FROZEN CLIENT BANNER ====== */}
-    {['Inactif', 'Suspendu', 'Blacklisté'].includes(client.status || '') && (
+    {['INACTIVE', 'SUSPENDED', 'DELETED'].includes(client.statut || '') && (
         <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-3 animate-in slide-in-from-top duration-300">
             <div className="shrink-0 w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
                 <AlertTriangle className="text-red-400" size={20} />
             </div>
             <div>
-                <h4 className="text-red-400 font-bold text-sm">Client {client.status}</h4>
+                <h4 className="text-red-400 font-bold text-sm">Client {client.statut}</h4>
                 <p className="text-red-300/80 text-xs">Les comptes de ce client sont gelés. Les opérations de débit sont bloquées.</p>
             </div>
         </div>
@@ -183,26 +183,26 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
                    </div>
                </div>
                
-               {client.adresse && (
+               {client.adresseDomicile && (
                 <div className="bg-slate-800/30 rounded-lg p-2.5 border border-slate-700/30 flex items-center gap-3">
                     <div className="bg-slate-700/50 p-1.5 rounded-md">
                             <MapPin size={14} className="text-purple-400" />
                     </div>
                     <div className="overflow-hidden">
                         <p className="text-[10px] text-slate-500 uppercase">Adresse</p>
-                        <p className="text-sm font-medium text-slate-200 truncate">{client.adresse}</p>
+                        <p className="text-sm font-medium text-slate-200 truncate">{client.adresseDomicile}</p>
                     </div>
                 </div>
                )}
 
-               {(client.agence || (client as any).agence_nom) && (
+               {client.agence_nom && (
                 <div className="bg-slate-800/30 rounded-lg p-2.5 border border-slate-700/30 flex items-center gap-3">
                     <div className="bg-slate-700/50 p-1.5 rounded-md">
                             <Building2 size={14} className="text-blue-400" />
                     </div>
                     <div className="overflow-hidden">
                         <p className="text-[10px] text-slate-500 uppercase">Agence Affiliée</p>
-                        <p className="text-sm font-medium text-slate-200 truncate">{(client as any).agence_nom || client.agence}</p>
+                        <p className="text-sm font-medium text-slate-200 truncate">{client.agence_nom}</p>
                     </div>
                 </div>
                )}

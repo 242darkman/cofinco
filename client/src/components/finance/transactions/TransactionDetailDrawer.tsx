@@ -30,7 +30,7 @@ export interface TransactionDetails {
   amount: number;
   type: string;
   type_operation?: string;
-  status: 'Succès' | 'Échec' | 'En attente' | 'Annulé' | 'completed' | 'pending' | 'failed';
+  status: 'Succès' | 'Échec' | 'En attente' | 'Annulé' | 'completed' | 'pending' | 'failed' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'CANCELLED' | string;
   date: string | Date;
   client?: {
     name: string;

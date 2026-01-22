@@ -75,7 +75,9 @@ export function useLoge() {
 
   const { uploadFile, isUploading, progress } = useUpload({
     onSuccess: (response) => {
-      createDocumentRecord(response.objectPath, response.metadata);
+      if (response.objectPath) {
+        createDocumentRecord(response.objectPath, response.metadata);
+      }
     }
   });
 

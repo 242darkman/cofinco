@@ -1,11 +1,18 @@
 import { db } from "../db";
 import { credits } from "@shared/schema";
-import { sql, and, or, lt, inArray } from "drizzle-orm";
+import { sql, and, or, lt, inArray, eq } from "drizzle-orm";
+import {
+  validateCreditTransition,
+  CreditTransitionError,
+  CreditStatus,
+} from "@shared/machines/credit-workflow";
 
 /**
  * Cron Job: Update Credit Status to "En retard"
  * Runs hourly to ensure data integrity for overdue credits
  * Uses transactions for ACID compliance
+ *
+ * State Machine: ACTIVE -> LATE is allowed by credit-workflow.ts
  */
 export async function updateOverdueCredits() {
   const startTime = Date.now();
@@ -14,19 +21,15 @@ export async function updateOverdueCredits() {
   try {
     // Step 1: Find overdue credits using SQL for maximum performance
     // A credit is overdue if:
-    // - Status is 'Actif', 'En cours', or 'En_cours'
+    // - Status is 'ACTIVE' (Greenfield: only EN values)
     // - prochaine_echeance (next due date) is in the past
     const overdueCredits = await db
-      .select({ id: credits.id, numeroCredit: credits.numeroCredit })
+      .select({ id: credits.id, numeroCredit: credits.numeroCredit, statut: credits.statut })
       .from(credits)
       .where(
         and(
           // Only active credits can become overdue
-          or(
-            sql`${credits.statut} = 'Actif'`,
-            sql`${credits.statut} = 'En cours'`,
-            sql`${credits.statut} = 'En_cours'`
-          ),
+          sql`${credits.statut} = 'ACTIVE'`,
           // Next payment is overdue
           sql`${credits.prochaineEcheance} < NOW()`
         )
@@ -39,22 +42,42 @@ export async function updateOverdueCredits() {
 
     console.log(`[CRON] Found ${overdueCredits.length} overdue credits`);
 
-    // Step 2: Update credits in a transaction for ACID compliance
-    const creditIds = overdueCredits.map(c => c.id);
-    
+    // Step 2: Validate each credit can transition to LATE using state machine
+    const validCreditIds: string[] = [];
+    const skippedCredits: Array<{ id: string; reason: string }> = [];
+
+    for (const credit of overdueCredits) {
+      try {
+        // State Machine Guard: Validate transition ACTIVE -> LATE
+        validateCreditTransition(credit.statut, CreditStatus.LATE);
+        validCreditIds.push(credit.id);
+      } catch (error) {
+        if (error instanceof CreditTransitionError) {
+          skippedCredits.push({ id: credit.id, reason: error.message });
+          console.warn(`[CRON] Skipping credit ${credit.numeroCredit}: ${error.message}`);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (validCreditIds.length === 0) {
+      console.log('[CRON] No credits eligible for LATE status transition');
+      return { success: true, updated: 0, skipped: skippedCredits.length, duration: Date.now() - startTime };
+    }
+
+    // Step 3: Update credits in a transaction for ACID compliance
     await db.transaction(async (tx) => {
-      // Batch update all overdue credits
+      // Batch update all valid credits
       await tx
         .update(credits)
-        .set({ 
-          statut: 'En retard',
+        .set({
+          statut: CreditStatus.LATE, // Use standardized EN value
           updatedAt: new Date()
         })
-        .where(inArray(credits.id, creditIds));
+        .where(inArray(credits.id, validCreditIds));
 
-      // Log audit trail (if audit table exists, otherwise skip)
-      // TODO: Add audit logging if needed
-      console.log(`[CRON] Updated ${creditIds.length} credits to 'En retard' status`);
+      console.log(`[CRON] Updated ${validCreditIds.length} credits to 'LATE' status`);
     });
 
     const duration = Date.now() - startTime;
@@ -62,9 +85,10 @@ export async function updateOverdueCredits() {
 
     return {
       success: true,
-      updated: creditIds.length,
+      updated: validCreditIds.length,
+      skipped: skippedCredits.length,
       duration,
-      creditIds
+      creditIds: validCreditIds
     };
 
   } catch (error) {

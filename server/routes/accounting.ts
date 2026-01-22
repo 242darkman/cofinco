@@ -3,25 +3,26 @@ import { storage } from "../storage";
 import { insertCompteSchema, insertEcritureSchema, insertJournalSchema, insertDeclarationTvaSchema } from "@shared/schema";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
 
 export function registerAccountingRoutes(app: Express) {
 
   // 1. Plan Comptable (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/comptes", requireAuth, requireRole('admin', 'chef', 'comptable'), async (_req, res) => {
+  app.get("/api/comptabilite/comptes", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
     const comptes = await storage.getAllComptes();
     res.json(addSnakeCaseAliasesDeep(comptes));
   });
 
-  app.get("/api/comptabilite/plan-ohada", requireAuth, requireRole('admin', 'chef', 'comptable'), async (_req, res) => {
+  app.get("/api/comptabilite/plan-ohada", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
     // Alias for same endpoint if needed by legacy calls
     const comptes = await storage.getAllComptes();
     res.json(addSnakeCaseAliasesDeep(comptes));
   });
 
   // Create compte (roles: admin, comptable)
-  app.post("/api/comptabilite/comptes", requireAuth, requireRole('admin', 'comptable'), async (req, res) => {
+  app.post("/api/comptabilite/comptes", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
     try {
       const data = insertCompteSchema.parse(normalizeKeysDeep(req.body));
       const compte = await storage.createCompte(data);
@@ -39,13 +40,13 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 2. Journaux (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/journaux", requireAuth, requireRole('admin', 'chef', 'comptable'), async (_req, res) => {
+  app.get("/api/comptabilite/journaux", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
     const journaux = await storage.getAllJournaux();
     res.json(addSnakeCaseAliasesDeep(journaux));
   });
 
   // Create journal (roles: admin, comptable)
-  app.post("/api/comptabilite/journaux", requireAuth, requireRole('admin', 'comptable'), async (req, res) => {
+  app.post("/api/comptabilite/journaux", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
     try {
       const data = insertJournalSchema.parse(normalizeKeysDeep(req.body));
       const journal = await storage.createJournal(data);
@@ -63,7 +64,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 3. Ecritures (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/ecritures", requireAuth, requireRole('admin', 'chef', 'comptable'), async (req, res) => {
+  app.get("/api/comptabilite/ecritures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
     const filter = {
       journalId: req.query.journalId as string,
       dateDebut: req.query.dateDebut as string,
@@ -74,7 +75,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // Create écriture (roles: admin, comptable)
-  app.post("/api/comptabilite/ecritures", requireAuth, requireRole('admin', 'comptable'), async (req, res) => {
+  app.post("/api/comptabilite/ecritures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
     try {
       const body = normalizeKeysDeep(req.body) as any;
       // Validate Header
@@ -99,7 +100,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 4. Grand Livre (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/grand-livre/:compteId", requireAuth, requireRole('admin', 'chef', 'comptable'), async (req, res) => {
+  app.get("/api/comptabilite/grand-livre/:compteId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
     const { compteId } = req.params;
     const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
@@ -109,13 +110,13 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 5. TVA (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/declarations-tva", requireAuth, requireRole('admin', 'chef', 'comptable'), async (_req, res) => {
+  app.get("/api/comptabilite/declarations-tva", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
     const declarations = await storage.getDeclarationsTva();
     res.json(addSnakeCaseAliasesDeep(declarations));
   });
 
   // Create déclaration TVA (roles: admin, comptable)
-  app.post("/api/comptabilite/declarations-tva", requireAuth, requireRole('admin', 'comptable'), async (req, res) => {
+  app.post("/api/comptabilite/declarations-tva", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
     try {
       const data = insertDeclarationTvaSchema.parse(normalizeKeysDeep(req.body));
       const declaration = await storage.createDeclarationTva(data);
@@ -133,7 +134,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 6. Balance (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/balance", requireAuth, requireRole('admin', 'chef', 'comptable'), async (req, res) => {
+  app.get("/api/comptabilite/balance", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
     const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
     const balance = await storage.getBalance(dateDebut, dateFin);
@@ -141,20 +142,20 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 7. Stats Journaux (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/journaux-stats", requireAuth, requireRole('admin', 'chef', 'comptable'), async (_req, res) => {
+  app.get("/api/comptabilite/journaux-stats", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
     const stats = await storage.getJournauxStats();
     res.json(addSnakeCaseAliasesDeep(stats));
   });
 
   // 8. Bilan Synthetique (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/bilan-synthetique", requireAuth, requireRole('admin', 'chef', 'comptable'), async (req, res) => {
+  app.get("/api/comptabilite/bilan-synthetique", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
     const bilan = await storage.getBilan(dateFin);
     res.json(bilan);
   });
 
   // 9. Tableau de Trésorerie (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/tableau-tresorerie", requireAuth, requireRole('admin', 'chef', 'comptable'), async (req, res) => {
+  app.get("/api/comptabilite/tableau-tresorerie", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
     const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
 
@@ -201,7 +202,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 10. TAFIRE (Tableau Financier des Ressources et Emplois) (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/tafire", requireAuth, requireRole('admin', 'chef', 'comptable'), async (req, res) => {
+  app.get("/api/comptabilite/tafire", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
     const exercice = parseInt(req.query.exercice as string) || new Date().getFullYear();
     const dateDebut = `${exercice}-01-01`;
     const dateFin = `${exercice}-12-31`;

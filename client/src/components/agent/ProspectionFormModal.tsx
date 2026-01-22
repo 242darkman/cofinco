@@ -156,7 +156,7 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
       longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
       photoUrl: formData.photoUrl || undefined,
       observations: formData.observations.trim() || undefined,
-      statut: 'nouveau',
+      statut: 'NEW',
     };
 
     setLoading(true);

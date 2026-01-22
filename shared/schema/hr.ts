@@ -17,7 +17,7 @@ export const demandesConges = pgTable("demandes_conges", {
   dateDebut: date("date_debut").notNull(),
   dateFin: date("date_fin").notNull(),
   motif: text("motif"),
-  statut: varchar("statut").notNull().default("En attente"), // 'En attente', 'Approuvé', 'Refusé'
+  statut: varchar("statut").notNull().default("PENDING"), // 'PENDING', 'APPROVED', 'REJECTED'
   approuvePar: uuid("approuve_par"), // User ID qui a approuvé/refusé
   dateDecision: timestamp("date_decision"),
   commentaire: text("commentaire"), // Commentaire de l'approbateur
@@ -36,7 +36,7 @@ export const formations = pgTable("formations", {
   lieu: varchar("lieu"),
   description: text("description"),
   programme: text("programme"), // Détail du programme
-  statut: varchar("statut").notNull().default("Planifiée"), // 'Planifiée', 'En cours', 'Terminée', 'Annulée'
+  statut: varchar("statut").notNull().default("PLANNED"), // 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'
   capaciteMax: integer("capacite_max"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -78,7 +78,7 @@ export const candidatures = pgTable("candidatures", {
   experience: text("experience"), // Description de l'expérience
   formation: text("formation"), // Diplômes et certificats
   datePostulation: date("date_postulation").defaultNow().notNull(),
-  statut: varchar("statut").notNull().default("En attente"), // 'En attente', 'Entretien', 'Accepté', 'Refusé'
+  statut: varchar("statut").notNull().default("PENDING"), // 'PENDING', 'INTERVIEW', 'ACCEPTED', 'REJECTED'
   cvUrl: varchar("cv_url"), // Lien vers CV stocké
   lettreMotivationUrl: varchar("lettre_motivation_url"),
   notes: text("notes"), // Notes internes du recruteur
@@ -109,7 +109,7 @@ export const bulletinsPaie = pgTable("bulletins_paie", {
   pdfUrl: varchar("pdf_url"), // URL du PDF généré stocké dans Loge Cloud
   pdfHash: varchar("pdf_hash"), // Hash SHA256 pour vérifier l'intégrité
   genereParId: uuid("genere_par_id"), // User ID qui a généré
-  statut: varchar("statut").default("Brouillon"), // 'Brouillon', 'Validé', 'Payé'
+  statut: varchar("statut").default("DRAFT"), // 'DRAFT', 'VALIDATED', 'PAID'
   datePaiement: date("date_paiement"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -134,7 +134,7 @@ export const avantagesEmployes = pgTable("avantages_employes", {
   avantageId: integer("avantage_id").notNull().references(() => avantages.id),
   montant: integer("montant").notNull(), // Montant spécifique pour cet employé
   dateAttribution: date("date_attribution").defaultNow().notNull(),
-  statut: varchar("statut").default("Actif"), // 'Actif', 'Suspendu'
+  statut: varchar("statut").default("ACTIVE"), // 'ACTIVE', 'SUSPENDED'
 });
 
 // Suivi de présence

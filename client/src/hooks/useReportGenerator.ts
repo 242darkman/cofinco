@@ -55,7 +55,7 @@ export function useReportGenerator() {
   const applyClientFilters = (data: any[]) => {
     let filtered = data;
     if (filters.status !== 'all') {
-      filtered = filtered.filter((client) => client.status === filters.status);
+      filtered = filtered.filter((client) => client.statut === filters.status);
     }
     if (filters.segment !== 'all') {
       filtered = filtered.filter((client) => client.segment === filters.segment);
@@ -108,7 +108,7 @@ export function useReportGenerator() {
       clients: {
         title: 'Rapport des Clients',
         columns: ['Nom', 'Prénom', 'Téléphone', 'Email', 'Segment', 'Score', 'Statut'],
-        keys: ['nom', 'prenom', 'telephone', 'email', 'segment', 'score', 'status']
+        keys: ['nom', 'prenom', 'telephone', 'email', 'segment', 'score', 'statut']
       },
       credits: {
         title: 'Rapport des Crédits',

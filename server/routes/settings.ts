@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { insertSystemSettingsSchema, insertSecuritySettingsSchema, systemSettings, securitySettings } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
 import { db } from "../db";
@@ -76,7 +77,7 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  app.put("/api/system-settings", requireAuth, requireRole("admin"), async (req, res) => {
+  app.put("/api/system-settings", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const settings = parseWithSchema(insertSystemSettingsSchema, req.body);
       
@@ -150,7 +151,7 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  app.post("/api/settings/security", requireAuth, requireRole("admin"), async (req, res) => {
+  app.post("/api/settings/security", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const parsed = parseWithSchema(insertSecuritySettingsSchema, req.body);
       const [created] = await db.insert(securitySettings).values({
@@ -164,7 +165,7 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  app.put("/api/settings/security/:id", requireAuth, requireRole("admin"), async (req, res) => {
+  app.put("/api/settings/security/:id", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const parsed = parseWithSchema(insertSecuritySettingsSchema.partial(), req.body);
       const [updated] = await db.update(securitySettings)
@@ -184,7 +185,7 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // ========== RÉINITIALISATION PLATEFORME (Admin Only) ==========
-  app.post("/api/admin/reset-platform", requireAuth, requireRole("admin"), async (req, res) => {
+  app.post("/api/admin/reset-platform", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { confirmation } = req.body;
       
@@ -283,7 +284,7 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // ========== RÉINITIALISATION PAR AGENCE (Admin Only) ==========
-  app.post("/api/admin/reset-agence/:agenceId", requireAuth, requireRole("admin"), async (req, res) => {
+  app.post("/api/admin/reset-agence/:agenceId", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
     const { agenceId } = req.params;
     const { confirmation } = req.body;
 

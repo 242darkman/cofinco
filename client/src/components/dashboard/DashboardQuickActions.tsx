@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Building2, Plus, DollarSign, Banknote, FileText, ChevronDown, Check, MapPin } from 'lucide-react';
 import { Button } from '../ui';
 import { useAgence } from '../../contexts/AgenceContext';
+import { TypeAgence } from '@shared/enum/status-constants';
 
 export interface DashboardQuickActionsProps {
   onModuleChange?: (module: string) => void;
@@ -74,9 +75,9 @@ export default function DashboardQuickActions({ onModuleChange, onQuickAction, t
                   >
                     <div className={`
                       w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
-                      ${ua.agence.typeAgence === 'Principale'
+                      ${ua.agence.typeAgence === TypeAgence.MAIN
                         ? 'bg-amber-500/20 text-amber-400'
-                        : ua.agence.typeAgence === 'Kiosque'
+                        : ua.agence.typeAgence === TypeAgence.KIOSK
                           ? 'bg-emerald-500/20 text-emerald-400'
                           : 'bg-blue-500/20 text-blue-400'
                       }

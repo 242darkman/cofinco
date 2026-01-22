@@ -91,72 +91,70 @@ describe('Account Opening & Activation Workflow', () => {
   });
 
   describe('createCompteWithInitialDeposit', () => {
-    
-    it('should create an account with EN_ATTENTE_PAIEMENT status when mode is "Espèces"', async () => {
-      // Setup
+
+    it('should create an account with PENDING_ACTIVATION status when mode is "CASH"', async () => {
+      // Setup - use correct function signature: (data, userId)
       const payload = {
         clientId: 'client-1',
-        typeCompte: 'Epargne',
+        typeCompte: 'SAVINGS' as const,
+        agenceId: 'agence-1',
         montantInitial: 5000,
-        modePaiement: 'Espèces',
-        pays: 'Congo',
-        ville: 'Brazzaville'
+        modePaiement: 'CASH' as const,
       };
 
-      // Execute
-      await comptesService.createCompteWithInitialDeposit(payload as any, 'user-1', 'agence-1');
+      // Execute - createCompteWithInitialDeposit takes (data, userId) not (data, userId, agenceId)
+      await comptesService.createCompteWithInitialDeposit(payload, 'user-1');
 
       // Assert
       // 1. Verify db.insert was called for Comptes table (via tx)
       expect(mockTx.insert).toHaveBeenCalledWith(comptes);
-      
+
       // 2. Verify values passed contain correct status
       const insertCall = vi.mocked(mockValuesSpy).mock.calls[0];
       const insertedData = insertCall[0];
       expect(insertedData).toMatchObject({
-        statut: 'EN_ATTENTE_PAIEMENT',
-        soldeCourant: '0', // Initial balance should be 0 until paid? Or stored but not active? 
-                      // In logic: logic usually sets solde to 0 and solde_initial to amount?
-                      // Let's check logic: actually schema defaults solde.
+        statut: 'PENDING_ACTIVATION',
+        soldeCourant: '5000', // For PENDING_ACTIVATION, soldeCourant stores the expected initial deposit
       });
-      // Note: My implementation sets 'en_attente_paiement' so we expect that.
     });
 
-    it('should activate account immediately when mode is "Virement"', async () => {
-       // Setup
+    it('should activate account immediately when mode is "TRANSFER"', async () => {
+       // Setup - use correct function signature
        const payload = {
          clientId: 'client-1',
-         typeCompte: 'Epargne',
+         typeCompte: 'SAVINGS' as const,
+         agenceId: 'agence-1',
          montantInitial: 5000,
-         modePaiement: 'Virement',
+         modePaiement: 'TRANSFER' as const,
          compteSourceId: 'source-1'
        };
 
        const mockSourceAccount = {
          id: 'source-1',
          soldeCourant: '100000',
-         statut: 'Actif'
+         statut: 'ACTIVE',
+         numeroCompte: 'CE-12345678-0001'
        };
 
        // Mock finding source account via TX
        mockTx.select.mockImplementation(() => createMockBuilder([mockSourceAccount]));
 
        // Execute
-       await comptesService.createCompteWithInitialDeposit(payload as any, 'user-1', 'agence-1');
+       await comptesService.createCompteWithInitialDeposit(payload, 'user-1');
 
        // Assert
-       // 1. Check account creation Status = Actif
+       // 1. Check account creation Status = ACTIVE
        const insertCalls = vi.mocked(mockValuesSpy).mock.calls;
        // We expect multiple inserts? (Compte + Transaction?)
        // Actually `executeWithLedger` is called for transfer.
        // The account creation is likely the first insert.
-       
-       const accountInsert = insertCalls.find((call: any) => call[0].clientId === 'client-1');
+
+       const accountInsert = insertCalls.find((call: unknown[]) => (call[0] as Record<string, unknown>).clientId === 'client-1');
        expect(accountInsert).toBeDefined();
-       expect(accountInsert[0].statut).toBe('Actif');
+       expect((accountInsert as unknown[])[0]).toHaveProperty('statut', 'ACTIVE');
 
        // 2. Check Debit/Credit Transactions Logic (Mocked Ledger)
-       // Since we verified status is Actif and it didn't throw, and we mock ledger,
+       // Since we verified status is ACTIVE and it didn't throw, and we mock ledger,
        // we assume flow passed.
     });
 
@@ -164,23 +162,25 @@ describe('Account Opening & Activation Workflow', () => {
         // Setup
         const payload = {
           clientId: 'client-1',
-          typeCompte: 'Epargne',
+          typeCompte: 'SAVINGS' as const,
+          agenceId: 'agence-1',
           montantInitial: 50000, // High amount
-          modePaiement: 'Virement',
+          modePaiement: 'TRANSFER' as const,
           compteSourceId: 'source-mini'
         };
- 
+
         const mockSourceAccount = {
           id: 'source-mini',
           soldeCourant: '1000', // Low balance
-          statut: 'Actif'
+          statut: 'ACTIVE',
+          numeroCompte: 'CE-87654321-0001'
         };
- 
+
         // Mock finding source account via TX
         mockTx.select.mockImplementation(() => createMockBuilder([mockSourceAccount]));
- 
+
         // Execute & Assert
-        await expect(comptesService.createCompteWithInitialDeposit(payload as any, 'user-1', 'agence-1'))
+        await expect(comptesService.createCompteWithInitialDeposit(payload, 'user-1'))
           .rejects.toThrow(/Solde insuffisant/);
     });
   });
@@ -191,37 +191,38 @@ describe('Account Opening & Activation Workflow', () => {
           const compteId = 'pending-1';
           const mockPendingAccount = {
               id: compteId,
-              statut: 'EN_ATTENTE_PAIEMENT',
+              statut: 'PENDING_ACTIVATION',
               clientId: 'client-1',
-              // solde: '0'
+              soldeCourant: '5000',
+              numeroCompte: 'CE-12345678-0001',
+              typeCompte: 'Épargne'
           };
 
           // Mock finding the account via TX
           mockTx.select.mockImplementation(() => createMockBuilder([mockPendingAccount]));
-          
+
           // Mock finding session caisse (if checked) - Mocking simple DB select
           // Assuming service checks session validity?
-          
-          // Execute
+
+          // Execute - payerDepotInitialCompte takes (compteId, { montant, sessionCaisseId, userId })
           const result = await comptesService.payerDepotInitialCompte(compteId, {
               montant: 5000,
               sessionCaisseId: 'session-1',
-              modePaiement: 'Espèces',
               userId: 'user-admin'
           });
 
           // Assert
-          // 1. Account Update to Actif
+          // 1. Account Update to ACTIVE
           const updateCalls = mockTx.update.mock.calls;
-          expect(updateCalls.some((call: any) => call[0] === comptes)).toBe(true);
-          
+          expect(updateCalls.some((call: unknown[]) => call[0] === comptes)).toBe(true);
+
           const setCalls = mockSetSpy.mock.calls;
-          const statusUpdate = setCalls.find((call: any) => call[0].statut === 'Actif');
+          const statusUpdate = setCalls.find((call: unknown[]) => (call[0] as Record<string, unknown>).statut === 'ACTIVE');
           expect(statusUpdate).toBeDefined();
 
           // 2. Transaction Creation (via Ledger mock callback)
           const insertCalls = mockTx.insert.mock.calls;
-          const txInsert = insertCalls.find((call: any) => call[0] === transactionsCompte);
+          const txInsert = insertCalls.find((call: unknown[]) => call[0] === transactionsCompte);
           expect(txInsert).toBeDefined();
 
           // 3. Invoice Creation
@@ -234,15 +235,17 @@ describe('Account Opening & Activation Workflow', () => {
       it('should throw if account is already active', async () => {
           const mockActiveAccount = {
               id: 'active-1',
-              statut: 'Actif'
+              statut: 'ACTIVE',
+              soldeCourant: '10000',
+              numeroCompte: 'CE-87654321-0001'
           };
           // Mock txn select
           mockTx.select.mockImplementation(() => createMockBuilder([mockActiveAccount]));
 
+          // payerDepotInitialCompte takes (compteId, { montant, sessionCaisseId, userId })
           await expect(comptesService.payerDepotInitialCompte('active-1', {
               montant: 5000,
               sessionCaisseId: 's1',
-              modePaiement: 'Espèces',
               userId: 'u1'
           })).rejects.toThrow();
       });

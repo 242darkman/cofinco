@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins } from 'lucide-react';
-import { OTPValidationSimple } from '../../auth/OTPValidationSimple';
-import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
+import { PhysicalConfirmationStep, PhysicalConfirmationData } from '../../auth/PhysicalConfirmationStep';
 import { Card, Button, Badge } from '@/components/ui';
-import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi, securityConfigApi, SecurityConfigResponse } from '../../../lib/api-client';
+import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
@@ -13,6 +12,7 @@ import { SkeletonCard } from '../../ui/Skeleton';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
+import { StatutCredit, TypeCompte } from '@shared/enum/status-constants';
 
 interface Client {
   id: string;
@@ -54,8 +54,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
-  const [otpData, setOtpData] = useState<any>(null);
+  const [showPhysicalConfirmation, setShowPhysicalConfirmation] = useState(false);
+  const [pendingOperationData, setPendingOperationData] = useState<any>(null);
   const [creditsActifs, setCreditsActifs] = useState<any[]>([]);
   const [creditSelectionne, setCreditSelectionne] = useState<any>(null);
   const [prochaineEcheance, setProchaineEcheance] = useState<any>(null);
@@ -67,10 +67,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [montantError, setMontantError] = useState<string | null>(null);
   const [lastOperationData, setLastOperationData] = useState<any>(null);
 
-  // Security configuration states
-  const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
-  const [showPresenceModal, setShowPresenceModal] = useState(false);
-  const [presenceVerified, setPresenceVerified] = useState<PresenceConfirmationData | null>(null);
+  // Physical confirmation state (replaces OTP)
+  const [confirmationData, setConfirmationData] = useState<PhysicalConfirmationData | null>(null);
 
   // Universal Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -103,25 +101,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setBilletage({});
   }, []);
 
-  // Charger la configuration de sécurité au montage
-  useEffect(() => {
-    const loadSecurityConfig = async () => {
-      try {
-        const config = await securityConfigApi.getConfig();
-        setSecurityConfig(config);
-      } catch (error) {
-        console.error('Erreur chargement config sécurité:', error);
-        // Par défaut: OTP désactivé, présence requise pour retraits
-        setSecurityConfig({
-          otpEnabled: false,
-          requireAccountHolderPresence: true,
-          operationsRequiringPresence: ['Retrait', 'Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine'],
-          presenceVerificationThreshold: 0
-        });
-      }
-    };
-    loadSecurityConfig();
-  }, []);
+  // NOTE: OTP/Security config removed - Physical Confirmation is now always used for sensitive operations
 
   // Validation du montant
   const validateMontant = useCallback((value: string): boolean => {
@@ -178,7 +158,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   // Charger les crédits actifs via api-client
   const chargerCreditsActifs = useCallback(async (clientId: string) => {
     try {
-      const credits = await creditApi.getAll({ clientId, statut: 'Actif' });
+      const credits = await creditApi.getAll({ clientId, statut: StatutCredit.ACTIVE });
       setCreditsActifs(credits || []);
     } catch (error) {
       console.error('Erreur chargement crédits:', error);
@@ -241,19 +221,19 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const getCompteIdForOperation = useCallback((typeOp: TypeDepot | TypeRetrait | null): string | undefined => {
     if (!comptesClient.length) return undefined;
 
-    let typeCompte: string | null = null;
+    let targetType: string | null = null;
     if (typeOp === 'Compte Courant' || typeOp === 'Retrait Compte Courant') {
-      typeCompte = 'Courant';
+      targetType = TypeCompte.CURRENT;
     } else if (typeOp === 'Compte Épargne' || typeOp === 'Retrait Épargne') {
-      typeCompte = 'Epargne';
+      targetType = TypeCompte.SAVINGS;
     } else if (typeOp === 'Compte Bloqué') {
-      typeCompte = 'Bloqué';
+      targetType = TypeCompte.BLOCKED;
     }
 
-    if (typeCompte) {
+    if (targetType) {
       const compte = comptesClient.find(c => {
         const ct = c.type_compte || c.typeCompte || '';
-        return ct === typeCompte || ct.toLowerCase().includes(typeCompte!.toLowerCase());
+        return ct === targetType;
       });
       return compte?.id;
     }
@@ -285,16 +265,16 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setShowConfirmDialog(true);
   }, [typeOperation, montant, typeDepot, typeRetrait, validateMontant]);
 
-  // Vérifier si l'opération nécessite une validation spéciale
-  const requiresPresenceVerification = useCallback((opType: string, subType?: string): boolean => {
-    if (!securityConfig?.requireAccountHolderPresence) return false;
-    const typeToCheck = subType || opType;
-    return securityConfig.operationsRequiringPresence.some(
-      op => op.toLowerCase() === typeToCheck.toLowerCase() || opType.toLowerCase() === 'retrait'
-    );
-  }, [securityConfig]);
+  // Vérifier si l'opération nécessite une confirmation physique (retraits et montants élevés)
+  const requiresPhysicalConfirmation = useCallback((opType: string, amount: number): boolean => {
+    // Retraits toujours confirmés physiquement
+    if (opType === 'Retrait') return true;
+    // Dépôts > 500 000 FCFA aussi (anti-blanchiment)
+    if (amount >= 500_000) return true;
+    return false;
+  }, []);
 
-  // Confirmer et décider du type de validation (OTP, présence, ou bypass)
+  // Confirmer et décider du type de validation (physique ou direct)
   const confirmerPreparation = useCallback(async () => {
     setShowConfirmDialog(false);
     setLoading(true);
@@ -305,6 +285,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
 
       // Trouver le compte associé à ce type d'opération
       const compteId = getCompteIdForOperation(typeDetaille);
+      const parsedMontant = parseFloat(montant);
 
       const operationData = {
         session_id: sessionId,
@@ -312,9 +293,9 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         compte_id: compteId,
         type_operation: typeOperation,
         sous_type_operation: typeDetaille,
-        montant: parseFloat(montant),
-        mode_paiement: 'Espèces',
-        type_paiement: 'Espèces',
+        montant: parsedMontant,
+        mode_paiement: 'CASH',
+        type_paiement: 'CASH',
         reference: reference,
         description: sanitizeInput(description) || `${typeOperation} - ${typeDetaille}`,
         details_billetage: Object.keys(billetage).length > 0 ? billetage : undefined,
@@ -325,19 +306,15 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         }
       };
 
-      setOtpData({ operation: operationData, type: 'caisse_especes' });
+      setPendingOperationData(operationData);
 
-      // Décider du type de validation selon la configuration
-      const isWithdrawal = requiresPresenceVerification(typeOperation!, typeDetaille || undefined);
-
-      if (securityConfig?.otpEnabled) {
-        // OTP activé - utiliser la validation OTP
-        setShowOTP(true);
-      } else if (isWithdrawal) {
-        // OTP désactivé mais c'est un retrait - exiger la présence du titulaire
-        setShowPresenceModal(true);
+      // Décider du type de validation
+      if (requiresPhysicalConfirmation(typeOperation!, parsedMontant)) {
+        // Retraits ou montants élevés: confirmation physique requise
+        setShowPhysicalConfirmation(true);
+        setLoading(false);
       } else {
-        // OTP désactivé et c'est un dépôt - exécuter directement
+        // Petits dépôts: exécution directe
         setLoading(false);
         await validerOperationDirect(operationData);
       }
@@ -345,12 +322,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       const errorMessage = handleApiError(error, 'Erreur lors de la préparation');
       toast.error(errorMessage);
       setLoading(false);
-    } finally {
-      if (securityConfig?.otpEnabled || requiresPresenceVerification(typeOperation!, typeDepot || typeRetrait || undefined)) {
-        setLoading(false);
-      }
     }
-  }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, description, billetage, getCompteIdForOperation, securityConfig, requiresPresenceVerification]);
+  }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, description, billetage, getCompteIdForOperation, requiresPhysicalConfirmation]);
 
   // Fonction centrale pour exécuter l'opération (utilisée par tous les modes de validation)
   const executeOperation = useCallback(async (operationData: any, loadingId?: string | number) => {
@@ -419,38 +392,25 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     }
   }, [executeOperation]);
 
-  // Valider l'opération après confirmation de présence du titulaire
-  const validerOperationAvecPresence = useCallback(async (presenceData: PresenceConfirmationData) => {
-    const loadingId = toast.loading('Traitement du retrait en cours...');
-    setShowPresenceModal(false);
-    setPresenceVerified(presenceData); // Stocker pour affichage UI
+  // Valider l'opération après confirmation physique de l'agent
+  const validerOperationAvecConfirmation = useCallback(async (physicalData: PhysicalConfirmationData) => {
+    const loadingId = toast.loading('Traitement de l\'opération en cours...');
+    setShowPhysicalConfirmation(false);
+    setConfirmationData(physicalData); // Stocker pour affichage UI
     setLoading(true);
 
     try {
-      // Ajouter les données de confirmation de présence à l'opération (traçabilité)
-      const operationAvecPresence = {
-        ...otpData.operation,
-        presence_verification: presenceData  // Stocké en DB pour audit
+      // Ajouter les données de confirmation physique à l'opération (traçabilité)
+      const operationAvecConfirmation = {
+        ...pendingOperationData,
+        physical_confirmation: physicalData  // Stocké en DB pour audit
       };
 
-      await executeOperation(operationAvecPresence, loadingId);
+      await executeOperation(operationAvecConfirmation, loadingId);
     } finally {
       setLoading(false);
     }
-  }, [otpData, executeOperation]);
-
-  // Valider l'opération après OTP
-  const validerOperation = useCallback(async (code: string) => {
-    const loadingId = toast.loading('Traitement de l\'opération en cours...');
-    setLoading(true);
-
-    try {
-      await executeOperation(otpData.operation, loadingId);
-    } finally {
-      setLoading(false);
-      setShowOTP(false);
-    }
-  }, [otpData, executeOperation]);
+  }, [pendingOperationData, executeOperation]);
 
   // Réinitialiser le formulaire
   const reinitialiserFormulaire = useCallback(() => {
@@ -461,14 +421,14 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     setMontant('');
     setDescription('');
     setSearchTerm('');
-    setOtpData(null);
+    setPendingOperationData(null);
     setCreditSelectionne(null);
     setTontineSelectionnee(null);
     setProchaineEcheance(null);
     setBilletage({});
     setShowBilletage(false);
     setMontantError(null);
-    setPresenceVerified(null);
+    setConfirmationData(null);
   }, []);
 
   // Fonction pour afficher le reçu via le modal universel
@@ -499,7 +459,7 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         }
       ],
       total: lastOperationData.montant,
-      modePaiement: 'Espèces',
+      modePaiement: 'CASH',
       devise: 'FCFA'
     };
     
@@ -622,8 +582,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                   {/* Success Message */}
 
 
-                  {/* Presence Verification Indicator */}
-                  {presenceVerified && typeOperation === 'Retrait' && (
+                  {/* Physical Confirmation Indicator */}
+                  {confirmationData && (
                     <div
                       className="bg-blue-950/30 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2"
                       role="status"
@@ -632,21 +592,21 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                         <div className="p-1 rounded-full bg-blue-500/20">
                           <CheckCircle size={12} className="text-blue-400" />
                         </div>
-                        <span className="text-xs font-semibold text-blue-300">Presence verifiee</span>
+                        <span className="text-xs font-semibold text-blue-300">Confirmation physique</span>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-[10px] text-blue-300 border border-blue-500/20">
-                          {presenceVerified.verificationMethod === 'piece_identite' && 'Piece d\'identite'}
-                          {presenceVerified.verificationMethod === 'reconnaissance_visuelle' && 'Client connu'}
-                          {presenceVerified.verificationMethod === 'signature' && 'Signature'}
+                          {confirmationData.verificationMethod === 'piece_identite' && "Pièce d'identité"}
+                          {confirmationData.verificationMethod === 'reconnaissance_visuelle' && 'Client connu'}
+                          {confirmationData.verificationMethod === 'signature' && 'Signature'}
                         </span>
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-300 border border-emerald-500/20">
-                          Identite confirmee
+                          Identité confirmée
                         </span>
                       </div>
-                      {presenceVerified.agentNotes && (
+                      {confirmationData.agentNotes && (
                         <p className="text-[10px] text-slate-400 mt-2 italic">
-                          Note: {presenceVerified.agentNotes}
+                          Note: {confirmationData.agentNotes}
                         </p>
                       )}
                     </div>
@@ -957,30 +917,15 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         cancelText="Annuler"
       />
 
-      {/* OTP Validation (si OTP activé) */}
-      {showOTP && otpData && selectedClient && securityConfig?.otpEnabled && (
-        <OTPValidationSimple
-          isOpen={showOTP}
-          onClose={() => setShowOTP(false)}
-          onValidate={(isValid) => {
-            if (isValid) validerOperation('valid');
-          }}
-          phoneNumber={selectedClient.telephone || selectedClient.phone || ''}
-          generatedCode="123456"
-          operationType={typeOperation || ''}
-          amount={parseFloat(montant)}
-        />
-      )}
-
-      {/* Account Holder Presence Modal (pour retraits quand OTP désactivé) */}
-      {showPresenceModal && otpData && selectedClient && (
-        <AccountHolderPresenceModal
-          isOpen={showPresenceModal}
-          onClose={() => setShowPresenceModal(false)}
-          onConfirm={validerOperationAvecPresence}
+      {/* Physical Confirmation Modal (retraits et montants élevés) */}
+      {showPhysicalConfirmation && pendingOperationData && selectedClient && (
+        <PhysicalConfirmationStep
+          isOpen={showPhysicalConfirmation}
+          onClose={() => setShowPhysicalConfirmation(false)}
+          onConfirm={validerOperationAvecConfirmation}
           clientName={`${selectedClient.nom} ${selectedClient.prenom || ''}`}
           clientPhone={selectedClient.telephone || selectedClient.phone}
-          operationType={typeRetrait || typeOperation || 'Retrait'}
+          operationType={typeRetrait || typeDepot || typeOperation || 'Opération'}
           amount={parseFloat(montant)}
           isLoading={loading}
         />

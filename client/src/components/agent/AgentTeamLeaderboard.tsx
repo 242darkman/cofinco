@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Star, TrendingUp, Award, Zap, Target, Crown } from 'lucide-react';
 import { agentTerrainApi } from '../../lib/api-client';
+import { StatutUser } from '@shared/enum/status-constants';
 
 interface AgentRanking {
   id: string;
@@ -37,7 +38,7 @@ export default function AgentTeamLeaderboard() {
       const dateFilter = getDateFilter();
 
       const agents = await agentTerrainApi.getAllList();
-      const actifs = (agents || []).filter((agent: any) => agent.statut === 'Actif');
+      const actifs = (agents || []).filter((agent: any) => agent.statut === StatutUser.ACTIVE);
 
       if (!actifs || actifs.length === 0) {
         setRankings([]);

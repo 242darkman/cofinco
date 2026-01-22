@@ -8,6 +8,7 @@ import { formatMoney } from '../../../lib/format';
 import { validateAmount, validateRequired, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { Button, IconButton, Card, SelectField } from '../../ui';
+import { StatutClient, StatutCompte, TypeCompte as TypeCompteEnum, FrequenceVirement } from '@shared/enum/status-constants';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', textColor: 'text-yellow-500', prefix: '+242 05/06' },
@@ -54,9 +55,54 @@ interface EpargneAccountFormProps {
   clientId?: string;
 }
 
-type TypeCompte = 'Courant' | 'Épargne' | 'Bloqué';
-type ModeOuverture = 'Espèces' | 'Virement' | 'Mobile Money';
-type FrequenceVersement = 'Hebdomadaire' | 'Bimensuel' | 'Mensuel' | 'Trimestriel';
+// Types utilisant les valeurs EN (alignées avec le backend)
+type TypeCompte = 'CURRENT' | 'SAVINGS' | 'BLOCKED';
+type ModeOuverture = 'CASH' | 'TRANSFER' | 'MOBILE_MONEY';
+type FrequenceVersement = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY';
+
+// Labels FR pour l'affichage UI
+const TYPE_COMPTE_LABELS: Record<TypeCompte, string> = {
+  'CURRENT': 'Courant',
+  'SAVINGS': 'Épargne',
+  'BLOCKED': 'Bloqué',
+};
+
+const TYPE_COMPTE_DESCRIPTIONS: Record<TypeCompte, string> = {
+  'CURRENT': 'Opérations quotidiennes',
+  'SAVINGS': 'Économies avec intérêts',
+  'BLOCKED': 'Épargne à terme fixe',
+};
+
+const FREQUENCE_LABELS: Record<FrequenceVersement, string> = {
+  'WEEKLY': 'Chaque semaine',
+  'BIWEEKLY': 'Toutes les 2 semaines',
+  'MONTHLY': 'Chaque mois',
+  'QUARTERLY': 'Chaque trimestre',
+};
+
+// Helper pour valider les valeurs de type compte
+const normalizeTypeCompte = (value: string): TypeCompte => {
+  if (value === TypeCompteEnum.CURRENT) return 'CURRENT';
+  if (value === TypeCompteEnum.SAVINGS) return 'SAVINGS';
+  if (value === TypeCompteEnum.BLOCKED) return 'BLOCKED';
+  return 'CURRENT';
+};
+
+interface CreateAccountPayload {
+  clientId: string;
+  typeCompte: TypeCompte;
+  produitId?: string;
+  soldeInitial: number;
+  modePaiement: ModeOuverture;
+  compteSourceId?: string;
+  blocageActif: boolean;
+  blocageMotif?: string;
+  blocageReference?: string;
+  versementAutoActif: boolean;
+  versementAutoMontant?: number;
+  versementAutoFrequence?: FrequenceVersement;
+  versementAutoJour?: number;
+}
 
 export default function EpargneAccountForm({ onClose, onSuccess, clientId }: EpargneAccountFormProps) {
   const { mobileMoneyEnabled, mobileMoneyMessage } = useFeatureFlags();
@@ -85,10 +131,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
   const [formData, setFormData] = useState({
     client_id: clientId || '',
-    type_compte: 'Courant' as TypeCompte,
+    type_compte: 'CURRENT' as TypeCompte,
     produit_id: '',
     solde_initial: '',
-    mode_ouverture: 'Espèces' as ModeOuverture,
+    mode_ouverture: 'CASH' as ModeOuverture,
     compte_source_id: '',
     reference_paiement: '',
     date_echeance: '',
@@ -96,7 +142,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     notes: '',
     versement_auto_active: false,
     versement_auto_montant: '',
-    versement_auto_frequence: 'Mensuel' as FrequenceVersement,
+    versement_auto_frequence: 'MONTHLY' as FrequenceVersement,
     versement_auto_jour: '28'
   });
 
@@ -104,7 +150,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     setLoadingClients(true);
     try {
       const data = await clientApi.getAllList();
-      const activeClients = Array.isArray(data) ? data.filter((c: any) => c.status === 'Actif') : [];
+      const activeClients = Array.isArray(data) ? data.filter((c: any) => (c.statut || c.status) === StatutClient.ACTIVE) : [];
       setClients(activeClients);
     } catch (error) {
       const errorMessage = handleApiError(error, 'Erreur lors du chargement des clients');
@@ -117,6 +163,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const loadProduits = useCallback(async (typeCompte: TypeCompte) => {
     setLoadingProduits(true);
     try {
+      // typeCompte is already in EN format
       const data = await compteEpargneApi.getProduits({ typeCompte });
       setProduits(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -131,34 +178,35 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const loadComptesClient = useCallback(async (clientIdParam: string) => {
     try {
       const data = await compteEpargneApi.getByClient(clientIdParam);
-      // Fix: Include all accounts that are not permanently closed to prevent duplicates
-      // This includes 'Actif', 'Suspendu' and 'EN_ATTENTE_PAIEMENT'
       const activeComptes = Array.isArray(data) ? data.filter((c: any) => {
           const status = c.statut as Compte['statut'] | undefined;
           if (!status) return false;
-          
-          // Strict check against known closed statuses
-          return status !== 'Clôturé';
+
+          return status !== StatutCompte.CLOSED;
       }) : [];
       setComptesExistants(activeComptes);
-      
+
       // Check eligibility for internal transfer
       const isVirementEligible = activeComptes.some((c: any) => {
-        const type = (c.type_compte || c.typeCompte || '').toLowerCase();
+        const typeBackend = c.type_compte || c.typeCompte || '';
+        const typeEN = normalizeTypeCompte(typeBackend);
         const soldeValue = c.solde !== undefined ? c.solde : c.solde_courant;
         const solde = typeof soldeValue === 'number' ? soldeValue : parseFloat(String(soldeValue || 0));
-        return type === 'courant' && solde > 0;
+        return typeEN === 'CURRENT' && solde > 0;
       });
 
-      // Reset mode_ouverture to 'Espèces' if virement is no longer eligible
-      if (!isVirementEligible && formData.mode_ouverture === 'Virement') {
-        setFormData(prev => ({ ...prev, mode_ouverture: 'Espèces' }));
+      // Reset mode_ouverture to 'CASH' if transfer is no longer eligible
+      if (!isVirementEligible && formData.mode_ouverture === 'TRANSFER') {
+        setFormData(prev => ({ ...prev, mode_ouverture: 'CASH' }));
       }
 
       // Auto-sélectionner un type disponible si celui par défaut est déjà possédé
-      const ownedTypes = activeComptes.map((c: any) => c.typeCompte || c.type_compte);
-      if (ownedTypes.includes(formData.type_compte)) {
-        const available = (['Courant', 'Épargne', 'Bloqué'] as TypeCompte[]).find(t => !ownedTypes.includes(t));
+      const ownedTypesEN = activeComptes.map((c: any) => {
+        const typeBackend = c.typeCompte || c.type_compte || '';
+        return normalizeTypeCompte(typeBackend);
+      });
+      if (ownedTypesEN.includes(formData.type_compte)) {
+        const available = (['CURRENT', 'SAVINGS', 'BLOCKED'] as TypeCompte[]).find(t => !ownedTypesEN.includes(t));
         if (available) {
           setFormData(prev => ({ ...prev, type_compte: available }));
         }
@@ -195,9 +243,9 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
   const generateNumeroCompte = useCallback(() => {
     const prefixes: Record<TypeCompte, string> = {
-      'Courant': 'CRT',
-      'Épargne': 'EPG',
-      'Bloqué': 'BLQ'
+      'CURRENT': 'CRT',
+      'SAVINGS': 'EPG',
+      'BLOCKED': 'BLQ'
     };
     const prefix = prefixes[formData.type_compte];
     const timestamp = Date.now().toString().slice(-8);
@@ -215,7 +263,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     }
 
     // Internal transfer validation
-    if (formData.mode_ouverture === 'Virement') {
+    if (formData.mode_ouverture === 'TRANSFER') {
       if (!formData.compte_source_id) {
         newErrors.compte_source_id = 'Compte source requis';
       } else {
@@ -240,7 +288,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     }
 
     // Blocked account validation
-    if (formData.type_compte === 'Bloqué') {
+    if (formData.type_compte === 'BLOCKED') {
       if (!formData.date_echeance) {
         newErrors.date_echeance = "Date d'échéance requise";
       } else {
@@ -280,11 +328,11 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       }
       
       const jour = parseInt(formData.versement_auto_jour) || 0;
-      if (formData.versement_auto_frequence === 'Mensuel' || formData.versement_auto_frequence === 'Trimestriel') {
+      if (formData.versement_auto_frequence === 'MONTHLY' || formData.versement_auto_frequence === 'QUARTERLY') {
         if (jour < 1 || jour > 28) {
           newErrors.versement_auto_jour = 'Jour doit être entre 1 et 28';
         }
-      } else if (formData.versement_auto_frequence === 'Hebdomadaire') {
+      } else if (formData.versement_auto_frequence === 'WEEKLY') {
         if (jour < 1 || jour > 7) {
           newErrors.versement_auto_jour = 'Jour doit être entre 1 (Lundi) et 7 (Dimanche)';
         }
@@ -307,7 +355,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     }
 
     // Intercept Cash payments for validation
-    if (formData.mode_ouverture === 'Espèces' && parseFloat(formData.solde_initial) > 0) {
+    if (formData.mode_ouverture === 'CASH' && parseFloat(formData.solde_initial) > 0) {
       setShowCaisseModal(true);
       return;
     }
@@ -330,20 +378,17 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       const sanitizedNotes = sanitizeInput(formData.notes);
       const sanitizedMotif = sanitizeInput(formData.motif_blocage);
 
-      const payload: any = {
+      // Type and frequence are already in EN format
+      const payload = {
         clientId: formData.client_id,
-        typeCompte: formData.type_compte,
+        typeCompte: formData.type_compte, // Already EN value
         produitId: formData.produit_id || undefined,
-        // numeroCompte generated by backend
-        soldeInitial: soldeInitial, // Backend expects soldeInitial but maps it to initial deposit
-        modePaiement: formData.mode_ouverture, // Espèces | Virement
-        compteSourceId: formData.mode_ouverture === 'Virement' ? formData.compte_source_id : undefined,
-        
-        blocageActif: formData.type_compte === 'Bloqué',
-        blocageMotif: formData.type_compte === 'Bloqué' ? sanitizedMotif : undefined,
-        blocageReference: formData.type_compte === 'Bloqué' ? formData.date_echeance : undefined, // passing date as ref for now or handle appropriately
-        
-        // Auto transfer fields
+        soldeInitial: soldeInitial,
+        modePaiement: formData.mode_ouverture,
+        compteSourceId: formData.mode_ouverture === 'TRANSFER' ? formData.compte_source_id : undefined,
+        blocageActif: formData.type_compte === 'BLOCKED',
+        blocageMotif: formData.type_compte === 'BLOCKED' ? sanitizedMotif : undefined,
+        blocageReference: formData.type_compte === 'BLOCKED' ? formData.date_echeance : undefined,
         versementAutoActif: formData.versement_auto_active,
         versementAutoMontant: formData.versement_auto_active ? parseFloat(formData.versement_auto_montant) : undefined,
         versementAutoFrequence: formData.versement_auto_active ? formData.versement_auto_frequence : undefined,
@@ -353,7 +398,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       const newCompte = await compteEpargneApi.create(payload);
 
       // Success message
-      if (formData.mode_ouverture === 'Espèces' && soldeInitial > 0) {
+      if (formData.mode_ouverture === 'CASH' && soldeInitial > 0) {
         toast.success(`Compte créé avec succès !`);
         toast.info(`Statut: En attente de paiement. Veuillez encaisser ${formatMoney(soldeInitial)} en caisse.`);
       } else {
@@ -563,16 +608,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                   
                   {/* Visual Account Type Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {(['Courant', 'Épargne', 'Bloqué'] as TypeCompte[]).map((type) => {
-                    // Normalize for comparison (handle case and accents)
-                    const normalizeType = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                    const normalizedType = normalizeType(type);
-                    
+                  {(['CURRENT', 'SAVINGS', 'BLOCKED'] as TypeCompte[]).map((type) => {
                     // Check if client ALREADY has this account type
                     const isOwned = comptesExistants.some(c => {
                       const compteType = c.typeCompte || c.type_compte || '';
-                      // Also check detailed type if needed, but usually typeCompte enum is enough
-                      return normalizeType(compteType) === normalizedType;
+                      const compteTypeEN = normalizeTypeCompte(compteType);
+                      return compteTypeEN === type;
                     });
                     
                     const isSelected = formData.type_compte === type;
@@ -612,21 +653,18 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                           </div>
                           <div className="flex-1">
                             <p className={`font-semibold text-sm ${isOwned ? 'text-slate-500' : isSelected ? 'text-white' : 'text-slate-300'}`}>
-                              {type} {isOwned && (
+                              {TYPE_COMPTE_LABELS[type]} {isOwned && (
                                 <span className="text-xs font-normal opacity-70">
-                                  {isOwned && comptesExistants.some(c => {
-                                     const cType = (c.typeCompte || c.type_compte || '').toLowerCase();
-                                     const nType = normalizedType.toLowerCase();
-                                     // Simple check, assumed correct as we are in the loop
-                                     return (cType.includes(nType) || nType.includes(cType)) && c.statut === 'EN_ATTENTE_PAIEMENT';
+                                  {comptesExistants.some(c => {
+                                     const compteType = c.typeCompte || c.type_compte || '';
+                                     const compteTypeEN = normalizeTypeCompte(compteType);
+                                     return compteTypeEN === type && c.statut === StatutCompte.PENDING_ACTIVATION;
                                   }) ? '(En attente)' : '(Déjà actif)'}
                                 </span>
                               )}
                             </p>
                             <p className={`text-xs mt-1 ${isOwned ? 'text-slate-600' : 'text-slate-400'}`}>
-                              {type === 'Courant' && 'Opérations quotidiennes'}
-                              {type === 'Épargne' && 'Économies avec intérêts'}
-                              {type === 'Bloqué' && 'Épargne à terme fixe'}
+                              {TYPE_COMPTE_DESCRIPTIONS[type]}
                             </p>
                             {isOwned && (
                               <span className="inline-block mt-2 px-2 py-0.5 bg-slate-800 text-slate-500 text-[10px] uppercase font-bold rounded-full border border-slate-700">
@@ -699,11 +737,11 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     <button
                       type="button"
                       role="radio"
-                      aria-checked={formData.mode_ouverture === 'Espèces'}
-                      onClick={() => handleInputChange('mode_ouverture', 'Espèces')}
+                      aria-checked={formData.mode_ouverture === 'CASH'}
+                      onClick={() => handleInputChange('mode_ouverture', 'CASH')}
                       disabled={loading}
                       className={`flex flex-col items-center justify-center p-4 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        formData.mode_ouverture === 'Espèces'
+                        formData.mode_ouverture === 'CASH'
                           ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
                           : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
                       }`}
@@ -712,22 +750,22 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       <span className="text-sm font-medium">Espèces</span>
                       <span className="text-xs opacity-75 mt-1">Paiement en caisse</span>
                     </button>
-                    
+
                     {comptesExistants.some(c => {
-                        const type = (c.type_compte || c.typeCompte || '').toLowerCase();
-                        // Handle potential property names and types
+                        const typeBackend = c.type_compte || c.typeCompte || '';
+                        const typeEN = normalizeTypeCompte(typeBackend);
                         const soldeValue = c.solde !== undefined ? c.solde : c.solde_courant;
                         const solde = typeof soldeValue === 'number' ? soldeValue : parseFloat(String(soldeValue || 0));
-                        return type === 'courant' && solde > 0;
+                        return typeEN === 'CURRENT' && solde > 0;
                     }) ? (
                         <button
                           type="button"
                           role="radio"
-                          aria-checked={formData.mode_ouverture === 'Virement'}
-                          onClick={() => handleInputChange('mode_ouverture', 'Virement')}
+                          aria-checked={formData.mode_ouverture === 'TRANSFER'}
+                          onClick={() => handleInputChange('mode_ouverture', 'TRANSFER')}
                           disabled={loading}
                           className={`flex flex-col items-center justify-center p-4 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                            formData.mode_ouverture === 'Virement'
+                            formData.mode_ouverture === 'TRANSFER'
                               ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20'
                               : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
                           }`}
@@ -767,7 +805,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     </button>
                   </div>
 
-                  {formData.mode_ouverture === 'Espèces' && (
+                  {formData.mode_ouverture === 'CASH' && (
                      <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-3">
                         <AlertTriangle className="text-yellow-500 shrink-0 mt-0.5" size={16} />
                         <div className="text-sm">
@@ -784,7 +822,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
 
                 {/* Source Account for Internal Transfer */}
-                {formData.mode_ouverture === 'Virement' ? (
+                {formData.mode_ouverture === 'TRANSFER' ? (
                   <div className="md:col-span-2">
                     <label htmlFor="compte-source" className="block text-sm font-semibold text-slate-300 mb-2">
                       Compte Source <span className="text-red-400">*</span>
@@ -830,7 +868,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     aria-invalid={!!errors.solde_initial}
                     aria-describedby={compteSource ? 'solde-disponible' : undefined}
                   />
-                  {formData.mode_ouverture === 'Virement' && compteSource && (
+                  {formData.mode_ouverture === 'TRANSFER' && compteSource && (
                     <p id="solde-disponible" className="text-xs text-slate-400 mt-1">
                       Solde disponible: {formatMoney(compteSource.solde)}
                     </p>
@@ -841,7 +879,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 </div>
 
                 {/* Payment Reference */}
-                {formData.mode_ouverture !== 'Virement' && (
+                {formData.mode_ouverture !== 'TRANSFER' && (
                   <div className="md:col-span-2">
                     <label htmlFor="reference-paiement" className="block text-sm font-semibold text-slate-300 mb-2">
                       Référence de Paiement
@@ -860,7 +898,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 )}
 
                 {/* Blocked Account Fields */}
-                {formData.type_compte === 'Bloqué' && (
+                {formData.type_compte === 'BLOCKED' && (
                   <>
                     <div>
                       <label htmlFor="date-echeance" className="block text-sm font-semibold text-slate-300 mb-2">
@@ -904,9 +942,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                   </>
                 )}
 
-                {/* Auto Transfer Settings - For Épargne and Bloqué accounts */}
-                {(formData.type_compte === 'Épargne' || formData.type_compte === 'Bloqué') && 
-                  comptesExistants.some(c => c.type_compte === 'Courant') && (
+                {/* Auto Transfer Settings - For Savings and Blocked accounts */}
+                {(formData.type_compte === 'SAVINGS' || formData.type_compte === 'BLOCKED') &&
+                  comptesExistants.some(c => {
+                    const typeBackend = c.type_compte || c.typeCompte || '';
+                    return normalizeTypeCompte(typeBackend) === 'CURRENT';
+                  }) && (
                   <div className="md:col-span-2 bg-green-500/10 border border-green-500/50 rounded-lg p-4">
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
@@ -919,7 +960,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       <div>
                         <p className="font-semibold text-white">Activer les versements automatiques</p>
                         <p className="text-sm text-slate-400">
-                          {formData.type_compte === 'Épargne' 
+                          {formData.type_compte === 'SAVINGS'
                             ? 'Transférer automatiquement depuis votre compte courant pour épargner régulièrement'
                             : 'Alimenter automatiquement votre épargne bloquée selon la fréquence choisie'
                           }
@@ -960,10 +1001,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                             className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                             disabled={loading}
                           >
-                            <option value="Hebdomadaire">Chaque semaine</option>
-                            <option value="Bimensuel">Toutes les 2 semaines</option>
-                            <option value="Mensuel">Chaque mois</option>
-                            <option value="Trimestriel">Chaque trimestre</option>
+                            <option value="WEEKLY">{FREQUENCE_LABELS['WEEKLY']}</option>
+                            <option value="BIWEEKLY">{FREQUENCE_LABELS['BIWEEKLY']}</option>
+                            <option value="MONTHLY">{FREQUENCE_LABELS['MONTHLY']}</option>
+                            <option value="QUARTERLY">{FREQUENCE_LABELS['QUARTERLY']}</option>
                           </select>
                         </div>
 
@@ -995,7 +1036,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                             disabled={loading}
                           >
                             <option value="">Sélectionner un compte</option>
-                            {comptesExistants.filter(c => c.type_compte === 'Courant').map(compte => (
+                            {comptesExistants.filter(c => {
+                              const typeBackend = c.type_compte || c.typeCompte || '';
+                              return normalizeTypeCompte(typeBackend) === 'CURRENT';
+                            }).map(compte => (
                               <option key={compte.id} value={compte.id}>
                                 {compte.numero_compte} (Solde: {formatMoney(compte.solde)})
                               </option>
@@ -1052,7 +1096,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     <p className="font-semibold text-white mb-1">Processus d'ouverture</p>
                     <ul className="space-y-1 text-slate-400">
                       <li>✓ Le compte sera créé {validationRequise ? 'en attente de validation' : 'immédiatement'}</li>
-                      {formData.mode_ouverture !== 'Virement' && (
+                      {formData.mode_ouverture !== 'TRANSFER' && (
                         <li>✓ Le client doit se présenter à la caisse pour effectuer le paiement</li>
                       )}
                       {validationRequise && (

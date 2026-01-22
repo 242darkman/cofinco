@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Shuffle, Gift, RefreshCw } from 'lucide-react';
 import { Card, ProgressBar, Button } from '../../ui';
 import { toast } from '../../../lib/toast';
+import { tontineApi } from '../../../lib/api-client';
+import { StatutClient, StatutContributionTontine } from '@shared/enum/status-constants';
 
 interface TontineDashboardProps {
   tontineId: string;
@@ -58,11 +60,8 @@ export default function TontineDashboard({
   const fetchEligiblesBenefice = async () => {
     if (!tontineId) return;
     try {
-      const res = await fetch(`/api/tontines/${tontineId}/eligibles-benefice`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setEligiblesBenefice(data || []);
-      }
+      const data = await tontineApi.getEligiblesBenefice(tontineId);
+      setEligiblesBenefice(data || []);
     } catch (error) {
       console.error('Erreur chargement éligibles:', error);
     }
@@ -71,11 +70,8 @@ export default function TontineDashboard({
   const fetchProchainBeneficiaire = async () => {
     if (!tontineId) return null;
     try {
-      const res = await fetch(`/api/tontines/${tontineId}/prochain-beneficiaire`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        return data?.client?.nom || null;
-      }
+      const data = await tontineApi.getProchainBeneficiaire(tontineId);
+      return data?.client?.nom || null;
     } catch (error) {
       console.error('Erreur chargement prochain bénéficiaire:', error);
     }
@@ -86,18 +82,7 @@ export default function TontineDashboard({
     if (!tontineId) return;
     setTirageEnCours(true);
     try {
-      const res = await fetch(`/api/tontines/${tontineId}/tirage-beneficiaire`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Erreur lors du tirage');
-      }
-
-      const data = await res.json();
+      const data = await tontineApi.tirageBeneficiaire(tontineId);
       const beneficiaireNom = data?.client?.nom || 'Membre sélectionné';
 
       toast.success(`Tirage effectué ! ${beneficiaireNom} est le prochain bénéficiaire`);
@@ -117,22 +102,14 @@ export default function TontineDashboard({
     if (!tontineId) return;
     setLoading(true);
     try {
-      const [contribRes, membresRes] = await Promise.all([
-        fetch(`/api/tontines/${tontineId}/contributions`, { credentials: 'include' }),
-        fetch(`/api/tontines/${tontineId}/membres`, { credentials: 'include' })
+      const [contribData, membresData] = await Promise.all([
+        tontineApi.getContributions(tontineId),
+        tontineApi.getMembres(tontineId)
       ]);
-
-      if (!contribRes.ok || !membresRes.ok) {
-        throw new Error('Erreur lors du chargement des données');
-      }
-
-      const contribData = await contribRes.json();
-      const membresData = await membresRes.json();
 
       const totalContributions = contribData?.reduce((sum: number, c: any) => sum + (Number(c.montant) || 0), 0) || 0;
       const totalDistributions = 0;
-      // Support both 'status' (frontend alias) and 'statut' (backend raw)
-      const membresActifs = membresData?.filter((m: any) => (m.status === 'Actif' || m.statut === 'Actif')).length || 0;
+      const membresActifs = membresData?.filter((m: any) => (m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE)).length || 0;
 
       const contributionsTourActuel = contribData?.filter((c: any) => c.tour_numero === currentTour).length || 0;
       const contributionsAttendues = membresActifs;
@@ -143,20 +120,19 @@ export default function TontineDashboard({
 
       // Calculer les retards: membres qui n'ont pas cotisé pour le tour actuel
       const membresAyantCotiseTourActuel = new Set(
-        contribData?.filter((c: any) => c.tour_numero === currentTour && c.statut === 'Validée')
+        contribData?.filter((c: any) => c.tour_numero === currentTour && c.statut === StatutContributionTontine.VALIDATED)
           .map((c: any) => c.clientId || c.client_id)
       );
       const membresEnRetard = membresData?.filter(
         (m: any) => {
-          const isActif = m.status === 'Actif' || m.statut === 'Actif';
+          const isActif = m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE;
           const clientId = m.client_id || m.clientId;
           return isActif && !membresAyantCotiseTourActuel.has(clientId);
         }
       ).length || 0;
 
-      // Prochain bénéficiaire: membre actif qui n'a pas encore reçu le bénéfice
       const prochainBeneficiaireCandidate = membresData?.find((m: any) => {
-        const isActif = m.status === 'Actif' || m.statut === 'Actif';
+        const isActif = m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE;
         const aRecuBenefice = m.a_recu_benefice || m.aRecuBenefice;
         return isActif && !aRecuBenefice;
       });
@@ -182,17 +158,14 @@ export default function TontineDashboard({
   const fetchRecentActivity = async () => {
     if (!tontineId) return;
     try {
-      const contribRes = await fetch(`/api/tontines/${tontineId}/contributions`, { credentials: 'include' });
-      if (!contribRes.ok) return;
-
-      const contribData = await contribRes.json();
+      const contribData = await tontineApi.getContributions(tontineId);
 
       const combined = (contribData || [])
         .slice(0, 8)
         .map((c: any) => ({
           type: 'contribution',
           montant: Number(c.montant),
-          date: c.date_contribution || c.created_at || c.createdAt, 
+          date: c.date_contribution || c.created_at || c.createdAt,
           nom: c.client?.nom || c.tontine_membres?.clients?.nom || 'Inconnu'
         }))
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());

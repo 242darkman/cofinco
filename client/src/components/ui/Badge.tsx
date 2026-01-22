@@ -1,13 +1,20 @@
 import React from 'react';
+import { getStatusLabel, ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 /**
  * Badge Component - COFIN Platform
  * Mobile-first badge for status indicators with auto color detection
  *
+ * Supporte les codes ANGLAIS (ACTIVE, PENDING, etc.) et les labels FR legacy
+ * Traduit automatiquement les codes EN en labels FR pour l'affichage
+ *
  * @example
- * <Badge value="Actif" />
+ * <Badge value="ACTIVE" />           // Affiche "Actif"
+ * <Badge value="PENDING" />          // Affiche "En attente"
+ * <Badge value="Actif" />            // Affiche "Actif" (legacy)
  * <Badge value="En attente" variant="warning" />
  * <Badge value="Rejeté" size="lg" />
+ * <Badge value="REJECTED" rawValue />  // Affiche "REJECTED" sans traduction
  */
 
 export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' | 'outline';
@@ -19,6 +26,8 @@ export interface BadgeProps {
   size?: BadgeSize;
   className?: string;
   icon?: React.ReactNode;
+  /** Si true, affiche la valeur brute sans traduction */
+  rawValue?: boolean;
 }
 
 const Badge: React.FC<BadgeProps> = ({
@@ -27,42 +36,60 @@ const Badge: React.FC<BadgeProps> = ({
   size = 'md',
   className = '',
   icon,
+  rawValue = false,
 }) => {
+  // Traduire la valeur EN -> FR si c'est une string
+  const displayValue = React.useMemo(() => {
+    if (rawValue || typeof value !== 'string') return value;
+    return getStatusLabel(value, ALL_STATUS_LABELS, value);
+  }, [value, rawValue]);
+
   // Auto-detect variant from value if not provided
   const getVariantFromValue = (val: string | React.ReactNode): BadgeVariant => {
     if (variant) return variant;
 
-    const str = String(val).toLowerCase();
+    const str = String(val).toUpperCase();
 
-    // Success states
-    if (['actif', 'active', 'validé', 'approuvé', 'approuvée', 'soldé', 'déboursé', 'validée'].includes(str)) {
-      return 'success';
-    }
+    // Success states (EN + FR)
+    const successStates = [
+      'ACTIVE', 'VALIDATED', 'APPROVED', 'PAID', 'POSTED', 'RECEIVED', 'EXECUTED', 'DISBURSED', 'RECONCILED', 'RESOLVED',
+      'ACTIF', 'VALIDÉ', 'APPROUVÉ', 'APPROUVÉE', 'SOLDÉ', 'DÉBOURSÉ', 'VALIDÉE', 'POSTÉ', 'REÇU', 'EXÉCUTÉ'
+    ];
+    if (successStates.includes(str)) return 'success';
 
-    // Warning states
-    if (['en attente', 'suspendu', 'en cours', "en cours d'analyse", 'pending'].includes(str)) {
-      return 'warning';
-    }
+    // Warning states (EN + FR)
+    const warningStates = [
+      'PENDING', 'PENDING_FEES', 'PENDING_ACTIVATION', 'SUSPENDED', 'IN_TRANSIT', 'SUBMITTED', 'DRAFT',
+      'REEVALUATION_IN_PROGRESS', 'READY_FOR_INVESTIGATION', 'UNDER_INVESTIGATION', 'INVESTIGATION_COMPLETE',
+      'EN ATTENTE', 'SUSPENDU', 'EN COURS', "EN COURS D'ANALYSE", 'BROUILLON', 'SOUMIS', 'EN TRANSIT',
+      'RÉÉVALUATION EN COURS', 'A ENQUÊTER', 'EN ENQUÊTE', 'ENQUÊTE TERMINÉE'
+    ];
+    if (warningStates.includes(str)) return 'warning';
 
-    // Danger states
-    if (['rejeté', 'rejetée', 'inactif', 'inactive', 'annulé', 'en retard', 'contentieux', 'bloqué'].includes(str)) {
-      return 'danger';
-    }
+    // Danger states (EN + FR)
+    const dangerStates = [
+      'REJECTED', 'CANCELLED', 'LATE', 'DEFINITIVELY_REJECTED', 'REVERSED', 'DISCREPANCY_DETECTED',
+      'RECEIVED_WITH_DISCREPANCY', 'DELETED', 'INACTIVE', 'FAILED',
+      'REJETÉ', 'REJETÉE', 'INACTIF', 'INACTIVE', 'ANNULÉ', 'EN RETARD', 'CONTENTIEUX', 'BLOQUÉ',
+      'REJETÉE DÉFINITIVEMENT', 'REVERSÉ', 'ÉCART DÉTECTÉ', 'REÇU AVEC ÉCART', 'SUPPRIMÉ'
+    ];
+    if (dangerStates.includes(str)) return 'danger';
 
-    // Info states
-    if (['réduite', 'restructuré', 'en révision'].includes(str)) {
-      return 'info';
-    }
+    // Info states (EN + FR)
+    const infoStates = [
+      'APPROVED_L1', 'APPROVED_L2', 'APPROVED_AFTER_REEVALUATION', 'CLOSED',
+      'APPROUVÉ N1', 'APPROUVÉ N2', 'APPROUVÉE APRÈS RÉÉVALUATION', 'CLÔTURÉ', 'CLÔTURÉE',
+      'RÉDUITE', 'RESTRUCTURÉ', 'EN RÉVISION'
+    ];
+    if (infoStates.includes(str)) return 'info';
 
-    // Primary states (Premium)
-    if (['premium', 'gold', 'pro'].includes(str)) {
-      return 'primary';
-    }
+    // Primary states (Premium, special)
+    const primaryStates = ['PREMIUM', 'GOLD', 'PRO'];
+    if (primaryStates.includes(str)) return 'primary';
 
     // Warning states (VIP uses warning for Gold color)
-    if (['vip', 'platinum'].includes(str)) {
-      return 'warning';
-    }
+    const vipStates = ['VIP', 'PLATINUM'];
+    if (vipStates.includes(str)) return 'warning';
 
     return 'neutral';
   };
@@ -99,7 +126,7 @@ const Badge: React.FC<BadgeProps> = ({
       `}
     >
       {icon && <span className="shrink-0">{icon}</span>}
-      <span className="truncate">{value}</span>
+      <span className="truncate">{displayValue}</span>
     </span>
   );
 };

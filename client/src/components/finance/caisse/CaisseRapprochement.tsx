@@ -113,7 +113,7 @@ export default function CaisseRapprochement({ session, onClose }: CaisseRapproch
           type_incident: 'Écart de caisse',
           montant_ecart: ecart,
           description: `Écart de ${ecart} FCFA lors de la fermeture`,
-          statut: 'Ouvert'
+          statut: 'OPEN'
         });
 
         toast.dismiss(loadingId);

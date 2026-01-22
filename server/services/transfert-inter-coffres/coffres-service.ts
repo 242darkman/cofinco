@@ -6,6 +6,7 @@ import {
   agences,
   configTransfertInterCoffres,
 } from "@shared/schema";
+import { StatutCoffre } from "@shared/enum/status-constants";
 
 interface ServiceResult<T = any> {
   success: boolean;
@@ -54,7 +55,7 @@ export class CoffresFortsService {
         solde: "0",
         plafondEncaisse: options?.plafondEncaisse?.toString(),
         soldeMinimum: options?.soldeMinimum?.toString() || "0",
-        statut: "Actif",
+        statut: StatutCoffre.ACTIVE,
       })
       .returning();
 
@@ -92,7 +93,7 @@ export class CoffresFortsService {
         solde: "0",
         plafondEncaisse: options?.plafondEncaisse?.toString(),
         soldeMinimum: options?.soldeMinimum?.toString() || "0",
-        statut: "Actif",
+        statut: StatutCoffre.ACTIVE,
       })
       .returning();
 
@@ -268,7 +269,7 @@ export class CoffresFortsService {
       nom?: string;
       plafondEncaisse?: number;
       soldeMinimum?: number;
-      statut?: "Actif" | "Suspendu" | "Fermé";
+      statut?: typeof StatutCoffre[keyof typeof StatutCoffre];
       description?: string;
     }
   ): Promise<ServiceResult> {
@@ -315,7 +316,7 @@ export class CoffresFortsService {
       return { success: false, errorCode: "COFFRE_NOT_FOUND", error: "Coffre-fort introuvable" };
     }
 
-    if (coffre.statut !== "Actif") {
+    if (coffre.statut !== StatutCoffre.ACTIVE) {
       return { success: false, errorCode: "COFFRE_INACTIVE", error: "Le coffre-fort n'est pas actif" };
     }
 
@@ -416,9 +417,9 @@ export class CoffresFortsService {
 
     const stats = {
       totalCoffres: coffres.length,
-      coffresActifs: coffres.filter(c => c.statut === "Actif").length,
-      coffresSuspendus: coffres.filter(c => c.statut === "Suspendu").length,
-      coffresFermes: coffres.filter(c => c.statut === "Fermé").length,
+      coffresActifs: coffres.filter(c => c.statut === StatutCoffre.ACTIVE).length,
+      coffresSuspendus: coffres.filter(c => c.statut === StatutCoffre.SUSPENDED).length,
+      coffresFermes: coffres.filter(c => c.statut === StatutCoffre.CLOSED).length,
       soldeTotal: coffres.reduce((sum, c) => sum + parseFloat(c.solde?.toString() || "0"), 0),
       soldeSiege: coffres
         .filter(c => c.ownerType === "SIEGE")

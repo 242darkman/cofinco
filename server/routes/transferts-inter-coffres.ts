@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { TransfertInterCoffresService, CoffresFortsService } from "../services/transfert-inter-coffres";
 import { db } from "../db";
 import {
@@ -11,6 +12,7 @@ import {
   tachesRegularisation,
   configTransfertInterCoffres,
 } from "@shared/schema";
+import { StatutCoffre, StatutReconciliation, StatutTacheRegularisation } from "@shared/enum/status-constants";
 import { eq, and, desc, asc, gte, isNull } from "drizzle-orm";
 
 export const transfertsInterCoffresRouter = Router();
@@ -89,14 +91,14 @@ transfertsInterCoffresRouter.get("/coffres/agence/:agenceId", async (req, res) =
 });
 
 // PATCH /coffres/:id - Modifier un coffre
-transfertsInterCoffresRouter.patch("/coffres/:id", requireRole("admin", "Directeur", "Directeur Financier"), async (req, res) => {
+transfertsInterCoffresRouter.patch("/coffres/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
   try {
     const { id } = req.params;
     const schema = z.object({
       nom: z.string().optional(),
       plafondEncaisse: z.number().positive().optional(),
       soldeMinimum: z.number().min(0).optional(),
-      statut: z.enum(["Actif", "Suspendu", "Fermé"]).optional(),
+      statut: z.enum([StatutCoffre.ACTIVE, StatutCoffre.SUSPENDED, StatutCoffre.CLOSED]).optional(),
       description: z.string().optional(),
     });
 
@@ -115,7 +117,7 @@ transfertsInterCoffresRouter.patch("/coffres/:id", requireRole("admin", "Directe
 });
 
 // POST /coffres/:id/approvisionner - Approvisionner un coffre
-transfertsInterCoffresRouter.post("/coffres/:id/approvisionner", requireRole("admin", "Directeur", "Directeur Financier", "Trésorier"), async (req, res) => {
+transfertsInterCoffresRouter.post("/coffres/:id/approvisionner", requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -558,11 +560,11 @@ transfertsInterCoffresRouter.get("/reconciliations", async (req, res) => {
 
     const reconciliations = await query.orderBy(desc(reconciliationsLiaison.createdAt));
 
-    // Stats
+    // Stats - Using standardized English enum values
     const stats = {
-      rapprochees: reconciliations.filter(r => r.statut === "Rapproché").length,
-      enAttente: reconciliations.filter(r => r.statut === "En attente").length,
-      ecarts: reconciliations.filter(r => r.statut === "Écart détecté").length,
+      rapprochees: reconciliations.filter(r => r.statut === StatutReconciliation.RECONCILED).length,
+      enAttente: reconciliations.filter(r => r.statut === StatutReconciliation.PENDING).length,
+      ecarts: reconciliations.filter(r => r.statut === StatutReconciliation.DISCREPANCY_DETECTED).length,
     };
 
     res.json({ success: true, reconciliations, stats });
@@ -604,7 +606,7 @@ transfertsInterCoffresRouter.get("/taches", async (req, res) => {
 });
 
 // POST /taches/:id/resolve - Résoudre une tâche
-transfertsInterCoffresRouter.post("/taches/:id/resolve", requireRole("admin", "Comptable", "Directeur Financier"), async (req, res) => {
+transfertsInterCoffresRouter.post("/taches/:id/resolve", requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -618,7 +620,7 @@ transfertsInterCoffresRouter.post("/taches/:id/resolve", requireRole("admin", "C
     const [updated] = await db
       .update(tachesRegularisation)
       .set({
-        statut: "Résolue",
+        statut: StatutTacheRegularisation.RESOLVED,
         resolution,
         resolvedBy: userId,
         resolvedAt: new Date(),
@@ -670,7 +672,7 @@ transfertsInterCoffresRouter.get("/config", async (req, res) => {
 });
 
 // PUT /config - Mettre à jour la configuration
-transfertsInterCoffresRouter.put("/config", requireRole("admin", "Directeur"), async (req, res) => {
+transfertsInterCoffresRouter.put("/config", requireRole(SystemRole.ADMIN), async (req, res) => {
   try {
     const { agenceId } = req.query;
 

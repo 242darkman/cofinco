@@ -20,14 +20,6 @@ export const agentsTerrain = pgTable("agents_terrain", {
   // Lien vers la table employes (source de vérité pour l'identité RH)
   employeId: uuid("employe_id").references(() => employes.id, { onDelete: "cascade" }),
 
-  // ===== CHAMPS LEGACY (à migrer vers users via employes) =====
-  // Ces champs sont conservés temporairement pour la rétro-compatibilité
-  // Ils seront supprimés après migration complète
-  nom: text("nom"), // LEGACY: Déplacé vers users.nom (maintenant nullable)
-  prenom: text("prenom"), // LEGACY: Déplacé vers users.prenom
-  telephone: text("telephone"), // LEGACY: Déplacé vers users.telephone
-  email: text("email"), // LEGACY: Déplacé vers users.email
-  // ===== FIN CHAMPS LEGACY =====
 
   // Zone d'affectation
   zoneAffectation: text("zone_affectation"),
@@ -43,7 +35,7 @@ export const agentsTerrain = pgTable("agents_terrain", {
   lastSeenAt: timestamp("last_seen_at"),
 
   // Statut et performance
-  statut: text("statut").notNull().default("Actif"),
+  statut: text("statut").notNull().default("ACTIVE"),
   objectifMensuel: numeric("objectif_mensuel"),
   totalProspections: integer("total_prospections").default(0),
   totalVisites: integer("total_visites").default(0),
@@ -56,8 +48,8 @@ export const agentsTerrain = pgTable("agents_terrain", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertAgentTerrainSchema = (createInsertSchema(agentsTerrain) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertAgentTerrain = any;
+export const insertAgentTerrainSchema = createInsertSchema(agentsTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertAgentTerrain = z.infer<typeof insertAgentTerrainSchema>;
 export type AgentTerrain = typeof agentsTerrain.$inferSelect;
 
 
@@ -73,7 +65,7 @@ export const remisesTerrain = pgTable(
     montantDeclare: numeric("montant_declare").notNull(),  // montant remis
     montantCalcule: numeric("montant_calcule").notNull().default("0"), // calculable depuis paiements liés
 
-    statut: text("statut").notNull().default("En attente"), // ou enum si tu veux (En attente, Validée, Rejetée)
+    statut: text("statut").notNull().default("PENDING"), // ou enum si tu veux (En attente, Validée, Rejetée)
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
     validatedAt: timestamp("validated_at"),
@@ -91,8 +83,8 @@ export const remisesTerrain = pgTable(
   }),
 );
 
-export const insertRemiseTerrainSchema = (createInsertSchema(remisesTerrain) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertRemiseTerrain = any;
+export const insertRemiseTerrainSchema = createInsertSchema(remisesTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertRemiseTerrain = z.infer<typeof insertRemiseTerrainSchema>;
 export type RemiseTerrain = typeof remisesTerrain.$inferSelect;
 
 
@@ -109,8 +101,8 @@ export const objectifsMensuels = pgTable("objectifs_mensuels", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertObjectifMensuelSchema = (createInsertSchema(objectifsMensuels) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertObjectifMensuel = any;
+export const insertObjectifMensuelSchema = createInsertSchema(objectifsMensuels).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertObjectifMensuel = z.infer<typeof insertObjectifMensuelSchema>;
 export type ObjectifMensuel = typeof objectifsMensuels.$inferSelect;
 
 // Prospections
@@ -135,8 +127,8 @@ export const prospections = pgTable("prospections", {
   montantSouhaite: numeric("montant_souhaite"),
   objetCredit: text("objet_credit"),
   photoUrl: text("photo_url"),
-  statut: text("statut").notNull().default("nouveau"),
-  priorite: text("priorite").default("normale"),
+  statut: text("statut").notNull().default("NEW"),
+  priorite: text("priorite").default("NORMAL"),
   commentairesAgent: text("commentaires_agent"),
   observations: text("observations"),
   dateProspection: timestamp("date_prospection").defaultNow(),
@@ -145,7 +137,7 @@ export const prospections = pgTable("prospections", {
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertProspectionSchema = (createInsertSchema(prospections as any, {
+export const insertProspectionSchema = createInsertSchema(prospections, {
   // Validate Congo phone format: +242XXXXXXXX or 06/05/04XXXXXXX
   telephoneProspect: z.string().regex(
     /^(\+242|0)[456]\d{7}$/,
@@ -160,8 +152,8 @@ export const insertProspectionSchema = (createInsertSchema(prospections as any, 
     (val) => (val === '' || val === null || val === undefined) ? undefined : Number(val),
     z.number().min(-180, "Longitude invalide").max(180, "Longitude invalide").optional()
   ),
-}) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertProspection = any;
+}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertProspection = z.infer<typeof insertProspectionSchema>;
 export type Prospection = typeof prospections.$inferSelect;
 
 // Visites terrain
@@ -179,14 +171,14 @@ export const visitesTerrain = pgTable("visites_terrain", {
   coordonneesGPS: text("coordonnees_gps"),
   latitude: numeric("latitude"), // GPS coordinates
   longitude: numeric("longitude"),
-  statut: text("statut").notNull().default("Planifiée"),
+  statut: text("statut").notNull().default("PLANNED"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertVisiteTerrainSchema = (createInsertSchema(visitesTerrain) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertVisiteTerrain = any;
+export const insertVisiteTerrainSchema = createInsertSchema(visitesTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertVisiteTerrain = z.infer<typeof insertVisiteTerrainSchema>;
 export type VisiteTerrain = typeof visitesTerrain.$inferSelect;
 
 // Paiements terrain
@@ -218,7 +210,7 @@ export const paiementsTerrain = pgTable(
     tontineId: uuid("tontine_id"), // Soft reference for now
 
     // Statut standard
-    statut: statutTransactionEnum("statut").notNull().default("Pending"),
+    statut: statutTransactionEnum("statut").notNull().default("PENDING"),
 
     // OTP
     validationOTP: text("validation_otp"),
@@ -261,8 +253,8 @@ export const paiementsTerrain = pgTable(
 );
 
 
-export const insertPaiementTerrainSchema = (createInsertSchema(paiementsTerrain) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertPaiementTerrain = any;
+export const insertPaiementTerrainSchema = createInsertSchema(paiementsTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertPaiementTerrain = z.infer<typeof insertPaiementTerrainSchema>;
 export type PaiementTerrain = typeof paiementsTerrain.$inferSelect;
 
 // Agent Location Logs
@@ -281,8 +273,8 @@ export const agentLocationLogs = pgTable("agent_location_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertAgentLocationLogSchema = (createInsertSchema(agentLocationLogs) as any).omit({ id: true, createdAt: true });
-export type InsertAgentLocationLog = any;
+export const insertAgentLocationLogSchema = createInsertSchema(agentLocationLogs).omit({ id: true, createdAt: true });
+export type InsertAgentLocationLog = z.infer<typeof insertAgentLocationLogSchema>;
 export type AgentLocationLog = typeof agentLocationLogs.$inferSelect;
 
 // Caisses definition moved to finance.ts to avoid circular dependency
@@ -306,8 +298,8 @@ export const caisseAssignations = pgTable("caisse_assignations", {
   assignedBy: uuid("assigned_by").references(() => users.id),
   assignedAt: timestamp("assigned_at").defaultNow(),
 });
-export const insertCaisseAssignationSchema = (createInsertSchema(caisseAssignations) as any).omit({ id: true, assignedAt: true });
-export type InsertCaisseAssignation = any;
+export const insertCaisseAssignationSchema = createInsertSchema(caisseAssignations).omit({ id: true, assignedAt: true });
+export type InsertCaisseAssignation = z.infer<typeof insertCaisseAssignationSchema>;
 export type CaisseAssignation = typeof caisseAssignations.$inferSelect;
 
 // Caisse Code Usages
@@ -318,27 +310,6 @@ export const caisseCodeUsages = pgTable("caisse_code_usages", {
   success: boolean("success").default(false),
 });
 export type CaisseCodeUsage = typeof caisseCodeUsages.$inferSelect;
-
-// Shifts Caisse
-export const shiftsCaisse = pgTable("shifts_caisse", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  caisseId: uuid("caisse_id").references(() => caisses.id), // Renamed from caisseAgentId
-  agentId: uuid("agent_id").references(() => users.id),
-  dateOuverture: timestamp("date_ouverture").defaultNow(),
-  dateFermeture: timestamp("date_fermeture"),
-  soldeOuverture: numeric("solde_ouverture").default("0"),
-  soldeFermeture: numeric("solde_fermeture"),
-  soldeTheorique: numeric("solde_theorique").default("0"),
-  ecart: numeric("ecart"),
-  statut: text("statut").notNull().default("ouvert"), 
-  codeSecuriteId: uuid("code_securite_id").references(() => caisseSecurityCodes.id),
-  observations: text("observations"),
-  fermetureAutomatique: boolean("fermeture_automatique").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-export const insertShiftCaisseSchema = (createInsertSchema(shiftsCaisse) as any).omit({ id: true, createdAt: true });
-export type InsertShiftCaisse = any;
-export type ShiftCaisse = typeof shiftsCaisse.$inferSelect;
 
 // Code Generation Permissions
 export const codeGenerationPermissions = pgTable("code_generation_permissions", {
@@ -361,8 +332,8 @@ export const posDevices = pgTable("pos_devices", {
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"),
 });
-export const insertPosDeviceSchema = (createInsertSchema(posDevices) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertPosDevice = any;
+export const insertPosDeviceSchema = createInsertSchema(posDevices).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertPosDevice = z.infer<typeof insertPosDeviceSchema>;
 export type PosDevice = typeof posDevices.$inferSelect;
 
 export const posDeviceLogs = pgTable("pos_device_logs", {
@@ -374,8 +345,8 @@ export const posDeviceLogs = pgTable("pos_device_logs", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
 });
-export const insertPosDeviceLogSchema = (createInsertSchema(posDeviceLogs) as any).omit({ id: true, createdAt: true });
-export type InsertPosDeviceLog = any;
+export const insertPosDeviceLogSchema = createInsertSchema(posDeviceLogs).omit({ id: true, createdAt: true });
+export type InsertPosDeviceLog = z.infer<typeof insertPosDeviceLogSchema>;
 export type PosDeviceLog = typeof posDeviceLogs.$inferSelect;
 
 // Modeles Factures
@@ -399,8 +370,8 @@ export const modelesFactures = pgTable("modeles_factures", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
-export const insertModeleFactureSchema = (createInsertSchema(modelesFactures) as any).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertModeleFacture = any;
+export const insertModeleFactureSchema = createInsertSchema(modelesFactures).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertModeleFacture = z.infer<typeof insertModeleFactureSchema>;
 export type ModeleFacture = typeof modelesFactures.$inferSelect;
 
 // Factures
@@ -410,7 +381,7 @@ export const factures = pgTable("factures", {
   modeleId: uuid("modele_id").references(() => modelesFactures.id),
   clientId: uuid("client_id").references(() => clients.id),
   agentId: uuid("agent_id").references(() => users.id),
-  shiftId: uuid("shift_id").references(() => shiftsCaisse.id),
+  sessionId: uuid("session_id").references(() => sessionsCaisse.id),
   dateFacture: timestamp("date_facture").notNull().defaultNow(),
   dateEcheance: timestamp("date_echeance"),
   sousTotal: numeric("sous_total").notNull().default("0"),
@@ -425,8 +396,8 @@ export const factures = pgTable("factures", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
-export const insertFactureSchema = (createInsertSchema(factures) as any).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertFacture = any;
+export const insertFactureSchema = createInsertSchema(factures).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFacture = z.infer<typeof insertFactureSchema>;
 export type Facture = typeof factures.$inferSelect;
 
 // Lignes Factures
@@ -441,14 +412,14 @@ export const lignesFactures = pgTable("lignes_factures", {
   referenceId: uuid("reference_id"), 
   createdAt: timestamp("created_at").defaultNow(),
 });
-export const insertLigneFactureSchema = (createInsertSchema(lignesFactures) as any).omit({ id: true, createdAt: true });
-export type InsertLigneFacture = any;
+export const insertLigneFactureSchema = createInsertSchema(lignesFactures).omit({ id: true, createdAt: true });
+export type InsertLigneFacture = z.infer<typeof insertLigneFactureSchema>;
 export type LigneFacture = typeof lignesFactures.$inferSelect;
 
 // Comptage Billets
 export const comptageBillets = pgTable("comptage_billets", {
   id: uuid("id").primaryKey().defaultRandom(),
-  shiftId: uuid("shift_id").notNull().references(() => shiftsCaisse.id),
+  sessionId: uuid("session_id").notNull().references(() => sessionsCaisse.id),
   typeComptage: text("type_comptage").notNull(), 
   billets10000: integer("billets_10000").default(0),
   billets5000: integer("billets_5000").default(0),
@@ -467,8 +438,8 @@ export const comptageBillets = pgTable("comptage_billets", {
   observations: text("observations"),
   createdAt: timestamp("created_at").defaultNow(),
 });
-export const insertComptageBilletsSchema = (createInsertSchema(comptageBillets) as any).omit({ id: true, createdAt: true });
-export type InsertComptageBillets = any;
+export const insertComptageBilletsSchema = createInsertSchema(comptageBillets).omit({ id: true, createdAt: true });
+export type InsertComptageBillets = z.infer<typeof insertComptageBilletsSchema>;
 export type ComptageBillets = typeof comptageBillets.$inferSelect;
 
 // Zones
@@ -477,10 +448,10 @@ export const zones = pgTable("zones", {
   nom: text("nom").notNull(), // e.g., "Poto-Poto"
   ville: text("ville").notNull(), // e.g., "Brazzaville"
   description: text("description"),
-  statut: text("statut").notNull().default("Actif"),
+  statut: text("statut").notNull().default("ACTIVE"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertZoneSchema = (createInsertSchema(zones) as any).omit({ id: true, createdAt: true });
-export type InsertZone = any;
+export const insertZoneSchema = createInsertSchema(zones).omit({ id: true, createdAt: true });
+export type InsertZone = z.infer<typeof insertZoneSchema>;
 export type Zone = typeof zones.$inferSelect;

@@ -1,7 +1,19 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  // ========== CONTENT PATHS FOR CSS PURGING ==========
+  // Tailwind scans these files to determine which classes to include
+  // This reduces CSS bundle size by ~50-70%
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+    // Include shared types that might contain class names
+    '../shared/**/*.{ts,tsx}',
+  ],
   darkMode: 'class',
+  // ========== FUTURE FLAGS FOR SMALLER OUTPUT ==========
+  future: {
+    hoverOnlyWhenSupported: true, // Reduces hover state CSS on touch devices
+  },
   theme: {
     extend: {
       fontFamily: {

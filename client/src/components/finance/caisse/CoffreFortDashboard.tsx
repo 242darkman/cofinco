@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
 import { coffreApi, sessionCaisseApi } from "@/lib/api-client";
+import { StatutTransfertCoffre } from "@shared/enum/status-constants";
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { CoffreAdminPanel } from './CoffreAdminPanel';
 import { ProvisionCoffreModal } from './ProvisionCoffreModal';
@@ -75,7 +76,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
   const transferts = transfertsData?.data || [];
 
-  const pendingCount = transferts.filter((t: any) => t.statut === 'Demandé' || t.statut === 'En attente').length;
+  const pendingCount = transferts.filter((t: any) => t.statut === StatutTransfertCoffre.REQUESTED).length;
   const todayVolume = transferts
     .filter((t: any) => new Date(t.createdAt).toDateString() === new Date().toDateString())
     .reduce((acc: number, t: any) => acc + Number(t.montant), 0);
@@ -325,9 +326,9 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       label: 'Statut',
       format: (_: any, row: any) => {
         let variant: 'success' | 'warning' | 'danger' | 'neutral' = 'neutral';
-        if (row.statut === 'Validé' || row.statut === 'Exécuté') variant = 'success';
-        if (row.statut === 'Demandé' || row.statut === 'En attente') variant = 'warning';
-        if (row.statut === 'Rejeté' || row.statut === 'Annulé') variant = 'danger';
+        if (row.statut === StatutTransfertCoffre.VALIDATED || row.statut === StatutTransfertCoffre.EXECUTED) variant = 'success';
+        if (row.statut === StatutTransfertCoffre.REQUESTED) variant = 'warning';
+        if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) variant = 'danger';
 
         return <Badge variant={variant} value={row.statut} />;
       }
@@ -340,7 +341,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         const isLoading = actionLoading === row.id;
 
         // Actions pour les transferts en attente de validation
-        if (row.statut === 'Demandé' || row.statut === 'En attente') {
+        if (row.statut === StatutTransfertCoffre.REQUESTED) {
           return (
             <div className="flex justify-end items-center gap-2">
               {canValidate && (
@@ -384,7 +385,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         }
 
         // Actions pour les transferts validés (prêts à exécuter)
-        if (row.statut === 'Validé') {
+        if (row.statut === StatutTransfertCoffre.VALIDATED) {
           return (
             <div className="flex justify-end items-center gap-2">
               {canExecute ? (
@@ -415,7 +416,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         }
 
         // Statuts terminaux (Exécuté, Rejeté, Annulé)
-        if (row.statut === 'Exécuté') {
+        if (row.statut === StatutTransfertCoffre.EXECUTED) {
           return (
             <span className="text-xs text-emerald-400/60 flex items-center justify-end gap-1.5">
               <CheckCircle2 size={12} />
@@ -424,7 +425,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           );
         }
 
-        if (row.statut === 'Rejeté' || row.statut === 'Annulé') {
+        if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) {
           return (
             <span className="text-xs text-red-400/60 flex items-center justify-end gap-1.5">
               <Ban size={12} />
@@ -613,7 +614,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             key: 'type',
             label: 'Type',
             format: (_: any, row: any) => {
-                const isCredit = row.sens === 'Crédit';
+                const isCredit = row.sens === 'CREDIT';
                 return (
                     <div className="flex items-center gap-2">
                         <Badge 
@@ -649,8 +650,8 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             label: 'Montant',
             align: 'right' as const,
             format: (val: any, row: any) => (
-                <span className={`font-bold font-mono ${row.sens === 'Crédit' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {row.sens === 'Crédit' ? '+' : '-'} {Number(val).toLocaleString()} FCFA
+                <span className={`font-bold font-mono ${row.sens === 'CREDIT' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {row.sens === 'CREDIT' ? '+' : '-'} {Number(val).toLocaleString()} FCFA
                 </span>
             )
         }

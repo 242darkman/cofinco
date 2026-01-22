@@ -3,6 +3,17 @@ import { X, Check, Calendar, DollarSign, Users, FileText, UserPlus, Search, Info
 import { tontineApi, clientApi, tontinePlanApi } from '../../../lib/api-client';
 import { Modal, FormField, SelectField, Button, Card, Badge, IconButton, TextareaField, LoadingSpinner } from '../../ui';
 import { formatClientName } from '../../../lib/format';
+import {
+  StatutClient,
+  StatutTontine,
+  FrequenceTontine,
+  TypeDistributionTontine,
+  FREQUENCE_TONTINE_LABELS,
+  FREQUENCE_TONTINE_OPTIONS,
+} from '@shared/enum/status-constants';
+
+type FrequenceTontineValue = typeof FrequenceTontine[keyof typeof FrequenceTontine];
+type StatutTontineValue = typeof StatutTontine[keyof typeof StatutTontine];
 
 interface Tontine {
   id: string;
@@ -12,10 +23,10 @@ interface Tontine {
   tauxPlateforme: number;
   intervalleCotisation: number;
   delaiPenalite: number;
-  frequence: 'Journalier' | 'Hebdomadaire' | 'Bimensuel' | 'Mensuel';
+  frequence: FrequenceTontineValue | string; // Support legacy FR values
   dateDebut: string;
   dateFin: string | null;
-  statut: 'Active' | 'Terminée' | 'Suspendue';
+  statut: StatutTontineValue | string; // Support legacy FR values
   nombreMembres?: number;
 }
 
@@ -34,7 +45,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
     intervalleCotisation: 1,
     delaiPenalite: 2,
     nombreMembres: 10,
-    frequence: 'Journalier' as 'Journalier' | 'Hebdomadaire' | 'Bimensuel' | 'Mensuel',
+    frequence: FrequenceTontine.DAILY as FrequenceTontineValue,
     dateDebut: new Date().toISOString().split('T')[0],
     dateFin: '',
   });
@@ -71,7 +82,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
       montantCotisation: plan.montant_cotisation,
       nombreMembres: plan.nombre_membres,
       tauxPlateforme: plan.taux_plateforme,
-      frequence: plan.frequence,
+      frequence: plan.frequence as FrequenceTontineValue,
     }));
   };
 
@@ -87,7 +98,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
         intervalleCotisation: tontine.intervalleCotisation || 1,
         delaiPenalite: tontine.delaiPenalite || 2,
         nombreMembres: tontine.nombreMembres || 10,
-        frequence: tontine.frequence,
+        frequence: tontine.frequence as FrequenceTontineValue,
         dateDebut: tontine.dateDebut?.split('T')[0] || new Date().toISOString().split('T')[0],
         dateFin: tontine.dateFin ? tontine.dateFin.split('T')[0] : '',
       });
@@ -147,7 +158,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
         intervalleCotisation: formData.intervalleCotisation,
         delaiPenalite: formData.delaiPenalite,
         nombreMembres: formData.nombreMembres,
-        typeDistribution: 'Rotatif',
+        typeDistribution: TypeDistributionTontine.ROTATING,
         frequence: formData.frequence,
         dateDebut: new Date(formData.dateDebut).toISOString(),
         dateFin: formData.dateFin ? new Date(formData.dateFin).toISOString() : null,
@@ -323,12 +334,12 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                     label="Fréquence"
                     name="frequence"
                     value={formData.frequence}
-                    onChange={(e) => setFormData(prev => ({ ...prev, frequence: e.target.value as any }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, frequence: e.target.value as FrequenceTontineValue }))}
                     options={[
-                        { value: 'Journalier', label: 'Journalier' },
-                        { value: 'Hebdomadaire', label: 'Hebdomadaire' },
-                        { value: 'Bimensuel', label: 'Bimensuel (2 semaines)' },
-                        { value: 'Mensuel', label: 'Mensuel' },
+                        { value: FrequenceTontine.DAILY, label: FREQUENCE_TONTINE_LABELS[FrequenceTontine.DAILY] },
+                        { value: FrequenceTontine.WEEKLY, label: FREQUENCE_TONTINE_LABELS[FrequenceTontine.WEEKLY] },
+                        { value: FrequenceTontine.BIWEEKLY, label: `${FREQUENCE_TONTINE_LABELS[FrequenceTontine.BIWEEKLY]} (2 semaines)` },
+                        { value: FrequenceTontine.MONTHLY, label: FREQUENCE_TONTINE_LABELS[FrequenceTontine.MONTHLY] },
                     ]}
                 />
             </div>
@@ -460,7 +471,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                                             <div className="text-xs text-slate-400">{client.telephone} • {client.quartier}</div>
                                         </div>
                                     </div>
-                                    <Badge value={client.statut} variant={client.statut === 'Actif' ? 'success' : 'neutral'} />
+                                    <Badge value={client.statut} variant={client.statut === StatutClient.ACTIVE ? 'success' : 'neutral'} />
                                 </div>
                             ))
                         )}

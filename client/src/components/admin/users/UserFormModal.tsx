@@ -5,8 +5,10 @@ import CameraCapture from '../../shared/CameraCapture';
 import { toast } from '../../../lib/toast';
 import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
 import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
+import { StatutUser } from '@shared/enum/status-constants';
 import PasswordStrengthIndicator from '../../auth/PasswordStrengthIndicator';
 import { useSecuritySettings } from '../../../hooks/settings/useSecuritySettings';
+import { resolveStorageUrl } from '../../../lib/format';
 
 interface User {
   id?: string;
@@ -18,7 +20,7 @@ interface User {
   email?: string;
   telephone?: string;
   phone?: string;
-  role: SystemRole;
+  role: SystemRole | string;
   statut: string;
   photoProfile?: string;
   photo_profile?: string;
@@ -33,7 +35,11 @@ interface UserFormModalProps {
 }
 
 const roles = getRoleOptions().filter((role) => role.value !== SystemRole.CLIENT);
-const statusOptions = ['Actif', 'Inactif', 'Suspendu'];
+const statusOptions = [
+  { value: StatutUser.ACTIVE, label: 'Actif' },
+  { value: StatutUser.INACTIVE, label: 'Inactif' },
+  { value: StatutUser.SUSPENDED, label: 'Suspendu' }
+];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[+]?[\d\s().-]{6,20}$/;
 const DEFAULT_PASSWORD_RULES = {
@@ -57,7 +63,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     email: '',
     telephone: '',
     role: SystemRole.CAISSIER,
-    statut: 'Actif',
+    statut: StatutUser.ACTIVE,
     photoProfile: ''
   });
   
@@ -111,26 +117,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     return { nom: '', prenom: '' };
   };
 
-  const resolveProfileUrl = (value?: string) => {
-    if (!value) return '';
-    if (value.startsWith('data:')) return value;
-    if (value.startsWith('/api/')) return value;
-    if (value.startsWith('/')) return value;
-    if (value.startsWith('http')) {
-      try {
-        const url = new URL(value);
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        if (pathParts.length >= 2) {
-          const key = pathParts.slice(1).join('/');
-          return `/api/uploads/files/${key}`;
-        }
-        return value;
-      } catch {
-        return value;
-      }
-    }
-    return `/api/uploads/files/${value}`;
-  };
+  const resolveProfileUrl = resolveStorageUrl;
 
   useEffect(() => {
     if (initialData) {
@@ -143,7 +130,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         email: initialData.email || '',
         telephone: initialData.telephone || initialData.phone || '',
         role: normalizeRoleValue(initialData.role),
-        statut: initialData.statut || 'Actif',
+        statut: initialData.statut || StatutUser.ACTIVE,
         photoProfile: initialData.photoProfile || initialData.photo_profile || ''
       });
       setErrors({});
@@ -161,7 +148,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
       email: '',
       telephone: '',
       role: SystemRole.CAISSIER,
-      statut: 'Actif',
+      statut: StatutUser.ACTIVE,
       photoProfile: ''
     });
     setShowPassword(false);

@@ -3,7 +3,11 @@
  *
  * Ce fichier définit les types d'opérations et leur impact sur les soldes.
  * Il est utilisé par tous les services de caisse pour garantir une cohérence.
+ *
+ * CONVENTION: Toutes les valeurs sont en ANGLAIS (SCREAMING_SNAKE_CASE)
  */
+
+import { TypeCompte } from "@shared/enum/status-constants";
 
 // ============================================================================
 // TYPES D'OPÉRATIONS - CLASSIFICATION PAR SENS DE FLUX
@@ -16,32 +20,26 @@
  */
 export const CAISSE_IN_OPERATIONS = [
   // Épargne & Comptes
-  "Dépôt épargne",
-  "Versement Épargne",
-  "Versement Courant",
-  "Versement Bloqué",
-  "Dépôt Épargne",
-  "Dépôt Courant",
-  "Dépôt Bloqué",
-  "Dépôt Initial",
+  "SAVINGS_DEPOSIT",
+  "DEPOSIT_SAVINGS",
+  "DEPOSIT_CURRENT",
+  "DEPOSIT_BLOCKED",
+  "INITIAL_DEPOSIT",
 
   // Crédits
-  "Remboursement crédit",
-  "Remboursement Crédit",
-  "Remboursement Prêt",
-  "Frais Engagement",
+  "CREDIT_REPAYMENT",
+  "LOAN_REPAYMENT",
+  "ENGAGEMENT_FEE",
 
   // Tontines
-  "Cotisation Tontine",
-  "Versement Tontine",
+  "TONTINE_CONTRIBUTION",
 
   // Encaissements
-  "Encaissement",
-  "Encaissement Divers",
+  "MISC_COLLECTION",
 
   // Transferts entrants
-  "Approvisionnement coffre", // Argent venant du coffre
-  "Transfert Entrant",
+  "SAFE_SUPPLY",
+  "TRANSFER_IN",
 ] as const;
 
 /**
@@ -51,25 +49,24 @@ export const CAISSE_IN_OPERATIONS = [
  */
 export const CAISSE_OUT_OPERATIONS = [
   // Épargne & Comptes
-  "Retrait épargne",
-  "Retrait Épargne",
-  "Retrait Courant",
-  "Retrait Bloqué",
-  "Retrait Tontine",
+  "SAVINGS_WITHDRAWAL",
+  "WITHDRAWAL_SAVINGS",
+  "WITHDRAWAL_CURRENT",
+  "WITHDRAWAL_BLOCKED",
+  "TONTINE_WITHDRAWAL",
 
   // Crédits
-  "Décaissement crédit",
-  "Décaissement Crédit",
-  "Décaissement Prêt",
+  "CREDIT_DISBURSEMENT",
+  "LOAN_DISBURSEMENT",
 
   // Frais et sorties
-  "Frais",
-  "Frais Bancaires",
-  "Décaissement Divers",
+  "FEE",
+  "BANK_FEE",
+  "MISC_DISBURSEMENT",
 
   // Transferts sortants
-  "Versement coffre", // Argent vers le coffre
-  "Transfert Sortant",
+  "SAFE_DEPOSIT",
+  "TRANSFER_OUT",
 ] as const;
 
 /**
@@ -77,9 +74,9 @@ export const CAISSE_OUT_OPERATIONS = [
  * La direction est déterminée par d'autres critères (référence, description)
  */
 export const CAISSE_NEUTRAL_OPERATIONS = [
-  "Transfert caisse",
-  "Ajustement",
-  "Virement Interne",
+  "CASH_TRANSFER",
+  "ADJUSTMENT",
+  "INTERNAL_TRANSFER",
 ] as const;
 
 // ============================================================================
@@ -95,20 +92,14 @@ export type CaisseOperation = CaisseInOperation | CaisseOutOperation | CaisseNeu
  * Détermine si une opération est une entrée d'argent en caisse
  */
 export function isIncomingOperation(typeOperation: string): boolean {
-  const normalized = typeOperation.toLowerCase();
-  return CAISSE_IN_OPERATIONS.some(op =>
-    normalized === op.toLowerCase() || normalized.includes(op.toLowerCase())
-  );
+  return (CAISSE_IN_OPERATIONS as readonly string[]).includes(typeOperation);
 }
 
 /**
  * Détermine si une opération est une sortie d'argent de caisse
  */
 export function isOutgoingOperation(typeOperation: string): boolean {
-  const normalized = typeOperation.toLowerCase();
-  return CAISSE_OUT_OPERATIONS.some(op =>
-    normalized === op.toLowerCase() || normalized.includes(op.toLowerCase())
-  );
+  return (CAISSE_OUT_OPERATIONS as readonly string[]).includes(typeOperation);
 }
 
 /**
@@ -140,25 +131,20 @@ export function getOperationDelta(
   }
 
   // Cas des opérations neutres nécessitant analyse contextuelle
-  const normalizedType = typeOperation.toLowerCase();
-
-  if (normalizedType.includes("transfert caisse")) {
+  if (typeOperation === "CASH_TRANSFER") {
     // Analyser la référence ou description pour déterminer le sens
     const ref = context?.reference || "";
     const desc = (context?.description || "").toLowerCase();
 
     const isIncoming =
       ref.includes("TRF-IN") ||
-      desc.includes("réception") ||
-      desc.includes("reception") ||
-      desc.includes("entrant") ||
-      desc.includes("entrée") ||
-      desc.includes("entree");
+      desc.includes("incoming") ||
+      desc.includes("in");
 
     return isIncoming ? amount : -amount;
   }
 
-  if (normalizedType.includes("ajustement")) {
+  if (typeOperation === "ADJUSTMENT") {
     // Les ajustements peuvent être positifs ou négatifs
     // Par convention, le montant signé indique déjà le sens
     return amount;
@@ -200,55 +186,55 @@ export const CAISSE_THRESHOLDS = {
 // ============================================================================
 
 /**
- * Mapping entre type de compte et type d'opération de versement
+ * Mapping entre type de compte et type d'opération de versement (EN)
  */
 export const COMPTE_VERSEMENT_MAPPING: Record<string, string> = {
-  "Épargne": "Versement Épargne",
-  "Courant": "Versement Courant",
-  "Bloqué": "Versement Bloqué",
+  [TypeCompte.SAVINGS]: "DEPOSIT_SAVINGS",
+  [TypeCompte.CURRENT]: "DEPOSIT_CURRENT",
+  [TypeCompte.BLOCKED]: "DEPOSIT_BLOCKED",
 };
 
 /**
- * Mapping entre type de compte et type d'opération de retrait
+ * Mapping entre type de compte et type d'opération de retrait (EN)
  */
 export const COMPTE_RETRAIT_MAPPING: Record<string, string> = {
-  "Épargne": "Retrait Épargne",
-  "Courant": "Retrait Courant",
-  "Bloqué": "Retrait Bloqué",
+  [TypeCompte.SAVINGS]: "WITHDRAWAL_SAVINGS",
+  [TypeCompte.CURRENT]: "WITHDRAWAL_CURRENT",
+  [TypeCompte.BLOCKED]: "WITHDRAWAL_BLOCKED",
 };
 
 /**
  * Obtient le type d'opération de versement pour un type de compte
  */
 export function getVersementOperation(typeCompte: string): string {
-  return COMPTE_VERSEMENT_MAPPING[typeCompte] || "Versement Courant";
+  return COMPTE_VERSEMENT_MAPPING[typeCompte] || "DEPOSIT_CURRENT";
 }
 
 /**
  * Obtient le type d'opération de retrait pour un type de compte
  */
 export function getRetraitOperation(typeCompte: string): string {
-  return COMPTE_RETRAIT_MAPPING[typeCompte] || "Retrait Courant";
+  return COMPTE_RETRAIT_MAPPING[typeCompte] || "WITHDRAWAL_CURRENT";
 }
 
 // ============================================================================
 // SENS COMPTABLE POUR MOUVEMENTS FINANCIERS
 // ============================================================================
 
-export type SensMouvement = "Débit" | "Crédit";
+export type SensMouvement = "DEBIT" | "CREDIT";
 
 /**
  * Détermine le sens du mouvement financier pour le ledger
  *
  * Convention:
- * - Crédit = Argent qui entre (perspective institution)
- * - Débit = Argent qui sort (perspective institution)
+ * - CREDIT = Argent qui entre (perspective institution)
+ * - DEBIT = Argent qui sort (perspective institution)
  */
 export function getSensMouvement(typeOperation: string): SensMouvement {
   if (isOutgoingOperation(typeOperation)) {
-    return "Débit"; // Argent sort de l'institution
+    return "DEBIT"; // Argent sort de l'institution
   }
-  return "Crédit"; // Argent entre dans l'institution
+  return "CREDIT"; // Argent entre dans l'institution
 }
 
 /**

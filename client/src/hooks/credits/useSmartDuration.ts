@@ -5,6 +5,34 @@ import {
   type FrequenceRemboursement,
   type DureeUnite
 } from '@shared/config/credit-durations';
+import { DureeUnite as DureeUniteEnum, FrequenceRemboursement as FrequenceEnum } from '@shared/enum/status-constants';
+
+// Mapping pour normaliser les valeurs françaises vers anglaises
+const DUREE_UNITE_NORMALIZE: Record<string, string> = {
+  'Mois': DureeUniteEnum.MONTH,
+  'Jour': DureeUniteEnum.DAY,
+  'Semaine': DureeUniteEnum.WEEK,
+  'MONTH': DureeUniteEnum.MONTH,
+  'DAY': DureeUniteEnum.DAY,
+  'WEEK': DureeUniteEnum.WEEK,
+};
+
+const FREQUENCE_NORMALIZE: Record<string, string> = {
+  'Mensuel': FrequenceEnum.MONTHLY,
+  'Journalier': FrequenceEnum.DAILY,
+  'Hebdomadaire': FrequenceEnum.WEEKLY,
+  'Bimensuel': FrequenceEnum.BI_MONTHLY,
+  'Trimestriel': FrequenceEnum.QUARTERLY,
+  'MONTHLY': FrequenceEnum.MONTHLY,
+  'DAILY': FrequenceEnum.DAILY,
+  'WEEKLY': FrequenceEnum.WEEKLY,
+  'BI_MONTHLY': FrequenceEnum.BI_MONTHLY,
+  'QUARTERLY': FrequenceEnum.QUARTERLY,
+};
+
+// Helper pour normaliser les valeurs
+const normalizeUnit = (unit: string): string => DUREE_UNITE_NORMALIZE[unit] || unit;
+const normalizeFrequence = (freq: string): string => FREQUENCE_NORMALIZE[freq] || freq;
 
 /**
  * Interface for a credit plan with duration constraints
@@ -26,10 +54,11 @@ interface CreditPlan {
 
 /**
  * Interface for a duration option
+ * Note: unit uses EN values (DAY, WEEK, MONTH) for consistency with shared config
  */
 export interface DurationOption {
   value: number;
-  unit: 'Mois' | 'Jour' | 'Semaine';
+  unit: 'MONTH' | 'DAY' | 'WEEK';
   label: string;
   isRecommended: boolean;
 }
@@ -62,6 +91,10 @@ interface ValidationResult {
  */
 const generateLabel = (value: number, unit: string): string => {
   const unitLabels: Record<string, string> = {
+    'MONTH': value === 1 ? 'mois' : 'mois',
+    'DAY': value === 1 ? 'jour' : 'jours',
+    'WEEK': value === 1 ? 'semaine' : 'semaines',
+    // Legacy French values (for backwards compatibility)
     'Mois': value === 1 ? 'mois' : 'mois',
     'Jour': value === 1 ? 'jour' : 'jours',
     'Semaine': value === 1 ? 'semaine' : 'semaines',
@@ -88,29 +121,31 @@ export function useSmartDuration({
   const suggestedDurations = useMemo<DurationOption[]>(() => {
     // Get plan duration values (normalized for snake_case vs camelCase)
     const planDuration = selectedPlan?.dureeValeur || selectedPlan?.duree_valeur;
-    const planUnit = (selectedPlan?.dureeUnite || selectedPlan?.duree_unite) as 'Mois' | 'Jour' | 'Semaine' | undefined;
-    
+    const rawPlanUnit = selectedPlan?.dureeUnite || selectedPlan?.duree_unite;
+    // Normalize the unit to EN values
+    const planUnit = rawPlanUnit ? normalizeUnit(rawPlanUnit) as 'MONTH' | 'DAY' | 'WEEK' : undefined;
+
     // CASE 1: Plan is active - generate options based on plan constraints
     if (selectedPlan && planDuration && planUnit) {
       // The default duration is the plan's standard duration
       const defaultDuration = planDuration;
-      
+
       // Calculate min and max based on plan duration (±50% range)
       const minDuration = Math.max(1, Math.floor(defaultDuration * 0.5));
       const maxDuration = Math.ceil(defaultDuration * 1.5);
-      
+
       // If min/max are the same (or very close), expand the range
       const durations = new Set([minDuration, defaultDuration, maxDuration]);
-      
+
       // Convert to sorted array and take 3 options
       const sortedDurations = Array.from(durations).sort((a, b) => a - b).slice(0, 3);
-      
+
       // If we have less than 3 unique values, add intermediate values
       while (sortedDurations.length < 3 && sortedDurations.length > 0) {
         const lastValue = sortedDurations[sortedDurations.length - 1];
         sortedDurations.push(lastValue + Math.ceil(defaultDuration * 0.25));
       }
-      
+
       return sortedDurations.map(value => ({
         value,
         unit: planUnit,
@@ -118,12 +153,12 @@ export function useSmartDuration({
         isRecommended: value === defaultDuration,
       }));
     }
-    
+
     // CASE 2: No plan - generate based on amount (financial logic)
-    const unit: 'Mois' = 'Mois'; // Default to months for amount-based
-    
+    const unit: 'MONTH' = 'MONTH'; // Default to months for amount-based
+
     let durations: number[];
-    
+
     if (!amount || amount < 100000) {
       // Small loans: short durations
       durations = [1, 2, 3];
@@ -134,10 +169,10 @@ export function useSmartDuration({
       // Large loans: longer durations
       durations = [6, 12, 18];
     }
-    
+
     // Middle option is recommended
     const middleIndex = Math.floor(durations.length / 2);
-    
+
     return durations.map((value, index) => ({
       value,
       unit,
@@ -151,19 +186,23 @@ export function useSmartDuration({
    * Simple calculation: (principal + interest) / number of payments
    */
   const calculateInstallment = useCallback(
-    (duration: number, loanAmount: number, rate: number, repaymentFrequence: string, durationUnit: string = 'Mois'): number => {
+    (duration: number, loanAmount: number, rate: number, repaymentFrequence: string, durationUnit: string = 'MONTH'): number => {
       if (duration <= 0 || loanAmount <= 0) return 0;
-      
+
       // Calculate total with simple interest
       const totalWithInterest = loanAmount * (1 + rate / 100);
-      
+
+      // Normalize inputs to EN values for shared logic
+      const normalizedFrequence = normalizeFrequence(repaymentFrequence);
+      const normalizedUnit = normalizeUnit(durationUnit);
+
       // Use shared logic for accurate calculation
       const numberOfPayments = calculerNombreEcheances(
-        repaymentFrequence as FrequenceRemboursement,
+        normalizedFrequence as FrequenceRemboursement,
         duration,
-        durationUnit as DureeUnite
+        normalizedUnit as DureeUnite
       );
-      
+
       return numberOfPayments > 0 ? Math.round(totalWithInterest / numberOfPayments) : 0;
     },
     []
@@ -178,12 +217,16 @@ export function useSmartDuration({
       if (!duration || duration <= 0) {
         return null; // Will be caught by required field validation
       }
-      
+
+      // Normalize inputs to EN values
+      const normalizedUnit = normalizeUnit(unit);
+      const normalizedFrequence = normalizeFrequence(frequence);
+
       // 1. Validate against shared logic first (Backend rules)
       const sharedValidation = validerCoherenceFrequenceDuree(
-        frequence as FrequenceRemboursement,
+        normalizedFrequence as FrequenceRemboursement,
         duration,
-        unit as DureeUnite
+        normalizedUnit as DureeUnite
       );
 
       if (!sharedValidation.isValid) {
@@ -192,44 +235,46 @@ export function useSmartDuration({
           message: sharedValidation.debugMessage || "Durée incompatible avec la fréquence"
         };
       }
-      
+
       // 2. Validate against plan limits if a plan is selected
       if (selectedPlan) {
         const planDuration = selectedPlan.dureeValeur || selectedPlan.duree_valeur;
-        const planUnit = selectedPlan.dureeUnite || selectedPlan.duree_unite;
-        
+        const rawPlanUnit = selectedPlan.dureeUnite || selectedPlan.duree_unite;
+        const planUnit = rawPlanUnit ? normalizeUnit(rawPlanUnit) : null;
+
         if (planDuration && planUnit) {
           // Check if exceeds plan max (we use 1.5x as a soft max)
           const maxAllowed = Math.ceil(planDuration * 1.5);
           const minAllowed = Math.max(1, Math.floor(planDuration * 0.3));
-          
+
           // Convert to same unit for comparison
-          if (unit === planUnit) {
+          if (normalizedUnit === planUnit) {
+            const unitLabel = planUnit === 'DAY' ? 'jours' : planUnit === 'WEEK' ? 'semaines' : 'mois';
             if (duration > maxAllowed) {
               return {
                 type: 'error',
-                message: `Ce plan impose max ${maxAllowed} ${planUnit.toLowerCase()}`,
+                message: `Ce plan impose max ${maxAllowed} ${unitLabel}`,
               };
             }
             if (duration < minAllowed) {
               return {
                 type: 'error',
-                message: `Ce plan impose min ${minAllowed} ${planUnit.toLowerCase()}`,
+                message: `Ce plan impose min ${minAllowed} ${unitLabel}`,
               };
             }
           }
         }
       }
-      
+
       // Check for very high monthly payment (based on amount)
       if (amount && duration > 0) {
         // Convert duration to months for consistent calculation
         let durationInMonths = duration;
-        if (unit === 'Jour') durationInMonths = Math.ceil(duration / 30);
-        else if (unit === 'Semaine') durationInMonths = Math.ceil(duration / 4);
-        
+        if (normalizedUnit === 'DAY') durationInMonths = Math.ceil(duration / 30);
+        else if (normalizedUnit === 'WEEK') durationInMonths = Math.ceil(duration / 4);
+
         const estimatedMonthly = amount / Math.max(1, durationInMonths);
-        
+
         // Warn if monthly payment exceeds 500,000 FCFA (high threshold)
         if (estimatedMonthly > 500000) {
           return {
@@ -238,7 +283,7 @@ export function useSmartDuration({
           };
         }
       }
-      
+
       return null;
     },
     [selectedPlan, amount, frequence]

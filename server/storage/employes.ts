@@ -1,8 +1,68 @@
-import { employes, users, agences } from "@shared/schema";
+/**
+ * ============================================
+ * Storage: Employés - Architecture V3
+ * ============================================
+ *
+ * Gestion des employés avec architecture multi-rôles propre.
+ * Source de vérité unique: userRoles (plus de roleSystem)
+ *
+ * Transactions:
+ * - createEmployeWithUser: users + employes + userRoles
+ * - updateEmployeWithUser: users + employes + userRoles
+ * - deleteEmploye: soft delete user + suppression rôles
+ */
+
+import { employes, users, userRoles } from "@shared/schema";
 import { type Employe, type InsertEmploye, type User, type EmployeWithUser } from "@shared/schema";
-import { SystemRole, normalizeRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles";
+import { StatutUser } from "@shared/enum/status-constants";
 import { db } from "../db";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and, isNull, asc } from "drizzle-orm";
+import { StorageService } from "../services/storage-service";
+
+// ============================================
+// Types pour l'architecture V3
+// ============================================
+
+export interface CreateEmployeData {
+  // Données utilisateur
+  nom: string;
+  prenom?: string;
+  email?: string;
+  telephone?: string;
+  sexe?: 'M' | 'F';
+  username?: string;
+  password?: string;
+}
+
+export interface CreateEmployeRHData {
+  // Données RH (sans userId ni roleSystem)
+  matricule?: string;
+  poste?: string;
+  departement?: string;
+  dateEmbauche?: string;
+  typeContrat?: string;
+  agenceId?: string;
+  managerId?: string;
+  salaireBase?: number;
+  tauxHoraire?: number;
+  tauxJournalier?: number;
+  modeCalculPaie?: string;
+  caissePin?: string;
+  statut?: string;
+}
+
+export interface EmployeWithRoles extends EmployeWithUser {
+  roles: Array<{
+    role: SystemRole;
+    agenceId: string | null;
+    isPrimary: boolean;
+  }>;
+}
+
+// ============================================
+// Fonctions de lecture
+// ============================================
 
 /**
  * Récupérer un employé par son ID
@@ -13,7 +73,7 @@ export async function getEmploye(id: string): Promise<Employe | undefined> {
 }
 
 /**
- * Récupérer un employé par son userId (lien vers users)
+ * Récupérer un employé par son userId
  */
 export async function getEmployeByUserId(userId: string): Promise<Employe | undefined> {
   const [employe] = await db.select().from(employes).where(eq(employes.userId, userId));
@@ -47,6 +107,32 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
   return {
     ...result[0].employe,
     user: result[0].user
+  };
+}
+
+/**
+ * Récupérer un employé avec ses rôles (Architecture V3)
+ */
+export async function getEmployeWithRoles(id: string): Promise<EmployeWithRoles | undefined> {
+  const employe = await getEmployeWithUser(id);
+  if (!employe) return undefined;
+
+  const roles = await db.select({
+    role: userRoles.role,
+    agenceId: userRoles.agenceId,
+    isPrimary: userRoles.isPrimary,
+  })
+  .from(userRoles)
+  .where(eq(userRoles.userId, employe.userId))
+  .orderBy(desc(userRoles.isPrimary), asc(userRoles.createdAt));
+
+  return {
+    ...employe,
+    roles: roles.map(r => ({
+      role: r.role as SystemRole,
+      agenceId: r.agenceId,
+      isPrimary: r.isPrimary,
+    })),
   };
 }
 
@@ -112,24 +198,35 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
 }
 
 /**
- * Créer un nouvel employé (avec son user associé)
- * Cette fonction crée d'abord un user puis l'employe lié
+ * Récupérer tous les employés (simple)
+ */
+export async function getAllEmployes(): Promise<Employe[]> {
+  return db.select().from(employes).orderBy(desc(employes.createdAt));
+}
+
+// ============================================
+// Fonctions de création (Transactions)
+// ============================================
+
+/**
+ * Créer un nouvel employé avec user et rôle (Architecture V3)
+ *
+ * Transaction atomique:
+ * 1. Créer le user (identité + auth)
+ * 2. Créer l'employé (données RH)
+ * 3. Créer le rôle dans userRoles
+ *
+ * @param userData - Données d'identité et authentification
+ * @param employeData - Données RH
+ * @param role - Rôle à attribuer (défaut: AGENT_TERRAIN)
  */
 export async function createEmployeWithUser(
-  userData: {
-    nom: string;
-    prenom?: string;
-    email?: string;
-    telephone?: string;
-    sexe?: 'M' | 'F';
-    username?: string;
-    password?: string;
-  },
-  employeData: Omit<InsertEmploye, 'userId'>
+  userData: CreateEmployeData,
+  employeData: CreateEmployeRHData,
+  role: SystemRole = SystemRole.AGENT_TERRAIN
 ): Promise<{ user: User; employe: Employe }> {
-  const resolvedRole = normalizeRole(employeData.roleSystem) || SystemRole.AGENT_TERRAIN;
   return await db.transaction(async (tx) => {
-    // Créer l'utilisateur
+    // 1. Créer l'utilisateur
     const [user] = await tx.insert(users).values({
       nom: userData.nom,
       prenom: userData.prenom,
@@ -140,15 +237,34 @@ export async function createEmployeWithUser(
       password: userData.password,
       typeCompte: 'employe',
       canLogin: !!userData.username,
-      statut: 'Actif',
-      role: resolvedRole,
+      statut: StatutUser.ACTIVE,
     }).returning();
 
-    // Créer l'employé lié
+    // 2. Créer l'employé
     const [employe] = await tx.insert(employes).values({
-      ...employeData,
       userId: user.id,
+      matricule: employeData.matricule,
+      poste: employeData.poste,
+      departement: employeData.departement,
+      dateEmbauche: employeData.dateEmbauche,
+      typeContrat: employeData.typeContrat,
+      agenceId: employeData.agenceId,
+      managerId: employeData.managerId,
+      salaireBase: employeData.salaireBase,
+      tauxHoraire: employeData.tauxHoraire,
+      tauxJournalier: employeData.tauxJournalier,
+      modeCalculPaie: employeData.modeCalculPaie,
+      caissePin: employeData.caissePin,
+      statut: employeData.statut || StatutUser.ACTIVE,
     }).returning();
+
+    // 3. Créer le rôle dans userRoles
+    await tx.insert(userRoles).values({
+      userId: user.id,
+      role: role,
+      agenceId: employeData.agenceId,
+      isPrimary: true,
+    });
 
     return { user, employe };
   });
@@ -157,13 +273,59 @@ export async function createEmployeWithUser(
 /**
  * Créer un employé pour un user existant
  */
-export async function createEmployeForUser(userId: string, employeData: Omit<InsertEmploye, 'userId'>): Promise<Employe> {
-  const [employe] = await db.insert(employes).values({
-    ...employeData,
-    userId,
-  }).returning();
+export async function createEmployeForUser(
+  userId: string,
+  employeData: CreateEmployeRHData,
+  role: SystemRole = SystemRole.AGENT_TERRAIN
+): Promise<Employe> {
+  return await db.transaction(async (tx) => {
+    // Créer l'employé
+    const [employe] = await tx.insert(employes).values({
+      userId,
+      matricule: employeData.matricule,
+      poste: employeData.poste,
+      departement: employeData.departement,
+      dateEmbauche: employeData.dateEmbauche,
+      typeContrat: employeData.typeContrat,
+      agenceId: employeData.agenceId,
+      managerId: employeData.managerId,
+      salaireBase: employeData.salaireBase,
+      tauxHoraire: employeData.tauxHoraire,
+      tauxJournalier: employeData.tauxJournalier,
+      modeCalculPaie: employeData.modeCalculPaie,
+      caissePin: employeData.caissePin,
+      statut: employeData.statut || StatutUser.ACTIVE,
+    }).returning();
+
+    // Créer le rôle s'il n'existe pas déjà
+    const [existingRole] = await tx.select()
+      .from(userRoles)
+      .where(eq(userRoles.userId, userId));
+
+    if (!existingRole) {
+      await tx.insert(userRoles).values({
+        userId,
+        role: role,
+        agenceId: employeData.agenceId,
+        isPrimary: true,
+      });
+    }
+
+    return employe;
+  });
+}
+
+/**
+ * Créer un employé simple (pour compatibilité)
+ */
+export async function createEmploye(employeData: InsertEmploye): Promise<Employe> {
+  const [employe] = await db.insert(employes).values(employeData).returning();
   return employe;
 }
+
+// ============================================
+// Fonctions de mise à jour
+// ============================================
 
 /**
  * Mettre à jour un employé
@@ -177,7 +339,12 @@ export async function updateEmploye(id: string, data: Partial<InsertEmploye>): P
 }
 
 /**
- * Mettre à jour un employé et son user associé
+ * Mettre à jour un employé, son user et son rôle (Architecture V3)
+ *
+ * @param employeId - ID de l'employé
+ * @param userData - Données user à mettre à jour
+ * @param employeData - Données RH à mettre à jour
+ * @param newRole - Nouveau rôle (optionnel)
  */
 export async function updateEmployeWithUser(
   employeId: string,
@@ -190,25 +357,49 @@ export async function updateEmployeWithUser(
     photoProfile: string;
     statut: string;
   }>,
-  employeData?: Partial<InsertEmploye>
+  employeData?: Partial<CreateEmployeRHData>,
+  newRole?: SystemRole
 ): Promise<EmployeWithUser | undefined> {
   return await db.transaction(async (tx) => {
     // Récupérer l'employé pour avoir le userId
     const [currentEmploye] = await tx.select().from(employes).where(eq(employes.id, employeId));
     if (!currentEmploye) return undefined;
 
-    // Mettre à jour le user si des données sont fournies
+    // 1. Mettre à jour le user si des données sont fournies
     if (userData && Object.keys(userData).length > 0) {
       await tx.update(users)
         .set({ ...userData, updatedAt: new Date() })
         .where(eq(users.id, currentEmploye.userId));
     }
 
-    // Mettre à jour l'employe si des données sont fournies
+    // 2. Mettre à jour l'employe si des données sont fournies
     if (employeData && Object.keys(employeData).length > 0) {
       await tx.update(employes)
         .set({ ...employeData, updatedAt: new Date() })
         .where(eq(employes.id, employeId));
+    }
+
+    // 3. Mettre à jour le rôle si demandé
+    if (newRole) {
+      const [existingRole] = await tx.select()
+        .from(userRoles)
+        .where(and(
+          eq(userRoles.userId, currentEmploye.userId),
+          eq(userRoles.isPrimary, true)
+        ));
+
+      if (existingRole) {
+        await tx.update(userRoles)
+          .set({ role: newRole, updatedAt: new Date() })
+          .where(eq(userRoles.id, existingRole.id));
+      } else {
+        await tx.insert(userRoles).values({
+          userId: currentEmploye.userId,
+          role: newRole,
+          agenceId: employeData?.agenceId || currentEmploye.agenceId,
+          isPrimary: true,
+        });
+      }
     }
 
     // Retourner les données mises à jour
@@ -239,34 +430,109 @@ export async function updateEmployeWithUser(
   });
 }
 
+// ============================================
+// Gestion des rôles (Architecture V3)
+// ============================================
+
 /**
- * Supprimer un employé (soft delete du user associé)
+ * Obtenir tous les rôles d'un utilisateur
+ */
+export async function getUserRolesByUserId(userId: string): Promise<Array<{
+  id: string;
+  role: SystemRole;
+  agenceId: string | null;
+  isPrimary: boolean;
+}>> {
+  const roles = await db.select({
+    id: userRoles.id,
+    role: userRoles.role,
+    agenceId: userRoles.agenceId,
+    isPrimary: userRoles.isPrimary,
+  })
+  .from(userRoles)
+  .where(eq(userRoles.userId, userId))
+  .orderBy(desc(userRoles.isPrimary), asc(userRoles.createdAt));
+
+  return roles.map(r => ({
+    id: r.id,
+    role: r.role as SystemRole,
+    agenceId: r.agenceId,
+    isPrimary: r.isPrimary,
+  }));
+}
+
+/**
+ * Ajouter un rôle à un utilisateur
+ */
+export async function addUserRole(
+  userId: string,
+  role: SystemRole,
+  agenceId?: string,
+  isPrimary: boolean = false
+): Promise<void> {
+  await db.insert(userRoles).values({
+    userId,
+    role,
+    agenceId: agenceId || null,
+    isPrimary,
+  });
+}
+
+/**
+ * Supprimer un rôle d'un utilisateur
+ */
+export async function removeUserRole(roleId: string): Promise<void> {
+  await db.delete(userRoles).where(eq(userRoles.id, roleId));
+}
+
+/**
+ * Définir le rôle principal d'un utilisateur
+ */
+export async function setUserPrimaryRole(userId: string, roleId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Désactiver tous les rôles principaux
+    await tx.update(userRoles)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(and(
+        eq(userRoles.userId, userId),
+        eq(userRoles.isPrimary, true)
+      ));
+
+    // Activer le nouveau rôle principal
+    await tx.update(userRoles)
+      .set({ isPrimary: true, updatedAt: new Date() })
+      .where(eq(userRoles.id, roleId));
+  });
+}
+
+// ============================================
+// Fonctions de suppression
+// ============================================
+
+/**
+ * Supprimer un employé (soft delete du user + suppression fichiers MinIO)
  */
 export async function deleteEmploye(id: string): Promise<boolean> {
   return await db.transaction(async (tx) => {
     const [employe] = await tx.select().from(employes).where(eq(employes.id, id));
     if (!employe) return false;
 
-    // Soft delete du user (met deletedAt)
+    // Supprimer les fichiers MinIO associés à l'employé (CASCADE)
+    try {
+      const { publicDeleted, privateDeleted } = await StorageService.deleteEntityFiles('employe', id);
+      if (publicDeleted > 0 || privateDeleted > 0) {
+        console.log(`🗑️  Employe ${id}: suppression cascade MinIO (${publicDeleted} publics, ${privateDeleted} privés)`);
+      }
+    } catch (storageError) {
+      // Log l'erreur mais continue la suppression
+      console.error(`⚠️  Erreur suppression fichiers MinIO pour employe ${id}:`, storageError);
+    }
+
+    // Soft delete du user
     await tx.update(users)
-      .set({ deletedAt: new Date(), statut: 'Inactif' })
+      .set({ deletedAt: new Date(), statut: StatutUser.INACTIVE })
       .where(eq(users.id, employe.userId));
 
     return true;
   });
-}
-
-/**
- * Récupérer tous les employés (simple, sans user)
- */
-export async function getAllEmployes(): Promise<Employe[]> {
-  return db.select().from(employes).orderBy(desc(employes.createdAt));
-}
-
-/**
- * Créer un employé (simple, pour compatibilité)
- */
-export async function createEmploye(employeData: InsertEmploye): Promise<Employe> {
-  const [employe] = await db.insert(employes).values(employeData).returning();
-  return employe;
 }

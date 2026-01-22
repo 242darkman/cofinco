@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
 import { IconButton } from './';
 
@@ -102,16 +103,25 @@ const Modal: React.FC<ModalProps> = ({
     }
   };
 
-  return (
+  // Render with Portal to avoid z-index conflicts
+  return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto backdrop-blur-sm"
-      onClick={handleBackdropClick}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+        onClick={handleBackdropClick}
+        aria-hidden="true"
+      />
+
+      {/* Modal Container */}
       <div
         className={`
+          relative z-[110]
           bg-surface-base sm:rounded-2xl border-x-0 sm:border border-edge
           w-full ${sizeClasses[size]}
           h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden shadow-theme-lg
@@ -163,7 +173,8 @@ const Modal: React.FC<ModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

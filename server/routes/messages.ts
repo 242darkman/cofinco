@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { requireAuth } from "../auth";
 import { db } from "../db";
-import { messages, users, userAgences, agences } from "@shared/schema";
+import { messages, users, userAgences, agences, userRoles, employes } from "@shared/schema";
 import { eq, or, and, desc, asc, sql, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
@@ -164,17 +164,22 @@ export function registerMessagesRoutes(app: Express) {
       if (!query || query.length < 2) return res.json([]);
 
       // Search by username, nom, prenom, or full name combination
+      // Role is fetched from userRoles (Architecture V3: source de vérité unique)
       const foundUsers = await db.select({
         id: users.id,
         username: users.username,
         nom: users.nom,
         prenom: users.prenom,
         photoProfile: users.photoProfile,
-        role: users.role,
+        role: userRoles.role,
         agence: agences.nom,
         typeCompte: users.typeCompte
       })
       .from(users)
+      .leftJoin(userRoles, and(
+        eq(userRoles.userId, users.id),
+        eq(userRoles.isPrimary, true)
+      ))
       .leftJoin(userAgences, and(
         eq(userAgences.userId, users.id),
         eq(userAgences.isPrimary, true),

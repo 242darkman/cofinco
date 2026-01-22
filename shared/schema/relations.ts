@@ -3,7 +3,8 @@ import { users, loginAttempts } from "./auth";
 import { clients } from "./clients";
 import { credits, remboursements, comptes, transactionsCompte, plansEpargne, sessionsCaisse, operationsCaisse, mouvementsFinanciers } from "./finance";
 import { tontines, membresTontine, contributionsTontine, tontineAlertes, tontinePenalites } from "./tontines";
-import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures, lignesFactures, remisesTerrain } from "./operations";
+import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures, lignesFactures, remisesTerrain, comptageBillets } from "./operations";
+
 import { notifications, pushSubscriptions } from "./settings";
 import { transferts } from "./transferts";
 import { clientTags, clientActivities } from "./clients";
@@ -98,6 +99,10 @@ export const facturesRelations = relations(factures, ({ one }) => ({
   agent: one(users, {
     fields: [factures.agentId],
     references: [users.id],
+  }),
+  session: one(sessionsCaisse, {
+    fields: [factures.sessionId],
+    references: [sessionsCaisse.id],
   }),
 }));
 
@@ -223,4 +228,10 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
 }));
 
 
+export const comptageBilletsRelations = relations(comptageBillets, ({ one }) => ({
+  session: one(sessionsCaisse, {
+    fields: [comptageBillets.sessionId],
+    references: [sessionsCaisse.id],
+  }),
+}));
 

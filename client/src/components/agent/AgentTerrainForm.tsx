@@ -25,7 +25,7 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
     phone: agent?.phone || '',
     email: agent?.email || '',
     zone_affectation: agent?.zone_affectation || agent?.zoneAffectation || '',
-    statut: agent?.statut || 'Actif',
+    statut: agent?.statut || 'ACTIVE',
     objectif_mensuel: agent?.objectif_mensuel || agent?.objectifMensuel || '',
     date_embauche: agent?.date_embauche || agent?.dateEmbauche || new Date().toISOString().split('T')[0]
   });
@@ -213,10 +213,10 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
                   value={formData.statut}
                   onChange={(e) => setFormData({ ...formData, statut: e.target.value })}
                   options={[
-                     { value: 'Actif', label: 'Actif' },
-                     { value: 'En congé', label: 'En congé' },
-                     { value: 'Suspendu', label: 'Suspendu' },
-                     { value: 'Inactif', label: 'Inactif' }
+                     { value: 'ACTIVE', label: 'Actif' },
+                     { value: 'ON_LEAVE', label: 'En congé' },
+                     { value: 'SUSPENDED', label: 'Suspendu' },
+                     { value: 'INACTIVE', label: 'Inactif' }
                   ]}
                />
                <FormField

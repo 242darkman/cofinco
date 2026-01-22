@@ -80,7 +80,7 @@ export const ROUTES: RouteConfig[] = [
     path: '/remboursements',
     component: CreditRefundsPage,
     requiredModule: 'Remboursements',
-    label: 'Restitutions Frais',
+    label: 'Restitutions (Refus)',
     labelKey: 'menuRemboursements',
     group: 'Services Clients',
   },

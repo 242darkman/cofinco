@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { StatutConge } from '@shared/enum/status-constants';
 
 export interface DemandeConge {
   id: number;
@@ -8,7 +9,7 @@ export interface DemandeConge {
   dateDebut: string;
   dateFin: string;
   motif?: string;
-  statut: 'En attente' | 'Approuvé' | 'Refusé';
+  statut: string; // EN values: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
   approuvePar?: string;
   dateDecision?: string;
   commentaire?: string;
@@ -115,10 +116,10 @@ export function useConges() {
   };
 
   const getStats = () => ({
-    enCours: demandesConges.filter(c => c.statut === 'Approuvé').length,
-    enAttente: demandesConges.filter(c => c.statut === 'En attente').length,
-    approuves: demandesConges.filter(c => c.statut === 'Approuvé').length,
-    refuses: demandesConges.filter(c => c.statut === 'Refusé').length
+    enCours: demandesConges.filter(c => c.statut === StatutConge.APPROVED).length,
+    enAttente: demandesConges.filter(c => c.statut === StatutConge.PENDING).length,
+    approuves: demandesConges.filter(c => c.statut === StatutConge.APPROVED).length,
+    refuses: demandesConges.filter(c => c.statut === StatutConge.REJECTED).length
   });
 
   useEffect(() => {

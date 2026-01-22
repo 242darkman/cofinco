@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, User, Percent, DollarSign, Calendar, Lock, AlertCircle } from 'lucide-react';
 import { clientApi, compteBloqueApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { StatutClient, StatutCompte } from '@shared/enum/status-constants';
 
 interface Client {
   id: string;
@@ -38,7 +39,7 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
     try {
       const data = await clientApi.getAllList();
       // Filter for active clients only
-      const activeClients = (data || []).filter((c: any) => c.statut === 'Actif');
+      const activeClients = (data || []).filter((c: any) => c.statut === StatutClient.ACTIVE);
       setClients(activeClients);
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du chargement des clients'));
@@ -108,7 +109,7 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
         date_echeance: dateEcheance.toISOString().split('T')[0],
         penalite_retrait_anticipe: parseFloat(formData.penalite_retrait_anticipe),
         description: formData.description,
-        statut: 'Actif'
+        statut: StatutCompte.ACTIVE
       });
 
       toast.success('Compte bloqué créé avec succès');

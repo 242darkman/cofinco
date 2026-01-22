@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
-import { activeSessions, users, userAgences, agences } from '@shared/schema';
+import { activeSessions, users, userAgences, agences, userRoles } from '@shared/schema';
+import { SystemRole } from '@shared/types/roles';
 import { eq, and, lt, desc, sql } from 'drizzle-orm';
 
 // Simple user agent parser without external dependencies
@@ -121,6 +122,7 @@ export async function deleteUserSessions(userId: string): Promise<number> {
 // Get all active sessions with user info
 export async function getActiveSessions(): Promise<any[]> {
   try {
+    // Query sessions with user data (Architecture V3: rôle uniquement via userRoles)
     const sessions = await db
       .select({
         id: activeSessions.id,
@@ -139,11 +141,16 @@ export async function getActiveSessions(): Promise<any[]> {
         userName: users.nom,
         userPrenom: users.prenom,
         userEmail: users.email,
-        userRole: users.role,
+        // Rôle uniquement via userRoles (Architecture V3)
+        userRole: userRoles.role,
         userAgence: agences.nom,
       })
       .from(activeSessions)
       .leftJoin(users, eq(activeSessions.userId, users.id))
+      .leftJoin(userRoles, and(
+        eq(userRoles.userId, activeSessions.userId),
+        eq(userRoles.isPrimary, true)
+      ))
       .leftJoin(userAgences, and(
         eq(userAgences.userId, users.id),
         eq(userAgences.isPrimary, true),
@@ -153,7 +160,11 @@ export async function getActiveSessions(): Promise<any[]> {
       .where(eq(activeSessions.isActive, true))
       .orderBy(desc(activeSessions.lastActivity));
 
-    return sessions;
+    // Si pas de rôle dans userRoles, fallback vers CLIENT (Architecture V3: plus de employes.roleSystem)
+    return sessions.map((s) => ({
+      ...s,
+      userRole: s.userRole || SystemRole.CLIENT,
+    }));
   } catch (error) {
     console.error('[SESSION TRACKER] Error getting active sessions:', error);
     return [];

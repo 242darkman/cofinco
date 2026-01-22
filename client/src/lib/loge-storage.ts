@@ -38,19 +38,19 @@ export async function saveToLoge(
   file: File | Blob,
   options: SaveToLogeOptions
 ): Promise<LogeDocument | null> {
-  const logeToken = getLogeToken();
-  
   try {
     // Étape 1: Demander une URL de téléchargement signée
     const fileName = options.nom.includes('.') ? options.nom : `${options.nom}.${getExtensionFromMimeType(file.type)}`;
-    
-    const urlResponse = await fetch('/api/uploads/request-url', {
+
+    const urlResponse = await fetch('/api/storage/presigned-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({
-        name: fileName,
-        size: file.size,
-        contentType: file.type || 'application/octet-stream'
+        filename: fileName,
+        contentType: file.type || 'application/octet-stream',
+        path: options.categorie || 'general',
+        isPublic: options.visibilite === 'public',
       })
     });
 
@@ -58,7 +58,7 @@ export async function saveToLoge(
       throw new Error('Impossible d\'obtenir l\'URL de téléchargement');
     }
 
-    const { uploadURL, objectPath } = await urlResponse.json();
+    const { uploadUrl: uploadURL, key: objectPath } = await urlResponse.json();
 
     // Étape 2: Télécharger le fichier vers le stockage cloud
     const uploadResponse = await fetch(uploadURL, {

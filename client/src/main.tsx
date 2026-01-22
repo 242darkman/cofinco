@@ -8,12 +8,43 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ServerHealthProvider, getServerHealthBridge, isNetworkFailure } from './contexts/ServerHealthContext';
 import { SERVER_HEALTH_ENDPOINT } from './lib/serverHealthConfig';
 
-// Create a client
+// ========== REACT QUERY CONFIGURATION FOR SLOW CONNECTIONS ==========
+// Optimized for 3G/slow networks with aggressive caching and deduplication
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // Data freshness: 5 minutes before marking as stale
       staleTime: 5 * 60 * 1000, // 5 minutes
+
+      // Garbage collection: keep unused data for 30 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes (was cacheTime in v4)
+
+      // Don't refetch on window focus (saves bandwidth on slow connections)
       refetchOnWindowFocus: false,
+
+      // Don't refetch on mount if data is still fresh
+      refetchOnMount: false,
+
+      // Only refetch on reconnect if data is stale
+      refetchOnReconnect: 'always',
+
+      // Retry configuration for flaky connections
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+
+      // Network mode: always try to fetch, but return cached data if offline
+      networkMode: 'offlineFirst',
+
+      // Structural sharing for performance
+      structuralSharing: true,
+    },
+    mutations: {
+      // Retry mutations once on failure
+      retry: 1,
+      retryDelay: 1000,
+
+      // Network mode for mutations
+      networkMode: 'offlineFirst',
     },
   },
 });

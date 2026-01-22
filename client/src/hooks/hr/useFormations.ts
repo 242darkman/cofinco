@@ -8,7 +8,7 @@ export interface Formation {
   duree: string;
   lieu?: string;
   description?: string;
-  statut: 'Planifiée' | 'En cours' | 'Terminée' | 'Annulée';
+  statut: 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   capaciteMax?: number;
   participants?: number;
   createdAt?: string;

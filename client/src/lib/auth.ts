@@ -1,6 +1,7 @@
-import { authApi, AuthUser, setOnUnauthorized } from './api-client';
+import { authApi, AuthUser, setOnUnauthorized, PermissionsData } from './api-client';
 import { canAccessModule as rbacCanAccessModule, hasPermission as rbacHasPermission, ROLE_PERMISSIONS, AppModule, APP_MODULES } from '@shared/config/rbac';
 import { SystemRole, hasRole as hasSystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
+import { StatutUser } from '@shared/enum/status-constants';
 
 export interface User {
   id: string;
@@ -81,13 +82,18 @@ class AuthService {
    */
   async login(username: string, password: string): Promise<User | null> {
     try {
-      const authUser = await authApi.login(username, password);
+      const loginResult = await authApi.login(username, password);
 
-      const user = this.mapAuthUser(authUser);
+      const user = this.mapAuthUser(loginResult.user);
       this.currentUser = user;
 
-      // Charger les permissions depuis l'API (BDD)
-      await this.loadPermissionsFromApi();
+      // Utiliser les permissions incluses dans la réponse de login (évite race condition)
+      if (loginResult.permissions) {
+        this.applyPermissionsData(loginResult.permissions);
+      } else {
+        // Fallback: charger les permissions depuis l'API si non incluses
+        await this.loadPermissionsFromApi();
+      }
 
       // Démarrer la vérification périodique de session
       this.startSessionCheck();
@@ -97,6 +103,43 @@ class AuthService {
       console.error('Login error:', error);
       return null;
     }
+  }
+
+  /**
+   * Applique les données de permissions reçues (login ou API)
+   */
+  private applyPermissionsData(data: PermissionsData): void {
+    this.permissionsMap = data.permissions;
+    this.isAdminUser = data.isAdmin;
+    this.permissionsLoaded = true;
+
+    // Sync role if changed
+    if (this.currentUser && data.role) {
+      const normalizedRole = normalizeRole(data.role);
+      if (normalizedRole && this.currentUser.role !== normalizedRole) {
+        console.log(`👤 Role updated: ${this.currentUser.role} -> ${normalizedRole}`);
+        this.currentUser.role = normalizedRole;
+      }
+    }
+
+    // Populate legacy permissions array for backward compatibility
+    this.permissions = [];
+    for (const [module, actions] of Object.entries(data.permissions)) {
+      for (const action of actions) {
+        this.permissions.push({
+          module,
+          action,
+          autorise: true
+        });
+      }
+    }
+
+    console.group('🔐 Permissions Loaded (from login)');
+    console.log('👤 Role:', this.currentUser?.role);
+    console.log('🔑 IsAdmin:', this.isAdminUser);
+    console.log('📦 Total Modules:', Object.keys(this.permissionsMap).length);
+    console.log('✅ Total Permissions:', this.permissions.length);
+    console.groupEnd();
   }
 
   /**
@@ -116,7 +159,7 @@ class AuthService {
       nom: authUser.nom,
       prenom: authUser.prenom,
       role: normalizedRole || SystemRole.CLIENT,
-      status: authUser.statut || 'Actif',
+      status: authUser.statut || StatutUser.ACTIVE,
       agence: authUser.agence,
       agenceId: authUser.agenceId,
       mustChangePassword: authUser.mustChangePassword,
@@ -170,9 +213,25 @@ class AuthService {
       console.log('📜 Permissions Map:', this.permissionsMap);
       console.groupEnd();
     } catch (error) {
-      console.warn('⚠️ Failed to load permissions from API, using static config:', error);
-      // Fallback to static config
-      this.loadPermissionsFromStaticConfig(this.currentUser?.role || '');
+      // Fail-Closed: Ne pas fallback sur config statique - retourner permissions vides
+      console.error('🚨 SECURITY: Failed to load permissions from API - applying Fail-Closed strategy');
+      console.error('Error details:', error);
+
+      this.permissionsMap = {};
+      this.permissions = [];
+      this.isAdminUser = false;
+      this.permissionsLoaded = true; // Marquer comme chargé pour éviter les boucles infinies
+
+      // Notifier l'utilisateur du problème de sécurité
+      if (typeof window !== 'undefined') {
+        // Dispatch un événement custom pour que l'UI puisse afficher une notification
+        window.dispatchEvent(new CustomEvent('auth:permissions-error', {
+          detail: {
+            message: 'Impossible de charger vos permissions. Veuillez vous reconnecter.',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }
+        }));
+      }
     }
   }
 
@@ -323,7 +382,7 @@ class AuthService {
     this.stopSessionCheck();
     this.sessionCheckInterval = setInterval(() => {
       this.verifySession();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 1 * 60 * 1000); // 1 minute - Security hardening: faster session invalidation detection
   }
 
   /**

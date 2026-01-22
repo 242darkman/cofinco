@@ -27,15 +27,9 @@ export async function updateUser(id: string, data: Partial<InsertUser>): Promise
   const [user] = await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, id)).returning();
   return user || undefined;
 }
-// Update Location
-export async function updateUserLocation(userId: string, latitude: string, longitude: string): Promise<void> {
-  await db.update(users)
-    .set({ 
-       lastLatitude: latitude, 
-       lastLongitude: longitude 
-    })
-    .where(eq(users.id, userId));
-}
+// Note: User location tracking has been moved to updateAgentLocation in operations.ts
+// This is because lastLatitude/lastLongitude exist on agents_terrain table, not users
+// The updateUserLocation function was removed as it referenced non-existent columns
 
 // Push Subscriptions
 export async function createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription> {

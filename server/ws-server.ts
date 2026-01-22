@@ -9,7 +9,53 @@ import { storage } from "./storage";
 // Extend WebSocket interface
 interface ExtendedWebSocket extends WebSocket {
   isAlive: boolean;
+  messageCount?: number;
+  lastMessageReset?: number;
 }
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX_MESSAGES = 100; // max messages per window
+const RATE_LIMIT_WARNING_THRESHOLD = 80; // warn at 80 messages
+
+// Rate limiter state per user
+const rateLimiters = new Map<string, { count: number; windowStart: number; warned: boolean }>();
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; warn: boolean } {
+  const now = Date.now();
+  let limiter = rateLimiters.get(userId);
+
+  if (!limiter || now - limiter.windowStart > RATE_LIMIT_WINDOW_MS) {
+    // Start new window
+    limiter = { count: 0, windowStart: now, warned: false };
+    rateLimiters.set(userId, limiter);
+  }
+
+  limiter.count++;
+
+  const remaining = RATE_LIMIT_MAX_MESSAGES - limiter.count;
+  const warn = limiter.count >= RATE_LIMIT_WARNING_THRESHOLD && !limiter.warned;
+
+  if (warn) {
+    limiter.warned = true;
+  }
+
+  return {
+    allowed: limiter.count <= RATE_LIMIT_MAX_MESSAGES,
+    remaining: Math.max(0, remaining),
+    warn,
+  };
+}
+
+// Clean up old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, limiter] of rateLimiters.entries()) {
+    if (now - limiter.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
+      rateLimiters.delete(userId);
+    }
+  }
+}, RATE_LIMIT_WINDOW_MS);
 
 type GlobalMessage = {
   type: "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "PRESENCE_UPDATE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "REALTIME_EVENT" | "OPERATIONS_UPDATE" | "TONTINE_UPDATE" | "CAISSE_UPDATE" | "COMPTE_UPDATE" | "EMPLOYE_UPDATE" | "RBAC_UPDATE" | "HR_UPDATE" | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT" | "MAINTENANCE_UPDATE" | "SETTINGS_UPDATE" | "FORCE_LOGOUT" | "ACCOUNTING_UPDATE" | "AGENCE_UPDATE" | "LOYALTY_UPDATE";
@@ -233,9 +279,37 @@ export function setupWebSocket(server: Server) {
 
     ws.on("message", (message) => {
        (ws as ExtendedWebSocket).isAlive = true;
+
+       // Rate limiting check
+       if (userId) {
+         const { allowed, remaining, warn } = checkRateLimit(userId);
+
+         if (!allowed) {
+           console.warn(`[WebSocket] Rate limit exceeded for user ${userId}`);
+           ws.send(JSON.stringify({
+             type: 'RATE_LIMITED',
+             payload: {
+               message: 'Too many messages. Please slow down.',
+               retryAfter: RATE_LIMIT_WINDOW_MS / 1000,
+             }
+           }));
+           return;
+         }
+
+         if (warn) {
+           ws.send(JSON.stringify({
+             type: 'RATE_LIMIT_WARNING',
+             payload: {
+               message: `Approaching rate limit. ${remaining} messages remaining in window.`,
+               remaining,
+             }
+           }));
+         }
+       }
+
        try {
          const data = JSON.parse(message.toString());
-         
+
          if (data.type === 'PING') {
              ws.send(JSON.stringify({ type: 'PONG' }));
          }
@@ -308,10 +382,11 @@ export function setupWebSocket(server: Server) {
             // but the plan said "Persist (throttled)".
             // Let's defer persistence code to keep ws-server clean or do a quick direct DB call if possible.
             // Since `storage` is available in server/storage.ts, we can try to use it if we can import it.
+            // Note: updateAgentLocation updates the agents_terrain table (lastLatitude, lastLongitude, lastSeenAt)
             try {
-               storage.updateUserLocation(userId, latitude, longitude);
+               storage.updateAgentLocation(userId, latitude, longitude);
             } catch (err) {
-               console.error("Failed to persist location", err);
+               console.error("Failed to persist agent location", err);
             }
           }
        } catch (e) {

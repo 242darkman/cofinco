@@ -10,7 +10,7 @@ export interface Candidature {
   experience?: string;
   formation?: string;
   datePostulation: string;
-  statut: 'En attente' | 'Entretien' | 'Accepté' | 'Refusé';
+  statut: string; // EN values: 'PENDING' | 'INTERVIEW' | 'ACCEPTED' | 'REJECTED'
   cvUrl?: string;
   lettreMotivationUrl?: string;
   notes?: string;

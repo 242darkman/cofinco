@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { StatutUser } from '@shared/enum/status-constants';
 
 export interface Employe {
   id: string;
@@ -20,6 +21,8 @@ export interface Employe {
   numeroCnss: string | null;
   createdAt: string;
   photoProfile?: string | null;
+  managerId?: string | null; // ID du supérieur hiérarchique
+  managerNom?: string | null; // Nom complet du manager (pour affichage)
 }
 
 export interface EmployeFormData {
@@ -39,6 +42,7 @@ export interface EmployeFormData {
   salaireBase: string;
   numeroCnss: string;
   photoProfile?: string;
+  managerId?: string | null; // ID du supérieur hiérarchique
 }
 
 export function useEmployes() {
@@ -66,6 +70,8 @@ export function useEmployes() {
         salaireBase: item.salaireBase ? String(item.salaireBase) : '0',
         numeroCnss: item.numeroCnss || null,
         createdAt: item.createdAt,
+        managerId: item.managerId || null,
+        managerNom: null, // Sera calculé après
         // Données utilisateur aplaties depuis item.user
         nom: item.user?.nom || '',
         prenom: item.user?.prenom || '',
@@ -75,11 +81,23 @@ export function useEmployes() {
         sexe: item.user?.sexe || 'M',
         adresse: item.user?.adresse || null,
         ville: item.user?.ville || null,
-        statut: item.user?.statut || 'Actif',
+        statut: item.user?.statut || StatutUser.ACTIVE,
         photoProfile: item.user?.photoProfile || null,
       }));
-      
-      setEmployes(flattenedData);
+
+      // Calculer le nom du manager pour chaque employé (enrichissement côté client)
+      const employeMap = new Map<string, Employe>(flattenedData.map((e: Employe) => [e.id, e]));
+      const enrichedData = flattenedData.map((emp: Employe) => {
+        if (emp.managerId) {
+          const manager = employeMap.get(emp.managerId);
+          if (manager) {
+            return { ...emp, managerNom: `${manager.nom} ${manager.prenom}`.trim() };
+          }
+        }
+        return emp;
+      });
+
+      setEmployes(enrichedData);
     } catch (error) {
       console.error('Erreur chargement employés:', error);
       setError('Impossible de charger les employés');
@@ -171,19 +189,17 @@ export function useEmployes() {
   };
 
   const getStatutColor = (statut: string) => {
-    switch (statut) {
-      case 'Actif': return 'text-green-400 bg-green-500/20';
-      case 'Congé': return 'text-blue-400 bg-blue-500/20';
-      case 'Suspendu': return 'text-cyan-400 bg-cyan-500/20';
-      case 'Inactif': return 'text-slate-400 bg-slate-500/20';
-      case 'Démissionné': return 'text-blue-400 bg-blue-500/20';
-      default: return 'text-slate-400 bg-slate-500/20';
-    }
+    if (statut === StatutUser.ACTIVE) return 'text-green-400 bg-green-500/20';
+    if (statut === 'Congé') return 'text-blue-400 bg-blue-500/20';
+    if (statut === StatutUser.SUSPENDED) return 'text-cyan-400 bg-cyan-500/20';
+    if (statut === StatutUser.INACTIVE) return 'text-slate-400 bg-slate-500/20';
+    if (statut === 'Démissionné') return 'text-blue-400 bg-blue-500/20';
+    return 'text-slate-400 bg-slate-500/20';
   };
 
   const getStats = () => ({
     total: employes.length,
-    actifs: employes.filter(e => e.statut === 'Actif').length,
+    actifs: employes.filter(e => e.statut === StatutUser.ACTIVE).length,
     conges: employes.filter(e => e.statut === 'Congé').length,
     masseSalariale: employes.reduce((sum, e) => sum + parseFloat(e.salaireBase || '0'), 0)
   });

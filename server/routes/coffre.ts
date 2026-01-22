@@ -207,7 +207,7 @@ coffreRouter.post(
 );
 
 // 5. SUPERVISION TREASURY (Super-Admin)
-coffreRouter.get("/supervision", requireRole("admin", "Administrateur", "admin_generale"), async (req, res) => {
+coffreRouter.get("/supervision", requireRole(SystemRole.ADMIN), async (req, res) => {
   try {
     // 1. Get all safes with Agency Info
     const allCoffres = await db.select({
@@ -409,12 +409,12 @@ coffreRouter.get("/mouvements", async (req, res) => {
     
     const conditions = and(
         eq(schema.mouvementsFinanciers.agenceId, agenceId),
-        sql`(${schema.mouvementsFinanciers.metadata}->>'coffreId' = ${coffre.id} 
+        sql`(${schema.mouvementsFinanciers.metadata}->>'coffreId' = ${coffre.id}
             OR ${schema.mouvementsFinanciers.metadata}->>'caisseId' = ${coffre.id}
             OR ${schema.mouvementsFinanciers.sourceId} = ${coffre.id}
-            OR ${schema.mouvementsFinanciers.typePaiement} = 'Approvisionnement coffre'
-            OR ${schema.mouvementsFinanciers.typePaiement} = 'Décaissement Crédit'
-            OR ${schema.mouvementsFinanciers.typePaiement} = 'Transfert Sortant'
+            OR ${schema.mouvementsFinanciers.typePaiement}::text = 'SAFE_SUPPLY'
+            OR ${schema.mouvementsFinanciers.typePaiement}::text = 'CREDIT_DISBURSEMENT'
+            OR ${schema.mouvementsFinanciers.typePaiement}::text = 'TRANSFER_OUT'
             OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'APPROVISIONNEMENT_EXTERNE'
             OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'REFUND_SOURCE'
             OR ${schema.mouvementsFinanciers.metadata}->>'type' = 'TRANSFERT_INTER_COFFRES')`

@@ -3,14 +3,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet,
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
-  PiggyBank, ArrowUpRight, ArrowDownRight, Shield, Timer, AlertCircle
+  PiggyBank, ArrowUpRight, ArrowDownRight, Shield, Timer, AlertCircle,
+  LockKeyhole, KeyRound
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { Button, Card, StatCard, TabGroup } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compteEpargneApi } from '../../../lib/api-client';
+import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compteEpargneApi, api } from '../../../lib/api-client';
 import { computeSessionStatus } from '../../../lib/format';
+import { isIncomingOperation, isOutgoingOperation } from '@shared/config/caisse-operations';
 import { CaisseQuickActions } from './CaisseQuickActions';
 import CaisseOuverture from './CaisseOuverture';
 import { useCaisseWebSocket } from '../../../hooks/useCaisseWebSocket';
@@ -29,10 +31,11 @@ import { isAdminRole } from '@shared/types/roles';
 
 import CaisseAccessControl from './CaisseAccessControl';
 import CaisseClientInfos from './CaisseClientInfos';
+import CaisseHistoriqueGlobal from './CaisseHistoriqueGlobal';
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
 import { PendingActivationDrawer } from './PendingActivationDrawer';
-import { UserCheck } from 'lucide-react';
+import { UserCheck, History } from 'lucide-react';
 
 interface SessionCaisse {
   id: string;
@@ -106,6 +109,10 @@ export default function CaisseDashboard({
   const [showPaiement, setShowPaiement] = useState(false);
   const [showActivationDrawer, setShowActivationDrawer] = useState(false);
   const [initialPaymentType, setInitialPaymentType] = useState<string | undefined>(undefined);
+  // État pour pré-remplir le modal de paiement (activation de compte)
+  const [preSelectedAccountId, setPreSelectedAccountId] = useState<string | undefined>(undefined);
+  const [preFilledAmount, setPreFilledAmount] = useState<number | undefined>(undefined);
+  const [preSelectedClientId, setPreSelectedClientId] = useState<string | undefined>(undefined);
   const [caissesSeparees, setCaissesSeparees] = useState<any[]>([]);
   
   // Super-User mode: Admin can supervise a specific active session
@@ -118,13 +125,15 @@ export default function CaisseDashboard({
   // End of day reminder state
   const [showEndOfDayReminder, setShowEndOfDayReminder] = useState(false);
 
-  // Pending activations
-  const [comptesEnAttenteCount, setComptesEnAttenteCount] = useState(0);
+
 
   // History Receipt State
   const [showHistoryReceipt, setShowHistoryReceipt] = useState(false);
   const [historyReceiptData, setHistoryReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [historyFactureId, setHistoryFactureId] = useState<string | undefined>(undefined);
+
+  // Historique Mode: 'today' = transactions du jour, 'global' = historique complet avec pagination
+  const [historiqueMode, setHistoriqueMode] = useState<'today' | 'global'>('today');
 
   // Transaction Detail Drawer State
   const [selectedTxDetail, setSelectedTxDetail] = useState<TransactionDetails | null>(null);
@@ -153,6 +162,16 @@ export default function CaisseDashboard({
   // Actual session being used (own or supervised)
   const currentSession = supervisedSession || sessionActive;
 
+  // Pending activations - sync with PendingActivationDrawer
+  const { data: pendingActivations = [] } = useQuery({
+    queryKey: ['comptes', 'pending-activation'],
+    queryFn: () => api.get<any[]>('/comptes/pending-activation'),
+    enabled: !!currentSession,
+    refetchInterval: 30000
+  });
+
+  const comptesEnAttenteCount = pendingActivations.length;
+
   useEffect(() => {
     if (activeView) {
       switch (activeView) {
@@ -177,13 +196,10 @@ export default function CaisseDashboard({
   } = useQuery({
     queryKey: ['operations-caisse', 'today', 'debug'],
     queryFn: async () => {
-      console.log('Fetching operations for', currentSession?.id);
       try {
         const res = await caisseOperationApi.getToday();
-        console.log('Operations fetched:', res);
         return res;
       } catch (e) {
-        console.error('Error fetching operations:', e);
         throw e;
       }
     },
@@ -193,11 +209,6 @@ export default function CaisseDashboard({
 
   // Debug effect
   useEffect(() => {
-    console.log('[DEBUG] CaisseDashboard Mounted');
-    console.log('[DEBUG] SupervisedSession:', supervisedSession);
-    console.log('[DEBUG] SessionActive:', sessionActive);
-    console.log('[DEBUG] CurrentSession:', currentSession);
-    
     // Force refetch
     refetchSession();
     if (currentSession) {
@@ -211,13 +222,12 @@ export default function CaisseDashboard({
     sessionId: currentSession?.id,
     enabled: !!currentSession,
     onSessionUpdated: (data) => {
-        console.log('[REALTIME] Session Updated:', data);
         refetchSession(); // To update balance
         refetchTransactions(); // To show new operation
         toast.info(data.type === 'MOUVEMENT_CREE' ? 'Nouvelle opération reçue' : 'Session mise à jour');
     },
     onCaisseStatusChanged: (data) => {
-        if (data.sessionId === currentSession?.id && data.status === 'Fermée') {
+        if (data.sessionId === currentSession?.id && data.status === 'CLOSED') {
             refetchSession();
             toast.warning('La session a été fermée');
         }
@@ -242,8 +252,8 @@ export default function CaisseDashboard({
   };
 
   const loadTransactionsJour = async () => {
-    // queryClient.invalidateQueries({ queryKey: ['operations-caisse', 'today'] });
-    // Handled automatically via websocket ideally, or we can force refetch
+    // Force refetch des transactions pour mettre à jour l'UI après mutation
+    await refetchTransactions();
   };
 
   const loadCaissesSeparees = async () => {
@@ -256,21 +266,12 @@ export default function CaisseDashboard({
     }
   };
 
-  const loadComptesEnAttente = async () => {
-    try {
-      const response = await compteEpargneApi.getAll({ 
-        statut: 'EN_ATTENTE_PAIEMENT',
-        limit: 1 
-      });
-      setComptesEnAttenteCount(response.total);
-    } catch (error) {
-      console.error('Erreur chargement comptes en attente:', error);
-    }
-  };
+  // Manual loadComptesEnAttente removed in favor of useQuery
 
   useEffect(() => {
     loadCaissesSeparees();
-    loadComptesEnAttente();
+    loadCaissesSeparees();
+    // loadComptesEnAttente(); // Handled by useQuery
   }, [currentSession?.id]);
 
   // Sync sessionActive query result to currentSession logic
@@ -291,7 +292,6 @@ export default function CaisseDashboard({
         await sessionCaisseApi.heartbeat(currentSession.id);
       } catch (error) {
         // Silencieux - le heartbeat est optionnel
-        console.debug('Heartbeat failed:', error);
       }
     };
 
@@ -425,43 +425,41 @@ export default function CaisseDashboard({
     }
   };
 
-  // Types d'opérations considérées comme des ENTRÉES (argent qui entre en caisse)
-  const TYPES_ENTREES = [
-    'Dépôt',
-    'Versement',
-    'Remboursement',
-    'Remboursement Crédit',
-    'Encaissement',
-    'Cotisation Tontine',
-    'Approvisionnement coffre',
-    'FRAIS_ENGAGEMENT',
-    'Frais Engagement',
-    'DEPOT_ESPECES',
-    'Dépôt Espèces'
-  ];
-
+  // Calcul des entrées/sorties en utilisant les helpers centralisés
   const totalEntrees = transactions
-    .filter(t => TYPES_ENTREES.includes(t.type_operation))
+    .filter(t => isIncomingOperation(t.type_operation))
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
   const totalSorties = transactions
-    .filter(t => ['Retrait', 'Décaissement', 'Prêt', 'Versement coffre'].includes(t.type_operation))
+    .filter(t => isOutgoingOperation(t.type_operation))
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
   const soldeActuel = currentSession
     ? toNumber(currentSession.solde_initial) + totalEntrees - totalSorties
     : 0;
 
+  const isSessionOpen = !!currentSession;
+
+  // Redirection automatique si on tente d'accéder à un onglet verrouillé
+  useEffect(() => {
+    if (!isSessionOpen && activeTab !== 'dashboard' && activeTab !== 'supervision') {
+      setActiveTab('dashboard');
+      toast.error("Session fermée", {
+        description: "Veuillez ouvrir une session pour accéder à ce module."
+      });
+    }
+  }, [isSessionOpen, activeTab]);
+
   const tabs = [
-    { key: 'dashboard', label: 'Dashboard', icon: Activity },
-    { key: 'infos-client', label: 'Info Client', icon: Users },
-    { key: 'especes', label: 'Espèces', icon: Wallet },
-    { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !mobileMoneyEnabled },
-    { key: 'historique', label: 'Historique', icon: Clock },
-    { key: 'rapprochement', label: 'Clôture', icon: RefreshCw },
-    { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft },
-    { key: 'etats', label: 'États', icon: FileText },
-    { key: 'supervision', label: 'Supervision', icon: Shield },
+    { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
+    { key: 'infos-client', label: 'Info Client', icon: Users, disabled: !isSessionOpen },
+    { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen },
+    { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !mobileMoneyEnabled || !isSessionOpen },
+    { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
+    { key: 'rapprochement', label: 'Clôture', icon: RefreshCw, disabled: !isSessionOpen },
+    { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen },
+    { key: 'etats', label: 'États', icon: FileText, disabled: !isSessionOpen },
+    { key: 'supervision', label: 'Supervision', icon: Shield, disabled: false },
   ];
 
   if (!accessGranted) {
@@ -488,29 +486,77 @@ export default function CaisseDashboard({
         return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} onBack={() => setActiveTab('dashboard')} /></div> : null;
       case 'historique':
         return (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 -mx-4 md:-mx-6 -mb-16">
-            <TransactionHistoryPage
-              transactions={transactions.map(tx => ({
-                id: tx.id,
-                reference: tx.reference,
-                amount: toNumber(tx.montant),
-                type: tx.type_operation,
-                type_operation: tx.type_operation,
-                status: 'Succès' as const,
-                date: tx.created_at,
-                description: tx.description,
-                client: tx.client_nom ? {
-                  name: `${tx.client_nom} ${tx.client_prenom || ''}`.trim(),
-                  phone: tx.client_telephone
-                } : undefined,
-                agent: currentSession?.caissier_nom,
-                mode_paiement: tx.mode_paiement,
-                created_at: tx.created_at
-              }))}
-              isLoading={loadingTransactions}
-              onRefresh={() => refetchTransactions()}
-              onBack={() => setActiveTab('dashboard')}
-            />
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* Toggle between Today and Global History */}
+            <div className="flex items-center justify-between mb-4 px-4 md:px-0">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveTab('dashboard')}
+                  icon={ArrowRightLeft}
+                  className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180"
+                />
+                <h2 className="text-lg font-bold text-white">Historique</h2>
+              </div>
+              <div className="flex bg-slate-800 rounded-lg p-1">
+                <button
+                  onClick={() => setHistoriqueMode('today')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                    historiqueMode === 'today'
+                      ? 'bg-cyan-500 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Clock size={14} className="inline mr-1" />
+                  Aujourd'hui
+                </button>
+                <button
+                  onClick={() => setHistoriqueMode('global')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                    historiqueMode === 'global'
+                      ? 'bg-cyan-500 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <History size={14} className="inline mr-1" />
+                  Tout l'historique
+                </button>
+              </div>
+            </div>
+
+            {historiqueMode === 'global' && currentSession?.caisse_id ? (
+              <CaisseHistoriqueGlobal
+                caisseId={currentSession.caisse_id}
+                caisseName={currentSession.caisse_nom}
+                onBack={() => setActiveTab('dashboard')}
+              />
+            ) : (
+              <div className="-mx-4 md:-mx-6 -mb-16">
+                <TransactionHistoryPage
+                  transactions={transactions.map(tx => ({
+                    id: tx.id,
+                    reference: tx.reference,
+                    amount: toNumber(tx.montant),
+                    type: tx.type_operation,
+                    type_operation: tx.type_operation,
+                    status: 'SUCCESS',
+                    date: tx.created_at,
+                    description: tx.description,
+                    client: tx.client_nom ? {
+                      name: `${tx.client_nom} ${tx.client_prenom || ''}`.trim(),
+                      phone: tx.client_telephone
+                    } : undefined,
+                    agent: currentSession?.caissier_nom,
+                    mode_paiement: tx.mode_paiement,
+                    created_at: tx.created_at
+                  }))}
+                  isLoading={loadingTransactions}
+                  onRefresh={() => refetchTransactions()}
+                  onBack={() => setActiveTab('dashboard')}
+                />
+              </div>
+            )}
           </div>
         );
       case 'especes':
@@ -560,8 +606,46 @@ export default function CaisseDashboard({
             </div>
         );
       default:
+        if (!isSessionOpen) {
+           return (
+             <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                <div className="p-6 rounded-full bg-slate-900 ring-1 ring-slate-800 shadow-2xl relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-slate-800/0 to-slate-700/0 group-hover:from-slate-800/20 group-hover:to-slate-700/20 transition-all duration-500" />
+                  <LockKeyhole className="w-16 h-16 text-slate-500 relative z-10" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold text-white">Session de Caisse Fermée</h2>
+                  <p className="text-slate-400 max-w-md mx-auto">
+                    Les opérations d'encaissement et de décaissement sont verrouillées. Veuillez ouvrir une session pour commencer votre journée.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 items-center w-full max-w-sm">
+                  {canOpenCaisse && (
+                    <Button 
+                      size="lg" 
+                      onClick={() => setShowOuverture(true)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.2)] font-bold py-6 text-lg"
+                    >
+                      <KeyRound className="w-5 h-5 mr-2" />
+                      Ouvrir ma Session
+                    </Button>
+                  )}
+                  
+                  {isAdminRole(userRole) && (
+                    <button 
+                      onClick={() => setActiveTab('supervision')} 
+                      className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
+                    >
+                      Accéder aux outils de supervision sans ouvrir
+                    </button>
+                  )}
+                </div>
+             </div>
+           );
+        }
+
         return (
-    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
+          <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
       {currentSession && (
         <CaisseQuickActions 
           caisseId={currentSession.caisse_id || ''} 
@@ -663,42 +747,40 @@ export default function CaisseDashboard({
              </Card>
           </div>
 
-           {/* Pending Activations Alert - Replaced by Action Card */}
-           {comptesEnAttenteCount > 0 && (
-             <Card 
-                variant="default" 
-                padding="sm" 
-                className="cursor-pointer border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 transition-all group animate-pulse"
-                onClick={() => setShowActivationDrawer(true)}
-             >
-                 <div className="flex flex-col items-center gap-3 py-2">
-                     <div className="relative p-3 rounded-xl bg-orange-500/20 text-orange-400 group-hover:scale-110 transition-transform">
-                         <UserCheck size={24} />
-                         <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900">
-                           {comptesEnAttenteCount}
-                         </span>
-                     </div>
-                     <span className="text-sm font-bold text-orange-400 group-hover:text-orange-300">
-                       Activations
+       {/* Pending Activations Alert Card - Only show when there are pending accounts */}
+       {comptesEnAttenteCount > 0 && (
+         <Card
+            variant="default"
+            padding="sm"
+            className="cursor-pointer border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 transition-all group animate-pulse"
+            onClick={() => setShowActivationDrawer(true)}
+         >
+             <div className="flex flex-col items-center gap-3 py-2">
+                 <div className="relative p-3 rounded-xl bg-orange-500/20 text-orange-400 group-hover:scale-110 transition-transform">
+                     <UserCheck size={24} />
+                     <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900">
+                       {comptesEnAttenteCount}
                      </span>
                  </div>
-             </Card>
-           )}
-      </div>
+                 <span className="text-sm font-bold text-orange-400 group-hover:text-orange-300">
+                   Activations en attente
+                 </span>
+             </div>
+         </Card>
+       )}
+  </div>
 
-      <PendingActivationDrawer 
+      <PendingActivationDrawer
         open={showActivationDrawer}
         onClose={() => setShowActivationDrawer(false)}
-        onActivate={(compteId, montant) => {
+        onActivate={(compteId, montant, clientId) => {
            setShowActivationDrawer(false);
-           // Open payment modal
-           setInitialPaymentType('Dépôt');
-           // Logic to pre-fill account/amount would require props on CaissePaiementModal, 
-           // but for now we follow the user request to just open the modal.
-           // Ideally we should pass the account ID to the modal.
-           setShowPaiement(true); 
-           // We can use a toast to guide
-           toast.info(`Montant à encaisser : ${new Intl.NumberFormat('fr-FR').format(montant)} FCFA`);
+           // Ouvrir le modal de paiement avec les valeurs pré-remplies
+           setInitialPaymentType('DEPOSIT_SAVINGS'); // Valeur EN pour activation
+           setPreSelectedAccountId(compteId);
+           setPreFilledAmount(montant);
+           setPreSelectedClientId(clientId);
+           setShowPaiement(true);
         }}
       />
 
@@ -710,7 +792,7 @@ export default function CaisseDashboard({
           amount: toNumber(tx.montant),
           type: tx.type_operation,
           type_operation: tx.type_operation,
-          status: 'Succès' as const,
+          status: 'SUCCESS',
           date: tx.created_at,
           description: tx.description,
           client: tx.client_nom ? {
@@ -956,10 +1038,16 @@ export default function CaisseDashboard({
           onClose={() => {
             setShowPaiement(false);
             setInitialPaymentType(undefined);
+            setPreSelectedAccountId(undefined);
+            setPreFilledAmount(undefined);
+            setPreSelectedClientId(undefined);
             onPaiementModalClose?.();
           }}
           initialType={initialPaymentType}
           sessionId={currentSession.id}
+          preSelectedAccountId={preSelectedAccountId}
+          preFilledAmount={preFilledAmount}
+          preSelectedClientId={preSelectedClientId}
           onSuccess={() => {
             loadTransactionsJour();
             loadSessionActive();

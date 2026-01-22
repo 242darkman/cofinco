@@ -15,30 +15,30 @@ describe('Robustesse Transactionnelle', () => {
 
   // Helper to create required entities
   async function createTestClientAndAccount() {
-    // 1. Create User
+    // 1. Create User (with ACTIVE status since status is on users table)
     const [user] = await db.insert(users).values({
       nom: `TestUser_${faker.string.alphanumeric(5)}`,
       username: `testuser_${faker.string.alphanumeric(8)}`,
       password: 'hash_placeholder',
-      typeCompte: 'client'
+      typeCompte: 'client',
+      statut: 'ACTIVE'
     }).returning();
     testUserId = user.id;
 
-    // 2. Create Client
+    // 2. Create Client (linked to user - no status field here, it's on users)
     const [client] = await db.insert(clients).values({
-      userId: user.id,
-      status: 'Actif'
+      userId: user.id
     }).returning();
     testClientId = client.id;
     testAgenceId = client.agenceId || undefined;
 
-    // 3. Create Compte
+    // 3. Create Compte (using standardized EN enum values)
     const [compte] = await db.insert(comptes).values({
       clientId: client.id,
       numeroCompte: `CPT-${faker.string.numeric(10)}`,
-      typeCompte: 'Courant',
+      typeCompte: 'CURRENT',
       soldeCourant: '100000', // Start with 100k
-      statut: 'Actif'
+      statut: 'ACTIVE'
     }).returning();
     testCompteId = compte.id;
   }
@@ -68,7 +68,7 @@ describe('Robustesse Transactionnelle', () => {
         'EPARGNE',
         {
           montant: amount,
-          sens: 'Débit',
+          sens: 'DEBIT',
           clientId: testClientId,
           compteId: testCompteId,
           typePaiement: 'Retrait Courant',
@@ -87,7 +87,7 @@ describe('Robustesse Transactionnelle', () => {
         'EPARGNE',
         {
           montant: amount,
-          sens: 'Débit',
+          sens: 'DEBIT',
           clientId: testClientId,
           compteId: testCompteId,
           typePaiement: 'Retrait Courant',
@@ -107,7 +107,7 @@ describe('Robustesse Transactionnelle', () => {
           'EPARGNE',
           {
              montant: '5000',
-             sens: 'Débit',
+             sens: 'DEBIT',
              clientId: testClientId,
              compteId: testCompteId,
              typePaiement: 'Retrait Courant'
@@ -158,7 +158,7 @@ describe('Robustesse Transactionnelle', () => {
             'EPARGNE',
             {
               montant: withdrawalAmount.toString(),
-              sens: 'Débit',
+              sens: 'DEBIT',
               clientId: testClientId,
               compteId: testCompteId,
               typePaiement: 'Retrait Courant',

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { CreditCard, Wallet, Lock, MoreVertical, Copy, Check, TrendingUp, Unlock, AlertTriangle, Ban, XCircle, FileText } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { toast } from 'sonner';
+import { StatutCompte, type StatutCompteType } from '@shared/enum/status-constants';
+import { getStatusLabel, ACCOUNT_STATUS_LABELS } from '@/lib/status-labels';
 
 interface CompteBancaire {
   id: string;
@@ -10,7 +12,7 @@ interface CompteBancaire {
   numeroCompte: string;
   soldeCourant: string;
   tauxInteret?: number;
-  statut: 'Actif' | 'Fermé' | 'Suspendu' | 'Clôturé' | 'EN_ATTENTE_PAIEMENT';
+  statut: StatutCompteType; // Strict EN only
   blocageActif?: boolean;
   blocageMotif?: string;
   blocageFin?: string;
@@ -114,7 +116,7 @@ export default function AccountCard({ compte, onEdit, onAction }: AccountCardPro
                         <TrendingUp size={14} /> Historique
                     </button>
                     <div className="h-px bg-slate-800 my-1"></div>
-                    {compte.statut === 'Actif' ? (
+                    {compte.statut === StatutCompte.ACTIVE ? (
                         <button onClick={(e) => handleMenuAction('suspend', e)} className="w-full text-left px-4 py-2 text-sm text-amber-400 hover:bg-amber-950/30 flex items-center gap-2">
                             <Ban size={14} /> Suspendre
                         </button>
@@ -136,22 +138,9 @@ export default function AccountCard({ compte, onEdit, onAction }: AccountCardPro
              <p className="text-[10px] text-slate-500 uppercase tracking-tight">
                {isBloque ? 'Solde (Bloqué)' : 'Solde Disponible'}
              </p>
-             <Badge 
-                value={
-                   compte.statut === 'EN_ATTENTE_PAIEMENT' ? 'En attente paiement' :
-                   compte.statut === 'Actif' ? 'Actif' :
-                   compte.statut === 'Suspendu' ? 'Suspendu' :
-                   compte.statut === 'Clôturé' ? 'Clôturé' :
-                   compte.statut === 'Fermé' ? 'Fermé' :
-                   (compte.statut as string).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
-                } 
-                size="sm" 
-                variant={
-                    compte.statut === 'Actif' ? 'success' : 
-                    compte.statut === 'Suspendu' ? 'warning' : 
-                    compte.statut === 'EN_ATTENTE_PAIEMENT' ? 'danger' :
-                    'danger'
-                } 
+             <Badge
+                value={getStatusLabel(compte.statut, ACCOUNT_STATUS_LABELS)}
+                size="sm"
              />
           </div>
           

@@ -1,10 +1,10 @@
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState } from 'react';
 import { Send, Mail, MessageSquare, Users, AlertCircle, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 interface ClientBulkCommunicationProps {
-  clients: Client[];
+  clients: ClientWithIdentity[];
   onClose: () => void;
   onComplete: () => void;
 }
@@ -44,7 +44,7 @@ export default function ClientBulkCommunication({ clients, onClose, onComplete }
     ]
   };
 
-  const replacePlaceholders = (text: string, client: Client) => {
+  const replacePlaceholders = (text: string, client: ClientWithIdentity) => {
     return text
       .replace('{nom}', client.nom || '')
       .replace('{email}', client.email || '')

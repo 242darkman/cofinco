@@ -58,7 +58,7 @@ export default function ExcelModule() {
         pays: 'République du Congo',
         profession: (row.profession || row.Profession || '').trim() || null,
         segment: (row.segment || row.Segment || 'Standard').trim(),
-        status: 'Actif', score: 50, tauxRemboursement: '100', pointsFidelite: 0
+        status: 'ACTIVE', score: 50, tauxRemboursement: '100', pointsFidelite: 0
       }
     };
   };
@@ -76,7 +76,7 @@ export default function ExcelModule() {
         duree: parseInt(row.duree || row.Duree || '12'),
         typeCredit: (row.typeCredit || row.TypeCredit || 'Personnel').trim(),
         objetCredit: (row.objetCredit || row.ObjetCredit || '').trim(),
-        statut: (row.statut || row.Statut || 'En attente').trim(), echeance: 'Mensuel'
+        statut: (row.statut || row.Statut || 'PENDING').trim(), echeance: 'Mensuel'
       }
     };
   };

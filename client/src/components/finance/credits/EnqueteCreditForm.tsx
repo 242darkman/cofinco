@@ -9,6 +9,7 @@ import { LocationDisplay } from '../../common/LocationDisplay';
 import { formatClientName } from '../../../lib/format';
 import { clientApi } from '../../../lib/api-client';
 import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
+import { StatutClient } from '@shared/enum/status-constants';
 interface Client {
   id: string;
   nom: string;
@@ -190,7 +191,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   const loadClients = async () => {
     try {
       const data = await clientApi.getAllList();
-      setClients(data.filter((client: any) => client.status === 'Actif'));
+      setClients(data.filter((client: any) => client.statut === StatutClient.ACTIVE));
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     }

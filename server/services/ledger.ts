@@ -13,13 +13,14 @@ import {
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
+import { TypeCompte } from "@shared/enum/status-constants";
 
 // Infer MouvementFinancier type from table
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
 
 // Types for the ledger service
 export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE";
-export type SensMouvement = "Débit" | "Crédit";
+export type SensMouvement = "DEBIT" | "CREDIT";
 export type TypeEvenement =
   | "MOUVEMENT_CREE"
   | "MOUVEMENT_STATUT_CHANGE"
@@ -316,7 +317,7 @@ async function recalculateClientSavings(tx: PgTransaction<any, any, any>, client
             .from(comptes)
             .where(and(
                 eq(comptes.clientId, clientId),
-                inArray(comptes.typeCompte, ['Épargne', 'Bloqué'])
+                inArray(comptes.typeCompte, [TypeCompte.SAVINGS, TypeCompte.BLOCKED])
             ));
 
         // Sum tontine contributions
@@ -416,11 +417,11 @@ export async function updateSessionSolde(
 
   const [updated] = await tx.update(sessionsCaisse)
     .set({ 
-      soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${delta}`,
+      montantFermetureTheorique: sql`${sessionsCaisse.montantFermetureTheorique} + ${delta}`,
       updatedAt: new Date()
     })
     .where(eq(sessionsCaisse.id, sessionId))
-    .returning({ solde: sessionsCaisse.soldeTheorique });
+    .returning({ solde: sessionsCaisse.montantFermetureTheorique });
   
   if (!updated) throw new Error(`Session ${sessionId} not found`);
   return updated.solde;

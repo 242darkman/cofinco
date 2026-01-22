@@ -24,6 +24,7 @@ import SelectField from '@/components/ui/SelectField';
 import { useToast } from '../../hooks/use-toast';
 import { UniversalPaymentSuccessModal } from '@/components/finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '@/components/ui/printable/ReceiptTemplate';
+import { StatutOperationTerrain } from '@shared/enum/status-constants';
 
 interface AgentHistoryProps {
   agentId?: string;
@@ -80,11 +81,11 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
 
   const getStatusBadge = (statut: string) => {
     switch (statut) {
-      case 'SUBMITTED': return <Badge variant="warning" icon={<Clock size={12} />} value="En attente" />;
-      case 'APPROVED': return <Badge variant="primary" icon={<CheckCircle2 size={12} />} value="Validé" />;
-      case 'SETTLED': return <Badge variant="success" icon={<CheckCircle2 size={12} />} value="Apuré" />;
-      case 'REJECTED': return <Badge variant="danger" icon={<XCircle size={12} />} value="Rejeté" />;
-      case 'CANCELLED': return <Badge variant="danger" icon={<AlertCircle size={12} />} value="Annulé" />;
+      case StatutOperationTerrain.SUBMITTED: return <Badge variant="warning" icon={<Clock size={12} />} value="En attente" />;
+      case StatutOperationTerrain.APPROVED: return <Badge variant="primary" icon={<CheckCircle2 size={12} />} value="Validé" />;
+      case StatutOperationTerrain.SETTLED: return <Badge variant="success" icon={<CheckCircle2 size={12} />} value="Apuré" />;
+      case StatutOperationTerrain.REJECTED: return <Badge variant="danger" icon={<XCircle size={12} />} value="Rejeté" />;
+      case StatutOperationTerrain.CANCELLED: return <Badge variant="danger" icon={<AlertCircle size={12} />} value="Annulé" />;
       default: return <Badge value={statut} />;
     }
   };
@@ -119,7 +120,7 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
       }],
       total: parseFloat(op.montant),
       modePaiement: 'Espèces',
-      notes: op.statut === 'SETTLED' ? 'Fonds reçus et validés par l\'agence.' : 'En attente de validation physique.',
+      notes: op.statut === StatutOperationTerrain.SETTLED ? 'Fonds reçus et validés par l\'agence.' : 'En attente de validation physique.',
     };
 
     setReceiptData(data);
@@ -166,10 +167,10 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
                   onChange={(e) => setFilterStatut(e.target.value)}
                   options={[
                       { value: 'all', label: 'Tous les statuts' },
-                      { value: 'SUBMITTED', label: 'En attente' },
-                      { value: 'APPROVED', label: 'Validé' },
-                      { value: 'SETTLED', label: 'Apuré' },
-                      { value: 'REJECTED', label: 'Rejeté' }
+                      { value: StatutOperationTerrain.SUBMITTED, label: 'En attente' },
+                      { value: StatutOperationTerrain.APPROVED, label: 'Validé' },
+                      { value: StatutOperationTerrain.SETTLED, label: 'Apuré' },
+                      { value: StatutOperationTerrain.REJECTED, label: 'Rejeté' }
                   ]}
                   containerClassName="mb-0"
                   className="bg-slate-900/50 border-slate-600 text-xs"

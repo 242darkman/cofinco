@@ -23,12 +23,16 @@ import {
   DemandeCredit
 } from '@shared/schema/finance';
 import { clients } from '@shared/schema/clients';
-import { 
-  validateReevaluationCreation, 
+import {
+  validateReevaluationCreation,
   checkEligibilityQuick,
   CreateReevaluationPayload,
   REEVALUATION_RULES
 } from './reevaluation-validator';
+import {
+  StatutDemande,
+  StatutReevaluation,
+} from "@shared/enum/status-constants";
 
 /**
  * Get reevaluation configuration (global or agency-specific)
@@ -146,7 +150,7 @@ export async function createReevaluation(
     documentsJoints: payload.documentsJoints,
     
     // Metadata
-    statut: 'Demandée',
+    statut: StatutReevaluation.REQUESTED,
     createdBy: userId,
     
     // Placeholders that will be set by trigger
@@ -182,7 +186,7 @@ export async function createReevaluation(
   // 5. Update the demande status to indicate reevaluation in progress
   await db.update(demandesCredit)
     .set({
-      statut: 'Réévaluation en cours',
+      statut: StatutDemande.REEVALUATION_IN_PROGRESS,
       reevaluationEnCours: true,
       derniereReevaluationId: reevaluation.id,
       dateDerniereReevaluation: new Date()
@@ -195,7 +199,7 @@ export async function createReevaluation(
     demandeId: demande.id,
     action: 'REEVALUATION_CREEE',
     statutAvant: null,
-    statutApres: 'Demandée',
+    statutApres: StatutReevaluation.REQUESTED,
     details: {
       description: 'Réévaluation créée',
       elementsNouveaux: payload.elementsNouveaux.map(e => e.type),
@@ -232,8 +236,8 @@ export async function validateEligibility(
   
   // 2. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
-    reevaluation.statut, 
-    'Éligibilité en cours'
+    reevaluation.statut,
+    StatutReevaluation.ELIGIBILITY_CHECK
   );
   if (!transitionValid.valid && !override?.force) {
     throw new Error(transitionValid.message);
@@ -288,7 +292,7 @@ export async function validateEligibility(
   };
   
   // 5. Update reevaluation status
-  const nouveauStatut = eligibilityResult.estEligible || override?.force ? 'Autorisée' : 'Refusée';
+  const nouveauStatut = eligibilityResult.estEligible || override?.force ? StatutReevaluation.AUTHORIZED : StatutReevaluation.REFUSED;
   
   await db.update(reevaluationsCredit)
     .set({
@@ -349,8 +353,8 @@ export async function startEnqueteComplementaire(
   
   // 2. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
-    reevaluation.statut, 
-    'Enquête complémentaire'
+    reevaluation.statut,
+    StatutReevaluation.ADDITIONAL_INVESTIGATION
   );
   if (!transitionValid.valid) {
     throw new Error(transitionValid.message);
@@ -367,26 +371,26 @@ export async function startEnqueteComplementaire(
     objectifEnquete,
     pointsAVerifier,
     enqueteurId,
-    statut: 'En cours',
+    statut: 'IN_PROGRESS',
     dateDebut: new Date()
   } as InsertEnqueteComplementaire).returning();
   
   // 4. Update reevaluation
   await db.update(reevaluationsCredit)
     .set({
-      statut: 'Enquête complémentaire',
+      statut: StatutReevaluation.ADDITIONAL_INVESTIGATION,
       enqueteComplementaireId: enquete.id,
       updatedAt: new Date()
     })
     .where(eq(reevaluationsCredit.id, reevaluationId));
-  
+
   // 5. Audit log
   await createAuditLog({
     reevaluationId: reevaluation.id,
     demandeId: reevaluation.demandeId,
     action: 'ENQUETE_COMPLEMENTAIRE_DEMARREE',
     statutAvant: reevaluation.statut,
-    statutApres: 'Enquête complémentaire',
+    statutApres: StatutReevaluation.ADDITIONAL_INVESTIGATION,
     details: {
       description: 'Enquête complémentaire démarrée',
       enqueteId: enquete.id,
@@ -423,8 +427,8 @@ export async function submitToCommittee(
   
   // 2. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
-    reevaluation.statut, 
-    'En comité'
+    reevaluation.statut,
+    StatutReevaluation.IN_COMMITTEE
   );
   if (!transitionValid.valid) {
     throw new Error(transitionValid.message);
@@ -471,21 +475,21 @@ export async function submitToCommittee(
   // 5. Update reevaluation
   await db.update(reevaluationsCredit)
     .set({
-      statut: 'En comité',
+      statut: StatutReevaluation.IN_COMMITTEE,
       nouveauScore,
       deltaScore,
       membresComite: membresConvoques,
       updatedAt: new Date()
     })
     .where(eq(reevaluationsCredit.id, reevaluationId));
-  
+
   // 6. Audit log
   await createAuditLog({
     reevaluationId: reevaluation.id,
     demandeId: reevaluation.demandeId,
     action: 'SOUMIS_COMITE',
     statutAvant: reevaluation.statut,
-    statutApres: 'En comité',
+    statutApres: StatutReevaluation.IN_COMMITTEE,
     details: {
       description: 'Dossier soumis au comité de crédit',
       membresConvoques,
@@ -516,7 +520,7 @@ export async function submitToCommittee(
  */
 export async function recordCommitteeDecision(
   reevaluationId: string,
-  decision: 'Approuvée' | 'Rejetée définitivement' | 'Montant réduit',
+  decision: typeof StatutReevaluation.APPROVED | typeof StatutReevaluation.DEFINITIVELY_REJECTED | 'REDUCED_AMOUNT',
   montantApprouve: number | undefined,
   commentaire: string,
   membresPresents: string[],
@@ -535,7 +539,7 @@ export async function recordCommitteeDecision(
   }
   
   // 2. Determine final status
-  const finalStatut = decision === 'Montant réduit' ? 'Approuvée' : decision;
+  const finalStatut = decision === 'REDUCED_AMOUNT' ? StatutReevaluation.APPROVED : decision;
   
   // 3. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
@@ -564,10 +568,10 @@ export async function recordCommitteeDecision(
   
   // 5. If approved, update the parent DemandeCredit to 'Approuvée après réévaluation'
   // This status indicates the reevaluation was approved and the demand is ready for commission credit disbursement
-  if (finalStatut === 'Approuvée') {
+  if (finalStatut === StatutReevaluation.APPROVED) {
     await db.update(demandesCredit)
       .set({
-        statut: 'Approuvée après réévaluation',
+        statut: StatutDemande.APPROVED_AFTER_REEVALUATION,
         montantApprouve: montantApprouve?.toString() || reevaluation.nouveauMontantDemande,
         dureeValeur: reevaluation.nouvelleDureeValeur || undefined,
         dureeUnite: reevaluation.nouvelleDureeUnite || undefined,
@@ -621,24 +625,24 @@ export async function cancelReevaluation(
   }
   
   // Check if cancellation is allowed from current status
-  const terminalStatuses = ['Approuvée', 'Rejetée définitivement', 'Annulée'];
-  if (terminalStatuses.includes(reevaluation.statut)) {
+  const terminalStatuses = [StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.CANCELLED];
+  if (terminalStatuses.includes(reevaluation.statut as typeof terminalStatuses[number])) {
     throw new Error('Impossible d\'annuler une réévaluation dans cet état');
   }
-  
+
   await db.update(reevaluationsCredit)
     .set({
-      statut: 'Annulée',
+      statut: StatutReevaluation.CANCELLED,
       updatedAt: new Date()
     })
     .where(eq(reevaluationsCredit.id, reevaluationId));
-  
+
   await createAuditLog({
     reevaluationId: reevaluation.id,
     demandeId: reevaluation.demandeId,
     action: 'ANNULEE',
     statutAvant: reevaluation.statut,
-    statutApres: 'Annulée',
+    statutApres: StatutReevaluation.CANCELLED,
     details: {
       description: 'Réévaluation annulée',
       motif

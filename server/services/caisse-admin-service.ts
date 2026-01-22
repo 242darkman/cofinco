@@ -78,7 +78,7 @@ export class CaisseAdminService {
       }
 
       // 2. Calculer le solde théorique actuel
-      const soldeTheorique = parseFloat(session.soldeTheorique || "0");
+      const soldeTheorique = parseFloat(session.montantFermetureTheorique || "0");
 
       // 3. Fermer la session avec marquage force close
       const [closedSession] = await db
@@ -89,7 +89,7 @@ export class CaisseAdminService {
           forceClosedBy: params.closedBy,
           forceClosedAt: new Date(),
           fundsKeptInCaisse: params.keepFunds || false,
-          soldeReel: soldeTheorique.toString(), // Assume theoretical = real for force close
+          montantFermetureDeclare: soldeTheorique.toString(), // Assume theoretical = real for force close
           ecart: "0",
           updatedAt: new Date(),
         })
@@ -120,7 +120,7 @@ export class CaisseAdminService {
         aggregateId: session.caisseId,
         payload: {
           caisseId: session.caisseId,
-          status: "Fermée",
+          status: "CLOSED",
           forceClosed: true,
           sessionId: params.sessionId,
         },

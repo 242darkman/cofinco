@@ -4,12 +4,13 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import { createContributionTontineWithLedger } from "../storage/tontines";
 import { updateTontineSolde, executeWithLedger, updateCompteSolde, generateReference } from "./ledger";
 import { isTourFullyPaid } from "./tontine-logic";
+import { StatutTontine, StatutMembreTontine, TypeCompte, StatutTransaction, TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
 
 export async function processAutomaticTontineContributions() {
   const now = new Date();
 
   // 1. Get all active tontines
-  const activeTontines = await db.select().from(tontines).where(eq(tontines.statut, 'Actif'));
+  const activeTontines = await db.select().from(tontines).where(eq(tontines.statut, StatutTontine.ACTIVE));
 
   const results = {
     processed: 0,
@@ -33,7 +34,7 @@ export async function processAutomaticTontineContributions() {
       const eligibleMembers = await db.select().from(membresTontine).where(and(
         eq(membresTontine.tontineId, tontine.id),
         eq(membresTontine.cotisationAutomatique, true),
-        eq(membresTontine.statut, 'Actif')
+        eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
       ));
 
       for (const membre of eligibleMembers) {
@@ -80,7 +81,7 @@ async function executeAutomaticContribution(tontine: any, membre: any, tourNumer
   if (!sourceAccountId) {
      // Check for default account logic ?
      // For now require explicit account or find 'Courant'
-      const accounts = await db.select().from(comptes).where(and(eq(comptes.clientId, membre.clientId), eq(comptes.typeCompte, 'Courant')));
+      const accounts = await db.select().from(comptes).where(and(eq(comptes.clientId, membre.clientId), eq(comptes.typeCompte, TypeCompte.CURRENT)));
       if (accounts.length === 0) throw new Error("No source account found for automatic contribution");
      // Use first one
      const account = accounts[0];
@@ -154,12 +155,12 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
         "TONTINE",
         {
           montant: amount.toString(),
-          sens: "Crédit", // Tontine receives money
+          sens: "CREDIT", // Tontine receives money
           clientId: membre.clientId,
           tontineId: tontine.id,
           compteId: compte.id, // Source Account
-          typePaiement: "Versement Tontine",
-          methodePaiement: "Virement",
+          typePaiement: "TONTINE_CONTRIBUTION",
+          methodePaiement: "TRANSFER",
           referenceExterne: `AUTO-TON-${generateReference("TONTINE")}`,
           metadata: {
               description: montantAPrevelever
@@ -173,31 +174,31 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
         async (tx, mouvement) => {
             // 1. Debit Account
             const nouveauSoldeCompte = await updateCompteSolde(tx, compte.id, -amount);
-            
+
             // 2. Credit Tontine
             await updateTontineSolde(tx, tontine.id, amount);
-            
+
             // 3. Create Contribution Record
             await tx.insert(contributionsTontine).values({
                 tontineId: tontine.id,
                 clientId: membre.clientId,
-                typeOperation: "Versement",
+                typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
                 montant: amount.toString(),
                 tourNumero,
-                methodePaiement: "Virement",
+                methodePaiement: MethodePaiement.TRANSFER,
                 reference: mouvement.reference,
-                statutTransaction: "Posté",
+                statutTransaction: StatutTransaction.POSTED,
                 mouvementId: mouvement.id
             });
-            
+
             // 4. Create Transaction Record (for account history)
             await tx.insert(transactionsCompte).values({
                 compteId: compte.id,
                 mouvementId: mouvement.id,
-                typePaiement: "Versement Tontine",
+                typePaiement: TypeOperationCaisse.TONTINE_CONTRIBUTION,
                 montant: amount.toString(),
                 soldeApres: nouveauSoldeCompte,
-                methodePaiement: "Virement",
+                methodePaiement: MethodePaiement.TRANSFER,
                 observations: `Contribution automatique Tontine Tour ${tourNumero}`,
             });
             

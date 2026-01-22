@@ -8,6 +8,7 @@ import {
   sessionsCaisse,
   transfertsCoffreAuditLogs,
 } from "@shared/schema";
+import { StatutTransaction, StatutTransfertCoffre, TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
 import { eq, sql, desc, and, isNull } from "drizzle-orm";
 import { getWsInstance } from "../../ws-server";
 
@@ -75,7 +76,7 @@ export async function executeTransfertCoffre(
       throw new Error("TRANSFERT_NOT_FOUND: Transfert introuvable");
     }
 
-    if (transfert.statut !== "Validé") {
+    if (transfert.statut !== StatutTransfertCoffre.VALIDATED) {
       throw new Error(`INVALID_STATUS: Le transfert doit être 'Validé' pour être exécuté (actuel: ${transfert.statut})`);
     }
 
@@ -111,12 +112,12 @@ export async function executeTransfertCoffre(
     // Source: Si Coffre (Sortie Coffre), Si Caisse (Sortie Caisse)
     const [mouvementDebit] = await tx.insert(mouvementsFinanciers).values({
       montant: transfert.montant,
-      sens: "Débit",
+      sens: "DEBIT",
       sourceModule: "TRANSFERT",
       agenceId: transfert.agenceId,
       reference: refDebit,
       idempotencyKey: `${transfert.idempotencyKey || transfert.id}-debit`,
-      statut: "Posté",
+      statut: StatutTransaction.POSTED,
       dateOperation: new Date(),
       metadata: {
         transfertId: transfert.id,
@@ -132,12 +133,12 @@ export async function executeTransfertCoffre(
     // 7. Créer le mouvement CRÉDIT (Entrée Destination)
     const [mouvementCredit] = await tx.insert(mouvementsFinanciers).values({
       montant: transfert.montant,
-      sens: "Crédit",
+      sens: "CREDIT",
       sourceModule: "TRANSFERT",
       agenceId: transfert.agenceId,
       reference: refCredit,
       idempotencyKey: `${transfert.idempotencyKey || transfert.id}-credit`,
-      statut: "Posté",
+      statut: StatutTransaction.POSTED,
       dateOperation: new Date(),
       metadata: {
         transfertId: transfert.id,
@@ -163,18 +164,18 @@ export async function executeTransfertCoffre(
             const [op] = await tx.insert(operationsCaisse).values({
                 sessionId,
                 mouvementId: mouvementDebit.id,
-                typeOperation: "Versement coffre",
+                typeOperation: TypeOperationCaisse.SAFE_DEPOSIT,
                 montant: transfert.montant,
-                methodePaiement: "Espèces",
+                methodePaiement: MethodePaiement.CASH,
                 reference: refDebit,
                 description: `Versement vers ${coffre.nom}`,
-                statut: "Posté"
+                statut: StatutTransaction.POSTED
             }).returning();
             operationSource = op;
             
-            // Update Session Solde Theorique (Sortie)
+            // Update Session montantFermetureTheorique (Sortie)
             await tx.update(sessionsCaisse)
-                .set({ soldeTheorique: sql`${sessionsCaisse.soldeTheorique} - ${montant}`, updatedAt: new Date() })
+                .set({ montantFermetureTheorique: sql`${sessionsCaisse.montantFermetureTheorique} - ${montant}`, updatedAt: new Date() })
                 .where(eq(sessionsCaisse.id, sessionId));
         }
     }
@@ -190,18 +191,18 @@ export async function executeTransfertCoffre(
             const [op] = await tx.insert(operationsCaisse).values({
                 sessionId,
                 mouvementId: mouvementCredit.id,
-                typeOperation: "Approvisionnement coffre",
+                typeOperation: TypeOperationCaisse.SAFE_SUPPLY,
                 montant: transfert.montant,
-                methodePaiement: "Espèces",
+                methodePaiement: MethodePaiement.CASH,
                 reference: refCredit,
                 description: `Approvisionnement depuis ${coffre.nom}`,
-                statut: "Posté"
+                statut: StatutTransaction.POSTED
             }).returning();
             operationDest = op;
 
-             // Update Session Solde Theorique (Entrée)
+             // Update Session montantFermetureTheorique (Entrée)
              await tx.update(sessionsCaisse)
-                .set({ soldeTheorique: sql`${sessionsCaisse.soldeTheorique} + ${montant}`, updatedAt: new Date() })
+                .set({ montantFermetureTheorique: sql`${sessionsCaisse.montantFermetureTheorique} + ${montant}`, updatedAt: new Date() })
                 .where(eq(sessionsCaisse.id, sessionId));
         }
     }
@@ -220,7 +221,7 @@ export async function executeTransfertCoffre(
     // 10. Finaliser le transfert
     const [updatedTransfert] = await tx.update(transfertsCoffreCaisse)
       .set({
-        statut: "Exécuté",
+        statut: StatutTransfertCoffre.EXECUTED,
         executedBy: executorId,
         executedAt: new Date(),
         sessionExecuteId,
@@ -239,8 +240,8 @@ export async function executeTransfertCoffre(
     await tx.insert(transfertsCoffreAuditLogs).values({
       transfertId,
       action: "EXECUTED",
-      statutAvant: "Validé",
-      statutApres: "Exécuté",
+      statutAvant: StatutTransfertCoffre.VALIDATED,
+      statutApres: StatutTransfertCoffre.EXECUTED,
       details: {
         amount: montant,
         coffreId: coffre.id,

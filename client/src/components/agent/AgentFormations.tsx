@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GraduationCap, Plus, Award, TrendingUp, CheckCircle, Clock } from 'lucide-react';
+import { StatutSuiviFormation, STATUT_SUIVI_FORMATION_LABELS } from '@shared/enum/status-constants';
 
 interface Formation {
   id: string;
@@ -116,7 +117,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
           formation_id: formationId,
           date_debut: new Date().toISOString().slice(0, 10),
           progression: 0,
-          statut: 'En cours'
+          statut: 'IN_PROGRESS'
         })
       });
 
@@ -132,7 +133,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
 
   const updateProgression = async (suiviId: string, progression: number) => {
     try {
-      const statut = progression >= 100 ? 'Complété' : 'En cours';
+      const statut = progression >= 100 ? 'COMPLETED' : 'IN_PROGRESS';
 
       const response = await fetch(`/api/agent-formations-suivi/${suiviId}`, {
         method: 'PATCH',
@@ -151,7 +152,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
     }
   };
 
-  const formationsCompletes = suivis.filter(s => s.statut === 'Complété').length;
+  const formationsCompletes = suivis.filter(s => s.statut === 'COMPLETED').length;
   const progressionMoyenne = suivis.length > 0
     ? suivis.reduce((sum, s) => sum + s.progression, 0) / suivis.length
     : 0;
@@ -179,7 +180,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
           <div className="flex items-center justify-between mb-2">
             <Clock size={24} />
           </div>
-          <div className="text-3xl font-bold mb-1">{suivis.filter(s => s.statut === 'En cours').length}</div>
+          <div className="text-3xl font-bold mb-1">{suivis.filter(s => s.statut === StatutSuiviFormation.IN_PROGRESS).length}</div>
           <div className="text-emerald-100 text-sm">En Cours</div>
         </div>
 
@@ -288,11 +289,11 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
                     <p className="text-slate-400 text-sm">{suivi.formation?.description}</p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    suivi.statut === 'Complété' ? 'bg-green-500/20 text-green-400' :
-                    suivi.statut === 'En cours' ? 'bg-blue-500/20 text-blue-400' :
+                    suivi.statut === StatutSuiviFormation.COMPLETED ? 'bg-green-500/20 text-green-400' :
+                    suivi.statut === StatutSuiviFormation.IN_PROGRESS ? 'bg-blue-500/20 text-blue-400' :
                     'bg-slate-500/20 text-slate-400'
                   }`}>
-                    {suivi.statut}
+                    {STATUT_SUIVI_FORMATION_LABELS[suivi.statut as keyof typeof STATUT_SUIVI_FORMATION_LABELS] || suivi.statut}
                   </span>
                 </div>
 
@@ -309,7 +310,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
                   </div>
                 </div>
 
-                {suivi.statut === 'En cours' && (
+                {suivi.statut === StatutSuiviFormation.IN_PROGRESS && (
                   <div className="flex gap-2">
                     <input
                       type="range"

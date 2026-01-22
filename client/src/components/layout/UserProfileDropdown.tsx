@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Settings, LogOut, ChevronDown, Check } from 'lucide-react';
-import { authService } from '../../lib/auth';
-import { useLocation } from 'wouter';
+import { createPortal } from 'react-dom';
+import { User, Settings, LogOut, ChevronDown, Activity, Building2 } from 'lucide-react';
 import { getRoleLabel } from '@shared/types/roles';
 
 interface UserProfileDropdownProps {
@@ -11,27 +10,79 @@ interface UserProfileDropdownProps {
     email?: string;
     role?: string;
     photo_url?: string;
+    agence?: string;
   };
   onProfileClick: () => void;
   onSettingsClick: () => void;
+  onActivityClick?: () => void;
   onLogout: () => void;
   className?: string;
 }
 
-const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ 
-  user, 
-  onProfileClick, 
+// Composant MenuItem réutilisable
+interface MenuItemProps {
+  icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+}
+
+const MenuItem: React.FC<MenuItemProps> = ({ icon: Icon, label, onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer group"
+  >
+    <Icon size={18} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
+    <span className="group-hover:text-white transition-colors">{label}</span>
+  </button>
+);
+
+const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
+  user,
+  onProfileClick,
   onSettingsClick,
+  onActivityClick,
   onLogout,
   className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [, setLocation] = useLocation();
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Calculer la position du menu
+  const updateMenuPosition = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 12, // mt-3 = 12px
+        right: window.innerWidth - rect.right,
+      });
+    }
+  };
+
+  // Mise à jour de la position à l'ouverture et au resize
+  useEffect(() => {
+    if (isOpen) {
+      updateMenuPosition();
+      window.addEventListener('resize', updateMenuPosition);
+      window.addEventListener('scroll', updateMenuPosition, true);
+    }
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [isOpen]);
+
+  // Gestion du clic extérieur pour fermer le menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -42,100 +93,171 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const initials = (user?.nom || 'A').charAt(0).toUpperCase();
+  // Gestion de la touche Escape
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
 
-  return (
-    <div className={`relative ${className}`} ref={menuRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`
-          relative flex items-center gap-2 md:gap-3 p-1.5 md:p-2 rounded-xl transition-all duration-300
-          ${isOpen 
-            ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/40' 
-            : 'hover:bg-slate-800/80 text-slate-300 hover:text-white'
-          }
-        `}
-        aria-label="Menu utilisateur"
-        aria-expanded={isOpen}
-      >
-        <div className="w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-blue-900/20 border border-blue-500/30">
-          {initials}
-        </div>
-        
-        <div className="hidden md:flex flex-col items-start sr-only sm:not-sr-only">
-          <span className="text-xs font-bold leading-tight">{user?.nom || 'Admin'} {user?.prenom}</span>
-          <span className="text-[10px] opacity-60 font-medium tracking-wide uppercase">{getRoleLabel(user?.role || '')}</span>
-        </div>
-        
-        <ChevronDown size={14} className={`opacity-50 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen]);
 
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-2 z-[100] w-72 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-2 shadow-2xl ring-1 ring-white/10">
-            {/* Header info */}
-            <div className="p-3 mb-2 border-b border-white/5 mx-1">
-               <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center text-lg font-bold text-white shadow-inner">
-                    {initials}
-                  </div>
-                  <div className="overflow-hidden">
-                    <h4 className="font-bold text-white truncate">{user?.nom} {user?.prenom}</h4>
-                    <p className="text-xs text-slate-400 truncate">{user?.email}</p>
-                  </div>
-               </div>
-               <div className="flex items-center gap-2">
-                 <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold uppercase tracking-wider rounded-md">
-                   {getRoleLabel(user?.role || '')}
-                 </span>
+  // Génération des initiales
+  const getInitials = () => {
+    const nom = user?.nom?.charAt(0) || '';
+    const prenom = user?.prenom?.charAt(0) || '';
+    return (nom + prenom).toUpperCase() || 'U';
+  };
 
-               </div>
+  // Nom complet
+  const fullName = [user?.prenom, user?.nom].filter(Boolean).join(' ') || 'Utilisateur';
+
+  // Contenu du menu dropdown
+  const dropdownMenu = (
+    <div
+      ref={menuRef}
+      style={{
+        position: 'fixed',
+        top: menuPosition.top,
+        right: menuPosition.right,
+        zIndex: 99999,
+      }}
+      className="w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/60 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+      role="menu"
+      aria-orientation="vertical"
+    >
+      {/* ZONE 1: HEADER IDENTITÉ */}
+      <div className="p-4 bg-slate-800/50 border-b border-slate-700">
+        <div className="flex items-center gap-4">
+          {/* Avatar plus grand */}
+          {user?.photo_url ? (
+            <img
+              src={user.photo_url}
+              alt={fullName}
+              className="w-12 h-12 rounded-full object-cover border-2 border-slate-600"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-lg border border-indigo-500/30">
+              {getInitials()}
             </div>
+          )}
 
-            <div className="flex flex-col gap-1">
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onProfileClick();
-                }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all duration-200 group"
-              >
-                <div className="p-2 rounded-lg bg-slate-800 group-hover:bg-slate-700 transition-colors text-slate-400 group-hover:text-blue-400">
-                   <User size={16} />
-                </div>
-                <span>Mon Profil</span>
-              </button>
+          <div className="flex-1 min-w-0">
+            {/* Nom complet */}
+            <h4 className="text-white font-medium truncate">{fullName}</h4>
 
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  onSettingsClick();
-                }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all duration-200 group"
-              >
-                <div className="p-2 rounded-lg bg-slate-800 group-hover:bg-slate-700 transition-colors text-slate-400 group-hover:text-blue-400">
-                   <Settings size={16} />
-                </div>
-                <span>Paramètres</span>
-               </button>
+            {/* Rôle */}
+            <p className="text-xs text-slate-400 truncate">
+              {getRoleLabel(user?.role || '')}
+            </p>
 
-               <div className="h-px bg-white/5 my-1 mx-2" />
+            {/* Email */}
+            <p className="text-xs text-slate-500 truncate mt-0.5">
+              {user?.email}
+            </p>
 
-               <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    onLogout();
-                  }}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 group"
-                >
-                  <div className="p-2 rounded-lg bg-red-500/10 group-hover:bg-red-500/20 transition-colors text-red-500">
-                     <LogOut size={16} />
-                  </div>
-                  <span>Déconnexion</span>
-                </button>
-            </div>
+            {/* Badge Agence */}
+            {user?.agence && (
+              <div className="mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
+                <Building2 size={10} className="text-slate-400" />
+                <span className="text-[10px] text-slate-300">{user.agence}</span>
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* ZONE 2: NAVIGATION */}
+      <div className="p-2 space-y-1">
+        <MenuItem
+          icon={User}
+          label="Mon Profil"
+          onClick={() => {
+            setIsOpen(false);
+            onProfileClick();
+          }}
+        />
+        <MenuItem
+          icon={Settings}
+          label="Paramètres"
+          onClick={() => {
+            setIsOpen(false);
+            onSettingsClick();
+          }}
+        />
+        {onActivityClick && (
+          <MenuItem
+            icon={Activity}
+            label="Journal d'activité"
+            onClick={() => {
+              setIsOpen(false);
+              onActivityClick();
+            }}
+          />
+        )}
+      </div>
+
+      {/* ZONE 3: FOOTER */}
+      <div className="p-2 border-t border-slate-800">
+        <button
+          onClick={() => {
+            setIsOpen(false);
+            onLogout();
+          }}
+          className="w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors group"
+          role="menuitem"
+        >
+          <LogOut size={16} className="group-hover:text-rose-400 transition-colors" />
+          <span>Déconnexion</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`relative ${className}`}>
+      {/* TRIGGER ÉPURÉ */}
+      <button
+        ref={triggerRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 p-1 pr-2 rounded-full hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+        aria-label="Menu utilisateur"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+      >
+        <div className="relative">
+          {/* Avatar */}
+          {user?.photo_url ? (
+            <img
+              src={user.photo_url}
+              alt={fullName}
+              className="w-8 h-8 rounded-full object-cover border-2 border-slate-700"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold border-2 border-slate-700">
+              {getInitials()}
+            </div>
+          )}
+          {/* Indicateur de statut en ligne */}
+          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+        </div>
+        <ChevronDown
+          size={14}
+          className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {/* MENU FLOTTANT - Rendu via Portal pour garantir le z-index */}
+      {isOpen && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, pointerEvents: 'none' }}>
+          <div style={{ pointerEvents: 'auto' }}>
+            {dropdownMenu}
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

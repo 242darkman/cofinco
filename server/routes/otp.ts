@@ -68,11 +68,11 @@ export function registerOtpRoutes(app: Express) {
         return res.status(404).json({ error: "codeInvalide" }); // Generic error for security
       }
 
-      if (otpRecord.status === 'validated') {
+      if (otpRecord.statut === 'validated') {
         return res.json({ success: true, message: "Already validated" }); // Idempotency
       }
 
-      if (otpRecord.status !== 'pending') {
+      if (otpRecord.statut !== 'pending') {
         return res.status(400).json({ error: "otpExpiredOrInvalid" });
       }
 

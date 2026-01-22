@@ -6,11 +6,13 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { Button, StatCard, TabGroup } from '../../ui';
 import { formatMoney, parseMoney, formatClientName } from '../../../lib/format';
 import { escapeHtml } from '../../../lib/sanitize';
-import { generateLoanSchedule } from '../../../lib/credit-logic';
+import { generateLoanSchedule, getInstallmentStatusLabel } from '../../../lib/credit-logic';
+import { StatutEcheanceCredit, TypeCompte } from '@shared/enum/status-constants';
 import { CreditSchedulePDF } from '../../ui/printable/CreditScheduleTemplate';
 import { fr } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { SkeletonCard } from '../../ui/Skeleton';
+import { CreditTimeline } from './CreditTimeline';
 
 interface Credit {
   id: string;
@@ -34,6 +36,7 @@ interface Credit {
   remboursementCompteId?: string;
   prochaineEcheance?: string;
   montantEcheance?: number;
+  demandeId?: string;
 }
 
 interface Client {
@@ -203,7 +206,29 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-7xl max-h-[95vh] flex overflow-hidden shadow-2xl">
+        
+        {/* Left Sidebar: Timeline */}
+        <div className="w-80 border-r border-slate-700 bg-slate-900/50 flex flex-col hidden lg:flex">
+           <div className="p-4 border-b border-slate-700 bg-slate-800/80">
+              <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                 <Clock size={16} className="text-blue-400" />
+                 Parcours
+              </h3>
+           </div>
+           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+              {credit.demandeId ? (
+                 <CreditTimeline demandeId={credit.demandeId} compact />
+              ) : (
+                 <div className="text-center py-8 text-slate-500 italic text-sm">
+                    Liaison demande indisponible
+                 </div>
+              )}
+           </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-slate-800">
         {/* Header */}
         <div className="p-6 border-b border-slate-700 flex justify-between items-center shrink-0">
           <div>
@@ -315,7 +340,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                             <input 
                                type="checkbox" 
                                checked={!!credit.remboursementAutomatique} 
-                               onChange={(e) => handleUpdateAutoRepayment(e.target.checked, credit.remboursementCompteId || accounts.find(a => a.typeCompte === 'Courant')?.id)}
+                               onChange={(e) => handleUpdateAutoRepayment(e.target.checked, credit.remboursementCompteId || accounts.find(a => a.typeCompte === TypeCompte.CURRENT)?.id)}
                                className="sr-only peer"
                                disabled={updatingAutoRepay}
                             />
@@ -432,7 +457,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                      </thead>
                      <tbody className="divide-y divide-slate-700/50">
                         {stats.schedule.map((item) => (
-                           <tr key={item.number} className={`hover:bg-slate-700/20 transition-colors ${item.status === 'Soldé' ? 'opacity-30' : ''}`}>
+                           <tr key={item.number} className={`hover:bg-slate-700/20 transition-colors ${item.status === StatutEcheanceCredit.SETTLED ? 'opacity-30' : ''}`}>
                               <td className="px-4 py-4 text-slate-500 font-mono text-xs">{item.number}</td>
                               <td className="px-6 py-4 font-bold text-white whitespace-nowrap">
                                  {format(item.dueDate, 'dd MMM yyyy', { locale: fr })}
@@ -446,11 +471,11 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                               <td className="px-4 py-4 text-center">
                                  <span className={`
                                     px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border
-                                    ${item.status === 'Payé' || item.status === 'Soldé' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
-                                      item.status === 'Retard' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
+                                    ${item.status === StatutEcheanceCredit.PAID || item.status === StatutEcheanceCredit.SETTLED ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                      item.status === StatutEcheanceCredit.LATE ? 'bg-red-500/10 text-red-400 border-red-500/20' :
                                       'bg-slate-700/50 text-slate-500 border-slate-600'}
                                  `}>
-                                    {item.status}
+                                    {getInstallmentStatusLabel(item.status)}
                                  </span>
                               </td>
                            </tr>
@@ -475,6 +500,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
             Fermer le Dossier
           </Button>
         </div>
+        </div> {/* End Main Content */}
       </div>
 
       {/* Hidden Download-ready Printable Schedule (offscreen, not display:none) */}

@@ -1,37 +1,13 @@
 import { clientApi, clientSearchApi } from '../lib/api-client';
-import type { PaginationMeta } from '../lib/api-client';
+import type { PaginationMeta, ClientStatsResponse } from '../lib/api-client';
+import type { ClientWithIdentity } from '@shared/schema/clients';
 
-export interface Client {
-  id: string;
-  nom: string;
-  prenom?: string;
-  email?: string;
-  telephone: string;
-  adresse?: string;
-  ville?: string;
-  pays?: string;
-  dateNaissance?: string;
-  numeroPiece?: string;
-  typePiece?: string;
-  profession?: string;
-  employeur?: string;
-  revenuMensuel?: number;
-  status?: string;
-  segment?: string;
-  score?: number;
-  dateInscription?: string;
-  photoUrl?: string;
-  photoProfile?: string;
-  creditTotal?: string | number;
-  epargneTotal?: string | number;
-  tauxRemboursement?: string | number;
-  pointsFidelite?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  createdBy?: string;
-  typeMarcheId?: string | null;
-  type_marche_nom?: string | null;
-}
+/**
+ * Type Client utilisé côté frontend.
+ * Alias pour ClientWithIdentity qui contient les données d'identité (nom, prenom, email, telephone, photoProfile)
+ * fusionnées depuis la table users via jointure côté backend.
+ */
+export type Client = ClientWithIdentity;
 
 export interface ClientListResult {
   data: Client[];
@@ -92,7 +68,7 @@ export class ClientService {
       // kept other filters (status, segment) as client-side filtering for now
 
       if (filters?.status && filters.status !== 'all') {
-        filteredClients = filteredClients.filter(client => client.status === filters.status);
+        filteredClients = filteredClients.filter(client => client.statut === filters.status);
       }
 
       if (filters?.segment && filters.segment !== 'all') {
@@ -173,32 +149,24 @@ export class ClientService {
     return result.data;
   }
 
-  async getStats(): Promise<{
-    total: number;
-    actifs: number;
-    nouveaux: number;
-    vip: number;
-  }> {
+  /**
+   * Récupère les statistiques agrégées des clients via l'endpoint optimisé
+   * Utilise des COUNT SQL côté backend au lieu de charger tous les objets
+   */
+  async getStats(): Promise<ClientStatsResponse> {
     try {
-      const clients = await clientApi.getAllList();
-      
-      const total = clients.length;
-      const actifs = clients.filter(c => c.status === 'Actif').length;
-      const vip = clients.filter(c => c.segment === 'VIP').length;
-      
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const nouveaux = clients.filter(c => {
-        const createdAt = c.createdAt || c.dateInscription;
-        if (!createdAt) return false;
-        return new Date(createdAt) >= thirtyDaysAgo;
-      }).length;
-      
-      return { total, actifs, nouveaux, vip };
+      return await clientApi.getStats();
     } catch (error) {
       console.error('Error fetching client stats:', error);
-      return { total: 0, actifs: 0, nouveaux: 0, vip: 0 };
+      return {
+        totalClients: 0,
+        activeClients: 0,
+        inactiveClients: 0,
+        suspendedClients: 0,
+        newClientsThisMonth: 0,
+        segmentDistribution: { vip: 0, premium: 0, standard: 0 },
+        financialSummary: { totalCredit: 0, totalEpargne: 0, avgRepaymentRate: 0, totalLoyaltyPoints: 0 }
+      };
     }
   }
 }

@@ -9,7 +9,7 @@ export async function logAudit(
   resource: string,
   resourceId?: string,
   details?: Record<string, any>,
-  status: 'success' | 'failure' | 'blocked' = 'success',
+  statut: 'success' | 'failure' | 'blocked' = 'success',
   riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low'
 ): Promise<void> {
   try {
@@ -25,7 +25,7 @@ export async function logAudit(
       details,
       ipAddress,
       userAgent,
-      status,
+      statut,
       riskLevel,
     });
   } catch (error: any) {
@@ -40,7 +40,7 @@ export async function logAudit(
           details: { ...details, original_user_id: req.session?.userId },
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.headers['user-agent'] || 'unknown',
-          status,
+          statut,
           riskLevel,
         });
         console.warn('Audit log logged as anonymous due to missing user:', req.session?.userId);
@@ -134,7 +134,7 @@ export async function getAuditLogs(
     userId?: string;
     action?: string;
     resource?: string;
-    status?: string;
+    statut?: string;
     limit?: number;
   }
 ): Promise<any[]> {

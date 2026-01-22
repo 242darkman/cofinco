@@ -18,6 +18,7 @@ import TontineForm from './TontineForm';
 import TontineMembers from './TontineMembers';
 import TontineContributions from './TontineContributions';
 import TontineDistributions from './TontineDistributions';
+import { StatutTontine, StatutTontineType } from '@shared/enum/status-constants';
 import TontineDashboard from './TontineDashboard';
 import TontineCalendar from './TontineCalendar';
 import TontineAlertes from './TontineAlertes';
@@ -34,7 +35,7 @@ interface Tontine {
   frequence: 'Hebdomadaire' | 'Bimensuel' | 'Mensuel';
   dateDebut: string;
   dateFin: string | null;
-  statut: 'Active' | 'Terminée' | 'Suspendue';
+  statut: StatutTontineType;
   nombreMembres: number;
   nombreMembresActuel?: number;
   nombreMembresMax?: number;
@@ -107,7 +108,7 @@ export default function Tontines() {
 
   // Calculate success rate based on actual data (memoized)
   const stats = useMemo(() => {
-    const activeTontines = tontines.filter(t => t.statut === 'Active' || t.statut === 'Terminée');
+    const activeTontines = tontines.filter(t => t.statut === StatutTontine.ACTIVE || t.statut === StatutTontine.COMPLETED);
 
     let tauxReussite = 0;
     if (activeTontines.length > 0) {
@@ -122,7 +123,7 @@ export default function Tontines() {
 
     return {
       total: tontines.length,
-      active: tontines.filter(t => t.statut === 'Active').length,
+      active: tontines.filter(t => t.statut === StatutTontine.ACTIVE).length,
       membres: tontines.reduce((sum, t) => sum + (t.nombreMembresActuel || 0), 0),
       volume: tontines.reduce((sum, t) => sum + ((t.montantCotisation || 0) * (t.nombreMembresActuel || 0)), 0),
       tauxReussite,

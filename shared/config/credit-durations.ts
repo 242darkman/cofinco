@@ -5,7 +5,16 @@
  * Fichier partagé Frontend / Backend.
  * Contient les types, les constantes, les configurations par défaut
  * et les fonctions pures de validation et de conversion.
+ *
+ * CONVENTION: Toutes les valeurs sont en ANGLAIS (SCREAMING_SNAKE_CASE)
  */
+
+import {
+  FrequenceRemboursement,
+  FrequenceRemboursementType,
+  DureeUnite,
+  DureeUniteType,
+} from "@shared/enum/status-constants";
 
 // --- CONSTANTES GLOBALES (Pour éviter les "magic numbers") ---
 export const DAYS_IN_WEEK = 7;
@@ -15,8 +24,9 @@ export const MAX_ECHEANCES_SAFE_LIMIT = 365; // Sécurité anti-boucle ou surcha
 
 // --- TYPES & ENUMS ---
 
-export type FrequenceRemboursement = "Journalier" | "Hebdomadaire" | "Mensuel" | "Bimensuel" | "Trimestriel";
-export type DureeUnite = "Jour" | "Semaine" | "Mois";
+// Re-export pour compatibilité
+export type { FrequenceRemboursementType as FrequenceRemboursement };
+export type { DureeUniteType as DureeUnite };
 
 /**
  * Codes d'erreur pour la validation.
@@ -33,19 +43,19 @@ export interface ValidationResult {
   isValid: boolean;
   errorCode?: DurationErrorCode;
   /** Message de debug (fallback si pas de trad) */
-  debugMessage?: string; 
+  debugMessage?: string;
 }
 
 export interface DureeSuggestion {
   valeur: number;
-  unite: DureeUnite;
+  unite: DureeUniteType;
   label: string;
   estRecommandee?: boolean;
 }
 
 export interface FrequenceConfig {
-  frequence: FrequenceRemboursement;
-  uniteParDefaut: DureeUnite;
+  frequence: FrequenceRemboursementType;
+  uniteParDefaut: DureeUniteType;
   dureesSuggerees: DureeSuggestion[];
 }
 
@@ -54,12 +64,12 @@ export interface FrequenceConfig {
 /**
  * Mapping des unités valides par fréquence
  */
-export const FREQUENCE_UNITE_MAP: Record<FrequenceRemboursement, DureeUnite[]> = {
-  "Journalier": ["Jour"],
-  "Hebdomadaire": ["Semaine", "Mois", "Jour"],
-  "Mensuel": ["Mois"],
-  "Bimensuel": ["Mois"],
-  "Trimestriel": ["Mois"],
+export const FREQUENCE_UNITE_MAP: Record<FrequenceRemboursementType, DureeUniteType[]> = {
+  [FrequenceRemboursement.DAILY]: [DureeUnite.DAY],
+  [FrequenceRemboursement.WEEKLY]: [DureeUnite.WEEK, DureeUnite.MONTH, DureeUnite.DAY],
+  [FrequenceRemboursement.MONTHLY]: [DureeUnite.MONTH],
+  [FrequenceRemboursement.BI_MONTHLY]: [DureeUnite.MONTH],
+  [FrequenceRemboursement.QUARTERLY]: [DureeUnite.MONTH],
 };
 
 /**
@@ -67,49 +77,49 @@ export const FREQUENCE_UNITE_MAP: Record<FrequenceRemboursement, DureeUnite[]> =
  */
 export const DEFAULT_DURATIONS_CONFIG: FrequenceConfig[] = [
   {
-    frequence: "Journalier",
-    uniteParDefaut: "Jour",
+    frequence: FrequenceRemboursement.DAILY,
+    uniteParDefaut: DureeUnite.DAY,
     dureesSuggerees: [
-      { valeur: 15, unite: "Jour", label: "15 jours" },
-      { valeur: 30, unite: "Jour", label: "30 jours", estRecommandee: true },
-      { valeur: 60, unite: "Jour", label: "60 jours" },
-      { valeur: 90, unite: "Jour", label: "90 jours" },
+      { valeur: 15, unite: DureeUnite.DAY, label: "15 jours" },
+      { valeur: 30, unite: DureeUnite.DAY, label: "30 jours", estRecommandee: true },
+      { valeur: 60, unite: DureeUnite.DAY, label: "60 jours" },
+      { valeur: 90, unite: DureeUnite.DAY, label: "90 jours" },
     ],
   },
   {
-    frequence: "Hebdomadaire",
-    uniteParDefaut: "Mois",
+    frequence: FrequenceRemboursement.WEEKLY,
+    uniteParDefaut: DureeUnite.MONTH,
     dureesSuggerees: [
-      { valeur: 1, unite: "Mois", label: "1 mois" },
-      { valeur: 3, unite: "Mois", label: "3 mois", estRecommandee: true },
-      { valeur: 6, unite: "Mois", label: "6 mois" },
+      { valeur: 1, unite: DureeUnite.MONTH, label: "1 mois" },
+      { valeur: 3, unite: DureeUnite.MONTH, label: "3 mois", estRecommandee: true },
+      { valeur: 6, unite: DureeUnite.MONTH, label: "6 mois" },
     ],
   },
   {
-    frequence: "Mensuel",
-    uniteParDefaut: "Mois",
+    frequence: FrequenceRemboursement.MONTHLY,
+    uniteParDefaut: DureeUnite.MONTH,
     dureesSuggerees: [
-      { valeur: 3, unite: "Mois", label: "3 mois" },
-      { valeur: 6, unite: "Mois", label: "6 mois", estRecommandee: true },
-      { valeur: 12, unite: "Mois", label: "12 mois" },
+      { valeur: 3, unite: DureeUnite.MONTH, label: "3 mois" },
+      { valeur: 6, unite: DureeUnite.MONTH, label: "6 mois", estRecommandee: true },
+      { valeur: 12, unite: DureeUnite.MONTH, label: "12 mois" },
     ],
   },
   {
-    frequence: "Bimensuel",
-    uniteParDefaut: "Mois",
+    frequence: FrequenceRemboursement.BI_MONTHLY,
+    uniteParDefaut: DureeUnite.MONTH,
     dureesSuggerees: [
-      { valeur: 6, unite: "Mois", label: "6 mois" },
-      { valeur: 12, unite: "Mois", label: "12 mois", estRecommandee: true },
-      { valeur: 18, unite: "Mois", label: "18 mois" },
+      { valeur: 6, unite: DureeUnite.MONTH, label: "6 mois" },
+      { valeur: 12, unite: DureeUnite.MONTH, label: "12 mois", estRecommandee: true },
+      { valeur: 18, unite: DureeUnite.MONTH, label: "18 mois" },
     ],
   },
   {
-    frequence: "Trimestriel",
-    uniteParDefaut: "Mois",
+    frequence: FrequenceRemboursement.QUARTERLY,
+    uniteParDefaut: DureeUnite.MONTH,
     dureesSuggerees: [
-      { valeur: 12, unite: "Mois", label: "12 mois" },
-      { valeur: 24, unite: "Mois", label: "24 mois", estRecommandee: true },
-      { valeur: 36, unite: "Mois", label: "36 mois" },
+      { valeur: 12, unite: DureeUnite.MONTH, label: "12 mois" },
+      { valeur: 24, unite: DureeUnite.MONTH, label: "24 mois", estRecommandee: true },
+      { valeur: 36, unite: DureeUnite.MONTH, label: "36 mois" },
     ],
   },
 ];
@@ -122,13 +132,13 @@ export const DEFAULT_DURATIONS_CONFIG: FrequenceConfig[] = [
  * NE PAS UTILISER pour le calcul comptable d'intérêts ou les dates de calendrier exactes.
  * Utiliser uniquement pour l'UI ou des estimations de volume.
  */
-export function convertirDureeEnJours(valeur: number, unite: DureeUnite): number {
+export function convertirDureeEnJours(valeur: number, unite: DureeUniteType): number {
   switch (unite) {
-    case "Jour":
+    case DureeUnite.DAY:
       return valeur;
-    case "Semaine":
+    case DureeUnite.WEEK:
       return valeur * DAYS_IN_WEEK;
-    case "Mois":
+    case DureeUnite.MONTH:
       return valeur * DAYS_IN_MONTH_APPROX;
     default:
       return valeur;
@@ -140,30 +150,30 @@ export function convertirDureeEnJours(valeur: number, unite: DureeUnite): number
  * Gère spécifiquement les fréquences basées sur les mois pour éviter les erreurs d'arrondi.
  */
 export function calculerNombreEcheances(
-  frequence: FrequenceRemboursement,
+  frequence: FrequenceRemboursementType,
   dureeValeur: number,
-  dureeUnite: DureeUnite
+  dureeUnite: DureeUniteType
 ): number {
   // Optimisation: Calcul direct si l'unité est alignée avec la fréquence
-  if (dureeUnite === "Mois") {
-    if (frequence === "Mensuel") return dureeValeur;
-    if (frequence === "Bimensuel") return dureeValeur * 2; // 2x par mois
-    if (frequence === "Trimestriel") return Math.ceil(dureeValeur / 3);
+  if (dureeUnite === DureeUnite.MONTH) {
+    if (frequence === FrequenceRemboursement.MONTHLY) return dureeValeur;
+    if (frequence === FrequenceRemboursement.BI_MONTHLY) return dureeValeur * 2; // 2x par mois
+    if (frequence === FrequenceRemboursement.QUARTERLY) return Math.ceil(dureeValeur / 3);
   }
 
   // Fallback: Calcul via conversion en jours (pour Hebdomadaire sur X Mois par ex)
   const joursTotal = convertirDureeEnJours(dureeValeur, dureeUnite);
 
   switch (frequence) {
-    case "Journalier":
+    case FrequenceRemboursement.DAILY:
       return joursTotal;
-    case "Hebdomadaire":
+    case FrequenceRemboursement.WEEKLY:
       return Math.ceil(joursTotal / DAYS_IN_WEEK);
-    case "Mensuel":
+    case FrequenceRemboursement.MONTHLY:
       return Math.ceil(joursTotal / DAYS_IN_MONTH_APPROX);
-    case "Bimensuel":
+    case FrequenceRemboursement.BI_MONTHLY:
       return Math.ceil(joursTotal / 15);
-    case "Trimestriel":
+    case FrequenceRemboursement.QUARTERLY:
       return Math.ceil(joursTotal / 90);
     default:
       return joursTotal;
@@ -175,14 +185,14 @@ export function calculerNombreEcheances(
  * Retourne un objet ValidationResult pour faciliter l'i18n.
  */
 export function validerCoherenceFrequenceDuree(
-  frequence: FrequenceRemboursement,
+  frequence: FrequenceRemboursementType,
   dureeValeur: number,
-  dureeUnite: DureeUnite
+  dureeUnite: DureeUniteType
 ): ValidationResult {
-  
+
   // 1. Validation de l'unité
   const unitesValides = FREQUENCE_UNITE_MAP[frequence];
-  if (!unitesValides.includes(dureeUnite)) {
+  if (!unitesValides?.includes(dureeUnite)) {
     return {
       isValid: false,
       errorCode: DurationErrorCode.INCOMPATIBLE_UNIT,
@@ -212,8 +222,8 @@ export function validerCoherenceFrequenceDuree(
   // 3. Règles métier spécifiques (Hard rules)
   // Ces règles peuvent être ajustées selon le risk policy
   switch (frequence) {
-    case "Journalier":
-      if (dureeUnite !== "Jour") {
+    case FrequenceRemboursement.DAILY:
+      if (dureeUnite !== DureeUnite.DAY) {
         return { isValid: false, errorCode: DurationErrorCode.INVALID_FREQUENCY_UNIT };
       }
       if (dureeValeur < 7) {
@@ -221,23 +231,23 @@ export function validerCoherenceFrequenceDuree(
       }
       break;
 
-    case "Hebdomadaire":
+    case FrequenceRemboursement.WEEKLY:
       if (nombreEcheances < 2) {
         return { isValid: false, errorCode: DurationErrorCode.DURATION_TOO_SHORT, debugMessage: "Min 2 semaines pour hebdo" };
       }
       break;
 
-    case "Mensuel":
-    case "Bimensuel":
-      if (dureeUnite !== "Mois") {
+    case FrequenceRemboursement.MONTHLY:
+    case FrequenceRemboursement.BI_MONTHLY:
+      if (dureeUnite !== DureeUnite.MONTH) {
          return { isValid: false, errorCode: DurationErrorCode.INVALID_FREQUENCY_UNIT };
       }
       if (dureeValeur < 1) {
         return { isValid: false, errorCode: DurationErrorCode.DURATION_TOO_SHORT, debugMessage: "Min 1 mois requis" };
       }
       break;
-      
-    case "Trimestriel":
+
+    case FrequenceRemboursement.QUARTERLY:
       if (dureeValeur < 3) {
         return { isValid: false, errorCode: DurationErrorCode.DURATION_TOO_SHORT, debugMessage: "Min 3 mois (1 trimestre)" };
       }
@@ -250,7 +260,7 @@ export function validerCoherenceFrequenceDuree(
 /**
  * Retourne la configuration par défaut pour une fréquence donnée
  */
-export function getDefaultDureeForFrequence(frequence: FrequenceRemboursement): DureeSuggestion | null {
+export function getDefaultDureeForFrequence(frequence: FrequenceRemboursementType): DureeSuggestion | null {
   const config = DEFAULT_DURATIONS_CONFIG.find(c => c.frequence === frequence);
   if (!config) return null;
 
@@ -261,13 +271,12 @@ export function getDefaultDureeForFrequence(frequence: FrequenceRemboursement): 
 /**
  * Formate un label de durée pour l'affichage (Helper UI)
  */
-export function formaterLabelDuree(valeur: number, unite: DureeUnite): string {
+export function formaterLabelDuree(valeur: number, unite: DureeUniteType): string {
   const pluriel = valeur > 1 ? "s" : "";
-  // Note: Idéalement, utiliser une lib i18n ici aussi, mais acceptable pour un helper
   switch (unite) {
-    case "Jour": return `${valeur} jour${pluriel}`;
-    case "Semaine": return `${valeur} semaine${pluriel}`;
-    case "Mois": return `${valeur} mois`; // "Mois" est invariant
+    case DureeUnite.DAY: return `${valeur} jour${pluriel}`;
+    case DureeUnite.WEEK: return `${valeur} semaine${pluriel}`;
+    case DureeUnite.MONTH: return `${valeur} mois`; // "Mois" est invariant
     default: return `${valeur} ${unite}`;
   }
 }

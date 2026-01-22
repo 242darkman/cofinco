@@ -1,4 +1,5 @@
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
+import { StatutUser } from '@shared/enum/status-constants';
 import React, { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl, Circle, Polyline } from 'react-leaflet';
 import L, { DivIcon } from 'leaflet';
@@ -34,7 +35,7 @@ interface RoutePoint {
 
 interface SatelliteMapProps {
   agents?: Agent[];
-  clients?: Client[];
+  clients?: ClientWithIdentity[];
   visits?: Visit[];
   route?: RoutePoint[];
   center?: [number, number];
@@ -43,7 +44,7 @@ interface SatelliteMapProps {
   showRoute?: boolean;
   onLocationUpdate?: (lat: number, lng: number) => void;
   onAgentClick?: (agent: Agent) => void;
-  onClientClick?: (client: Client) => void;
+  onClientClick?: (client: ClientWithIdentity) => void;
   className?: string;
 }
 
@@ -289,7 +290,7 @@ export default function SatelliteMap({
   });
 
   const visitIcon = (statut: string) => new DivIcon({
-    html: `<div class="w-6 h-6 ${statut === 'Terminée' ? 'bg-emerald-500' : statut === 'En cours' ? 'bg-orange-500' : 'bg-slate-400'} rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+    html: `<div class="w-6 h-6 ${(statut === 'COMPLETED') ? 'bg-emerald-500' : (statut === 'IN_PROGRESS') ? 'bg-orange-500' : 'bg-slate-400'} rounded-full border-2 border-white shadow-lg flex items-center justify-center">
       <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
         <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
       </svg>
@@ -358,8 +359,8 @@ export default function SatelliteMap({
                     Dernière position: {new Date(agent.lastSeenAt).toLocaleString('fr-FR')}
                   </div>
                 )}
-                <div className={`text-xs mt-1 ${agent.statut === 'Actif' ? 'text-green-500' : 'text-gray-400'}`}>
-                  {agent.statut || 'Actif'}
+                <div className={`text-xs mt-1 ${(agent.statut === StatutUser.ACTIVE) ? 'text-green-500' : 'text-gray-400'}`}>
+                  {agent.statut || StatutUser.ACTIVE}
                 </div>
               </div>
             </Popup>
@@ -403,8 +404,8 @@ export default function SatelliteMap({
                   {new Date(visit.dateVisite).toLocaleDateString('fr-FR')}
                 </div>
                 <div className={`text-xs mt-1 font-medium ${
-                  visit.statut === 'Terminée' ? 'text-emerald-600' : 
-                  visit.statut === 'En cours' ? 'text-orange-600' : 'text-gray-500'
+                  (visit.statut === 'COMPLETED') ? 'text-emerald-600' :
+                  (visit.statut === 'IN_PROGRESS') ? 'text-orange-600' : 'text-gray-500'
                 }`}>
                   {visit.statut}
                 </div>

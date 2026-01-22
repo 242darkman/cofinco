@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart3, TrendingUp, Activity, Users, Clock, AlertTriangle } from 'lucide-react';
 import { auditApi, notificationApi, userApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { StatutUser } from '@shared/enum/status-constants';
 
 interface DashboardStats {
   totalLogs: number;
@@ -48,7 +49,7 @@ export default function AuditDashboard() {
       const totalAlerts = alertsData?.length || 0;
       const criticalAlerts = alertsData?.filter((a: any) => a.severity === 'critical')?.length || 0;
 
-      const activeUsers = usersData?.filter((u: any) => u.status === 'actif')?.length || 0;
+      const activeUsers = usersData?.filter((u: any) => u.status === StatutUser.ACTIVE)?.length || 0;
 
       setStats({
         totalLogs,

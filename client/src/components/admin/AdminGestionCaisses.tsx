@@ -8,12 +8,13 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
 import { ForceCloseModal } from './ForceCloseModal';
 import { isAdminRole, normalizeRole } from '@shared/types/roles';
+import { StatutClient, StatutCaisseAgent, StatutCaisse, StatutCaisseType } from '@shared/enum/status-constants';
 
 interface Caisse {
   id: string;
   nom: string;
   type: 'Physique' | 'Coffre-Fort' | 'Virtuelle';
-  statut: 'Ouverte' | 'Fermée';
+  statut: StatutCaisseType;
   solde: string;
   isOccupied?: boolean;
   occupiedBy?: string;
@@ -138,7 +139,7 @@ export default function AdminGestionCaisses() {
 
   const handleDelete = (caisse: Caisse) => {
       setOpenMenuId(null);
-      if (caisse.statut === 'Ouverte') {
+      if (caisse.statut === StatutCaisse.OPEN) {
           toast.error("Fermez d'abord la session");
           return;
       }
@@ -395,7 +396,7 @@ export default function AdminGestionCaisses() {
                   label="Agence"
                   name="agenceId"
                   required
-                  options={agences.filter((a: any) => a.statut === 'Actif').map((a: any) => ({ value: a.id, label: a.nom }))}
+                  options={agences.filter((a: any) => a.statut === StatutClient.ACTIVE).map((a: any) => ({ value: a.id, label: a.nom }))}
                   value={formData.agenceId}
                   onChange={e => setFormData({...formData, agenceId: e.target.value})}
                 />

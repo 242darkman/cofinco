@@ -1,4 +1,5 @@
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
+import { StatutCompte, StatutCredit } from '@shared/enum/status-constants';
 import React, { useState } from 'react';
 import { DollarSign, Target, Award, CreditCard, Wallet, Users, Activity, TrendingUp, TrendingDown, X, Calendar, ArrowRight } from 'lucide-react';
 import ClientTags from './ClientTags';
@@ -10,7 +11,7 @@ import { useLocation } from 'wouter';
 // Removed missing formatMoney import, using toLocaleString instead
 
 interface ClientAnalyticsProps {
-  client: Client;
+  client: ClientWithIdentity;
 }
 
 interface AnalyticsData {
@@ -63,13 +64,13 @@ const MetricDetailsModal = ({
               const res = await fetch(`/api/credits?clientId=${clientId}`);
               if (!res.ok) return [];
               const all = await res.json();
-              return all.filter((c: any) => ['Actif', 'En retard', 'En cours'].includes(c.statut));
+              return all.filter((c: any) => [StatutCredit.ACTIVE, StatutCredit.LATE].includes(c.statut));
             }
             if (type === 'savings') {
                const res = await fetch(`/api/comptes?clientId=${clientId}`);
                if (!res.ok) return [];
                const all = await res.json();
-               return all.filter((a: any) => ['Épargne', 'Compte Bloqué', 'Terme'].includes(a.typeCompte) && a.statut === 'Actif');
+               return all.filter((a: any) => ['Épargne', 'Compte Bloqué', 'Terme'].includes(a.typeCompte) && a.statut === StatutCompte.ACTIVE);
             }
             if (type === 'tontines') {
                 // This might be tricky if no direct endpoint.

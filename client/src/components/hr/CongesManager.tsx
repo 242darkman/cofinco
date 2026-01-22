@@ -5,6 +5,7 @@ import { Card, Button, Modal, FormField, SelectField, Badge, StatCard, Responsiv
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole } from '@shared/types/roles';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { StatutConge, STATUT_CONGE_LABELS } from '@shared/enum/status-constants';
 
 interface CongesManagerProps {
   demandes: DemandeConge[];
@@ -37,6 +38,10 @@ export default function CongesManager({
   const { hasPermission } = usePermissions();
   const canCreateConges = hasPermission('rh', 'edit') || hasPermission('conges', 'create');
   const canApproveConges = hasPermission('rh', 'approve') || hasPermission('conges', 'approve');
+
+  // Hook appelé au niveau racine du composant (règle des hooks respectée)
+  const { user } = useUserProfile();
+  const canApproveActions = canApproveConges || isAdminRole(user?.role);
 
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -110,18 +115,16 @@ export default function CongesManager({
       label: 'Statut',
       key: 'statut',
       format: (val: string) => {
-         const variant = val === 'Approuvé' ? 'success' : val === 'Refusé' ? 'danger' : 'warning';
-         return <Badge variant={variant} value={val} size="sm" />;
+         const variant = val === StatutConge.APPROVED ? 'success' : val === StatutConge.REJECTED ? 'danger' : 'warning';
+         return <Badge variant={variant} value={STATUT_CONGE_LABELS[val as keyof typeof STATUT_CONGE_LABELS] || val} size="sm" />;
       }
     },
     {
       label: 'Actions',
       key: 'actions',
       format: (_: any, item: DemandeConge) => {
-        const { user } = useUserProfile();
-        const canApprove = canApproveConges || isAdminRole(user?.role);
-        
-        if (!canApprove || item.statut !== 'En attente') return null;
+        // Utilise canApproveActions défini au niveau racine du composant (via closure)
+        if (!canApproveActions || item.statut !== StatutConge.PENDING) return null;
 
         return (
           <div className="flex gap-2 justify-end">

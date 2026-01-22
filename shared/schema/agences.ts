@@ -3,13 +3,15 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { sql } from "drizzle-orm";
+import { typeAgenceEnum } from "../enum/enums";
+import { TypeAgence } from "../enum/status-constants";
 
 // Agences table - Liste des agences/succursales
 export const agences = pgTable("agences", {
   id: uuid("id").primaryKey().defaultRandom(),
   codeAgence: varchar("code_agence", { length: 20 }).notNull().unique(),
   nom: text("nom").notNull(),
-  typeAgence: text("type_agence").notNull().default("Secondaire"), // 'Principale', 'Secondaire', 'Kiosque'
+  typeAgence: typeAgenceEnum("type_agence").notNull().default(TypeAgence.SECONDARY),
   adresse: text("adresse"),
   ville: text("ville"),
   region: text("region"),
@@ -19,10 +21,8 @@ export const agences = pgTable("agences", {
   responsableId: uuid("responsable_id").references(() => users.id),
   responsableNom: text("responsable_nom"),
   responsablePhone: text("responsable_phone"),
-  statut: text("statut").notNull().default("Actif"), // 'Actif', 'Suspendu', 'Fermé'
+  statut: text("statut").notNull().default("ACTIVE"), // 'ACTIVE', 'SUSPENDED', 'CLOSED'
   dateOuverture: date("date_ouverture"),
-  nombreEmployes: integer("nombre_employes").default(0),
-  nombreClients: integer("nombre_clients").default(0),
   latitude: numeric("latitude"),
   longitude: numeric("longitude"),
   notes: text("notes"),

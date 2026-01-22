@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { StatutCompte } from '@shared/enum/status-constants';
 import { Lock, Plus, Eye, TrendingUp, Calendar, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import CompteBloqueForm from './CompteBloqueForm';
-import CompteBloqueDetail from './CompteBloqueDetail';
+import AccountDetailSlideOver from '../epargne/AccountDetailSlideOver';
 import StatCard from '../../ui/StatCard';
 import ResponsiveTable from '../../ui/ResponsiveTable';
 import Badge from '../../ui/Badge';
@@ -104,7 +105,7 @@ export default function ComptesBloquesSection() {
     return Math.round(compte.montant_initial * (compte.taux_interet / 100) * (compte.duree_mois / 12));
   };
 
-  const activeComptes = (comptes || []).filter(c => c && c.statut === 'Actif');
+  const activeComptes = (comptes || []).filter(c => c && c.statut === StatutCompte.ACTIVE);
   
   const stats = {
     total: (comptes || []).length,
@@ -154,7 +155,7 @@ export default function ComptesBloquesSection() {
             <span className="text-white text-xs">
               {value ? new Date(value).toLocaleDateString() : 'N/A'}
             </span>
-            {row.statut === 'Actif' && jours > 0 && (
+            {row.statut === StatutCompte.ACTIVE && jours > 0 && (
               <span className="text-[10px] text-amber-400">{jours}j restants</span>
             )}
           </div>
@@ -166,11 +167,11 @@ export default function ComptesBloquesSection() {
       key: 'statut',
       format: (value: any, row: CompteBloque) => {
         const joursRestants = getJoursRestants(row.date_echeance);
-        const estEchu = joursRestants === 0 && row.statut === 'Actif';
+        const estEchu = joursRestants === 0 && row.statut === StatutCompte.ACTIVE;
         
         if (estEchu) return <Badge value="Échu" variant="success" />;
         
-        const color = value === 'Actif' ? 'success' : value === 'Retiré Anticipé' ? 'warning' : 'neutral';
+        const color = value === StatutCompte.ACTIVE ? 'success' : value === StatutCompte.CLOSED ? 'warning' : 'neutral';
         return <Badge value={value} variant={color} />;
       }
     }
@@ -384,13 +385,10 @@ export default function ComptesBloquesSection() {
       )}
 
       {selectedCompteId && (
-        <CompteBloqueDetail
+        <AccountDetailSlideOver
           compteId={selectedCompteId}
+          isOpen={!!selectedCompteId}
           onClose={() => setSelectedCompteId(null)}
-          onUpdate={() => {
-            setSelectedCompteId(null);
-            loadComptes();
-          }}
         />
       )}
     </div>

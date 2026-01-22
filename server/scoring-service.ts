@@ -22,8 +22,8 @@ export async function calculateClientScore(clientId: string): Promise<{ score: n
 
   // 2. Repayment History (Max 40 pts)
   let repaymentScore = 0;
-  const paidCredits = clientCredits.filter(c => c.statut === 'Payé' || c.statut === 'Soldé');
-  const lateCredits = clientCredits.filter(c => c.statut === 'En retard');
+  const paidCredits = clientCredits.filter(c => c.statut === 'PAID' || c.statut === 'CLOSED');
+  const lateCredits = clientCredits.filter(c => c.statut === 'LATE');
 
   repaymentScore += (paidCredits.length * 10); // +10 per paid credit
   repaymentScore -= (lateCredits.length * 20); // -20 per late credit (heavy penalty)
@@ -56,10 +56,11 @@ export async function calculateClientScore(clientId: string): Promise<{ score: n
   score += loyaltyScore;
 
   // 5. Profile Completeness (Max 10 pts)
+  // Check for address and profession (user identity fields are in users table)
   let profileScore = 0;
-  if (client.email && client.telephone && client.adresse) profileScore = 10;
-  else if (client.telephone && client.adresse) profileScore = 5;
-  
+  if (client.adresseDomicile && client.profession && client.numeroPiece) profileScore = 10;
+  else if (client.adresseDomicile && client.profession) profileScore = 5;
+
   score += profileScore;
 
   // Final Cap

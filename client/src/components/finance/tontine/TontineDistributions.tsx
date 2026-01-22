@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Check, DollarSign, User, X, AlertTriangle, Wallet, Info, TrendingDown } from 'lucide-react';
+import {
+  StatutClient,
+  MethodePaiement,
+  METHODE_PAIEMENT_LABELS,
+  ModeDistributionTontine,
+  MODE_DISTRIBUTION_TONTINE_LABELS,
+  MODE_DISTRIBUTION_TONTINE_OPTIONS,
+  StatutMembreTontine
+} from '@shared/enum/status-constants';
+import { Check, DollarSign, User, X, AlertTriangle, Wallet, Info, TrendingDown, Banknote, CreditCard } from 'lucide-react';
 import { Card, Button, Badge, IconButton } from '../../ui';
 import { tontineDistributionApi, tontineMembreApi, tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -70,7 +79,8 @@ export default function TontineDistributions({ tontineId, montantContribution, t
   // Form state
   const [selectedMembreId, setSelectedMembreId] = useState('');
   const [dateDistribution, setDateDistribution] = useState(new Date().toISOString().split('T')[0]);
-  const [modePaiement, setModePaiement] = useState('ESPECES');
+  const [modePaiement, setModePaiement] = useState<string>(MethodePaiement.CASH);
+  const [modeDistribution, setModeDistribution] = useState<string>(ModeDistributionTontine.CASH_WITHDRAWAL);
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -102,7 +112,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
     try {
       const data: Membre[] = await tontineMembreApi.getByTontine(tontineId);
       const activeMembres = data
-        .filter(m => m.statut === 'Actif')
+        .filter(m => m.statut === StatutMembreTontine.ACTIVE || m.statut === StatutClient.ACTIVE)
         .sort((a, b) => (a.position || 999) - (b.position || 999));
       setMembres(activeMembres);
     } catch (error) {
@@ -163,8 +173,10 @@ export default function TontineDistributions({ tontineId, montantContribution, t
         montantTotal: montantEstime.toString(),
         dateDistribution: new Date(dateDistribution).toISOString(),
         modePaiement,
+        modeDistribution, // CASH_WITHDRAWAL or ACCOUNT_TRANSFER
         referencePaiement: '',
-        notes
+        notes,
+        idempotencyKey: crypto.randomUUID(), // Prevent duplicate distributions
       });
 
       const beneficiaireNom = `${selectedMembre.client?.nom || ''} ${selectedMembre.client?.prenom || ''}`.trim();
@@ -472,17 +484,55 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Mode</label>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Mode Paiement</label>
                   <select
                     value={modePaiement}
                     onChange={(e) => setModePaiement(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:border-emerald-500 focus:outline-none text-sm"
                   >
-                    <option value="ESPECES">Espèces</option>
-                    <option value="MOBILE_MONEY">Mobile Money</option>
-                    <option value="VIREMENT">Virement</option>
+                    <option value={MethodePaiement.CASH}>{METHODE_PAIEMENT_LABELS[MethodePaiement.CASH]}</option>
+                    <option value={MethodePaiement.MOBILE_MONEY}>{METHODE_PAIEMENT_LABELS[MethodePaiement.MOBILE_MONEY]}</option>
+                    <option value={MethodePaiement.TRANSFER}>{METHODE_PAIEMENT_LABELS[MethodePaiement.TRANSFER]}</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Distribution Mode Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Canal de Distribution
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModeDistribution(ModeDistributionTontine.CASH_WITHDRAWAL)}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition ${
+                      modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL
+                        ? 'bg-emerald-600 border-emerald-500 text-white'
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Banknote size={16} />
+                    {MODE_DISTRIBUTION_TONTINE_LABELS[ModeDistributionTontine.CASH_WITHDRAWAL]}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModeDistribution(ModeDistributionTontine.ACCOUNT_TRANSFER)}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-sm font-medium transition ${
+                      modeDistribution === ModeDistributionTontine.ACCOUNT_TRANSFER
+                        ? 'bg-cyan-600 border-cyan-500 text-white'
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <CreditCard size={16} />
+                    {MODE_DISTRIBUTION_TONTINE_LABELS[ModeDistributionTontine.ACCOUNT_TRANSFER]}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL
+                    ? "Le bénéficiaire reçoit le montant en espèces au guichet"
+                    : "Le montant sera transféré sur le compte épargne du bénéficiaire"}
+                </p>
               </div>
 
               <div>

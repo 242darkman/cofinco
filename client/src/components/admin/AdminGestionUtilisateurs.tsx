@@ -9,6 +9,9 @@ import { getRoleBadgeStyle, getStatusBadgeStyle } from '../../lib/role-utils';
 import { userApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { resolveStorageUrl } from '../../lib/format';
+import { StatutUser } from '@shared/enum/status-constants';
+import { SystemRole } from '@shared/types/roles';
 
 interface User {
   id: string;
@@ -19,7 +22,7 @@ interface User {
   email?: string;
   telephone?: string;
   phone?: string;
-  role: string;
+  role: SystemRole | string;
   statut: string;
   photoProfile?: string;
   photo_profile?: string;
@@ -71,24 +74,7 @@ export default function AdminGestionUtilisateurs() {
 
   const getPhotoUrl = (user: User) => {
     const raw = user.photoProfile || user.photo_profile || '';
-    if (!raw) return '';
-    if (raw.startsWith('data:')) return raw;
-    if (raw.startsWith('/api/')) return raw;
-    if (raw.startsWith('/')) return raw;
-    if (raw.startsWith('http')) {
-      try {
-        const url = new URL(raw);
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        if (pathParts.length >= 2) {
-          const key = pathParts.slice(1).join('/');
-          return `/api/uploads/files/${key}`;
-        }
-        return raw;
-      } catch {
-        return raw;
-      }
-    }
-    return `/api/uploads/files/${raw}`;
+    return resolveStorageUrl(raw);
   };
 
   const handleFormSubmit = useCallback(async (formData: any) => {
@@ -126,10 +112,11 @@ export default function AdminGestionUtilisateurs() {
   }, [openConfirm, loadUsers]);
 
   const toggleStatus = useCallback(async (user: User) => {
-    const newStatus = user.statut === 'Actif' ? 'Inactif' : 'Actif';
+    const isActive = user.statut === StatutUser.ACTIVE;
+    const newStatus = isActive ? StatutUser.INACTIVE : StatutUser.ACTIVE;
     try {
       await userApi.update(user.id, { statut: newStatus });
-      toast.success(`Utilisateur ${newStatus === 'Actif' ? 'activé' : 'désactivé'}`);
+      toast.success(`Utilisateur ${newStatus === StatutUser.ACTIVE ? 'activé' : 'désactivé'}`);
       loadUsers();
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors de la modification du statut'));
@@ -241,7 +228,7 @@ export default function AdminGestionUtilisateurs() {
                     label: 'Statut',
                     format: (status: string) => {
                       const style = getStatusBadgeStyle(status);
-                      const isActif = (status || '').toLowerCase().includes('actif');
+                      const isActif = status === StatutUser.ACTIVE;
                       return (
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium border min-w-[90px] justify-center transition-colors ${style.classes}`}>
                           {isActif ? <CheckCircle size={12} /> : <XCircle size={12} />}
@@ -406,7 +393,7 @@ export default function AdminGestionUtilisateurs() {
           isOpen={showPinModal}
           onClose={() => { setShowPinModal(false); setPinUser(null); }}
           userId={pinUser.id}
-          userName={pinUser.name}
+          userName={pinUser.name || pinUser.nom || pinUser.username || 'Utilisateur'}
         />
       )}
 

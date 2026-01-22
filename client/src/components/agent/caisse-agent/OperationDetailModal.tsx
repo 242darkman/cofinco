@@ -11,6 +11,7 @@ import {
 import { Modal, Button, Badge } from '../../ui';
 import type { OperationTerrainWithRelations } from '@shared/schema';
 import { formatClientName } from '../../../lib/format';
+import { StatutOperationTerrain } from '@shared/enum/status-constants';
 
 interface OperationDetailModalProps {
   operation: OperationTerrainWithRelations;
@@ -37,28 +38,28 @@ const formatDate = (date: string | Date) => {
 
 const getStatutInfo = (statut: string) => {
   switch (statut) {
-    case 'SUBMITTED':
+    case StatutOperationTerrain.SUBMITTED:
       return {
         label: 'En attente',
         variant: 'warning' as const,
         icon: Clock,
         color: 'text-amber-400'
       };
-    case 'APPROVED':
+    case StatutOperationTerrain.APPROVED:
       return {
         label: 'Approuvée',
         variant: 'success' as const,
         icon: CheckCircle,
         color: 'text-emerald-400'
       };
-    case 'REJECTED':
+    case StatutOperationTerrain.REJECTED:
       return {
         label: 'Rejetée',
         variant: 'danger' as const,
         icon: XCircle,
         color: 'text-red-400'
       };
-    case 'CANCELLED':
+    case StatutOperationTerrain.CANCELLED:
       return {
         label: 'Annulée',
         variant: 'neutral' as const,
@@ -301,7 +302,7 @@ export default function OperationDetailModal({
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t border-edge">
           {/* Actions pour l'agent (annulation) */}
-          {operation.statut === 'SUBMITTED' && onCancel && (
+          {operation.statut === StatutOperationTerrain.SUBMITTED && onCancel && (
             <Button
               variant="danger"
               size="sm"
@@ -313,7 +314,7 @@ export default function OperationDetailModal({
           )}
 
           {/* Actions pour le superviseur */}
-          {operation.statut === 'SUBMITTED' && onReject && (
+          {operation.statut === StatutOperationTerrain.SUBMITTED && onReject && (
             <Button
               variant="outline"
               size="sm"
@@ -325,7 +326,7 @@ export default function OperationDetailModal({
             </Button>
           )}
 
-          {operation.statut === 'SUBMITTED' && onApprove && (
+          {operation.statut === StatutOperationTerrain.SUBMITTED && onApprove && (
             <Button
               variant="success"
               size="sm"

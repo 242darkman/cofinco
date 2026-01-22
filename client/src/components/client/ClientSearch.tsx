@@ -1,6 +1,6 @@
-import type { Client } from '@shared/schema';
 import React, { useState } from 'react';
 import { Search, Filter, X, Calendar, DollarSign, MapPin } from 'lucide-react';
+import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
 
 interface ClientSearchProps {
   onSearch: (filters: SearchFilters) => void;
@@ -104,9 +104,9 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
                 className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
               >
                 <option value="all">Tous les statuts</option>
-                <option value="Actif">Actif</option>
-                <option value="Suspendu">Suspendu</option>
-                <option value="Inactif">Inactif</option>
+                <option value={StatutClient.ACTIVE}>{STATUT_CLIENT_LABELS[StatutClient.ACTIVE]}</option>
+                <option value={StatutClient.SUSPENDED}>{STATUT_CLIENT_LABELS[StatutClient.SUSPENDED]}</option>
+                <option value={StatutClient.INACTIVE}>{STATUT_CLIENT_LABELS[StatutClient.INACTIVE]}</option>
               </select>
             </div>
 

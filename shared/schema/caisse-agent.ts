@@ -19,6 +19,7 @@ import {
   statutCaisseAgentEnum,
   typeOperationTerrainEnum,
   statutOperationTerrainEnum,
+  methodePaiementEnum,
 } from "@shared/enum/enums";
 
 // ============================================================================
@@ -43,7 +44,7 @@ export const caissesAgent = pgTable(
     devise: text("devise").notNull().default("XOF"),
 
     // Statut de la caisse
-    statut: statutCaisseAgentEnum("statut").notNull().default("Active"),
+    statut: statutCaisseAgentEnum("statut").notNull().default("ACTIVE"),
 
     // Traçabilité
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -306,7 +307,7 @@ export interface CaisseAgentSummary {
   /** Devise */
   devise: string;
   /** Statut de la caisse */
-  statut: "Active" | "Suspendue" | "Clôturée";
+  statut: string;
 }
 
 /**

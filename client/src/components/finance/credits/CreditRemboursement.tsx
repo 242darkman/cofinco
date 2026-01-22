@@ -14,6 +14,7 @@ import { Button } from '../../ui';
 import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
+import { StatutCredit, StatutEcheanceCredit, STATUT_ECHEANCE_CREDIT_LABELS } from '@shared/enum/status-constants';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
@@ -117,7 +118,7 @@ export default function CreditRemboursement() {
       const data = await creditApi.getAll();
       // Filter active credits
       const activeCredits = data.filter((c: Credit) =>
-        c.statut === 'Actif' || c.statut === 'En retard'
+        c.statut === StatutCredit.ACTIVE || c.statut === StatutCredit.LATE
       );
       setCredits(activeCredits);
     } catch (error) {
@@ -140,7 +141,7 @@ export default function CreditRemboursement() {
       const updatedData = data.map((ech: any) => {
         const dateEch = new Date(ech.date_echeance);
         dateEch.setHours(0, 0, 0, 0);
-        const joursRetard = ech.statut === 'En attente' && dateEch < today
+        const joursRetard = ech.statut === StatutEcheanceCredit.UPCOMING && dateEch < today
           ? Math.floor((today.getTime() - dateEch.getTime()) / (1000 * 60 * 60 * 24))
           : 0;
 
@@ -151,7 +152,7 @@ export default function CreditRemboursement() {
           montant_paye: ech.montant_paye || 0,
           jours_retard: joursRetard,
           penalite,
-          statut: joursRetard > 0 ? 'Retard' : ech.statut
+          statut: joursRetard > 0 ? StatutEcheanceCredit.LATE : ech.statut
         };
       });
 
@@ -594,7 +595,7 @@ export default function CreditRemboursement() {
                   disabled={loading}
                   className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
-                  {showPaymentForm ? 'Annuler' : 'Enregistrer Paiement'}
+                  {showPaymentForm ? 'Annuler' : 'Encaisser Échéance'}
                 </button>
               )}
             </div>
@@ -833,13 +834,13 @@ export default function CreditRemboursement() {
                       <div className="flex items-center gap-4">
                         <div
                           className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                            echeance.statut === 'Payé' ? 'bg-green-500/20 text-green-400' :
-                            echeance.statut === 'Retard' ? 'bg-red-500/20 text-red-400' :
+                            echeance.statut === StatutEcheanceCredit.PAID ? 'bg-green-500/20 text-green-400' :
+                            echeance.statut === StatutEcheanceCredit.LATE ? 'bg-red-500/20 text-red-400' :
                             'bg-cyan-500/20 text-cyan-400'
                           }`}
                           aria-hidden="true"
                         >
-                          {echeance.statut === 'Payé' ? <Check size={20} /> : echeance.numero_echeance}
+                          {echeance.statut === StatutEcheanceCredit.PAID ? <Check size={20} /> : echeance.numero_echeance}
                         </div>
 
                         <div>
@@ -878,11 +879,11 @@ export default function CreditRemboursement() {
                         <div className="text-right min-w-[100px]">
                           <div className="text-white font-bold">{formatMoney(echeance.montant_total)}</div>
                           <div className={`text-xs ${
-                            echeance.statut === 'Payé' ? 'text-green-400' :
-                            echeance.statut === 'Retard' ? 'text-red-400' :
+                            echeance.statut === StatutEcheanceCredit.PAID ? 'text-green-400' :
+                            echeance.statut === StatutEcheanceCredit.LATE ? 'text-red-400' :
                             'text-slate-400'
                           }`}>
-                            {echeance.statut}
+                            {STATUT_ECHEANCE_CREDIT_LABELS[echeance.statut as keyof typeof STATUT_ECHEANCE_CREDIT_LABELS] || echeance.statut}
                           </div>
                         </div>
                       </div>

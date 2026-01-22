@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, User, ChevronDown, Check, X } from 'lucide-react';
+import { Search, User, ChevronDown, Check, X, MapPin, Phone } from 'lucide-react';
+import { StatutUser } from '@shared/enum/status-constants';
 
 interface Agent {
   id: string;
@@ -7,8 +8,9 @@ interface Agent {
   prenom: string;
   telephone?: string;
   zone_affectation?: string;
+  zoneAffectation?: string; // Alias camelCase
   statut: string;
-  photo_url?: string;
+  photoUrl?: string; // Alias camelCase
 }
 
 interface AgentSelectorProps {
@@ -31,6 +33,16 @@ export default function AgentSelector({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Helper to get zone (handle both camelCase and snake_case)
+  const getZone = (agent: Agent) => agent.zone_affectation || agent.zoneAffectation || null;
+
+  // Get initials for avatar fallback
+  const getInitials = (agent: Agent) => {
+    const firstInitial = agent.nom?.charAt(0) || '';
+    const secondInitial = agent.prenom?.charAt(0) || '';
+    return (firstInitial + secondInitial).toUpperCase();
+  };
+
   // Find selected agent
   const selectedAgent = useMemo(
     () => agents.find((a) => a.id === selectedAgentId) || null,
@@ -39,14 +51,15 @@ export default function AgentSelector({
 
   // Filter agents by search query
   const filteredAgents = useMemo(() => {
-    if (!searchQuery.trim()) return agents.filter(a => a.statut === 'Actif');
+    const activeAgents = agents.filter(a => a.statut === StatutUser.ACTIVE);
+    if (!searchQuery.trim()) return activeAgents;
     const query = searchQuery.toLowerCase();
-    return agents.filter(
+    return activeAgents.filter(
       (a) =>
-        a.statut === 'Actif' &&
-        (`${a.nom} ${a.prenom}`.toLowerCase().includes(query) ||
-          a.zone_affectation?.toLowerCase().includes(query) ||
-          a.telephone?.includes(query))
+        `${a.nom} ${a.prenom}`.toLowerCase().includes(query) ||
+        `${a.prenom} ${a.nom}`.toLowerCase().includes(query) ||
+        getZone(a)?.toLowerCase().includes(query) ||
+        a.telephone?.includes(query)
     );
   }, [agents, searchQuery]);
 
@@ -100,28 +113,35 @@ export default function AgentSelector({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {selectedAgent ? (
             <>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
-                {selectedAgent.photo_url ? (
+              {/* Avatar avec photo ou initiales */}
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border-2 border-cyan-500/40 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {selectedAgent.photoUrl ? (
                   <img
-                    src={selectedAgent.photo_url}
-                    alt=""
+                    src={selectedAgent.photoUrl}
+                    alt={`${selectedAgent.nom} ${selectedAgent.prenom}`}
                     className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
-                  <User size={14} className="text-cyan-400" />
+                  <span className="text-sm font-bold text-cyan-400">{getInitials(selectedAgent)}</span>
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white truncate">
-                  {selectedAgent.nom} {selectedAgent.prenom}
+                <p className="text-sm font-semibold text-white truncate">
+                  {selectedAgent.prenom} {selectedAgent.nom}
                 </p>
-                <p className="text-[10px] text-slate-400 truncate">
-                  {selectedAgent.zone_affectation || 'Zone non assignée'}
-                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <MapPin size={10} className="text-cyan-500/70 flex-shrink-0" />
+                  <span className="truncate">{getZone(selectedAgent) || 'Zone non assignée'}</span>
+                </div>
               </div>
             </>
           ) : (
-            <span className="text-slate-400 text-sm">{placeholder}</span>
+            <>
+              <div className="w-10 h-10 rounded-full bg-slate-700/50 border border-slate-600 flex items-center justify-center flex-shrink-0">
+                <User size={18} className="text-slate-500" />
+              </div>
+              <span className="text-slate-400 text-sm">{placeholder}</span>
+            </>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -160,47 +180,69 @@ export default function AgentSelector({
           </div>
 
           {/* Agent List */}
-          <div className="max-h-64 overflow-y-auto">
+          <div className="max-h-72 overflow-y-auto">
             {filteredAgents.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-500">
-                Aucun agent trouvé
+              <div className="p-6 text-center">
+                <User size={32} className="mx-auto mb-2 text-slate-600" />
+                <p className="text-sm text-slate-500">Aucun agent trouvé</p>
+                <p className="text-xs text-slate-600 mt-1">Essayez un autre terme de recherche</p>
               </div>
             ) : (
-              filteredAgents.map((agent) => (
-                <button
-                  key={agent.id}
-                  type="button"
-                  onClick={() => handleSelect(agent)}
-                  className={`
-                    w-full flex items-center gap-3 px-4 py-3
-                    hover:bg-slate-800/50 transition-colors
-                    ${agent.id === selectedAgentId ? 'bg-cyan-500/10' : ''}
-                  `}
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
-                    {agent.photo_url ? (
-                      <img
-                        src={agent.photo_url}
-                        alt=""
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <User size={18} className="text-cyan-400" />
+              <>
+                <div className="px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wider font-semibold bg-slate-800/30">
+                  {filteredAgents.length} agent{filteredAgents.length > 1 ? 's' : ''} disponible{filteredAgents.length > 1 ? 's' : ''}
+                </div>
+                {filteredAgents.map((agent) => (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => handleSelect(agent)}
+                    className={`
+                      w-full flex items-center gap-3 px-4 py-3
+                      hover:bg-slate-800/50 transition-colors border-b border-slate-800/50 last:border-b-0
+                      ${agent.id === selectedAgentId ? 'bg-cyan-500/10 border-l-2 border-l-cyan-500' : ''}
+                    `}
+                  >
+                    {/* Avatar avec photo ou initiales */}
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border-2 border-cyan-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {agent.photoUrl ? (
+                        <img
+                          src={agent.photoUrl}
+                          alt={`${agent.nom} ${agent.prenom}`}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-base font-bold text-cyan-400">{getInitials(agent)}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      {/* Nom complet */}
+                      <p className="text-sm font-semibold text-white truncate">
+                        {agent.prenom} {agent.nom}
+                      </p>
+                      {/* Zone d'affectation */}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <MapPin size={11} className="text-cyan-500/70 flex-shrink-0" />
+                        <span className="text-xs text-slate-400 truncate">
+                          {getZone(agent) || 'Zone non assignée'}
+                        </span>
+                      </div>
+                      {/* Téléphone si disponible */}
+                      {agent.telephone && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <Phone size={10} className="text-slate-500 flex-shrink-0" />
+                          <span className="text-[10px] text-slate-500">{agent.telephone}</span>
+                        </div>
+                      )}
+                    </div>
+                    {agent.id === selectedAgentId && (
+                      <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                        <Check size={14} className="text-cyan-400" />
+                      </div>
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-medium text-white truncate">
-                      {agent.nom} {agent.prenom}
-                    </p>
-                    <p className="text-xs text-slate-400 truncate">
-                      {agent.zone_affectation || 'Zone non assignée'}
-                    </p>
-                  </div>
-                  {agent.id === selectedAgentId && (
-                    <Check size={16} className="text-cyan-400 flex-shrink-0" />
-                  )}
-                </button>
-              ))
+                  </button>
+                ))}
+              </>
             )}
           </div>
         </div>

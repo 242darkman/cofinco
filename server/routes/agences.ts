@@ -1,10 +1,11 @@
 import { Express } from "express";
 import { db } from "../db";
-import { agences, userAgences, users, coffresForts, comptesLiaison } from "../../shared/schema";
+import { agences, userAgences, users, coffresForts, comptesLiaison, userRoles } from "../../shared/schema";
 import { employes } from "../../shared/schema/employes";
 import { clients } from "../../shared/schema/clients";
 import { eq, and, ilike, or, desc, asc, sql, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { logAudit } from "../audit";
 import { CoffresFortsService } from "../services/transfert-inter-coffres";
 import {
@@ -16,6 +17,7 @@ import {
 } from "../../shared/schema/agency_migration";
 import { agencyMigrationService, MigrationError } from "../services/agency-migration";
 import { getWsInstance } from "../ws-server";
+import { TypeAgence, StatutAgence, StatutUser, StatutClient } from "../../shared/enum/status-constants";
 
 export function registerAgencesRoutes(app: Express) {
   // ============================================
@@ -55,11 +57,12 @@ export function registerAgencesRoutes(app: Express) {
           nombreEmployes: sql<number>`(
             SELECT COUNT(*)::int FROM employes e
             INNER JOIN users u ON e.user_id = u.id
-            WHERE e.agence_id = agences.id AND u.statut = 'Actif'
+            WHERE e.agence_id = agences.id AND u.statut = ${StatutUser.ACTIVE}
           )`,
           nombreClients: sql<number>`(
             SELECT COUNT(*)::int FROM clients c
-            WHERE c.agence_id = agences.id AND c.status = 'Actif'
+            INNER JOIN users u ON c.user_id = u.id
+            WHERE c.agence_id = agences.id AND u.statut = ${StatutClient.ACTIVE}
           )`,
         })
         .from(agences);
@@ -70,7 +73,7 @@ export function registerAgencesRoutes(app: Express) {
         conditions.push(eq(agences.statut, statut as string));
       }
       if (type && type !== "all") {
-        conditions.push(eq(agences.typeAgence, type as string));
+        conditions.push(eq(agences.typeAgence, type as any));
       }
       if (search) {
         const searchTerm = `%${search}%`;
@@ -130,7 +133,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences - Créer une agence (avec coffre-fort atomique)
-  app.post("/api/agences", requireRole("admin"), async (req, res) => {
+  app.post("/api/agences", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const data = req.body;
       const userId = (req as any).session?.userId;
@@ -154,7 +157,7 @@ export function registerAgencesRoutes(app: Express) {
           .values({
             codeAgence: data.code_agence || data.codeAgence,
             nom: data.nom,
-            typeAgence: data.type_agence || data.typeAgence || "Secondaire",
+            typeAgence: data.type_agence || data.typeAgence || TypeAgence.SECONDARY,
             adresse: data.adresse,
             ville: data.ville,
             region: data.region,
@@ -164,7 +167,7 @@ export function registerAgencesRoutes(app: Express) {
             responsableId: data.responsable_id || data.responsableId,
             responsableNom: data.responsable_nom || data.responsableNom,
             responsablePhone: data.responsable_phone || data.responsablePhone,
-            statut: data.statut || "Actif",
+            statut: data.statut || StatutAgence.ACTIVE,
             dateOuverture: data.date_ouverture || data.dateOuverture,
             latitude: data.latitude,
             longitude: data.longitude,
@@ -187,7 +190,7 @@ export function registerAgencesRoutes(app: Express) {
             solde: "0",
             plafondEncaisse: data.plafondEncaisseCoffre?.toString() || null,
             soldeMinimum: data.soldeMinimumCoffre?.toString() || "0",
-            statut: "Actif",
+            statut: "ACTIVE", // coffre uses EN statut enum
           })
           .returning();
 
@@ -233,7 +236,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // PATCH /api/agences/:id - Modifier une agence
-  app.patch("/api/agences/:id", requireRole("admin"), async (req, res) => {
+  app.patch("/api/agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const data = req.body;
@@ -283,7 +286,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // DELETE /api/agences/:id - Supprimer une agence
-  app.delete("/api/agences/:id", requireRole("admin"), async (req, res) => {
+  app.delete("/api/agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -303,8 +306,8 @@ export function registerAgencesRoutes(app: Express) {
       // Soft delete - désactiver plutôt que supprimer
       const [deleted] = await db
         .update(agences)
-        .set({ 
-          statut: 'Inactif', 
+        .set({
+          statut: StatutAgence.INACTIVE,
           deletedAt: new Date(),
           updatedAt: new Date()
         })
@@ -400,7 +403,7 @@ export function registerAgencesRoutes(app: Express) {
         .where(and(
           eq(userAgences.userId, userId),
           eq(userAgences.actif, true),
-          eq(agences.statut, "Actif")
+          eq(agences.statut, StatutAgence.ACTIVE)
         ))
         .orderBy(desc(userAgences.isPrimary), asc(agences.nom));
 
@@ -412,7 +415,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/users/:userId/agences - Affecter un utilisateur à une agence
-  app.post("/api/users/:userId/agences", requireRole("admin"), async (req, res) => {
+  app.post("/api/users/:userId/agences", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
       const { agenceId, isPrimary = false, role } = req.body;
@@ -524,7 +527,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // PATCH /api/user-agences/:id - Modifier une affectation
-  app.patch("/api/user-agences/:id", requireRole("admin"), async (req, res) => {
+  app.patch("/api/user-agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const { isPrimary, role, actif } = req.body;
@@ -603,7 +606,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // DELETE /api/user-agences/:id - Supprimer une affectation
-  app.delete("/api/user-agences/:id", requireRole("admin"), async (req, res) => {
+  app.delete("/api/user-agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const adminUserId = (req as any).session?.userId;
@@ -651,12 +654,17 @@ export function registerAgencesRoutes(app: Express) {
             username: users.username,
             nom: users.nom,
             prenom: users.prenom,
-            role: users.role,
+            // Use userRoles.role (primary) instead of deprecated users.role
+            role: userRoles.role,
             statut: users.statut
           }
         })
         .from(userAgences)
         .innerJoin(users, eq(userAgences.userId, users.id))
+        .leftJoin(userRoles, and(
+          eq(userRoles.userId, users.id),
+          eq(userRoles.isPrimary, true)
+        ))
         .where(and(eq(userAgences.agenceId, agenceId), eq(userAgences.actif, true)))
         .orderBy(asc(users.nom));
 
@@ -672,7 +680,7 @@ export function registerAgencesRoutes(app: Express) {
   // ============================================
 
   // POST /api/agences/:id/migrations - Créer une nouvelle migration
-  app.post("/api/agences/:id/migrations", requireRole("admin"), async (req, res) => {
+  app.post("/api/agences/:id/migrations", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const {
@@ -693,7 +701,7 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Agence source non trouvée" });
       }
 
-      if (sourceAgence.statut === "Fermé") {
+      if (sourceAgence.statut === StatutAgence.CLOSED) {
         return res.status(400).json({ error: "Cette agence est déjà fermée" });
       }
 
@@ -720,7 +728,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/dry-run - Simulation de migration
-  app.post("/api/agences/migrations/:id/dry-run", requireRole("admin"), async (req, res) => {
+  app.post("/api/agences/migrations/:id/dry-run", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -737,7 +745,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/submit - Soumettre pour exécution
-  app.post("/api/agences/migrations/:id/submit", requireRole("admin"), async (req, res) => {
+  app.post("/api/agences/migrations/:id/submit", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -746,7 +754,7 @@ export function registerAgencesRoutes(app: Express) {
 
       const migration = await agencyMigrationService.getMigrationStatus(id);
 
-      await logAudit(req, "MIGRATE_SUBMIT", "agency_migrations", id, { status: migration?.status });
+      await logAudit(req, "MIGRATE_SUBMIT", "agency_migrations", id, { status: migration?.statut });
 
       res.json(migration);
     } catch (error: any) {
@@ -759,7 +767,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/execute - Exécuter immédiatement
-  app.post("/api/agences/migrations/:id/execute", requireRole("admin"), async (req, res) => {
+  app.post("/api/agences/migrations/:id/execute", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -772,9 +780,9 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Migration non trouvée" });
       }
 
-      if (migration.status !== MIGRATION_STATUS.PENDING && migration.status !== MIGRATION_STATUS.SCHEDULED) {
+      if (migration.statut !== MIGRATION_STATUS.PENDING && migration.statut !== MIGRATION_STATUS.SCHEDULED) {
         return res.status(400).json({
-          error: `La migration ne peut pas être exécutée (statut actuel: ${migration.status})`,
+          error: `La migration ne peut pas être exécutée (statut actuel: ${migration.statut})`,
           code: "INVALID_STATUS"
         });
       }
@@ -797,7 +805,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/cancel - Annuler une migration
-  app.post("/api/agences/migrations/:id/cancel", requireRole("admin"), async (req, res) => {
+  app.post("/api/agences/migrations/:id/cancel", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const { reason } = req.body;
@@ -899,7 +907,7 @@ export function registerAgencesRoutes(app: Express) {
       res.json({
         reference: migration.reference,
         sourceAgencyId: migration.sourceAgencyId,
-        status: migration.status,
+        status: migration.statut,
         report: migration.report,
         completedAt: migration.completedAt
       });
@@ -932,7 +940,7 @@ export function registerAgencesRoutes(app: Express) {
   // ============================================
 
   // POST /api/agences/:id/migrate - Ancienne route (redirige vers la nouvelle)
-  app.post("/api/agences/:id/migrate", requireRole("admin"), async (req, res) => {
+  app.post("/api/agences/:id/migrate", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { id } = req.params;
       const { targetAgenceClients, targetAgenceEmployes, targetAgenceCoffre } = req.body;

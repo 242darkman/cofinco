@@ -5,11 +5,11 @@ import ClientDetails from './ClientDetails';
 import ClientAccounts from './ClientAccounts';
 import ClientHistory from './ClientHistory';
 import { ClientDocumentsTab } from '../finance/shared/ClientDocumentsTab';
-import { Client } from '@shared/schema';
+import { ClientWithIdentity } from '@shared/schema';
 import { formatClientName } from '../../lib/format';
 
 interface ClientViewProps {
-  client: Client;
+  client: ClientWithIdentity;
   onClose: () => void;
 }
 

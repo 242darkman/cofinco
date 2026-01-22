@@ -43,7 +43,7 @@ export function getAuthUser(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string; agenceNom: string } | null> {
+async function resolvePrimaryAgence(userId: string): Promise<{ agenceId: string; agenceNom: string | null } | null> {
   const [primaryAgence] = await db
     .select({
       agenceId: userAgences.agenceId,

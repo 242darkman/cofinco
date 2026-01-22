@@ -67,7 +67,7 @@ export class CaisseService {
           caissier_id: caissierId,
           solde_ouverture: soldeOuverture,
           solde_theorique: soldeOuverture,
-          status: 'Ouverte'
+          status: 'OPEN'
         })
       });
 

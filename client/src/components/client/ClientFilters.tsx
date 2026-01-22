@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { SearchInput, Button, SelectField } from '../ui';
+import { StatutClient } from '@shared/enum/status-constants';
+import { CLIENT_STATUS_LABELS } from '@/lib/status-labels';
 
 export interface ClientFiltersState {
   searchTerm: string;
-  status: string;
+  statut: string;
   segment: string;
 }
 
@@ -17,7 +19,7 @@ interface ClientFiltersProps {
 export default function ClientFilters({ onFilterChange, initialFilters, className = '' }: ClientFiltersProps) {
   const [filters, setFilters] = useState<ClientFiltersState>({
     searchTerm: '',
-    status: 'all',
+    statut: 'all',
     segment: 'all',
     ...initialFilters
   });
@@ -38,7 +40,7 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       ...filters,
       searchTerm: debouncedSearch
     });
-  }, [filters.status, filters.segment, debouncedSearch]);
+  }, [filters.statut, filters.segment, debouncedSearch]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFilters(prev => ({ ...prev, searchTerm: e.target.value }));
@@ -50,7 +52,7 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
   };
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters(prev => ({ ...prev, status: e.target.value }));
+    setFilters(prev => ({ ...prev, statut: e.target.value }));
   };
 
   const handleSegmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -60,12 +62,12 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
   const clearFilters = () => {
     setFilters({
       searchTerm: '',
-      status: 'all',
+      statut: 'all',
       segment: 'all'
     });
   };
 
-  const hasActiveFilters = filters.status !== 'all' || filters.segment !== 'all';
+  const hasActiveFilters = filters.statut !== 'all' || filters.segment !== 'all';
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -86,14 +88,14 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
         <div className="md:col-span-3 lg:col-span-2">
             <SelectField
               label="Statut"
-              name="status"
-              value={filters.status}
+              name="statut"
+              value={filters.statut}
               onChange={handleStatusChange}
               options={[
                 { value: 'all', label: 'Tous les statuts' },
-                { value: 'Actif', label: 'Actif' },
-                { value: 'Suspendu', label: 'Suspendu' },
-                { value: 'Inactif', label: 'Inactif' }
+                { value: StatutClient.ACTIVE, label: CLIENT_STATUS_LABELS.ACTIVE },
+                { value: StatutClient.SUSPENDED, label: CLIENT_STATUS_LABELS.SUSPENDED },
+                { value: StatutClient.INACTIVE, label: CLIENT_STATUS_LABELS.INACTIVE }
               ]}
               className="mb-0"
             />
@@ -109,8 +111,8 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
               options={[
                 { value: 'all', label: 'Tous les segments' },
                 { value: 'VIP', label: 'VIP' },
-                { value: 'Standard', label: 'Standard' },
-                { value: 'Nouveau', label: 'Nouveau' }
+                { value: 'Premium', label: 'Premium' },
+                { value: 'Standard', label: 'Standard' }
               ]}
               className="mb-0"
             />

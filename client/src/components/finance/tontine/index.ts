@@ -8,3 +8,4 @@ export { default as TontineDistributions } from './TontineDistributions';
 export { default as TontineForm } from './TontineForm';
 export { default as TontineMembers } from './TontineMembers';
 export { default as TontineRegles } from './TontineRegles';
+export { default as TontineTimeline } from './TontineTimeline';

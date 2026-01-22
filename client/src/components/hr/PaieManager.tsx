@@ -6,6 +6,7 @@ import { FileText, Play, CheckCircle, Download, FileCheck, Calculator, AlertCirc
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { isAdminRole } from '@shared/types/roles';
+import { StatutBulletin, STATUT_BULLETIN_LABELS } from '@shared/enum/status-constants';
 
 export default function PaieManager() {
   // RBAC permissions
@@ -32,7 +33,7 @@ export default function PaieManager() {
     { key: 'employeNom', label: 'Employé', hideOnMobile: true },
     { key: 'salaireNet', label: 'Net à Payer', render: (val: string) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{parseInt(val).toLocaleString()} FCFA</span> },
     { key: 'statut', label: 'Statut', badge: true, render: (val: string) => (
-        <Badge variant={val === 'Validé' || val === 'Payé' ? 'success' : 'warning'} value={val} />
+        <Badge variant={val === StatutBulletin.VALIDATED || val === StatutBulletin.PAID ? 'success' : 'warning'} value={STATUT_BULLETIN_LABELS[val as keyof typeof STATUT_BULLETIN_LABELS] || val} />
     )},
     { key: 'actions', label: 'Actions', render: (val: any, item: BulletinPaie) => (
         <Button variant="ghost" size="sm" icon={Download} onClick={(e) => { e.stopPropagation(); handleDownload(item); }} />

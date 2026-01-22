@@ -100,10 +100,10 @@ export default function FormationsManager({
 
   const getStatutColor = (statut: Formation['statut']) => {
     switch (statut) {
-      case 'En cours': return 'success';
-      case 'Planifiée': return 'warning';
-      case 'Terminée': return 'neutral';
-      case 'Annulée': return 'danger';
+      case 'IN_PROGRESS': return 'success';
+      case 'PLANNED': return 'warning';
+      case 'COMPLETED': return 'neutral';
+      case 'CANCELLED': return 'danger';
       default: return 'neutral';
     }
   };

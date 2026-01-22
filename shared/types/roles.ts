@@ -20,6 +20,7 @@ export const isSystemRole = (role?: string | null): role is SystemRole => {
 };
 
 const ROLE_ALIASES: Record<string, SystemRole> = {
+  // ADMIN aliases
   'admin': SystemRole.ADMIN,
   'administrateur': SystemRole.ADMIN,
   'administrateur systeme': SystemRole.ADMIN,
@@ -30,10 +31,20 @@ const ROLE_ALIASES: Record<string, SystemRole> = {
   'direction': SystemRole.ADMIN,
   'directeur': SystemRole.ADMIN,
   'directeur financier': SystemRole.ADMIN,
+  'pdg': SystemRole.ADMIN,
+  'dg': SystemRole.ADMIN,
+  'audit': SystemRole.ADMIN, // Audit permissions → Admin
+  'rh': SystemRole.ADMIN, // RH permissions → Admin (HR module access)
+  'manager': SystemRole.ADMIN, // Generic manager → Admin
+
+  // CHEF_AGENCE aliases
   'chef': SystemRole.CHEF_AGENCE,
   'chef_agence': SystemRole.CHEF_AGENCE,
   'chef agence': SystemRole.CHEF_AGENCE,
   "chef d'agence": SystemRole.CHEF_AGENCE,
+  'trésorier': SystemRole.CHEF_AGENCE, // Trésorier → Chef d'Agence level
+
+  // CAISSIER aliases
   'chef caisse': SystemRole.CAISSIER,
   'chef_caisse': SystemRole.CAISSIER,
   'caissier': SystemRole.CAISSIER,
@@ -41,16 +52,26 @@ const ROLE_ALIASES: Record<string, SystemRole> = {
   'agent caisse': SystemRole.CAISSIER,
   'agent_caisse': SystemRole.CAISSIER,
   'agent de caisse': SystemRole.CAISSIER,
+
+  // AGENT_TERRAIN aliases
   'agent terrain': SystemRole.AGENT_TERRAIN,
   'agent_terrain': SystemRole.AGENT_TERRAIN,
   'terrain': SystemRole.AGENT_TERRAIN,
   'agent': SystemRole.AGENT_TERRAIN,
+
+  // COMPTABLE aliases
   'comptable': SystemRole.COMPTABLE,
+
+  // SUPERVISEUR aliases
   'superviseur': SystemRole.SUPERVISEUR,
+
+  // GESTIONNAIRE_CREDIT aliases
   'gestionnaire crédit': SystemRole.GESTIONNAIRE_CREDIT,
   'gestionnaire credit': SystemRole.GESTIONNAIRE_CREDIT,
   'gestionnaire_credit': SystemRole.GESTIONNAIRE_CREDIT,
   'credit': SystemRole.GESTIONNAIRE_CREDIT,
+
+  // CLIENT aliases
   'client': SystemRole.CLIENT
 };
 

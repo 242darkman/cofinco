@@ -102,13 +102,13 @@ export default function BalanceHistoryChart({
     if (active && payload && payload.length) {
       const config = METRIC_CONFIG[activeMetric];
       return (
-        <div className="bg-slate-900 border border-slate-700/50 rounded-xl p-3 shadow-xl backdrop-blur-md">
-          <p className="text-slate-400 text-xs mb-1">{label}</p>
+        <div className="bg-slate-900/80 border border-slate-700/50 rounded-xl p-3 shadow-xl backdrop-blur-md">
+          <p className="text-slate-400 text-xs mb-1 font-medium">{label}</p>
           <div className="flex items-baseline gap-1">
-            <span className="font-bold text-lg text-white">
+            <span className="font-bold text-lg text-white tabular-nums">
               {formatValue(payload[0]?.value || 0)}
             </span>
-            <span className="text-xs text-slate-500">FCFA</span>
+            <span className="text-xs text-slate-500 font-medium">FCFA</span>
           </div>
         </div>
       );
@@ -136,7 +136,7 @@ export default function BalanceHistoryChart({
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[350px]">
       {/* Header Area */}
       <div className="p-4 sm:p-5 pb-0">
         <div className="flex items-center justify-between mb-4">
@@ -144,16 +144,16 @@ export default function BalanceHistoryChart({
             {displayTitle}
           </h3>
           
-          {/* Period Selector - Minimal & Modern */}
-          <div className="flex bg-slate-800/80 rounded-lg p-0.5 border border-slate-700/50">
+          {/* Period Selector - Segmented Control */}
+          <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700/50">
             {periods.map((p) => (
               <button
                 key={p.value}
                 onClick={() => setPeriod(p.value)}
                 className={`
-                  px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200
+                  px-3 py-1 text-[10px] font-medium rounded-md transition-all duration-200
                   ${period === p.value 
-                    ? 'bg-slate-600/50 text-white shadow-sm' 
+                    ? 'bg-slate-700 text-white shadow-sm' 
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}
                 `}
               >
@@ -194,7 +194,7 @@ export default function BalanceHistoryChart({
         {/* Current Stats Hero - Mobile First Layout */}
         <div className="flex items-baseline justify-between mb-2 px-1">
            <div>
-              <p className="text-sm text-slate-400 mb-1">Solde Actuel</p>
+              <p className="text-sm text-slate-400 mb-1">{t('volumePortefeuille')}</p>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                   {formatValue(latestValue)}
@@ -221,44 +221,50 @@ export default function BalanceHistoryChart({
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={chartData}
-            margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
+            margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
           >
             <defs>
               <linearGradient id={`gradient-${activeMetric}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={config.gradientColors[0]} stopOpacity={0.4} />
-                <stop offset="100%" stopColor={config.gradientColors[1]} stopOpacity={0} />
+                <stop offset="0%" stopColor={config.gradientColors[0]} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={config.gradientColors[1]} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid 
               strokeDasharray="3 3" 
               vertical={false} 
-              stroke="#1e293b" 
-              opacity={0.5}
+              stroke="#334155" 
+              opacity={0.4}
             />
             <XAxis
               dataKey="date"
-              stroke="#475569"
-              fontSize={10}
+              stroke="#94a3b8"
+              fontSize={11}
               tickLine={false}
               axisLine={false}
-              minTickGap={50}
-              dy={10}
+              minTickGap={30}
+              tickMargin={10}
+              fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
             />
             <YAxis
-              stroke="#475569"
-              fontSize={10}
-              tickFormatter={(val) => formatValue(val, true)}
+              stroke="#94a3b8"
+              fontSize={11}
+              tickFormatter={(value) => {
+                if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+                return value;
+              }}
               tickLine={false}
               axisLine={false}
-              domain={[minValue, maxValue]} // Makes graph dynamic
-              width={45}
+              domain={[minValue, maxValue]}
+              width={60}
+              tick={{ fill: '#94a3b8', fontSize: 11 }}
             />
             <Tooltip
               content={<CustomTooltip />}
               cursor={{ stroke: config.color, strokeDasharray: '4 4' }}
             />
             <Area
-              type="monotone" // Smooth curves
+              type="monotone"
               dataKey={activeMetric}
               stroke={config.color}
               strokeWidth={3}

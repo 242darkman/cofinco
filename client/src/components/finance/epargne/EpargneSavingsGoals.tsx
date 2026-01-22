@@ -9,6 +9,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, validateDate, VALIDATION_LIMITS } from '../../../lib/validation';
 import { formatMoney, formatDate, getDaysRemaining } from '../../../lib/format';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
+import { StatutObjectif, StatutObjectifType, STATUT_OBJECTIF_LABELS } from '@shared/enum/status-constants';
 
 interface Objectif {
   id: string;
@@ -17,7 +18,7 @@ interface Objectif {
   montantActuel: number;
   dateDebut: string;
   dateCible: string;
-  statut: 'En cours' | 'Atteint' | 'Abandonné';
+  statut: StatutObjectifType;
   description: string;
 }
 
@@ -190,8 +191,8 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
   // Memoized stats
   const stats = useMemo(() => {
     const total = objectifs.length;
-    const atteints = objectifs.filter((o) => o.statut === 'Atteint').length;
-    const enCours = objectifs.filter((o) => o.statut === 'En cours').length;
+    const atteints = objectifs.filter((o) => o.statut === StatutObjectif.ACHIEVED).length;
+    const enCours = objectifs.filter((o) => o.statut === StatutObjectif.IN_PROGRESS).length;
     return { total, atteints, enCours };
   }, [objectifs]);
 
@@ -457,7 +458,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                       <div className="text-right text-sm font-bold text-white mt-1">{pourcentage.toFixed(1)}%</div>
                     </div>
 
-                    {objectif.statut === 'En cours' && (
+                    {objectif.statut === StatutObjectif.IN_PROGRESS && (
                       <Button
                         onClick={() => updateObjectifProgression(objectif)}
                         variant="primary"

@@ -1,6 +1,8 @@
 import React from 'react';
 import { LayoutDashboard, PiggyBank, ArrowLeftRight, Menu } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { usePermissions } from '../auth/ProtectedFeature';
+import { AppModule } from '@shared/config/rbac';
 
 interface MobileBottomNavProps {
   currentModule: string;
@@ -10,10 +12,10 @@ interface MobileBottomNavProps {
   transferDisabled?: boolean;
 }
 
-const NAV_ITEMS = [
-  { key: 'dashboard', labelKey: 'menuDashboard', icon: LayoutDashboard },
-  { key: 'epargnes', labelKey: 'menuCompte', icon: PiggyBank },
-  { key: 'transfert', labelKey: 'menuTransfert', icon: ArrowLeftRight },
+const NAV_ITEMS: Array<{ key: string; labelKey: string; icon: typeof LayoutDashboard; requiredModule?: AppModule }> = [
+  { key: 'dashboard', labelKey: 'menuDashboard', icon: LayoutDashboard, requiredModule: 'Dashboard' },
+  { key: 'epargnes', labelKey: 'menuCompte', icon: PiggyBank, requiredModule: 'Comptes' },
+  { key: 'transfert', labelKey: 'menuTransfert', icon: ArrowLeftRight, requiredModule: 'Communications' },
 ];
 
 export default function MobileBottomNav({
@@ -24,14 +26,23 @@ export default function MobileBottomNav({
   transferDisabled = false,
 }: MobileBottomNavProps) {
   const { t } = useLanguage();
+  const { canAccessModule } = usePermissions();
+
+  // Filter items based on RBAC permissions
+  const accessibleItems = NAV_ITEMS.filter(item =>
+    !item.requiredModule || canAccessModule(item.requiredModule)
+  );
+
+  // Calculate grid columns dynamically (accessible items + menu button)
+  const gridCols = accessibleItems.length + 1;
 
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-edge bg-surface-base/95 backdrop-blur supports-[backdrop-filter]:bg-surface-base/80"
       aria-label="Navigation mobile"
     >
-      <div className="grid grid-cols-4 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
-        {NAV_ITEMS.map((item) => {
+      <div className={`grid px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)]`} style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
+        {accessibleItems.map((item) => {
           const isActive = currentModule === item.key;
           const isDisabled = item.key === 'transfert' && transferDisabled;
           const Icon = item.icon;

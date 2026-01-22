@@ -111,7 +111,7 @@ export interface Compte {
   numeroCompte: string;
   soldeCourant: string;
   tauxInteret?: number;
-  statut: 'Actif' | 'Suspendu' | 'Clôturé';
+  statut: 'ACTIVE' | 'SUSPENDED' | 'CLOSED' | 'PENDING_ACTIVATION' | 'CANCELLED';
   blocageActif?: boolean;
   blocageMotif?: string;
   blocageReference?: string;
@@ -223,7 +223,7 @@ export interface MouvementFinancier {
   id: string;
   reference: string;
   sourceModule: string;
-  sens: 'Débit' | 'Crédit';
+  sens: 'DEBIT' | 'CREDIT';
   montant: string;
   dateOperation: string;
   clientId?: string;

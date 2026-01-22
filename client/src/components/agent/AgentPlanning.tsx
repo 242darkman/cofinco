@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, Plus, Check, X } from 'lucide-react';
+import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
 
 interface Planning {
   id: string;
@@ -65,7 +66,7 @@ export default function AgentPlanning({ agentId }: { agentId?: string }) {
       const response = await fetch('/api/agent-planning', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, statut: 'Planifié' })
+        body: JSON.stringify({ ...formData, statut: 'PLANNED' })
       });
 
       if (!response.ok) {
@@ -253,13 +254,13 @@ export default function AgentPlanning({ agentId }: { agentId?: string }) {
                         </button>
                       </>
                     )}
-                    {planning.statut !== 'Planifié' && (
+                    {planning.statut !== StatutPlanning.PLANNED && (
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        planning.statut === 'Complété' ? 'bg-green-500/20 text-green-400' :
-                        planning.statut === 'Annulé' ? 'bg-blue-500/20 text-blue-400' :
+                        planning.statut === StatutPlanning.COMPLETED ? 'bg-green-500/20 text-green-400' :
+                        planning.statut === StatutPlanning.CANCELLED ? 'bg-blue-500/20 text-blue-400' :
                         'bg-cyan-500/20 text-cyan-400'
                       }`}>
-                        {planning.statut}
+                        {STATUT_PLANNING_LABELS[planning.statut as keyof typeof STATUT_PLANNING_LABELS] || planning.statut}
                       </span>
                     )}
                   </div>

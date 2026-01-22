@@ -11,14 +11,27 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { formatMoney, formatDate } from '../../../lib/format';
 import { usePagination } from '../../../hooks/usePagination';
+import {
+  StatutClient,
+  StatutContributionTontine,
+  MethodePaiement,
+  METHODE_PAIEMENT_LABELS
+} from '@shared/enum/status-constants';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
   { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04' },
 ];
 
-const PAYMENT_MODES = ['Cash', 'Mobile Money', 'Virement', 'Chèque'] as const;
-type PaymentMode = (typeof PAYMENT_MODES)[number];
+/** Mapping modes de paiement UI vers enum */
+const PAYMENT_MODE_OPTIONS = [
+  { value: MethodePaiement.CASH, label: METHODE_PAIEMENT_LABELS[MethodePaiement.CASH] },
+  { value: MethodePaiement.MOBILE_MONEY, label: METHODE_PAIEMENT_LABELS[MethodePaiement.MOBILE_MONEY] },
+  { value: MethodePaiement.TRANSFER, label: METHODE_PAIEMENT_LABELS[MethodePaiement.TRANSFER] },
+  { value: MethodePaiement.CHECK, label: METHODE_PAIEMENT_LABELS[MethodePaiement.CHECK] },
+] as const;
+
+type PaymentMode = typeof MethodePaiement[keyof typeof MethodePaiement];
 
 interface TontineContribution {
   id: string;
@@ -30,7 +43,7 @@ interface TontineContribution {
   date_contribution: string;
   mode_paiement: PaymentMode;
   reference_paiement: string | null;
-  statut: 'Validée' | 'En attente' | 'Rejetée';
+  statut: typeof StatutContributionTontine[keyof typeof StatutContributionTontine];
   notes: string | null;
   client: {
     nom: string;
@@ -96,7 +109,7 @@ const PaymentPreview = ({
   let toursDejaPayes = 0;
   if (selectedMembre) {
     const memberContribs = contributions.filter(
-      c => c.client_id === selectedMembre.client_id && c.statut === 'Validée'
+      c => c.client_id === selectedMembre.client_id && c.statut === StatutContributionTontine.VALIDATED
     );
     toursDejaPayes = memberContribs.reduce((max, c) => Math.max(max, c.tour_numero), 0);
   }
@@ -175,11 +188,17 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
   if (!contribution) return null;
 
   const getModeLabel = (mode: string) => {
+    // Use enum labels when available, fallback to mode value
+    const enumMode = Object.values(MethodePaiement).find(v => v === mode);
+    if (enumMode) {
+      return METHODE_PAIEMENT_LABELS[enumMode as PaymentMode];
+    }
+    // Legacy support for old French values
     switch (mode) {
-      case 'Cash': return 'Espèces';
-      case 'Mobile Money': return 'Mobile Money';
-      case 'Virement': return 'Virement Bancaire';
-      case 'Chèque': return 'Chèque';
+      case 'Cash': return METHODE_PAIEMENT_LABELS[MethodePaiement.CASH];
+      case 'Mobile Money': return METHODE_PAIEMENT_LABELS[MethodePaiement.MOBILE_MONEY];
+      case 'Virement': return METHODE_PAIEMENT_LABELS[MethodePaiement.TRANSFER];
+      case 'Chèque': return METHODE_PAIEMENT_LABELS[MethodePaiement.CHECK];
       default: return mode;
     }
   };
@@ -229,7 +248,7 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
              </div>
 
              {/* Afficher l'opérateur uniquement si Mobile Money */}
-             {contribution.mode_paiement === 'Mobile Money' && (
+             {contribution.mode_paiement === MethodePaiement.MOBILE_MONEY && (
                 // Note: Si l'opérateur n'est pas stocké explicitement dans le type TontineContribution actuel, 
                 // on pourrait avoir besoin de modifier le type ou le backend. 
                 // Mais s'il est dans 'notes' ou un champ dédié que j'aurais manqué...
@@ -242,7 +261,7 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
                  </div>
              )}
              
-             {contribution.reference_paiement && contribution.mode_paiement !== 'Mobile Money' && (
+             {contribution.reference_paiement && contribution.mode_paiement !== MethodePaiement.MOBILE_MONEY && (
                 <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
                   <span className="text-slate-400 text-sm">Référence</span>
                   <span className="text-slate-200 font-mono text-sm text-right">
@@ -260,8 +279,8 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
 
           <div className="flex justify-center">
             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-              contribution.statut === 'Validée' ? 'bg-green-500/20 text-green-400' :
-              contribution.statut === 'En attente' ? 'bg-amber-500/20 text-amber-400' :
+              contribution.statut === 'VALIDATED' ? 'bg-green-500/20 text-green-400' :
+              contribution.statut === 'PENDING' ? 'bg-amber-500/20 text-amber-400' :
               'bg-red-500/20 text-red-400'
             }`}>
               Statut: {contribution.statut}
@@ -296,7 +315,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
     membre_id: '',
     montant: 0,
     tour_numero: 1,
-    mode_paiement: 'Cash' as PaymentMode,
+    mode_paiement: MethodePaiement.CASH as PaymentMode,
     reference_paiement: '',
     notes: '',
   });
@@ -343,8 +362,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
     if (!tontineId) return;
     try {
       const data = await tontineMembreApi.getByTontine(tontineId);
-      // Ensure we handle both status (frontend alias potentially) or statut (backend raw)
-      const membresActifs = data?.filter((m: any) => (m.statut === 'Actif' || m.status === 'Actif')) || [];
+      const membresActifs = data?.filter((m: any) => (m.statut === StatutClient.ACTIVE || m.status === StatutClient.ACTIVE)) || [];
       setMembres(membresActifs);
     } catch (error) {
       console.error('Erreur chargement membres:', error);
@@ -371,7 +389,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
       newErrors.tour_numero = 'Le numéro de tour doit être supérieur à 0';
     }
 
-    if (formData.mode_paiement === 'Mobile Money' && !selectedOperator) {
+    if (formData.mode_paiement === MethodePaiement.MOBILE_MONEY && !selectedOperator) {
       newErrors.operateur = 'Veuillez sélectionner un opérateur';
     }
 
@@ -382,11 +400,11 @@ export default function TontineContributions({ tontineId }: TontineContributions
   const handleAddContribution = useCallback(async () => {
     if (!validateForm()) return;
 
-    if (formData.mode_paiement === 'Mobile Money') {
+    if (formData.mode_paiement === MethodePaiement.MOBILE_MONEY) {
       setPaymentModalType('mobile_money');
       setShowPaymentModal(true);
       return;
-    } else if (formData.mode_paiement === 'Cash') {
+    } else if (formData.mode_paiement === MethodePaiement.CASH) {
       setPaymentModalType('especes');
       setShowPaymentModal(true);
       return;
@@ -409,22 +427,14 @@ export default function TontineContributions({ tontineId }: TontineContributions
       try {
         await contributionTontineApi.create({
           tontineId: tontineId,
-          clientId: membre.client_id, // Note: clientId is required by schema, not membre_id directly although logic uses it
-          // membreId is not in the insert schema check, but we usually need it. 
-          // However, the schema `insertContributionTontineSchema` has tontineId, clientId, mouvementId...
-          // Wait, let's check schema again. `contributionsTontine` table has tontineId, clientId.
-          // It does NOT have membreId. So passing membre_id is useless for the API.
-          
-          typeOperation: 'Versement', // Required by schema
-          montant: String(formData.montant), // Must be string
+          clientId: membre.client_id,
+          typeOperation: 'Versement',
+          montant: String(formData.montant),
           tourNumero: formData.tour_numero,
-          methodePaiement: formData.mode_paiement === 'Cash' ? 'Espèces' : formData.mode_paiement,
-          reference: paymentRef || formData.reference_paiement || `REF-${Date.now()}`, // Required. fallback if empty
-          // referenceExterne: ... // Optional
-          // operateur_mobile is not in schema directly? 
-          // If existing logic used it, it might have been for notes or ignored.
-          // Let's put extra info in notes or observations
+          methodePaiement: formData.mode_paiement, // Already an enum value (CASH, MOBILE_MONEY, etc.)
+          reference: paymentRef || formData.reference_paiement || `REF-${Date.now()}`,
           observations: sanitizeInput(formData.notes) || (operator ? `Opérateur: ${operator}` : null),
+          idempotencyKey: crypto.randomUUID(), // Prevent duplicate submissions
         });
 
         setShowAddForm(false);
@@ -450,7 +460,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
       membre_id: '',
       montant: 0,
       tour_numero: 1,
-      mode_paiement: 'Cash',
+      mode_paiement: MethodePaiement.CASH,
       reference_paiement: '',
       notes: '',
     });
@@ -496,27 +506,34 @@ export default function TontineContributions({ tontineId }: TontineContributions
   );
 
   const getStatutColor = useCallback((statut: string) => {
-    switch (statut) {
-      case 'Validée':
-        return 'text-green-400 bg-green-500/20';
-      case 'En attente':
-        return 'text-cyan-400 bg-cyan-500/20';
-      case 'Rejetée':
-        return 'text-red-400 bg-red-500/20';
-      default:
-        return 'text-slate-400 bg-slate-500/20';
+    if (statut === StatutContributionTontine.VALIDATED) {
+      return 'text-green-400 bg-green-500/20';
     }
+    if (statut === StatutContributionTontine.PENDING) {
+      return 'text-cyan-400 bg-cyan-500/20';
+    }
+    if (statut === StatutContributionTontine.REJECTED) {
+      return 'text-red-400 bg-red-500/20';
+    }
+    if (statut === StatutContributionTontine.LATE) {
+      return 'text-amber-400 bg-amber-500/20';
+    }
+    return 'text-slate-400 bg-slate-500/20';
   }, []);
 
   const getModeIcon = useCallback((mode: string) => {
     switch (mode) {
-      case 'Cash':
+      case MethodePaiement.CASH:
+      case 'Cash': // Legacy support
         return <Banknote size={14} className="inline text-green-400" aria-hidden="true" />;
-      case 'Mobile Money':
+      case MethodePaiement.MOBILE_MONEY:
+      case 'Mobile Money': // Legacy support
         return <Smartphone size={14} className="inline text-cyan-400" aria-hidden="true" />;
-      case 'Virement':
+      case MethodePaiement.TRANSFER:
+      case 'Virement': // Legacy support
         return <Building size={14} className="inline text-blue-400" aria-hidden="true" />;
-      case 'Chèque':
+      case MethodePaiement.CHECK:
+      case 'Chèque': // Legacy support
         return <FileCheck size={14} className="inline text-purple-400" aria-hidden="true" />;
       default:
         return <DollarSign size={14} className="inline text-slate-400" aria-hidden="true" />;
@@ -584,9 +601,10 @@ export default function TontineContributions({ tontineId }: TontineContributions
             aria-label="Filtrer par statut"
           >
             <option value="all">Tous les statuts</option>
-            <option value="Validée">Validée</option>
-            <option value="En attente">En attente</option>
-            <option value="Rejetée">Rejetée</option>
+            <option value={StatutContributionTontine.VALIDATED}>Validée</option>
+            <option value={StatutContributionTontine.PENDING}>En attente</option>
+            <option value={StatutContributionTontine.REJECTED}>Rejetée</option>
+            <option value={StatutContributionTontine.LATE}>En retard</option>
           </select>
         </div>
       )}
@@ -741,7 +759,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     
                     // Auto-calculate next tour
                     if (newMembreId) {
-                        const memberContribs = contributions.filter(c => c.membre_id === newMembreId && c.statut === 'Validée');
+                        const memberContribs = contributions.filter(c => c.membre_id === newMembreId && c.statut === StatutContributionTontine.VALIDATED);
                         const maxTour = memberContribs.length > 0 ? Math.max(...memberContribs.map(c => c.tour_numero)) : 0;
                         newTour = maxTour + 1;
                     }
@@ -831,23 +849,23 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   Mode de paiement *
                 </label>
                 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode de paiement">
-                  {PAYMENT_MODES.map((mode) => (
+                  {PAYMENT_MODE_OPTIONS.map((option) => (
                     <button
-                      key={mode}
+                      key={option.value}
                       type="button"
                       role="radio"
-                      aria-checked={formData.mode_paiement === mode}
-                      onClick={() => setFormData((prev) => ({ ...prev, mode_paiement: mode }))}
+                      aria-checked={formData.mode_paiement === option.value}
+                      onClick={() => setFormData((prev) => ({ ...prev, mode_paiement: option.value }))}
                       className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition ${
-                        formData.mode_paiement === mode
+                        formData.mode_paiement === option.value
                           ? 'bg-emerald-600 border-emerald-500 text-white'
-                          : mode !== 'Cash' 
+                          : option.value !== MethodePaiement.CASH
                             ? 'bg-slate-800/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
                             : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                       }`}
-                      disabled={mode !== 'Cash'}
+                      disabled={option.value !== MethodePaiement.CASH}
                     >
-                      {getModeIcon(mode)} {mode}
+                      {getModeIcon(option.value)} {option.label}
                     </button>
                   ))}
                   <div className="col-span-2 text-[10px] text-slate-500 italic text-center mt-1">
@@ -858,7 +876,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
               </div>
 
               {/* Mobile Money Operator */}
-              {formData.mode_paiement === 'Mobile Money' && (
+              {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Opérateur *

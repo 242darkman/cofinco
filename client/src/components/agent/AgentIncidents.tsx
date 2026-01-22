@@ -67,7 +67,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
       const response = await fetch('/api/agent-incidents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, statut: 'Ouvert' })
+        body: JSON.stringify({ ...formData, statut: 'OPEN' })
       });
 
       if (!response.ok) {
@@ -98,7 +98,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          statut: 'Résolu',
+          statut: 'RESOLVED',
           resolution,
           date_resolution: new Date().toISOString()
         })
@@ -115,7 +115,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
     }
   };
 
-  const incidentsOuverts = incidents.filter(i => i.statut === 'Ouvert' || i.statut === 'En traitement').length;
+  const incidentsOuverts = incidents.filter(i => i.statut === 'OPEN' || i.statut === 'IN_PROGRESS').length;
   const incidentsGraves = incidents.filter(i => i.gravite === 'Grave' || i.gravite === 'Critique').length;
 
   return (

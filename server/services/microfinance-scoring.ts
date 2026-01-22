@@ -15,7 +15,13 @@ import {
   demandesCredit
 } from "@shared/schema";
 import { membresTontine, contributionsTontine, tontinePenalites } from "@shared/schema/tontines";
-import { eq, and, gte, lte, desc, sql, count, sum, avg } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, count, sum, avg, or } from "drizzle-orm";
+import {
+  StatutCompte,
+  StatutCredit,
+  StatutParticipationTontine,
+  StatutTransaction,
+} from "@shared/enum/status-constants";
 
 // ============================================================================
 // TYPES
@@ -230,12 +236,14 @@ async function getHistoriqueCredits(clientId: string): Promise<HistoriqueCredit>
     });
   }
 
-  const creditsSoldes = creditsClient.filter(c => c.statut === 'Soldé' || c.statut === 'Clôturé').length;
-  const creditsEnRetard = creditsClient.filter(c => c.statut === 'En retard').length;
-  const creditsActifs = creditsClient.filter(c => c.statut === 'Actif').length;
+  const creditsSoldes = creditsClient.filter(c => (c.statut === StatutCredit.PAID || c.statut === StatutCredit.CLOSED)).length;
+  const creditsEnRetard = creditsClient.filter(c => (c.statut === StatutCredit.LATE)).length;
+  const creditsActifs = creditsClient.filter(c => (c.statut === StatutCredit.ACTIVE)).length;
 
   // Calculer le taux de remboursement
-  const remboursementsPayes = remboursementsClient.filter(r => r.statut === 'Payé' || r.statut === 'Validé').length;
+  const remboursementsPayes = remboursementsClient.filter(r =>
+    r.statut === StatutTransaction.POSTED
+  ).length;
   const totalRemboursements = remboursementsClient.length;
   const tauxRemboursement = totalRemboursements > 0 ? (remboursementsPayes / totalRemboursements) * 100 : 100;
 
@@ -336,7 +344,7 @@ async function getComptesClient(clientId: string) {
   return db.query.comptes.findMany({
     where: and(
       eq(comptes.clientId, clientId),
-      eq(comptes.statut, 'Actif')
+      eq(comptes.statut, StatutCompte.ACTIVE)
     )
   });
 }
@@ -385,7 +393,7 @@ function calculerScoreEpargne(
   }
 
   // Analyser la régularité des dépôts
-  const depots = mouvements.filter(m => m.sens === 'Crédit' && m.typeOperation?.includes('Dépôt'));
+  const depots = mouvements.filter(m => (m.sens === 'CREDIT' || m.sens === 'Crédit') && m.typeOperation?.includes('Dépôt'));
 
   if (depots.length >= 12) {
     // Au moins 2 dépôts par mois sur 6 mois
@@ -450,7 +458,7 @@ async function getPenalitesTontine(clientId: string) {
   });
 
   // Pour l'instant, on considère les contributions en retard ou annulées
-  return contributions.filter(c => c.statutTransaction === 'Annulé');
+  return contributions.filter(c => (c.statutTransaction === StatutTransaction.CANCELLED));
 }
 
 function calculerScoreTontine(
@@ -474,7 +482,7 @@ function calculerScoreTontine(
   }
 
   // Points pour participation active
-  const participationsActives = participations.filter(p => p.statut === 'Actif');
+  const participationsActives = participations.filter(p => (p.statut === StatutParticipationTontine.ACTIVE));
   score += Math.min(6, participationsActives.length * 3);
 
   if (participationsActives.length >= 2) {

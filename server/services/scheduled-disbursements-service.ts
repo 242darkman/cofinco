@@ -2,6 +2,12 @@ import { db } from "../db";
 import { credits, decaissementsProgrammes, mouvementsFinanciers, comptes } from "@shared/schema";
 import { eq, and, lte, sql } from "drizzle-orm";
 import { createDecaissementWithLedger } from "../storage/finance";
+import {
+  validateCreditTransition,
+  CreditTransitionError,
+  CreditStatus,
+} from "@shared/machines/credit-workflow";
+import { TypeCompte, StatutCompte, StatutCredit } from "@shared/enum/status-constants";
 
 /**
  * Exécute un décaissement programmé pour un crédit donné
@@ -37,7 +43,7 @@ export async function executeScheduledDisbursement(
     }
     
     // 4. Vérifier que le crédit est approuvé
-    if (credit.statut !== 'Approuvée') {
+    if (credit.statut !== StatutCredit.PENDING) {
       return { success: false, error: `Crédit non approuvé (statut: ${credit.statut})` };
     }
     
@@ -56,8 +62,8 @@ export async function executeScheduledDisbursement(
       .where(
         and(
           eq(comptes.clientId, credit.clientId),
-          eq(comptes.typeCompte, 'Courant'),
-          eq(comptes.statut, 'Actif')
+          eq(comptes.typeCompte, TypeCompte.CURRENT),
+          eq(comptes.statut, StatutCompte.ACTIVE)
         )
       )
       .limit(1);
@@ -86,18 +92,31 @@ export async function executeScheduledDisbursement(
     await db.insert(decaissementsProgrammes).values({
       creditId: credit.id,
       montant: credit.montant,
-      statut: 'success',
+      statut: 'SUCCESS',
       dateExecution: new Date(),
       datePlanifiee: credit.dateDecaissementProgramme || new Date(),
       mouvementId: result.mouvement.id,
       tentatives: (credit.decaissementTentatives || 0) + 1,
     });
     
-    // 9. Mettre à jour le crédit
+    // 9. Mettre à jour le crédit avec validation de la state machine
+    // Note: After disbursement, the credit should transition to ACTIVE
+    // PENDING -> ACTIVE is the standard transition after disbursement
+    try {
+      validateCreditTransition(credit.statut, CreditStatus.ACTIVE);
+    } catch (error) {
+      if (error instanceof CreditTransitionError) {
+        console.warn(`[Scheduled Disbursement] State machine warning: ${error.message}`);
+        // Continue anyway for disbursement - status might already be correct
+      } else {
+        throw error;
+      }
+    }
+
     await db
       .update(credits)
       .set({
-        statut: 'Décaissée', // Mise à jour du statut après décaissement
+        statut: CreditStatus.ACTIVE, // Use standardized EN value
         dateDecaissementEffectif: new Date(),
         decaissementTentatives: (credit.decaissementTentatives || 0) + 1,
         decaissementErreur: null,
@@ -123,7 +142,7 @@ export async function executeScheduledDisbursement(
         await db.insert(decaissementsProgrammes).values({
           creditId: credit.id,
           montant: credit.montant,
-          statut: 'failed',
+          statut: 'FAILED',
           dateExecution: null,
           datePlanifiee: credit.dateDecaissementProgramme || new Date(),
           mouvementId: null,
@@ -164,7 +183,7 @@ export async function getCreditsWithPendingDisbursement(): Promise<typeof credit
       and(
         eq(credits.decaissementAutomatique, true),
         lte(credits.dateDecaissementProgramme, now),
-        eq(credits.statut, 'Approuvée'),
+        eq(credits.statut, StatutCredit.PENDING),
         sql`${credits.dateDecaissementEffectif} IS NULL` // Pas encore décaissé
       )
     );

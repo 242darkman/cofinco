@@ -18,6 +18,55 @@ interface WebSocketContextType {
   typingUsers: Map<string, boolean>;
   sendMessage: (type: MessageType, payload: any) => void;
   sendTyping: (receiverId: string, isTyping: boolean) => void;
+  pendingMessagesCount: number;
+}
+
+// Offline message buffer - persists important messages when disconnected
+interface BufferedMessage {
+  id: string;
+  type: MessageType;
+  payload: any;
+  timestamp: number;
+  retries: number;
+}
+
+const BUFFER_STORAGE_KEY = 'cofin_ws_buffer';
+const MAX_BUFFER_SIZE = 100;
+const MAX_RETRIES = 3;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_RECONNECT_DELAY = 1000; // 1 second
+const MAX_RECONNECT_DELAY = 30000; // 30 seconds
+
+// Messages that should be buffered when offline
+const BUFFERABLE_TYPES: MessageType[] = [
+  'CHAT_MESSAGE',
+  'TYPING',
+  'LOCATION_UPDATE',
+];
+
+function loadBuffer(): BufferedMessage[] {
+  try {
+    const stored = localStorage.getItem(BUFFER_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveBuffer(buffer: BufferedMessage[]) {
+  try {
+    localStorage.setItem(BUFFER_STORAGE_KEY, JSON.stringify(buffer.slice(-MAX_BUFFER_SIZE)));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function clearBuffer() {
+  try {
+    localStorage.removeItem(BUFFER_STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -27,14 +76,18 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [typingUsers, setTypingUsers] = useState<Map<string, boolean>>(new Map());
+  const [messageBuffer, setMessageBuffer] = useState<BufferedMessage[]>(loadBuffer);
   const { isServerReachable } = useServerHealth();
-  
+
   const user = authService.getCurrentUser();
   const queryClient = useQueryClient();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const typingTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const serverReachableRef = useRef(isServerReachable);
   serverReachableRef.current = isServerReachable;
+
+  // Reconnection state for exponential backoff
+  const reconnectAttemptsRef = useRef(0);
 
   // Ref pour maintenir l'instance WebSocket active sans déclencher de re-renders infinis
   const wsRef = useRef<WebSocket | null>(null);
@@ -65,6 +118,26 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       console.log("WebSocket Connected");
       setIsConnected(true);
       setSocket(ws);
+
+      // Reset reconnect counter on successful connection
+      reconnectAttemptsRef.current = 0;
+
+      // Flush buffered messages
+      const buffer = loadBuffer();
+      if (buffer.length > 0) {
+        console.log(`[WS] Flushing ${buffer.length} buffered messages`);
+        buffer.forEach((msg) => {
+          if (msg.retries < MAX_RETRIES) {
+            try {
+              ws.send(JSON.stringify({ type: msg.type, payload: msg.payload }));
+            } catch {
+              // Will be retried on next reconnect
+            }
+          }
+        });
+        clearBuffer();
+        setMessageBuffer([]);
+      }
     };
 
     ws.onmessage = (event) => {
@@ -89,9 +162,24 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       setOnlineUsers(new Set());
       wsRef.current = null;
 
-      // Reconnect after 3s only if user is still logged in
-      if (user && serverReachableRef.current) {
-          reconnectTimeoutRef.current = setTimeout(() => connect(), 3000);
+      // Reconnect with exponential backoff if user is still logged in
+      if (user && serverReachableRef.current && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttemptsRef.current++;
+          const delay = Math.min(
+            BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1),
+            MAX_RECONNECT_DELAY
+          );
+          console.log(`[WS] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
+          reconnectTimeoutRef.current = setTimeout(() => connect(), delay);
+      } else if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          console.warn('[WS] Max reconnect attempts reached. Please refresh the page.');
+          toast.error('Connexion temps réel perdue. Veuillez rafraîchir la page.', {
+            duration: Infinity,
+            action: {
+              label: 'Rafraîchir',
+              onClick: () => window.location.reload()
+            }
+          });
       }
     };
 
@@ -421,18 +509,35 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const sendMessage = (type: MessageType, payload: any) => {
+  const sendMessage = useCallback((type: MessageType, payload: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type, payload }));
+    } else if (BUFFERABLE_TYPES.includes(type)) {
+      // Buffer message if we're offline and it's a bufferable type
+      const bufferedMsg: BufferedMessage = {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type,
+        payload,
+        timestamp: Date.now(),
+        retries: 0,
+      };
+      setMessageBuffer((prev) => {
+        const newBuffer = [...prev, bufferedMsg].slice(-MAX_BUFFER_SIZE);
+        saveBuffer(newBuffer);
+        return newBuffer;
+      });
+      console.log(`[WS] Message buffered (offline): ${type}`);
     }
-  };
+  }, []);
 
-  const sendTyping = (receiverId: string, isTyping: boolean) => {
+  const sendTyping = useCallback((receiverId: string, isTyping: boolean) => {
     sendMessage("TYPING", { receiverId, isTyping });
-  };
+  }, [sendMessage]);
+
+  const pendingMessagesCount = messageBuffer.length;
 
   return (
-    <WebSocketContext.Provider value={{ isConnected, socket, onlineUsers, typingUsers, sendMessage, sendTyping }}>
+    <WebSocketContext.Provider value={{ isConnected, socket, onlineUsers, typingUsers, sendMessage, sendTyping, pendingMessagesCount }}>
       {children}
     </WebSocketContext.Provider>
   );

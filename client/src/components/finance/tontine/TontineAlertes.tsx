@@ -1,15 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Bell, AlertTriangle, Info, CheckCircle, X, Clock, Check } from 'lucide-react';
-import { Card, Badge, IconButton, Button, TabGroup } from '../../ui';
+import { Card, Badge, IconButton, TabGroup } from '../../ui';
+import { alerteTontineApi } from '../../../lib/api-client';
+import { toast, handleApiError } from '../../../lib/toast';
+import {
+  PrioriteAlerteTontine,
+  PrioriteAlerteTontineType,
+  PRIORITE_ALERTE_TONTINE_LABELS,
+  StatutAlerteTontine,
+  StatutAlerteTontineType,
+  STATUT_ALERTE_TONTINE_LABELS,
+  TypeAlerteTontine,
+  TypeAlerteTontineType,
+  TYPE_ALERTE_TONTINE_LABELS,
+} from '@shared/enum/status-constants';
 
 interface TontineAlerte {
   id: string;
   tontine_id: string;
   membre_id: string | null;
-  type_alerte: 'retard_paiement' | 'echeance_proche' | 'distribution_due' | 'tour_complet' | 'membre_inactif';
-  priorite: 'Basse' | 'Normale' | 'Haute' | 'Urgente';
+  type_alerte: string;
+  priorite: string;
   message: string;
-  statut: 'Active' | 'Résolue' | 'Ignorée';
+  statut: string;
   created_at: string;
   tontine_membres?: {
     clients: {
@@ -22,98 +35,107 @@ interface TontineAlertesProps {
   tontineId: string;
 }
 
+
 export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
   const [alertes, setAlertes] = useState<TontineAlerte[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'Active' | 'Résolue'>('Active');
+  const [filter, setFilter] = useState<'all' | StatutAlerteTontineType>(StatutAlerteTontine.ACTIVE);
 
-  useEffect(() => {
-    fetchAlertes();
-  }, [tontineId, filter]);
-
-  const fetchAlertes = async () => {
+  const fetchAlertes = useCallback(async () => {
     setLoading(true);
     try {
-      const url = `/api/tontines/${tontineId}/alertes${filter !== 'all' ? `?status=${filter}` : ''}`;
-      const res = await fetch(url, { credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur chargement alertes');
-      
-      const data = await res.json();
+      const data = await alerteTontineApi.getByTontine(tontineId, {
+        statut: filter === 'all' ? undefined : filter
+      });
       setAlertes(data || []);
     } catch (error) {
-      console.error('Erreur chargement alertes:', error);
+      toast.error(handleApiError(error, 'Erreur chargement alertes'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [tontineId, filter]);
+
+  useEffect(() => {
+    fetchAlertes();
+  }, [fetchAlertes]);
 
   const handleResolveAlerte = async (alerteId: string) => {
     try {
-      const res = await fetch(`/api/tontine-alertes/${alerteId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statut: 'Résolue' }),
-        credentials: 'include'
-      });
-      
-      if (!res.ok) throw new Error('Erreur résolution alerte');
-      
+      await alerteTontineApi.resolve(alerteId);
+      toast.success('Alerte résolue');
       fetchAlertes();
     } catch (error) {
-      console.error('Erreur résolution alerte:', error);
+      toast.error(handleApiError(error, 'Erreur résolution alerte'));
     }
   };
 
   const handleIgnoreAlerte = async (alerteId: string) => {
     try {
-      const res = await fetch(`/api/tontine-alertes/${alerteId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statut: 'Ignorée' }),
-        credentials: 'include'
-      });
-      
-      if (!res.ok) throw new Error('Erreur ignorer alerte');
-      
+      await alerteTontineApi.ignore(alerteId);
+      toast.success('Alerte ignorée');
       fetchAlertes();
     } catch (error) {
-      console.error('Erreur ignorer alerte:', error);
+      toast.error(handleApiError(error, 'Erreur ignorer alerte'));
     }
   };
 
   const getPrioriteVariant = (priorite: string): 'danger' | 'warning' | 'info' | 'neutral' => {
-    switch (priorite) {
-      case 'Urgente': return 'danger';
-      case 'Haute': return 'warning';
-      case 'Normale': return 'info';
+    switch (priorite as PrioriteAlerteTontineType) {
+      case PrioriteAlerteTontine.URGENT: return 'danger';
+      case PrioriteAlerteTontine.HIGH: return 'warning';
+      case PrioriteAlerteTontine.NORMAL: return 'info';
       default: return 'neutral';
     }
   };
 
+  const getPrioriteLabel = (priorite: string): string => {
+    return PRIORITE_ALERTE_TONTINE_LABELS[priorite as PrioriteAlerteTontineType] || priorite;
+  };
+
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'retard_paiement': return <AlertTriangle size={18} />;
-      case 'echeance_proche': return <Clock size={18} />;
-      case 'distribution_due': return <Bell size={18} />;
-      case 'tour_complet': return <CheckCircle size={18} />;
-      case 'membre_inactif': return <Info size={18} />;
+    switch (type as TypeAlerteTontineType) {
+      case TypeAlerteTontine.PAYMENT_LATE: return <AlertTriangle size={18} />;
+      case TypeAlerteTontine.DEADLINE_NEAR: return <Clock size={18} />;
+      case TypeAlerteTontine.DISTRIBUTION_DUE: return <Bell size={18} />;
+      case TypeAlerteTontine.CYCLE_COMPLETE: return <CheckCircle size={18} />;
+      case TypeAlerteTontine.MEMBER_DROPOUT: return <Info size={18} />;
       default: return <Bell size={18} />;
     }
   };
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'retard_paiement': return 'Retard de paiement';
-      case 'echeance_proche': return 'Échéance proche';
-      case 'distribution_due': return 'Distribution requise';
-      case 'tour_complet': return 'Tour complété';
-      case 'membre_inactif': return 'Membre inactif';
-      default: return type;
-    }
+  const getTypeLabel = (type: string): string => {
+    return TYPE_ALERTE_TONTINE_LABELS[type as TypeAlerteTontineType] || type;
   };
 
-  const alertesActives = alertes.filter(a => a.statut === 'Active');
-  const alertesUrgentes = alertesActives.filter(a => a.priorite === 'Urgente');
+  const getStatutLabel = (statut: string): string => {
+    return STATUT_ALERTE_TONTINE_LABELS[statut as StatutAlerteTontineType] || statut;
+  };
+
+  const isAlertActive = (statut: string): boolean => {
+    return statut === StatutAlerteTontine.ACTIVE;
+  };
+
+  const isAlertResolved = (statut: string): boolean => {
+    return statut === StatutAlerteTontine.RESOLVED;
+  };
+
+  const isAlertUrgent = (priorite: string): boolean => {
+    return priorite === PrioriteAlerteTontine.URGENT;
+  };
+
+  const isAlertHigh = (priorite: string): boolean => {
+    return priorite === PrioriteAlerteTontine.HIGH;
+  };
+
+  const alertesActives = alertes.filter(a => isAlertActive(a.statut));
+  const alertesUrgentes = alertesActives.filter(a => isAlertUrgent(a.priorite));
+
+  // Tabs avec labels FR
+  const filterTabs = [
+    { key: 'all', label: 'Toutes' },
+    { key: StatutAlerteTontine.ACTIVE, label: STATUT_ALERTE_TONTINE_LABELS[StatutAlerteTontine.ACTIVE] },
+    { key: StatutAlerteTontine.RESOLVED, label: STATUT_ALERTE_TONTINE_LABELS[StatutAlerteTontine.RESOLVED] },
+  ];
 
   return (
     <div className="space-y-4">
@@ -128,12 +150,8 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
           </h3>
         </div>
 
-        <TabGroup 
-            tabs={[
-                { key: 'all', label: 'Toutes' },
-                { key: 'Active', label: 'Actives' },
-                { key: 'Résolue', label: 'Résolues' }
-            ]}
+        <TabGroup
+            tabs={filterTabs}
             activeTab={filter}
             onTabChange={(id) => setFilter(id as any)}
             variant="pills"
@@ -154,21 +172,21 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
       ) : (
         <div className="grid gap-3">
           {alertes.map((alerte) => (
-            <Card 
+            <Card
               key={alerte.id}
               className={`
                  p-4 border-l-4 transition-all
-                 ${alerte.priorite === 'Urgente' ? 'border-l-red-500 bg-red-900/10' : 
-                   alerte.priorite === 'Haute' ? 'border-l-amber-500 bg-amber-900/10' : 
+                 ${isAlertUrgent(alerte.priorite) ? 'border-l-red-500 bg-red-900/10' :
+                   isAlertHigh(alerte.priorite) ? 'border-l-amber-500 bg-amber-900/10' :
                    'border-l-cyan-500/50 bg-slate-800/50'}
-                 ${alerte.statut === 'Résolue' ? 'opacity-60 grayscale' : ''}
+                 ${isAlertResolved(alerte.statut) ? 'opacity-60 grayscale' : ''}
               `}
             >
               <div className="flex gap-4">
                 <div className={`
                     shrink-0 w-10 h-10 rounded-full flex items-center justify-center
-                    ${alerte.priorite === 'Urgente' ? 'bg-red-500/20 text-red-400' :
-                      alerte.priorite === 'Haute' ? 'bg-amber-500/20 text-amber-400' :
+                    ${isAlertUrgent(alerte.priorite) ? 'bg-red-500/20 text-red-400' :
+                      isAlertHigh(alerte.priorite) ? 'bg-amber-500/20 text-amber-400' :
                       'bg-cyan-500/20 text-cyan-400'}
                 `}>
                   {getTypeIcon(alerte.type_alerte)}
@@ -179,7 +197,7 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
                     <div>
                         <div className="flex items-center gap-2">
                              <span className="font-bold text-white text-sm">{getTypeLabel(alerte.type_alerte)}</span>
-                             <Badge variant={getPrioriteVariant(alerte.priorite)} value={alerte.priorite} className="text-[10px] py-0" />
+                             <Badge variant={getPrioriteVariant(alerte.priorite)} value={getPrioriteLabel(alerte.priorite)} className="text-[10px] py-0" />
                         </div>
                         <p className="text-sm text-slate-300 mt-1">{alerte.message}</p>
                     </div>
@@ -195,20 +213,20 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
                     </div>
                   )}
 
-                  {alerte.statut === 'Active' && (
+                  {isAlertActive(alerte.statut) && (
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50 justify-end">
-                         <IconButton 
-                            icon={Check} 
-                            onClick={() => handleResolveAlerte(alerte.id)} 
-                            size="sm" 
+                         <IconButton
+                            icon={Check}
+                            onClick={() => handleResolveAlerte(alerte.id)}
+                            size="sm"
                             className="bg-green-500/10 text-green-400 hover:bg-green-500/20"
                             aria-label="Résoudre"
                          />
-                         <IconButton 
-                            icon={X} 
-                            onClick={() => handleIgnoreAlerte(alerte.id)} 
+                         <IconButton
+                            icon={X}
+                            onClick={() => handleIgnoreAlerte(alerte.id)}
                             size="sm"
-                            className="bg-slate-700/50 text-slate-400 hover:bg-slate-700" 
+                            className="bg-slate-700/50 text-slate-400 hover:bg-slate-700"
                             aria-label="Ignorer"
                          />
                       </div>

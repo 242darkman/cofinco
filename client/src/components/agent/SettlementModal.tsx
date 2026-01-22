@@ -18,6 +18,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { v4 as uuidv4 } from 'uuid';
+import { StatutCaisse } from '@shared/enum/status-constants';
 
 interface SettlementModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
         caisseApi.getStatus(),
         caisseAgentApi.getCaisseSummary(agentId)
       ]);
-      setCaisses(caissesData.filter((c: any) => c.statut === 'Ouverte'));
+      setCaisses(caissesData.filter((c: any) => c.statut === StatutCaisse.OPEN));
       setAgentSummary(summary);
     } catch (error) {
        console.error('Erreur chargement données settlement:', error);

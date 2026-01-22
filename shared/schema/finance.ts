@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -65,51 +65,74 @@ export const insertCreditPlanSchema = createInsertSchema(creditPlans);
 export type UserCreditPlan = typeof creditPlans.$inferSelect;
 export type InsertCreditPlan = typeof creditPlans.$inferInsert;
 
-export const credits = pgTable("credits", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  numeroCredit: text("numero_credit").notNull().unique(),
-  clientId: uuid("client_id").notNull().references(() => clients.id),
-  demandeId: uuid("demande_id").references(() => demandesCredit.id), // Added for linking back to application (fees, etc)
-  enqueteId: uuid("enquete_id"),
-  montant: numeric("montant").notNull(),
-  taux: numeric("taux").notNull(),
-  duree: integer("duree").notNull(),
-  typeCredit: text("type_credit").notNull(),
-  objetCredit: text("objet_credit"),
-  statut: text("statut").notNull().default("En attente"),
-  dateDebut: timestamp("date_debut"),
-  dateFin: timestamp("date_fin"),
-  dateSolvabilite: timestamp("date_solvabilite"),
-  dateSolde: timestamp("date_solde"),
-  soldeAvant2Mois: boolean("solde_avant_2_mois").default(false),
-  soldeRestant: numeric("solde_restant"),
-  echeance: text("echeance").default("Journalier"),
-  
-  // Suivi des échéances
-  montantEcheance: numeric("montant_echeance"), // Montant à payer par période
-  prochaineEcheance: timestamp("prochaine_echeance"), // Date prochaine échéance
-  
-  garanties: text("garanties"),
-  observations: text("observations"),
-  agenceId: uuid("agence_id").references(() => agences.id), // Agence du crédit
-  
-  // Décaissement programmé
-  dateDecaissementProgramme: timestamp("date_decaissement_programme"),
-  decaissementAutomatique: boolean("decaissement_automatique").notNull().default(false),
-  dateDecaissementEffectif: timestamp("date_decaissement_effectif"),
-  decaissementTentatives: integer("decaissement_tentatives").notNull().default(0),
-  decaissementErreur: text("decaissement_erreur"),
-  
-  // Remboursement Automatique
-  remboursementAutomatique: boolean("remboursement_automatique").notNull().default(false),
-  remboursementCompteId: uuid("remboursement_compte_id").references(() => comptes.id), // Optionnel: Compte épargne ou autre, sinon compte courant
-  lastAutoRepaymentCheck: timestamp("last_auto_repayment_check"),
-  
-  createdBy: uuid("created_by"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  deletedAt: timestamp("deleted_at"), // Soft delete
-});
+export const credits = pgTable(
+  "credits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    numeroCredit: text("numero_credit").notNull().unique(),
+    clientId: uuid("client_id").notNull().references(() => clients.id),
+    demandeId: uuid("demande_id").references(() => demandesCredit.id), // Added for linking back to application (fees, etc)
+    enqueteId: uuid("enquete_id").references(() => enquetesCredit.id, { onDelete: "set null" }),
+    montant: numeric("montant").notNull(),
+    taux: numeric("taux").notNull(),
+    duree: integer("duree").notNull(),
+    typeCredit: text("type_credit").notNull(),
+    objetCredit: text("objet_credit"),
+    statut: statutCreditEnum("statut").notNull().default("PENDING"),
+    dateDebut: timestamp("date_debut"),
+    dateFin: timestamp("date_fin"),
+    dateSolvabilite: timestamp("date_solvabilite"),
+    dateSolde: timestamp("date_solde"),
+    soldeAvant2Mois: boolean("solde_avant_2_mois").default(false),
+    soldeRestant: numeric("solde_restant"),
+    echeance: text("echeance").default("DAILY"),
+
+    // Suivi des échéances
+    montantEcheance: numeric("montant_echeance"), // Montant à payer par période
+    prochaineEcheance: timestamp("prochaine_echeance"), // Date prochaine échéance
+
+    garanties: text("garanties"),
+    observations: text("observations"),
+    agenceId: uuid("agence_id").references(() => agences.id), // Agence du crédit
+
+    // Décaissement programmé
+    dateDecaissementProgramme: timestamp("date_decaissement_programme"),
+    decaissementAutomatique: boolean("decaissement_automatique").notNull().default(false),
+    dateDecaissementEffectif: timestamp("date_decaissement_effectif"),
+    decaissementTentatives: integer("decaissement_tentatives").notNull().default(0),
+    decaissementErreur: text("decaissement_erreur"),
+
+    // Remboursement Automatique
+    remboursementAutomatique: boolean("remboursement_automatique").notNull().default(false),
+    remboursementCompteId: uuid("remboursement_compte_id").references(() => comptes.id), // Optionnel: Compte épargne ou autre, sinon compte courant
+    lastAutoRepaymentCheck: timestamp("last_auto_repayment_check"),
+
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+    deletedAt: timestamp("deleted_at"), // Soft delete
+  },
+  (t) => ({
+    // Index pour recherche par client
+    idxClient: index("idx_credits_client_id").on(t.clientId),
+    // Index pour recherche par statut (très fréquent)
+    idxStatut: index("idx_credits_statut").on(t.statut),
+    // Index composite client + statut
+    idxClientStatut: index("idx_credits_client_statut").on(t.clientId, t.statut),
+    // Index pour l'agence
+    idxAgence: index("idx_credits_agence_id").on(t.agenceId),
+    // Index composite agence + statut
+    idxAgenceStatut: index("idx_credits_agence_statut").on(t.agenceId, t.statut),
+    // Index pour les échéances (automatisation remboursements)
+    idxProchaineEcheance: index("idx_credits_prochaine_echeance").on(t.prochaineEcheance),
+    // Index pour les décaissements programmés
+    idxDecaissementProgramme: index("idx_credits_decaissement_programme").on(t.dateDecaissementProgramme, t.decaissementAutomatique),
+    // Index pour les remboursements automatiques
+    idxRemboursementAuto: index("idx_credits_remboursement_auto").on(t.remboursementAutomatique),
+    // Index pour soft delete
+    idxDeletedAt: index("idx_credits_deleted_at").on(t.deletedAt),
+  }),
+);
 
 export const insertCreditSchema = createInsertSchema(credits).omit({ createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertCredit = z.infer<typeof insertCreditSchema>;
@@ -215,7 +238,7 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   capaciteRemboursement: numeric("capacite_remboursement"),
   scoreGlobal: integer("score_global"),
   recommandation: text("recommandation"),
-  statut: text("statut").notNull().default("En cours"),
+  statut: statutEnqueteCreditEnum("statut").notNull().default("PENDING"),
   observations: text("observations"),
 
   createdBy: uuid("created_by"),
@@ -248,7 +271,7 @@ export const remboursements = pgTable(
     dateRemboursement: timestamp("date_remboursement").notNull(),
 
     methodePaiement: methodePaiementEnum("methode_paiement"),
-    statut: statutTransactionEnum("statut").notNull().default("Posté"),
+    statut: statutTransactionEnum("statut").notNull().default("POSTED"),
 
     numeroTransaction: text("numero_transaction"),
     referenceExterne: text("reference_externe"),
@@ -332,7 +355,7 @@ export const mouvementsFinanciers = pgTable(
     montant: numeric("montant").notNull(),
     sens: sensMouvementEnum("sens").notNull(), // Débit / Crédit
 
-    statut: statutTransactionEnum("statut").notNull().default("Posté"),
+    statut: statutTransactionEnum("statut").notNull().default("POSTED"),
     methodePaiement: methodePaiementEnum("methode_paiement"),
 
     reference: text("reference").notNull(), // unique interne
@@ -421,7 +444,7 @@ export const comptes = pgTable(
     // Type comptable (règle “un seul par client”)
     typeCompte: typeCompteEnum("type_compte").notNull(),
 
-    statut: statutCompteEnum("statut").notNull().default("Actif"),
+    statut: statutCompteEnum("statut").notNull().default("ACTIVE"),
 
     // Blocage (utile même pour un compte non-bloqué “temporairement gelé”)
     blocageActif: boolean("blocage_actif").notNull().default(false),
@@ -546,7 +569,7 @@ export const versementsAutomatiques = pgTable(
 
     montant: numeric("montant").notNull(),
 
-    statut: text("statut").notNull(), // 'success', 'failed', 'pending'
+    statut: statutVersementAutoEnum("statut").notNull(),
 
     dateExecution: timestamp("date_execution"),
     datePlanifiee: timestamp("date_planifiee").notNull(),
@@ -577,13 +600,13 @@ export const virementsProgrammes = pgTable(
     compteDestId: uuid("compte_dest_id").notNull().references(() => comptes.id, { onDelete: "cascade" }),
 
     montant: numeric("montant").notNull(),
-    frequence: text("frequence").notNull(), // once | daily | weekly | monthly
+    frequence: frequenceVirementEnum("frequence").notNull(),
 
     prochaineExecution: timestamp("prochaine_execution"),
     actif: boolean("actif").notNull().default(true),
 
     dernierExecution: timestamp("dernier_execution"),
-    statutDernier: text("statut_dernier"),
+    statutDernier: statutAuditVirementEnum("statut_dernier"),
     erreurDerniere: text("erreur_derniere"),
 
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -602,6 +625,35 @@ export const insertVirementProgrammeSchema = createInsertSchema(virementsProgram
 export type InsertVirementProgramme = z.infer<typeof insertVirementProgrammeSchema>;
 export type VirementProgramme = typeof virementsProgrammes.$inferSelect;
 
+// Audit logs pour virements programmés
+export const virementsProgrammesAuditLogs = pgTable(
+  "virements_programmes_audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    virementId: uuid("virement_id").notNull().references(() => virementsProgrammes.id, { onDelete: "cascade" }),
+
+    statut: statutAuditVirementEnum("statut").notNull(),
+    message: text("message"),
+
+    executedAt: timestamp("executed_at").notNull().defaultNow(),
+    executionTimeMs: integer("execution_time_ms"),
+
+    metadata: jsonb("metadata"), // Détails supplémentaires (montant, soldes, etc.)
+
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+  },
+  (t) => ({
+    idxVirementId: index("idx_virement_audit_virement_id").on(t.virementId),
+    idxExecutedAt: index("idx_virement_audit_executed_at").on(t.executedAt),
+    idxStatut: index("idx_virement_audit_statut").on(t.statut),
+  }),
+);
+
+export const insertVirementAuditLogSchema = createInsertSchema(virementsProgrammesAuditLogs).omit({ id: true });
+export type InsertVirementAuditLog = z.infer<typeof insertVirementAuditLogSchema>;
+export type VirementAuditLog = typeof virementsProgrammesAuditLogs.$inferSelect;
+
 // Historique des décaissements programmés
 export const decaissementsProgrammes = pgTable(
   "decaissements_programmes",
@@ -609,10 +661,10 @@ export const decaissementsProgrammes = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
 
     creditId: uuid("credit_id").notNull().references(() => credits.id, { onDelete: "cascade" }),
-    
+
     montant: numeric("montant").notNull(),
 
-    statut: text("statut").notNull(), // 'success', 'failed', 'pending'
+    statut: statutDecaissementProgEnum("statut").notNull(),
 
     dateExecution: timestamp("date_execution"),
     datePlanifiee: timestamp("date_planifiee").notNull(),
@@ -655,7 +707,7 @@ export const transactionsCompte = pgTable(
     // Unification : même enum partout (terrain/caisse/crédit/tontine/compte)
     typePaiement: typePaiementTerrainEnum("type_paiement").notNull(),
 
-    statut: statutTransactionEnum("statut").notNull().default("Posté"),
+    statut: statutTransactionEnum("statut").notNull().default("POSTED"),
 
     montant: numeric("montant").notNull(),
 
@@ -664,7 +716,7 @@ export const transactionsCompte = pgTable(
 
     methodePaiement: methodePaiementEnum("methode_paiement")
       .notNull()
-      .default("Espèces"),
+      .default("CASH"),
 
     referenceExterne: text("reference_externe"),
     idempotencyKey: text("idempotency_key"),
@@ -712,11 +764,11 @@ export const plansEpargne = pgTable(
     dateDebut: timestamp("date_debut").notNull(),
     dateFin: timestamp("date_fin").notNull(),
 
-    statut: text("statut").notNull().default("Actif"),
+    statut: statutPlanEpargneEnum("statut").notNull().default("ACTIVE"),
     observations: text("observations"),
 
-    // Optionnel : pour uniformiser le “sens” des versements
-    typePaiement: typePaiementTerrainEnum("type_paiement").default("Dépôt Épargne"),
+    // Optionnel : pour uniformiser le "sens" des versements
+    typePaiement: typePaiementTerrainEnum("type_paiement").default("DEPOSIT_SAVINGS"),
 
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -749,7 +801,7 @@ export const objectifsEpargne = pgTable(
     dateCible: timestamp("date_cible").notNull(),
     description: text("description"),
 
-    statut: text("statut").notNull().default("En cours"),
+    statut: statutObjectifEpargneEnum("statut").notNull().default("IN_PROGRESS"),
     actif: boolean("actif").notNull().default(true),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -771,9 +823,9 @@ export const caisses = pgTable("caisses", {
   id: uuid("id").primaryKey().defaultRandom(),
   nom: text("nom").notNull(),
   agenceId: uuid("agence_id").notNull().references(() => agences.id),
-  type: text("type").notNull().default("Physique"), // 'Physique', 'Coffre-Fort', 'Virtuelle'
+  type: text("type").notNull().default("PHYSICAL"), // 'PHYSICAL'
   solde: numeric("solde").notNull().default("0"),
-  statut: text("statut").notNull().default("Fermée"), // 'Ouverte', 'Fermée'
+  statut: statutCaisseMainEnum("statut").notNull().default("CLOSED"),
   // Optional: link to a specific device or location?
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -789,10 +841,11 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   caissierId: uuid("caissier_id").notNull().references(() => users.id),
   openedAt: timestamp("opened_at").defaultNow(),
   closedAt: timestamp("closed_at"),
-  soldeInitial: numeric("solde_initial").notNull().default("0"),
-  soldeTheorique: numeric("solde_theorique").notNull().default("0"),
-  soldeReel: numeric("solde_reel"),
+  montantOuverture: numeric("montant_ouverture").notNull().default("0"),
+  montantFermetureTheorique: numeric("montant_fermeture_theorique").notNull().default("0"),
+  montantFermetureDeclare: numeric("montant_fermeture_declare"),
   ecart: numeric("ecart"),
+  statut: statutSessionCaisseEnum("statut").notNull().default("OPEN"),
   observations: text("observations"),
   billetageOuverture: json("billetage_ouverture"),
   billetageFermeture: json("billetage_fermeture"),
@@ -832,10 +885,10 @@ export const operationsCaisse = pgTable(
     mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
 
     typeOperation: typeOperationCaisseEnum("type_operation").notNull(),
-    statut: statutTransactionEnum("statut").notNull().default("Posté"),
+    statut: statutTransactionEnum("statut").notNull().default("POSTED"),
 
     montant: numeric("montant").notNull(), // garde pour compat
-    methodePaiement: methodePaiementEnum("methode_paiement").notNull().default("Espèces"),
+    methodePaiement: methodePaiementEnum("methode_paiement").notNull().default("CASH"),
 
     reference: text("reference").notNull(),
     idempotencyKey: text("idempotency_key"),
@@ -845,6 +898,9 @@ export const operationsCaisse = pgTable(
 
     // Traçabilité de la vérification de présence du titulaire (pour retraits sans OTP)
     presenceVerification: jsonb("presence_verification"),
+
+    // Métadonnées additionnelles (chèques, virements, etc.)
+    metadata: jsonb("metadata"),
 
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -882,7 +938,7 @@ export const caisseTransferts = pgTable(
     agenceDestId: uuid("agence_dest_id").notNull().references(() => agences.id, { onDelete: "restrict" }),
 
     montant: numeric("montant").notNull(),
-    statut: statutTransfertCaisseEnum("statut").notNull().default("En attente"),
+    statut: statutTransfertCaisseEnum("statut").notNull().default("PENDING"),
 
     reference: text("reference").notNull(),
     idempotencyKey: text("idempotency_key"),
@@ -1011,7 +1067,7 @@ export const reevaluationsCredit = pgTable(
     documentsJoints: text("documents_joints").array(),
     
     // State and workflow
-    statut: statutReevaluationEnum("statut").notNull().default("Demandée"),
+    statut: statutReevaluationEnum("statut").notNull().default("REQUESTED"),
     
     // Eligibility
     eligibiliteValidee: boolean("eligibilite_validee"),
@@ -1113,10 +1169,10 @@ export const enquetesComplementaires = pgTable(
     recommandationEnqueteur: text("recommandation_enqueteur"), // Favorable, Défavorable, Réservé
     observationsEnqueteur: text("observations_enqueteur"),
     risquesIdentifies: text("risques_identifies").array(),
-    
+
     // Status
-    statut: text("statut").notNull().default("En cours"), // En cours, Terminée, Annulée
-    
+    statut: statutEnqueteComplementaireEnum("statut").notNull().default("IN_PROGRESS"),
+
     // Field agent
     enqueteurId: uuid("enqueteur_id").notNull().references(() => users.id),
     dateDebut: timestamp("date_debut").defaultNow(),
@@ -1269,10 +1325,10 @@ export const creditRefundRequests = pgTable(
     montantEncaisse: numeric("montant_encaisse").notNull(),
     montantRemboursable: numeric("montant_remboursable").notNull(),
     montantNonRemboursable: numeric("montant_non_remboursable").notNull(),
-    
+
     // Workflow State
-    statut: text("statut").notNull().default("DRAFT"), // DRAFT | SUBMITTED | APPROVED | REJECTED | PAID | CANCELLED
-    
+    statut: statutRefundRequestEnum("statut").notNull().default("DRAFT"),
+
     // Context
     motifRejetCredit: text("motif_rejet_credit"),
     motifRemboursement: text("motif_remboursement"),

@@ -17,7 +17,7 @@ interface HistoryItem {
     id: string;
     date: string;
     type: string;
-    sens: 'Débit' | 'Crédit';
+    sens: 'DEBIT' | 'CREDIT';
     montant: number;
     source_module: string;
     reference: string;
@@ -173,7 +173,7 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                     >
                         {/* Icon */}
                         <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                            item.sens === 'Crédit' ? 'bg-green-500/10' : 'bg-red-500/10'
+                            item.sens === 'CREDIT' ? 'bg-green-500/10' : 'bg-red-500/10'
                         }`}>
                             {getIcon(item.icon)}
                         </div>
@@ -197,9 +197,9 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                         {/* Amount */}
                         <div className="text-right shrink-0">
                             <p className={`text-sm font-bold ${
-                                item.sens === 'Crédit' ? 'text-green-400' : 'text-red-400'
+                                item.sens === 'CREDIT' ? 'text-green-400' : 'text-red-400'
                             }`}>
-                                {item.sens === 'Crédit' ? '+' : '-'}{item.montant.toLocaleString()} F
+                                {item.sens === 'CREDIT' ? '+' : '-'}{item.montant.toLocaleString()} F
                             </p>
                             <p className="text-[10px] text-slate-500 uppercase">
                                 {item.source_module}

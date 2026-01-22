@@ -1,16 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, DollarSign, AlertTriangle, Check, X, Trash2, Gavel, Scale, FileText, AlertCircle } from 'lucide-react';
+import { Plus, AlertTriangle, Check, X, Trash2, Gavel, Scale, FileText, AlertCircle } from 'lucide-react';
 import { Card, Badge, Button, IconButton, Modal, FormField, SelectField, EmptyState, TextareaField } from '../../ui';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { tontineRegleApi, tontinePenaliteApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { escapeHtml } from '../../../lib/sanitize';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
+import {
+  TypeRegleTontine,
+  TypeRegleTontineType,
+  TYPE_REGLE_TONTINE_LABELS,
+  TYPE_REGLE_TONTINE_OPTIONS,
+  StatutPenaliteTontine,
+  StatutPenaliteTontineType,
+  STATUT_PENALITE_TONTINE_LABELS,
+} from '@shared/enum/status-constants';
 
 interface TontineRegle {
   id: string;
   tontineId: string;
-  typeRegle: 'penalite_retard' | 'frais_adhesion' | 'frais_sortie' | 'amende';
+  typeRegle: string;
   montantPenalite: string | number;
   description: string;
   actif: boolean;
@@ -19,9 +27,9 @@ interface TontineRegle {
 interface TontinePenalite {
   id: string;
   montant: string | number;
-  motif: string; // Changed from raison to motif to match schema
-  statut: 'En attente' | 'Payée' | 'Annulée';
-  dateFaute: string; // Changed from date_application
+  motif: string;
+  statut: string;
+  dateFaute: string;
   datePaiement: string | null;
   tontine_membres: {
     clients: {
@@ -34,6 +42,7 @@ interface TontineReglesProps {
   tontineId: string;
 }
 
+
 export default function TontineRegles({ tontineId }: TontineReglesProps) {
   // Confirmation dialog hook
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
@@ -43,16 +52,11 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
-    typeRegle: 'penalite_retard' as 'penalite_retard' | 'frais_adhesion' | 'frais_sortie' | 'amende',
+    typeRegle: TypeRegleTontine.LATE_PENALTY as TypeRegleTontineType,
     montant: 0,
     description: ''
   });
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    fetchRegles();
-    fetchPenalites();
-  }, [tontineId]);
 
   const fetchRegles = useCallback(async () => {
     try {
@@ -75,6 +79,11 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
     }
   }, [tontineId]);
 
+  useEffect(() => {
+    fetchRegles();
+    fetchPenalites();
+  }, [fetchRegles, fetchPenalites]);
+
   const handleAddRegle = useCallback(async () => {
     setSubmitting(true);
     try {
@@ -82,12 +91,13 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
         tontineId: tontineId,
         typeRegle: formData.typeRegle,
         montantPenalite: formData.montant,
-        description: formData.description
+        description: formData.description,
+        idempotencyKey: crypto.randomUUID(),
       });
 
       setShowAddForm(false);
       setFormData({
-        typeRegle: 'penalite_retard',
+        typeRegle: TypeRegleTontine.LATE_PENALTY,
         montant: 0,
         description: ''
       });
@@ -111,9 +121,10 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
   }, [fetchRegles]);
 
   const handleDeleteRegle = useCallback((regle: TontineRegle) => {
+    const typeLabel = getTypeLabel(regle.typeRegle);
     openConfirm({
       title: 'Supprimer cette règle ?',
-      message: `Êtes-vous sûr de vouloir supprimer la règle "${getTypeLabel(regle.typeRegle)}" ? Cette action est irréversible.`,
+      message: `Êtes-vous sûr de vouloir supprimer la règle "${typeLabel}" ? Cette action est irréversible.`,
       variant: 'danger',
       confirmText: 'Supprimer',
       onConfirm: async () => {
@@ -131,7 +142,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
   const handleMarquerPenalitePaye = useCallback(async (penaliteId: string) => {
     try {
       await tontinePenaliteApi.update(penaliteId, {
-        statut: 'Payée',
+        statut: StatutPenaliteTontine.PAID,
         date_paiement: new Date().toISOString()
       });
       fetchPenalites();
@@ -141,35 +152,52 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
     }
   }, [fetchPenalites]);
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'penalite_retard': return 'Pénalité de retard';
-      case 'frais_adhesion': return 'Frais d\'adhésion';
-      case 'frais_sortie': return 'Frais de sortie';
-      case 'amende': return 'Amende';
-      default: return type;
-    }
+  const getTypeLabel = (type: string): string => {
+    return TYPE_REGLE_TONTINE_LABELS[type as TypeRegleTontineType] || type;
   };
 
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'penalite_retard': return <AlertTriangle size={24} />;
-      case 'frais_adhesion': return <FileText size={24} />;
-      case 'frais_sortie': return <X size={24} />;
-      case 'amende': return <Gavel size={24} />;
+    switch (type as TypeRegleTontineType) {
+      case TypeRegleTontine.LATE_PENALTY: return <AlertTriangle size={24} />;
+      case TypeRegleTontine.MEMBERSHIP_FEE: return <FileText size={24} />;
+      case TypeRegleTontine.EXIT_FEE: return <X size={24} />;
+      case TypeRegleTontine.FINE: return <Gavel size={24} />;
       default: return <Scale size={24} />;
     }
   };
 
-  const regleOptions = [
-    { value: 'penalite_retard', label: 'Pénalité de retard' },
-    { value: 'frais_adhesion', label: 'Frais d\'adhésion' },
-    { value: 'frais_sortie', label: 'Frais de sortie' },
-    { value: 'amende', label: 'Amende' }
-  ];
+  const getTypeColor = (type: string): string => {
+    switch (type as TypeRegleTontineType) {
+      case TypeRegleTontine.LATE_PENALTY: return 'bg-orange-500/10 text-orange-400';
+      case TypeRegleTontine.MEMBERSHIP_FEE: return 'bg-blue-500/10 text-blue-400';
+      case TypeRegleTontine.EXIT_FEE: return 'bg-purple-500/10 text-purple-400';
+      case TypeRegleTontine.FINE: return 'bg-red-500/10 text-red-400';
+      default: return 'bg-slate-500/10 text-slate-400';
+    }
+  };
+
+  const getStatutPenaliteLabel = (statut: string): string => {
+    return STATUT_PENALITE_TONTINE_LABELS[statut as StatutPenaliteTontineType] || statut;
+  };
+
+  const getStatutPenaliteColor = (statut: string): string => {
+    switch (statut as StatutPenaliteTontineType) {
+      case StatutPenaliteTontine.PAID: return 'text-green-400';
+      case StatutPenaliteTontine.CANCELLED:
+      case StatutPenaliteTontine.WAIVED: return 'text-slate-400';
+      default: return 'text-red-400';
+    }
+  };
+
+  const isPenalitePending = (statut: string): boolean => {
+    return statut === StatutPenaliteTontine.PENDING;
+  };
+
+  // Options pour le select avec labels FR
+  const regleOptions = TYPE_REGLE_TONTINE_OPTIONS;
 
   const totalPenalitesEnAttente = penalites
-    .filter(p => p.statut === 'En attente')
+    .filter(p => isPenalitePending(p.statut))
     .reduce((sum, p) => sum + Number(p.montant), 0);
 
   return (
@@ -185,9 +213,9 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                    </h3>
                    <p className="text-slate-400 text-sm mt-1">Gérez les pénalités et frais de cette tontine</p>
                 </div>
-                <Button 
-                    size="sm" 
-                    icon={Plus} 
+                <Button
+                    size="sm"
+                    icon={Plus}
                     onClick={() => setShowAddForm(true)}
                     variant="primary"
                     className="shadow-lg shadow-cyan-500/20"
@@ -197,7 +225,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
             </div>
 
             {regles.length === 0 ? (
-                <EmptyState 
+                <EmptyState
                     icon={Scale}
                     title="Aucune règle définie"
                     description="Commencez par ajouter des règles pour encadrer votre tontine (retards, absences, etc.)"
@@ -209,11 +237,11 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
             ) : (
                 <div className="grid sm:grid-cols-2 gap-4">
                     {regles.map((regle) => (
-                        <Card 
-                            key={regle.id} 
+                        <Card
+                            key={regle.id}
                             className={`relative overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl ${
-                                regle.actif 
-                                ? 'border-cyan-500/30 bg-slate-800/80 hover:border-cyan-500/50' 
+                                regle.actif
+                                ? 'border-cyan-500/30 bg-slate-800/80 hover:border-cyan-500/50'
                                 : 'border-slate-700 bg-slate-800/40 opacity-75 grayscale-[0.5]'
                             }`}
                         >
@@ -229,12 +257,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                             <div className="p-5 space-y-4">
                                 {/* Header & Icon */}
                                 <div className="flex justify-between items-start">
-                                    <div className={`p-3 rounded-2xl ${
-                                        regle.typeRegle === 'penalite_retard' ? 'bg-orange-500/10 text-orange-400' :
-                                        regle.typeRegle === 'frais_adhesion' ? 'bg-blue-500/10 text-blue-400' :
-                                        regle.typeRegle === 'frais_sortie' ? 'bg-purple-500/10 text-purple-400' :
-                                        'bg-red-500/10 text-red-400'
-                                    }`}>
+                                    <div className={`p-3 rounded-2xl ${getTypeColor(regle.typeRegle)}`}>
                                         {getTypeIcon(regle.typeRegle)}
                                     </div>
                                     <div className="flex gap-1">
@@ -244,8 +267,8 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                                             icon={regle.actif ? X : Check}
                                             onClick={() => handleToggleRegle(regle)}
                                             className={`rounded-full w-8 h-8 ${
-                                                regle.actif 
-                                                ? 'hover:bg-amber-500/20 hover:text-amber-400 text-slate-400' 
+                                                regle.actif
+                                                ? 'hover:bg-amber-500/20 hover:text-amber-400 text-slate-400'
                                                 : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
                                             }`}
                                             title={regle.actif ? "Désactiver" : "Activer"}
@@ -333,15 +356,12 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                                 <div className="flex justify-between items-start gap-3 mb-2">
                                     <div className="font-medium text-white text-sm">{penalite.tontine_membres.clients.nom}</div>
                                     <div className="text-right">
-                                         <span className={`text-sm font-bold ${
-                                            penalite.statut === 'Payée' ? 'text-green-400' : 
-                                            penalite.statut === 'Annulée' ? 'text-slate-400' : 'text-red-400'
-                                         }`}>
+                                         <span className={`text-sm font-bold ${getStatutPenaliteColor(penalite.statut)}`}>
                                             {Number(penalite.montant).toLocaleString()} F
                                          </span>
                                     </div>
                                 </div>
-                                
+
                                 <div className="flex items-center justify-between text-xs">
                                      <div className="text-slate-500">{penalite.motif}</div>
                                      <div className="text-slate-600">
@@ -349,7 +369,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                                      </div>
                                 </div>
 
-                                {penalite.statut === 'En attente' && (
+                                {isPenalitePending(penalite.statut) && (
                                     <div className="mt-3 text-right">
                                         <Button
                                             size="sm"
@@ -379,9 +399,9 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                    <Button variant="ghost" onClick={() => setShowAddForm(false)} disabled={submitting}>
                      Annuler
                    </Button>
-                   <Button 
-                     variant="primary" 
-                     onClick={handleAddRegle} 
+                   <Button
+                     variant="primary"
+                     onClick={handleAddRegle}
                      disabled={formData.montant <= 0 || submitting}
                      isLoading={submitting}
                      icon={Check}
@@ -397,11 +417,11 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                     name="typeRegle"
                     options={regleOptions}
                     value={formData.typeRegle}
-                    onChange={(e) => setFormData(prev => ({ ...prev, typeRegle: e.target.value as any }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, typeRegle: e.target.value as TypeRegleTontineType }))}
                 />
-                
-                <FormField 
-                    label="Montant (FCFA)" 
+
+                <FormField
+                    label="Montant (FCFA)"
                     name="montant"
                     type="number"
                     min="0"
@@ -409,7 +429,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                     onChange={(e) => setFormData(prev => ({ ...prev, montant: Number(e.target.value) }))}
                 />
 
-                <TextareaField 
+                <TextareaField
                     label="Description (Optionnel)"
                     name="description"
                     value={formData.description}

@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, numeric, boolean, timestamp, uuid, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { clients } from "./clients";
@@ -15,7 +15,7 @@ export const documents = pgTable("documents", {
   chemin: text("chemin").notNull(), 
   objectPath: text("object_path"), 
   parentId: uuid("parent_id"), 
-  categorie: text("categorie").notNull().default("general"), 
+  categorie: text("categorie").notNull().default("GENERAL"), 
   referenceId: uuid("reference_id"), 
   referenceType: text("reference_type"), 
   visibilite: text("visibilite").notNull().default("prive"), 
@@ -36,7 +36,7 @@ export const logeSettings = pgTable("loge_settings", {
   quotaUtilise: bigint("quota_utilise", { mode: "number" }).default(0),
   retentionJours: integer("retention_jours").default(365), 
   sauvegardeAuto: boolean("sauvegarde_auto").default(true),
-  frequenceSauvegarde: text("frequence_sauvegarde").default("daily"),
+  frequenceSauvegarde: text("frequence_sauvegarde").default("DAILY"),
   compressionEnabled: boolean("compression_enabled").default(true),
   encryptionEnabled: boolean("encryption_enabled").default(true),
   logePasswordRequired: boolean("loge_password_required").default(true), 
@@ -48,33 +48,6 @@ export const insertLogeSettingsSchema = createInsertSchema(logeSettings).omit({ 
 export type InsertLogeSettings = z.infer<typeof insertLogeSettingsSchema>;
 export type LogeSettings = typeof logeSettings.$inferSelect;
 
-// Employes - HR Employee management
-export const employes = pgTable("employes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  matricule: text("matricule").notNull().unique(),
-  nom: text("nom").notNull(),
-  prenom: text("prenom").notNull(),
-  email: text("email"),
-  phone: text("phone"),
-  dateNaissance: text("date_naissance"),
-  sexe: text("sexe").notNull().default("M"),
-  adresse: text("adresse"),
-  ville: text("ville"),
-  dateEmbauche: text("date_embauche").notNull(),
-  departement: text("departement"),
-  poste: text("poste").notNull(),
-  typeContrat: text("type_contrat").notNull().default("CDI"),
-  salaireBase: numeric("salaire_base").notNull().default("0"),
-  numeroCnss: text("numero_cnss"),
-  statut: text("statut").notNull().default("Actif"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const insertEmployeSchema = createInsertSchema(employes).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertEmploye = z.infer<typeof insertEmployeSchema>;
-export type Employe = typeof employes.$inferSelect;
-
 // Portefeuilles Bourse
 export const portefeuillesBourse = pgTable("portefeuilles_bourse", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -85,7 +58,7 @@ export const portefeuillesBourse = pgTable("portefeuilles_bourse", {
   valeurTotale: numeric("valeur_totale").notNull().default("0"),
   gainPerte: numeric("gain_perte").notNull().default("0"),
   gainPertePercent: numeric("gain_perte_percent").notNull().default("0"),
-  statut: text("statut").notNull().default("actif"), 
+  statut: text("statut").notNull().default("ACTIVE"), 
   profilRisque: text("profil_risque").default("modere"), 
   objectifInvestissement: text("objectif_investissement"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -124,7 +97,7 @@ export const ordresBourse = pgTable("ordres_bourse", {
   id: uuid("id").primaryKey().defaultRandom(),
   portefeuilleId: uuid("portefeuille_id").references(() => portefeuillesBourse.id).notNull(),
   type: text("type").notNull(), 
-  typeOrdre: text("type_ordre").notNull().default("market"), 
+  typeOrdre: text("type_ordre").notNull().default("MARKET"), 
   symbole: text("symbole").notNull(),
   nom: text("nom").notNull(),
   quantite: numeric("quantite").notNull(),
@@ -134,7 +107,7 @@ export const ordresBourse = pgTable("ordres_bourse", {
   montantTotal: numeric("montant_total"),
   frais: numeric("frais").default("0"),
   devise: text("devise").notNull().default("USD"),
-  statut: text("statut").notNull().default("en_attente"), 
+  statut: text("statut").notNull().default("PENDING"), 
   motifAnnulation: text("motif_annulation"),
   dateExpiration: timestamp("date_expiration"),
   executionPartielle: boolean("execution_partielle").default(false),

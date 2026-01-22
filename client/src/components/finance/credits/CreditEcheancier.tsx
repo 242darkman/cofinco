@@ -5,6 +5,7 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import { escapeHtml } from '../../../lib/sanitize';
 import { SkeletonCard } from '../../ui/Skeleton';
+import { StatutCredit, StatutEcheanceCredit, STATUT_ECHEANCE_CREDIT_LABELS } from '@shared/enum/status-constants';
 
 interface Echeance {
   id: string;
@@ -41,7 +42,7 @@ export default function CreditEcheancier() {
     setLoading(true);
 
     try {
-      const credits = await creditApi.getAll({ statut: 'Actif', includeEcheances: true });
+      const credits = await creditApi.getAll({ statut: StatutCredit.ACTIVE, includeEcheances: true });
 
       let allEcheances: Echeance[] = [];
 
@@ -68,26 +69,26 @@ export default function CreditEcheancier() {
       let processedEcheances = allEcheances.map(ech => {
         const dateEch = new Date(ech.date_echeance);
         dateEch.setHours(0, 0, 0, 0);
-        const joursRetard = ech.statut === 'En attente' && dateEch < today
+        const joursRetard = ech.statut === StatutEcheanceCredit.UPCOMING && dateEch < today
           ? Math.floor((today.getTime() - dateEch.getTime()) / (1000 * 60 * 60 * 24))
           : 0;
 
         return {
           ...ech,
           jours_retard: joursRetard,
-          statut: joursRetard > 0 ? 'Retard' : ech.statut
+          statut: joursRetard > 0 ? StatutEcheanceCredit.LATE : ech.statut
         };
       });
 
       // Application des filtres
       if (filter === 'upcoming') {
         processedEcheances = processedEcheances.filter(e =>
-          e.statut === 'En attente' && new Date(e.date_echeance) >= today
+          e.statut === StatutEcheanceCredit.UPCOMING && new Date(e.date_echeance) >= today
         );
       } else if (filter === 'overdue') {
-        processedEcheances = processedEcheances.filter(e => e.statut === 'Retard');
+        processedEcheances = processedEcheances.filter(e => e.statut === StatutEcheanceCredit.LATE);
       } else if (filter === 'paid') {
-        processedEcheances = processedEcheances.filter(e => e.statut === 'Payé');
+        processedEcheances = processedEcheances.filter(e => e.statut === StatutEcheanceCredit.PAID);
       }
 
       // Filtre par période
@@ -125,7 +126,7 @@ export default function CreditEcheancier() {
 
   // Badge de statut mémorisé
   const getStatutBadge = useCallback((statut: string, joursRetard: number) => {
-    if (statut === 'Payé') {
+    if (statut === StatutEcheanceCredit.PAID) {
       return (
         <span
           className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-semibold"
@@ -135,7 +136,7 @@ export default function CreditEcheancier() {
         </span>
       );
     }
-    if (statut === 'Retard' || joursRetard > 0) {
+    if (statut === StatutEcheanceCredit.LATE || joursRetard > 0) {
       return (
         <span
           className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-semibold"
@@ -173,15 +174,15 @@ export default function CreditEcheancier() {
   // Statistiques mémorisées
   const stats = useMemo(() => ({
     total: echeances.length,
-    enAttente: echeances.filter(e => e.statut === 'En attente').length,
-    enRetard: echeances.filter(e => e.statut === 'Retard' || e.jours_retard > 0).length,
-    paye: echeances.filter(e => e.statut === 'Payé').length,
+    enAttente: echeances.filter(e => e.statut === StatutEcheanceCredit.UPCOMING).length,
+    enRetard: echeances.filter(e => e.statut === StatutEcheanceCredit.LATE || e.jours_retard > 0).length,
+    paye: echeances.filter(e => e.statut === StatutEcheanceCredit.PAID).length,
     montantTotal: echeances.reduce((sum, e) => sum + (e.montant_total || 0), 0),
     montantEnAttente: echeances
-      .filter(e => e.statut === 'En attente')
+      .filter(e => e.statut === StatutEcheanceCredit.UPCOMING)
       .reduce((sum, e) => sum + (e.montant_total || 0), 0),
     montantRetard: echeances
-      .filter(e => e.statut === 'Retard' || e.jours_retard > 0)
+      .filter(e => e.statut === StatutEcheanceCredit.LATE || e.jours_retard > 0)
       .reduce((sum, e) => sum + (e.montant_total || 0), 0)
   }), [echeances]);
 

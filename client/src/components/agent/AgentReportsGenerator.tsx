@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { requestAllPages } from '../../lib/api-client';
 import { FileText, Download, Calendar, Filter, TrendingUp, Users, Banknote, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { StatutVisiteTerrain, StatutValidationDepense } from '@shared/enum/status-constants';
 
 interface ReportData {
   presences: any[];
@@ -140,15 +141,15 @@ export default function AgentReportsGenerator() {
     lines.push('  4. VISITES TERRAIN');
     lines.push('───────────────────────────────────────────────────');
     lines.push(`Nombre de visites: ${reportData.visites.length}`);
-    lines.push(`Visites effectuées: ${reportData.visites.filter(v => v.statut === 'Effectuée').length}`);
-    lines.push(`Visites en cours: ${reportData.visites.filter(v => v.statut === 'En cours').length}`);
+    lines.push(`Visites effectuées: ${reportData.visites.filter(v => v.statut === StatutVisiteTerrain.COMPLETED).length}`);
+    lines.push(`Visites en cours: ${reportData.visites.filter(v => v.statut === StatutVisiteTerrain.IN_PROGRESS).length}`);
     lines.push('');
     lines.push('───────────────────────────────────────────────────');
     lines.push('  5. DÉPENSES DE TERRAIN');
     lines.push('───────────────────────────────────────────────────');
     lines.push(`Nombre de dépenses: ${reportData.depenses.length}`);
     lines.push(`Montant total: ${reportData.depenses.reduce((sum, d) => sum + d.montant, 0).toLocaleString()} FCFA`);
-    lines.push(`Dépenses validées: ${reportData.depenses.filter(d => d.statut_validation === 'Validée').length}`);
+    lines.push(`Dépenses validées: ${reportData.depenses.filter(d => d.statut_validation === StatutValidationDepense.VALIDATED).length}`);
     lines.push('');
     lines.push('═══════════════════════════════════════════════════');
     lines.push('               FIN DU RAPPORT');

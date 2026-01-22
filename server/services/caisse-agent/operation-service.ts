@@ -11,6 +11,7 @@ import {
   clients,
   caisses,
   users,
+  employes,
   type OperationTerrain,
   type CreateCollectCashInput,
   type CreateSettlementCashInput,
@@ -19,6 +20,7 @@ import {
 } from "@shared/schema";
 import { eq, and, isNull, desc, gte, lte, sql, count } from "drizzle-orm";
 import { caisseAgentService } from "./caisse-agent-service";
+import { StatutCaisseAgent } from "@shared/enum/status-constants";
 
 /**
  * Génère une référence unique pour une opération terrain
@@ -81,7 +83,7 @@ export class OperationService {
         caisseAgent = createResult.caisseAgent;
       }
 
-      if (caisseAgent.statut !== "Active") {
+      if (caisseAgent.statut !== StatutCaisseAgent.ACTIVE) {
         return {
           success: false,
           error: "Caisse agent inactive",
@@ -188,7 +190,7 @@ export class OperationService {
         };
       }
 
-      if (caisseAgent.statut !== "Active") {
+      if (caisseAgent.statut !== StatutCaisseAgent.ACTIVE) {
         return {
           success: false,
           error: "Caisse agent inactive",
@@ -362,14 +364,16 @@ export class OperationService {
       return null;
     }
 
-    // Récupérer les relations
+    // Récupérer les relations (agentsTerrain -> employes -> users pour nom/prenom)
     const [agentData] = await db
       .select({
         id: agentsTerrain.id,
-        nom: agentsTerrain.nom,
-        prenom: agentsTerrain.prenom,
+        nom: users.nom,
+        prenom: users.prenom,
       })
       .from(agentsTerrain)
+      .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+      .leftJoin(users, eq(employes.userId, users.id))
       .where(eq(agentsTerrain.id, operation.agentId));
 
     const agent = agentData ? {
@@ -380,13 +384,15 @@ export class OperationService {
 
     let client = null;
     if (operation.clientId) {
+      // Client identity (nom/prenom) is in users table via userId
       const [clientData] = await db
         .select({
           id: clients.id,
-          nom: clients.nom,
-          prenom: clients.prenom,
+          nom: users.nom,
+          prenom: users.prenom,
         })
         .from(clients)
+        .leftJoin(users, eq(clients.userId, users.id))
         .where(eq(clients.id, operation.clientId));
       client = clientData ? {
         ...clientData,
@@ -505,17 +511,21 @@ export class OperationService {
       .offset(filters.offset || 0);
 
     // Enrichir avec les relations (version simplifiée pour la liste)
+    // Note: agentsTerrain -> employes -> users pour nom/prenom
+    // Note: clients -> users pour nom/prenom
     const enrichedOperations = await Promise.all(
       operations.map(async (op) => {
         const [agentData] = await db
           .select({
             id: agentsTerrain.id,
-            nom: agentsTerrain.nom,
-            prenom: agentsTerrain.prenom,
+            nom: users.nom,
+            prenom: users.prenom,
           })
           .from(agentsTerrain)
+          .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+          .leftJoin(users, eq(employes.userId, users.id))
           .where(eq(agentsTerrain.id, op.agentId));
-        
+
         const agent = agentData ? {
           ...agentData,
           nom: agentData.nom || "",
@@ -527,10 +537,11 @@ export class OperationService {
           const [clientData] = await db
             .select({
               id: clients.id,
-              nom: clients.nom,
-              prenom: clients.prenom,
+              nom: users.nom,
+              prenom: users.prenom,
             })
             .from(clients)
+            .leftJoin(users, eq(clients.userId, users.id))
             .where(eq(clients.id, op.clientId));
           client = clientData ? {
             ...clientData,

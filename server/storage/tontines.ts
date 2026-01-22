@@ -5,10 +5,18 @@ import { type Tontine, type InsertTontine, type MembreTontine, type InsertMembre
     operationsCaisse
  } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, sql, getTableColumns } from "drizzle-orm";
+import { eq, desc, and, sql, getTableColumns, or } from "drizzle-orm";
 
 import { executeWithLedger, updateTontineSolde, updateSessionSolde, validateUserId } from "../services/ledger";
 import { createFactureForContributionTontine } from "./finance";
+import {
+  StatutCompte,
+  StatutMembreTontine,
+  StatutTransaction,
+  MethodePaiement,
+  METHODE_PAIEMENT_LABELS,
+  TypeDistributionTontine,
+} from "@shared/enum/status-constants";
 
 
 // Tontine Plans
@@ -57,13 +65,13 @@ export async function getTontine(id: string): Promise<any | undefined> {
         SELECT SUM(CAST(ct.montant AS NUMERIC))
         FROM contributions_tontine ct
         WHERE ct.tontine_id = tontines.id
-        AND ct.statut_transaction = 'Posté'
+        AND ct.statut_transaction = 'POSTED'
       ), 0)`.mapWith(Number)
     })
     .from(tontines)
     .leftJoin(membresTontine, and(
       eq(tontines.id, membresTontine.tontineId),
-      eq(membresTontine.statut, 'Actif')
+      eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
     ))
     .leftJoin(tontineDistributions, eq(tontines.id, tontineDistributions.tontineId))
     .where(eq(tontines.id, id))
@@ -84,13 +92,13 @@ export async function getAllTontines(filter: { agence?: string } = {}): Promise<
           SELECT SUM(CAST(ct.montant AS NUMERIC))
           FROM contributions_tontine ct
           WHERE ct.tontine_id = tontines.id
-          AND ct.statut_transaction = 'Posté'
+          AND ct.statut_transaction = 'POSTED'
         ), 0)`.mapWith(Number)
       })
       .from(tontines)
       .leftJoin(membresTontine, and(
           eq(tontines.id, membresTontine.tontineId),
-          eq(membresTontine.statut, 'Actif')
+          eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
       ))
       .leftJoin(tontineDistributions, eq(tontines.id, tontineDistributions.tontineId))
       .groupBy(tontines.id)
@@ -106,13 +114,13 @@ export async function getAllTontines(filter: { agence?: string } = {}): Promise<
               SELECT SUM(CAST(ct.montant AS NUMERIC))
               FROM contributions_tontine ct
               WHERE ct.tontine_id = tontines.id
-              AND ct.statut_transaction = 'Posté'
+              AND ct.statut_transaction = 'POSTED'
             ), 0)`.mapWith(Number)
         })
         .from(tontines)
         .leftJoin(membresTontine, and(
             eq(tontines.id, membresTontine.tontineId),
-            eq(membresTontine.statut, 'Actif')
+            eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
         ))
         .leftJoin(tontineDistributions, eq(tontines.id, tontineDistributions.tontineId))
         .leftJoin(users, eq(tontines.gestionnaireId, users.id))
@@ -191,7 +199,7 @@ export async function getMembresTontine(tontineId: string): Promise<any[]> {
         SELECT COUNT(*) FROM contributions_tontine ct
         WHERE ct.tontine_id = membres_tontine.tontine_id
         AND ct.client_id = membres_tontine.client_id
-        AND ct.statut_transaction = 'Posté'
+        AND ct.statut_transaction = 'POSTED'
       )`.mapWith(Number),
       // Calculer le total cotisé directement depuis les contributions (plus fiable)
       totalCotiseCalcule: sql<number>`COALESCE((
@@ -199,7 +207,7 @@ export async function getMembresTontine(tontineId: string): Promise<any[]> {
         FROM contributions_tontine ct
         WHERE ct.tontine_id = membres_tontine.tontine_id
         AND ct.client_id = membres_tontine.client_id
-        AND ct.statut_transaction = 'Posté'
+        AND ct.statut_transaction = 'POSTED'
       ), 0)`.mapWith(Number)
     })
     .from(membresTontine)
@@ -250,7 +258,7 @@ export async function getTontinesByClient(clientId: string): Promise<Array<Membr
     .innerJoin(tontines, eq(membresTontine.tontineId, tontines.id))
     .where(and(
       eq(membresTontine.clientId, clientId),
-      eq(membresTontine.statut, 'Actif')
+      eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
     ));
   return result as Array<MembreTontine & { tontine: Tontine }>;
 }
@@ -285,23 +293,18 @@ export async function getContributionsByTontine(tontineId: string): Promise<any[
 
   return rows.map(({ contributions_tontine, clients }) => {
     // Mapping des valeurs pour le frontend
-    let mode = 'Cash';
-    if (contributions_tontine.methodePaiement === 'Mobile Money') mode = 'Mobile Money';
-    else if (contributions_tontine.methodePaiement === 'Virement') mode = 'Virement';
-    else if (contributions_tontine.methodePaiement === 'Chèque') mode = 'Chèque';
-    
-    // Mapping du statut
-    let statut = 'Validée'; // Par défaut pour l'instant si "Posté"
-    if (contributions_tontine.statutTransaction === 'Pending') statut = 'En attente';
-    else if (contributions_tontine.statutTransaction === 'Annulé' || contributions_tontine.statutTransaction === 'Reversé') statut = 'Rejetée';
+    // Database stores English enum values (CASH, MOBILE_MONEY, TRANSFER, CHECK)
+    // Display French labels for the UI
+    const methodePaiement = contributions_tontine.methodePaiement;
+    const mode = METHODE_PAIEMENT_LABELS[methodePaiement as keyof typeof METHODE_PAIEMENT_LABELS] || METHODE_PAIEMENT_LABELS.CASH;
 
     return {
       ...contributions_tontine,
       client: clients,
-      // Alias for frontend compatibility 
+      // Alias for frontend compatibility
       date_contribution: contributions_tontine.createdAt,
       mode_paiement: mode,
-      statut: statut,
+      statut: contributions_tontine.statutTransaction, // Return EN enum value directly
       tour_numero: contributions_tontine.tourNumero || 1,
       // Ensure original fields are also available if needed by other components using snake_case alias middleware
       methode_paiement: contributions_tontine.methodePaiement,
@@ -334,7 +337,7 @@ export async function createContributionTontineWithLedger(
   sessionCaisseId?: string,
   userId?: string
 ): Promise<ContributionTontine> {
-  const isCash = data.methodePaiement === 'Espèces';
+  const isCash = data.methodePaiement === MethodePaiement.CASH;
 
   // If Cash, session is mandatory
   if (isCash && !sessionCaisseId) {
@@ -345,7 +348,7 @@ export async function createContributionTontineWithLedger(
     "TONTINE",
     {
       montant: data.montant.toString(),
-      sens: "Crédit", 
+      sens: "CREDIT", 
       sourceModule: "TONTINE",
       tontineId: data.tontineId,
       sessionCaisseId: isCash ? sessionCaisseId : undefined,
@@ -374,9 +377,9 @@ export async function createContributionTontineWithLedger(
         await tx.insert(operationsCaisse).values({
             sessionId: sessionCaisseId,
             mouvementId: mouvement.id,
-            typeOperation: "Ajustement" as any, 
+            typeOperation: "ADJUSTMENT" as any,
             montant: data.montant.toString(),
-            methodePaiement: "Espèces" as any,
+            methodePaiement: MethodePaiement.CASH,
             reference: `TON-IN-${data.reference}`,
             description: `Versement Tontine ref: ${data.reference}`,
             createdBy: validatedUserId
@@ -505,7 +508,7 @@ export async function getProchainBeneficiaire(tontineId: string): Promise<any | 
     .innerJoin(clients, eq(membresTontine.clientId, clients.id))
     .where(and(
       eq(membresTontine.tontineId, tontineId),
-      eq(membresTontine.statut, 'Actif'),
+      eq(membresTontine.statut, StatutMembreTontine.ACTIVE),
       eq(membresTontine.aRecuBenefice, false)
     ))
     .orderBy(membresTontine.position);
@@ -513,7 +516,7 @@ export async function getProchainBeneficiaire(tontineId: string): Promise<any | 
   if (eligibles.length === 0) return null;
 
   let selected;
-  if (tontine.typeDistribution === 'Ordre' || tontine.typeDistribution === 'Fixe') {
+  if (tontine.typeDistribution === TypeDistributionTontine.ORDER || tontine.typeDistribution === TypeDistributionTontine.FIXED) {
     // Premier membre selon la position
     selected = eligibles[0];
   } else {
@@ -533,17 +536,20 @@ export async function getProchainBeneficiaire(tontineId: string): Promise<any | 
  * et enregistre le résultat dans l'ordreDistribution de la tontine
  */
 export async function tirerProchainBeneficiaire(tontineId: string): Promise<any | null> {
-  // Get eligible members
+  // Get eligible members with user data for nom/prenom
   const eligibles = await db
     .select({
       membre: membresTontine,
-      client: clients
+      client: clients,
+      clientUserNom: sql<string>`client_users.nom`.as('client_user_nom'),
+      clientUserPrenom: sql<string>`client_users.prenom`.as('client_user_prenom'),
     })
     .from(membresTontine)
     .innerJoin(clients, eq(membresTontine.clientId, clients.id))
+    .leftJoin(sql`users as client_users`, sql`client_users.id = ${clients.userId}`)
     .where(and(
       eq(membresTontine.tontineId, tontineId),
-      eq(membresTontine.statut, 'Actif'),
+      eq(membresTontine.statut, StatutMembreTontine.ACTIVE),
       eq(membresTontine.aRecuBenefice, false)
     ));
 
@@ -563,13 +569,15 @@ export async function tirerProchainBeneficiaire(tontineId: string): Promise<any 
     .where(eq(tontines.id, tontineId));
 
   // Update ordre_distribution to track the draw
+  // Use nom from users table (via client_users join)
+  const clientNom = selected.clientUserNom || 'Client';
   const currentOrdre = (tontineInfo?.ordreDistribution as any[]) || [];
   const newOrdre = [
     ...currentOrdre,
     {
       tour: tontineInfo?.tourActuel || 1,
       membreId: selected.membre.id,
-      clientNom: selected.client.nom,
+      clientNom: clientNom,
       dateTirage: new Date().toISOString()
     }
   ];
@@ -580,7 +588,11 @@ export async function tirerProchainBeneficiaire(tontineId: string): Promise<any 
 
   return {
     ...selected.membre,
-    client: selected.client,
+    client: {
+      ...selected.client,
+      nom: selected.clientUserNom,
+      prenom: selected.clientUserPrenom,
+    },
     tour: tontineInfo?.tourActuel || 1
   };
 }
@@ -598,7 +610,7 @@ export async function getMembresEligiblesBenefice(tontineId: string): Promise<an
     .innerJoin(clients, eq(membresTontine.clientId, clients.id))
     .where(and(
       eq(membresTontine.tontineId, tontineId),
-      eq(membresTontine.statut, 'Actif'),
+      eq(membresTontine.statut, StatutMembreTontine.ACTIVE),
       eq(membresTontine.aRecuBenefice, false)
     ))
     .orderBy(membresTontine.position);
@@ -711,7 +723,7 @@ export async function createTontineDistribution(
       throw new Error("Membre introuvable dans cette tontine");
     }
 
-    if (membre.statut !== 'Actif') {
+    if (membre.statut !== StatutMembreTontine.ACTIVE) {
       throw new Error("Le membre n'est pas actif");
     }
 
@@ -749,7 +761,7 @@ export async function createTontineDistribution(
         tourNumero: data.tourNumero,
         montantTotal: data.montantTotal,
         dateDistribution: data.dateDistribution || new Date(),
-        modePaiement: data.modePaiement || 'ESPECES',
+        modePaiement: data.modePaiement || 'CASH',
         referencePaiement: data.referencePaiement,
         notes: data.notes
       })
@@ -859,7 +871,7 @@ export async function getDistributionStats(tontineId: string): Promise<{
   const [membreStats] = await db
     .select({
       membresAyantRecu: sql<number>`COUNT(*) FILTER (WHERE ${membresTontine.aRecuBenefice} = true)`.mapWith(Number),
-      membresEnAttente: sql<number>`COUNT(*) FILTER (WHERE ${membresTontine.aRecuBenefice} = false AND ${membresTontine.statut} = 'Actif')`.mapWith(Number)
+      membresEnAttente: sql<number>`COUNT(*) FILTER (WHERE ${membresTontine.aRecuBenefice} = false AND (${membresTontine.statut} = 'ACTIVE' OR ${membresTontine.statut} = 'ACTIVE'))`.mapWith(Number)
     })
     .from(membresTontine)
     .where(eq(membresTontine.tontineId, tontineId));

@@ -1,5 +1,5 @@
 import { db } from "../../db";
-import { caisses, configCoffreFort, users } from "@shared/schema";
+import { caisses, configCoffreFort, users, userRoles } from "@shared/schema";
 import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, and } from "drizzle-orm";
 import { validateTransition } from "./state-machine";
@@ -33,6 +33,11 @@ export class TransfertCoffreValidator {
       return { valid: false, error: "Utilisateur non trouvé" };
     }
 
+    // Get user's primary role from userRoles table (Architecture V3)
+    const [primaryRole] = await db.select({ role: userRoles.role })
+      .from(userRoles)
+      .where(and(eq(userRoles.userId, params.userId), eq(userRoles.isPrimary, true)));
+
     const [config] = await db.select()
       .from(configCoffreFort)
       .where(eq(configCoffreFort.agenceId, params.agenceId));
@@ -46,7 +51,7 @@ export class TransfertCoffreValidator {
       separationValideurExecuteur: false,
     };
 
-    const userRoleToken = this.normalizeRoleToken(user.role);
+    const userRoleToken = this.normalizeRoleToken(primaryRole?.role);
 
     switch (params.action) {
       case "create": {
@@ -66,7 +71,7 @@ export class TransfertCoffreValidator {
         if (!hasRole) {
           return { valid: false, error: "Vous n'avez pas le rôle requis pour valider" };
         }
-        if (effectiveConfig.separationInitiateurValideur && 
+        if (effectiveConfig.separationInitiateurValideur &&
             params.transfert?.requestedBy === params.userId) {
           return { valid: false, error: "Vous ne pouvez pas valider votre propre demande" };
         }
@@ -80,7 +85,7 @@ export class TransfertCoffreValidator {
         if (!hasRole) {
           return { valid: false, error: "Vous n'avez pas le rôle requis pour exécuter" };
         }
-        if (effectiveConfig.separationValideurExecuteur && 
+        if (effectiveConfig.separationValideurExecuteur &&
             params.transfert?.validatedBy === params.userId) {
           return { valid: false, error: "Le valideur ne peut pas exécuter le transfert" };
         }
@@ -88,7 +93,7 @@ export class TransfertCoffreValidator {
       }
 
       case "cancel": {
-        const isAdmin = isAdminRole(user.role);
+        const isAdmin = isAdminRole(primaryRole?.role);
         const isInitiator = params.transfert?.requestedBy === params.userId;
         if (!isAdmin && !isInitiator) {
           return { valid: false, error: "Seul l'initiateur ou un admin peut annuler" };

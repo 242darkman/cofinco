@@ -1,10 +1,24 @@
-import React, { useState, useCallback } from 'react';
-import { X, Save, AlertTriangle, Camera, Upload, User } from 'lucide-react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { X, Save, AlertTriangle, Upload, User, Users } from 'lucide-react';
 import { Employe, EmployeFormData } from '../../hooks/hr/useEmployes';
-import { Modal, FormField, SelectField, Button } from '../ui';
+import { Modal, FormField, SelectField, Button, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { StatutUser } from '@shared/enum/status-constants';
+
+// Patterns de validation
+const VALIDATION_PATTERNS = {
+  email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  phone: /^\+?[0-9]{8,15}$/, // Format international ou local (8-15 chiffres, + optionnel)
+  cnss: /^[A-Z0-9]{6,20}$/i, // Format alphanumérique (6-20 caractères)
+  matricule: /^[A-Z0-9-]{3,20}$/i, // Format alphanumérique avec tirets
+};
+
+// Âge minimum légal pour embauche (18 ans)
+const MIN_AGE_EMBAUCHE = 18;
+// Âge maximum réaliste (70 ans)
+const MAX_AGE_EMBAUCHE = 70;
 
 interface EmployeeFormProps {
   isOpen: boolean;
@@ -12,6 +26,7 @@ interface EmployeeFormProps {
   onSave: (data: EmployeFormData) => Promise<{ success: boolean; error?: string }>;
   editingEmploye: Employe | null;
   initialData: EmployeFormData;
+  allEmployes?: Employe[]; // Liste des employés pour sélection du manager
 }
 
 export default function EmployeeForm({
@@ -19,7 +34,8 @@ export default function EmployeeForm({
   onClose,
   onSave,
   editingEmploye,
-  initialData
+  initialData,
+  allEmployes = []
 }: EmployeeFormProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -30,9 +46,140 @@ export default function EmployeeForm({
   const [formData, setFormData] = useState<EmployeFormData>(initialData);
   const [saving, setSaving] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialData.photoProfile || null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
+
+  // Référence pour détecter les modifications non sauvegardées
+  const initialDataRef = useRef<string>(JSON.stringify(initialData));
+
+  // Détection des modifications non sauvegardées
+  const hasUnsavedChanges = useMemo(() => {
+    return JSON.stringify(formData) !== initialDataRef.current;
+  }, [formData]);
+
+  // Détection des références circulaires dans la hiérarchie
+  // Vérifie si sélectionner `potentialManagerId` créerait une boucle
+  const wouldCreateCircularReference = useCallback((potentialManagerId: string): boolean => {
+    if (!editingEmploye?.id) return false; // Nouvel employé, pas de risque
+
+    // Parcourir la chaîne hiérarchique du manager potentiel
+    let currentId: string | null | undefined = potentialManagerId;
+    const visited = new Set<string>();
+
+    while (currentId) {
+      if (currentId === editingEmploye.id) {
+        // Cercle détecté: le manager potentiel a l'employé actuel dans sa hiérarchie
+        return true;
+      }
+      if (visited.has(currentId)) {
+        // Boucle infinie détectée (données corrompues)
+        break;
+      }
+      visited.add(currentId);
+
+      // Trouver le manager du manager actuel
+      const currentEmp = allEmployes.find(e => e.id === currentId);
+      currentId = currentEmp?.managerId;
+    }
+
+    return false;
+  }, [allEmployes, editingEmploye?.id]);
+
+  // Liste des managers disponibles (exclure soi-même, les inactifs et ceux qui créeraient une boucle)
+  const availableManagers = useMemo(() => {
+    return allEmployes.filter(emp =>
+      emp.id !== editingEmploye?.id && // Ne peut pas être son propre manager
+      emp.statut === StatutUser.ACTIVE && // Seulement les employés actifs
+      !wouldCreateCircularReference(emp.id) // Pas de référence circulaire
+    ).map(emp => ({
+      value: emp.id,
+      label: `${emp.nom} ${emp.prenom} - ${emp.poste}`
+    }));
+  }, [allEmployes, editingEmploye?.id, wouldCreateCircularReference]);
+
+  // Fonction de validation
+  const validateForm = useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Validation email (optionnel mais doit être valide si renseigné)
+    if (formData.email && !VALIDATION_PATTERNS.email.test(formData.email)) {
+      errors.email = 'Format email invalide (ex: nom@domaine.com)';
+    }
+
+    // Validation téléphone (optionnel mais doit être valide si renseigné)
+    if (formData.phone) {
+      const cleanPhone = formData.phone.replace(/[\s.-]/g, ''); // Nettoyer espaces, points, tirets
+      if (!VALIDATION_PATTERNS.phone.test(cleanPhone)) {
+        errors.phone = 'Format téléphone invalide (8-15 chiffres, + optionnel)';
+      }
+    }
+
+    // Validation CNSS (optionnel mais doit être valide si renseigné)
+    if (formData.numeroCnss && !VALIDATION_PATTERNS.cnss.test(formData.numeroCnss)) {
+      errors.numeroCnss = 'Format CNSS invalide (6-20 caractères alphanumériques)';
+    }
+
+    // Validation matricule (obligatoire)
+    if (!formData.matricule || !VALIDATION_PATTERNS.matricule.test(formData.matricule)) {
+      errors.matricule = 'Matricule requis (3-20 caractères alphanumériques)';
+    }
+
+    // Validation salaire (doit être positif)
+    const salary = parseFloat(formData.salaireBase);
+    if (isNaN(salary) || salary < 0) {
+      errors.salaireBase = 'Salaire invalide (doit être un nombre positif)';
+    }
+
+    // Validation cohérence des dates
+    if (formData.dateNaissance && formData.dateEmbauche) {
+      const birthDate = new Date(formData.dateNaissance);
+      const hireDate = new Date(formData.dateEmbauche);
+      const today = new Date();
+
+      // Calcul de l'âge à l'embauche
+      const ageAtHire = Math.floor((hireDate.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+
+      // Vérifier que la date de naissance est dans le passé
+      if (birthDate >= today) {
+        errors.dateNaissance = 'La date de naissance doit être dans le passé';
+      }
+
+      // Vérifier que la date d'embauche n'est pas dans le futur lointain (max +1 mois)
+      const maxFutureHire = new Date();
+      maxFutureHire.setMonth(maxFutureHire.getMonth() + 1);
+      if (hireDate > maxFutureHire) {
+        errors.dateEmbauche = "La date d'embauche ne peut pas être trop éloignée dans le futur";
+      }
+
+      // Vérifier l'âge minimum légal
+      if (ageAtHire < MIN_AGE_EMBAUCHE) {
+        errors.dateNaissance = `L'employé doit avoir au moins ${MIN_AGE_EMBAUCHE} ans à l'embauche (actuellement: ${ageAtHire} ans)`;
+      }
+
+      // Vérifier l'âge maximum réaliste
+      if (ageAtHire > MAX_AGE_EMBAUCHE) {
+        errors.dateNaissance = `L'âge à l'embauche semble incorrect (${ageAtHire} ans)`;
+      }
+
+      // Vérifier que l'embauche est après la naissance
+      if (hireDate <= birthDate) {
+        errors.dateEmbauche = "La date d'embauche doit être après la date de naissance";
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [formData]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation avant soumission
+    if (!validateForm()) {
+      toast.error('Veuillez corriger les erreurs de validation');
+      return;
+    }
+
     setSaving(true);
 
     const result = await onSave(formData);
@@ -44,16 +191,33 @@ export default function EmployeeForm({
     } else {
       toast.error(result.error || 'Erreur lors de la sauvegarde');
     }
-  }, [formData, onSave, onClose]);
+  }, [formData, onSave, onClose, validateForm]);
 
-  const updateField = (field: keyof EmployeFormData, value: any) => {
+  const updateField = (field: keyof EmployeFormData, value: string | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  React.useEffect(() => {
+  // Mise à jour de la référence et reset du formulaire quand initialData change
+  useEffect(() => {
     setFormData(initialData);
-    setPhotoPreview(initialData.photoProfile || (editingEmploye as any)?.photoProfile || null);
+    setPhotoPreview(initialData.photoProfile || editingEmploye?.photoProfile || null);
+    initialDataRef.current = JSON.stringify(initialData);
+    setValidationErrors({});
   }, [initialData, editingEmploye]);
+
+  // Gestion de la fermeture avec confirmation si modifications non sauvegardées
+  const handleClose = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
+
+  const confirmClose = useCallback(() => {
+    setShowUnsavedConfirm(false);
+    onClose();
+  }, [onClose]);
 
   const { uploadFile, isUploading } = useMinIOUpload({
     path: 'employees',
@@ -83,9 +247,10 @@ export default function EmployeeForm({
   };
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={editingEmploye ? 'Modifier Employé' : 'Nouvel Employé'}
       size="lg"
     >
@@ -138,6 +303,8 @@ export default function EmployeeForm({
             value={formData.matricule}
             onChange={(e) => updateField('matricule', e.target.value)}
             required
+            pattern="[A-Za-z0-9-]{3,20}"
+            error={validationErrors.matricule}
           />
           
           <SelectField
@@ -176,6 +343,9 @@ export default function EmployeeForm({
             type="email"
             value={formData.email}
             onChange={(e) => updateField('email', e.target.value)}
+            pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+            error={validationErrors.email}
+            placeholder="nom@domaine.com"
           />
 
           <FormField
@@ -184,6 +354,9 @@ export default function EmployeeForm({
             type="tel"
             value={formData.phone}
             onChange={(e) => updateField('phone', e.target.value)}
+            pattern="\+?[0-9]{8,15}"
+            error={validationErrors.phone}
+            placeholder="+243 XXX XXX XXX"
           />
 
           <FormField
@@ -192,6 +365,7 @@ export default function EmployeeForm({
             type="date"
             value={formData.dateNaissance}
             onChange={(e) => updateField('dateNaissance', e.target.value)}
+            error={validationErrors.dateNaissance}
           />
 
           <FormField
@@ -201,6 +375,7 @@ export default function EmployeeForm({
             value={formData.dateEmbauche}
             onChange={(e) => updateField('dateEmbauche', e.target.value)}
             required
+            error={validationErrors.dateEmbauche}
           />
 
           <FormField
@@ -258,6 +433,8 @@ export default function EmployeeForm({
             value={formData.salaireBase}
             onChange={(e) => updateField('salaireBase', e.target.value)}
             required
+            min="0"
+            error={validationErrors.salaireBase}
           />
 
           <FormField
@@ -265,15 +442,51 @@ export default function EmployeeForm({
             name="numeroCnss"
             type="text"
             value={formData.numeroCnss}
-            onChange={(e) => updateField('numeroCnss', e.target.value)}
+            onChange={(e) => updateField('numeroCnss', e.target.value.toUpperCase())}
+            pattern="[A-Za-z0-9]{6,20}"
+            error={validationErrors.numeroCnss}
+            placeholder="Ex: CNSS123456"
           />
+        </div>
+
+        {/* Section Hiérarchie - Sélection du Supérieur */}
+        <div className="pt-4 border-t border-slate-700">
+          <div className="flex items-center gap-2 mb-4">
+            <Users size={18} className="text-indigo-400" />
+            <h4 className="text-sm font-semibold text-white">Rattachement Hiérarchique</h4>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <SelectField
+              label="Supérieur Hiérarchique (Manager)"
+              name="managerId"
+              value={formData.managerId || ''}
+              onChange={(e) => updateField('managerId', e.target.value || null)}
+              options={[
+                { value: '', label: '— Aucun (Niveau Direction) —' },
+                ...availableManagers
+              ]}
+              helperText="Sélectionnez le supérieur direct de cet employé pour l'organigramme"
+            />
+            {formData.managerId && (
+              <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-800/50 p-2 rounded-lg">
+                <User size={14} className="text-indigo-400" />
+                <span>
+                  Cet employé sera rattaché à{' '}
+                  <span className="text-indigo-300 font-medium">
+                    {availableManagers.find(m => m.value === formData.managerId)?.label || 'Manager sélectionné'}
+                  </span>
+                  {' '}dans l'organigramme
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
           <Button
             type="button"
             variant="secondary"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={saving}
           >
             <X size={18} />
@@ -297,5 +510,18 @@ export default function EmployeeForm({
         </div>
       </form>
     </Modal>
+
+    {/* Confirmation pour modifications non sauvegardées */}
+    <ConfirmDialog
+      isOpen={showUnsavedConfirm}
+      onClose={() => setShowUnsavedConfirm(false)}
+      onConfirm={confirmClose}
+      title="Modifications non sauvegardées"
+      message="Vous avez des modifications non sauvegardées. Êtes-vous sûr de vouloir quitter sans sauvegarder ?"
+      variant="warning"
+      confirmText="Quitter sans sauvegarder"
+      cancelText="Continuer l'édition"
+    />
+    </>
   );
 }

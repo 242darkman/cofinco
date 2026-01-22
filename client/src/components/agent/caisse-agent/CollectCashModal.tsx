@@ -10,6 +10,7 @@ import { X, Search, User, Wallet, FileText, MapPin, CreditCard, PiggyBank } from
 import { toast } from 'sonner';
 import { Modal, Button, FormField, SelectField, SearchableSelect } from '../../ui';
 import { caisseAgentApi, clientApi, creditApi, compteEpargneApi } from '../../../lib/api-client';
+import { StatutCredit, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
 
 interface CollectCashModalProps {
   agentId: string;
@@ -19,11 +20,26 @@ interface CollectCashModalProps {
 }
 
 const TYPE_PAIEMENT_OPTIONS = [
-  { value: 'Remboursement Crédit', label: 'Remboursement Crédit' },
-  { value: 'Dépôt Épargne', label: 'Dépôt Épargne' },
-  { value: 'Dépôt Courant', label: 'Dépôt Compte Courant' },
-  { value: 'Versement Tontine', label: 'Versement Tontine' },
-  { value: 'Frais Engagement', label: 'Frais Engagement Crédit' },
+  { 
+    value: TypeOperationTerrain.LOAN_REPAYMENT, 
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.LOAN_REPAYMENT] 
+  },
+  { 
+    value: TypeOperationTerrain.SAVINGS_DEPOSIT, 
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.SAVINGS_DEPOSIT] 
+  },
+  { 
+    value: TypeOperationTerrain.DEPOSIT_CURRENT, 
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.DEPOSIT_CURRENT] 
+  },
+  { 
+    value: TypeOperationTerrain.TONTINE_CONTRIBUTION, 
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.TONTINE_CONTRIBUTION] 
+  },
+  { 
+    value: TypeOperationTerrain.ENGAGEMENT_FEE, 
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.ENGAGEMENT_FEE] 
+  },
 ];
 
 export default function CollectCashModal({
@@ -80,7 +96,7 @@ export default function CollectCashModal({
           creditApi.getByClient(selectedClientId),
           compteEpargneApi.getByClient(selectedClientId)
         ]);
-        setClientCredits(credits?.filter((c: any) => c.statut === 'Actif' || c.statut === 'En retard') || []);
+        setClientCredits(credits?.filter((c: any) => c.statut === StatutCredit.ACTIVE || c.statut === StatutCredit.LATE) || []);
         setClientComptes(comptes || []);
       } catch (error) {
         console.error('Erreur chargement données client:', error);
@@ -120,12 +136,12 @@ export default function CollectCashModal({
     }
 
     // Validation selon le type de paiement
-    if (typePaiement === 'Remboursement Crédit' && !creditId) {
+    if (typePaiement === TypeOperationTerrain.LOAN_REPAYMENT && !creditId) {
       toast.error('Veuillez sélectionner le crédit');
       return;
     }
 
-    if ((typePaiement === 'Dépôt Épargne' || typePaiement === 'Dépôt Courant') && !compteId) {
+    if ((typePaiement === TypeOperationTerrain.SAVINGS_DEPOSIT || typePaiement === TypeOperationTerrain.DEPOSIT_CURRENT) && !compteId) {
       toast.error('Veuillez sélectionner le compte');
       return;
     }
@@ -143,7 +159,7 @@ export default function CollectCashModal({
         observations: observations || undefined,
         latitude,
         longitude,
-        idempotencyKey: `collect_${agentId}_${Date.now()}`
+        idempotencyKey: crypto.randomUUID()
       });
 
       onSuccess();
@@ -209,7 +225,7 @@ export default function CollectCashModal({
         />
 
         {/* Credit selection (si remboursement) */}
-        {typePaiement === 'Remboursement Crédit' && selectedClientId && (
+        {typePaiement === TypeOperationTerrain.LOAN_REPAYMENT && selectedClientId && (
           <SelectField
             label="Crédit concerné"
             name="creditId"
@@ -226,7 +242,7 @@ export default function CollectCashModal({
         )}
 
         {/* Compte selection (si dépôt) */}
-        {(typePaiement === 'Dépôt Épargne' || typePaiement === 'Dépôt Courant') && selectedClientId && (
+        {(typePaiement === TypeOperationTerrain.SAVINGS_DEPOSIT || typePaiement === TypeOperationTerrain.DEPOSIT_CURRENT) && selectedClientId && (
           <SelectField
             label="Compte concerné"
             name="compteId"

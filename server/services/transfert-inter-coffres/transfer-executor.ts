@@ -10,6 +10,11 @@ import {
   mouvementsFinanciers,
 } from "@shared/schema";
 import { generateReference } from "../ledger";
+import {
+  TypeTacheRegularisation,
+  StatutTacheRegularisation,
+  Priorite,
+} from "@shared/enum/status-constants";
 
 // ============================================================================
 // TYPES ET ERREURS PERSONNALISÉES
@@ -189,9 +194,9 @@ export async function executeDispatch(
         );
       }
 
-      if (transfert.statut !== "Approuvé N2") {
-        // Si déjà "En transit", c'est une demande dupliquée
-        if (transfert.statut === "En transit" || transfert.statut === "Reçu" || transfert.statut === "Reçu avec écart") {
+      if (transfert.statut !== "APPROVED_L2") {
+        // Si déjà "IN_TRANSIT", c'est une demande dupliquée
+        if (transfert.statut === "IN_TRANSIT" || transfert.statut === "RECEIVED" || transfert.statut === "RECEIVED_WITH_DISCREPANCY") {
           throw new TransfertAlreadyProcessedError(
             `Ce transfert a déjà été dispatché (statut actuel: ${transfert.statut})`,
             transfertId
@@ -242,11 +247,11 @@ export async function executeDispatch(
         .insert(mouvementsFinanciers)
         .values({
           montant: transfert.montant,
-          sens: "Crédit", // Sortie = Crédit (diminution)
+          sens: "CREDIT", // Sortie = Crédit (diminution)
           reference: referenceSource,
           sourceModule: "TRANSFERT",
           agenceId: coffreSource.owner_id as string | null,
-          statut: "Posté",
+          statut: "POSTED",
           dateOperation: new Date(),
           metadata: {
             transfertInterCoffreId: transfertId,
@@ -271,7 +276,7 @@ export async function executeDispatch(
       const updateResult = await tx
         .update(transfertsInterCoffres)
         .set({
-          statut: "En transit",
+          statut: "IN_TRANSIT",
           dispatchedBy: userId,
           dispatchedAt: now,
           mouvementSourceId: mouvementSource.id,
@@ -282,7 +287,7 @@ export async function executeDispatch(
         .where(
           and(
             eq(transfertsInterCoffres.id, transfertId),
-            eq(transfertsInterCoffres.statut, "Approuvé N2") // Double vérification
+            eq(transfertsInterCoffres.statut, "APPROVED_L2") // Double vérification
           )
         )
         .returning();
@@ -299,8 +304,8 @@ export async function executeDispatch(
       await tx.insert(transfertsInterCoffresAuditLogs).values({
         transfertId,
         action: "DISPATCHED",
-        statutAvant: "Approuvé N2",
-        statutApres: "En transit",
+        statutAvant: "APPROVED_L2",
+        statutApres: "IN_TRANSIT",
         details: {
           mouvementSourceId: mouvementSource.id,
           montant,
@@ -384,8 +389,8 @@ export async function executeReceive(
       }
 
       // 2. VÉRIFICATION D'ÉTAT STRICTE (après verrouillage)
-      if (transfert.statut !== "En transit") {
-        if (transfert.statut === "Reçu" || transfert.statut === "Reçu avec écart") {
+      if (transfert.statut !== "IN_TRANSIT") {
+        if (transfert.statut === "RECEIVED" || transfert.statut === "RECEIVED_WITH_DISCREPANCY") {
           throw new TransfertAlreadyProcessedError(
             `Ce transfert a déjà été réceptionné (statut actuel: ${transfert.statut})`,
             transfertId
@@ -438,11 +443,11 @@ export async function executeReceive(
         .insert(mouvementsFinanciers)
         .values({
           montant: montantRecu.toString(),
-          sens: "Débit", // Entrée = Débit (augmentation)
+          sens: "DEBIT", // Entrée = Débit (augmentation)
           reference: referenceDest,
           sourceModule: "TRANSFERT",
           agenceId: coffreDest.owner_id as string | null,
-          statut: "Posté",
+          statut: "POSTED",
           dateOperation: new Date(),
           metadata: {
             transfertInterCoffreId: transfertId,
@@ -478,7 +483,7 @@ export async function executeReceive(
       });
 
       // 8. Créer la réconciliation
-      const statutReconciliation = ecart === 0 ? "Rapproché" : "Écart détecté";
+      const statutReconciliation = ecart === 0 ? "RECONCILED" : "DISCREPANCY_DETECTED";
       const [reconciliation] = await tx
         .insert(reconciliationsLiaison)
         .values({
@@ -498,19 +503,19 @@ export async function executeReceive(
       if (ecart !== 0) {
         const priorite =
           Math.abs(ecart) > 100000
-            ? "Critique"
+            ? Priorite.CRITICAL
             : Math.abs(ecart) > 50000
-              ? "Haute"
-              : "Normale";
+              ? Priorite.HIGH
+              : Priorite.NORMAL;
         const [tache] = await tx
           .insert(tachesRegularisation)
           .values({
             transfertId,
-            type: "ECART_RECEPTION",
+            type: TypeTacheRegularisation.ECART_RECEPTION,
             description: `Écart de ${ecart.toLocaleString()} ${transfert.devise} sur transfert ${transfert.reference}. Attendu: ${montantAttendu.toLocaleString()}, Reçu: ${montantRecu.toLocaleString()}`,
             montantEcart: ecart.toString(),
             priorite,
-            statut: "Ouverte",
+            statut: StatutTacheRegularisation.OPEN,
           })
           .returning();
         tacheId = tache.id;
@@ -518,7 +523,7 @@ export async function executeReceive(
 
       // 10. Mettre à jour le transfert avec condition stricte
       const now = new Date();
-      const nouveauStatut = data.conforme ? "Reçu" : "Reçu avec écart";
+      const nouveauStatut = data.conforme ? "RECEIVED" : "RECEIVED_WITH_DISCREPANCY";
 
       const updateResult = await tx
         .update(transfertsInterCoffres)
@@ -538,7 +543,7 @@ export async function executeReceive(
         .where(
           and(
             eq(transfertsInterCoffres.id, transfertId),
-            eq(transfertsInterCoffres.statut, "En transit") // Double vérification
+            eq(transfertsInterCoffres.statut, "IN_TRANSIT") // Double vérification
           )
         )
         .returning();
@@ -556,7 +561,7 @@ export async function executeReceive(
       await tx.insert(transfertsInterCoffresAuditLogs).values({
         transfertId,
         action,
-        statutAvant: "En transit",
+        statutAvant: "IN_TRANSIT",
         statutApres: nouveauStatut,
         details: {
           mouvementDestId: mouvementDest.id,

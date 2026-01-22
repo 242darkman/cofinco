@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { XCircle, AlertTriangle, X } from 'lucide-react';
 import { Modal, Button } from '../../ui';
 import { toast } from 'sonner';
+import { STATUT_DEMANDE_LABELS, StatutDemandeType } from '@shared/enum/status-constants';
 
 interface CreditCommissionRejectionModalProps {
   demande: any;
@@ -111,7 +112,7 @@ export default function CreditCommissionRejectionModal({
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Statut actuel</span>
             <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs font-semibold">
-              {demande.statut}
+              {STATUT_DEMANDE_LABELS[demande.statut as StatutDemandeType] || demande.statut}
             </span>
           </div>
         </div>

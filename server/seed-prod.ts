@@ -2,6 +2,7 @@ import { db } from './db';
 import { seedRBAC } from './seed-rbac-logic';
 import {
   users,
+  userRoles,
   modules,
   permissions,
   rolePermissions,
@@ -51,6 +52,7 @@ import {
 } from '@shared/schema/agency_migration';
 import { hashPassword } from './auth';
 import { SystemRole } from '@shared/types/roles';
+import { StatutUser, StatutCoffre, TypeAgence } from '@shared/enum/status-constants';
 
 // ----------------------------------------------------------------------
 // DATA DEFINITIONS
@@ -62,38 +64,38 @@ const ZONES_DATA = [
   // ======================
   // BRAZZAVILLE
   // ======================
-  { nom: 'Centre-Ville', ville: 'Brazzaville', description: 'Zone commerciale et administrative centrale', statut: 'Actif' },
-  { nom: 'Bacongo', ville: 'Brazzaville', description: 'Quartier administratif et historique', statut: 'Actif' },
-  { nom: 'Poto-Poto', ville: 'Brazzaville', description: 'Quartier commerçant et résidentiel dense', statut: 'Actif' },
-  { nom: 'Ouenzé', ville: 'Brazzaville', description: 'Zone commerciale et populaire', statut: 'Actif' },
-  { nom: 'Talangaï', ville: 'Brazzaville', description: 'Grand quartier populaire au nord', statut: 'Actif' },
-  { nom: 'Moungali', ville: 'Brazzaville', description: 'Quartier populaire et résidentiel', statut: 'Actif' },
-  { nom: 'Makélékélé', ville: 'Brazzaville', description: 'Quartier sud, mixte commerce et habitation', statut: 'Actif' },
-  { nom: 'Mpila', ville: 'Brazzaville', description: 'Zone industrielle et portuaire', statut: 'Actif' },
-  { nom: 'Mfilou', ville: 'Brazzaville', description: 'Zone périphérique ouest', statut: 'Actif' },
-  { nom: 'Madibou', ville: 'Brazzaville', description: 'Extension sud, zones résidentielles', statut: 'Actif' },
-  { nom: 'Djiri', ville: 'Brazzaville', description: 'Zone nord en forte expansion', statut: 'Actif' },
-  { nom: 'Kintélé', ville: 'Brazzaville', description: 'Nouvelle zone urbaine et administrative', statut: 'Actif' },
-  { nom: 'Massengo', ville: 'Brazzaville', description: 'Zone périphérique et résidentielle', statut: 'Actif' },
-  { nom: 'Ngamakosso', ville: 'Brazzaville', description: 'Zone populaire et résidentielle', statut: 'Actif' },
-  { nom: 'Mikalou', ville: 'Brazzaville', description: 'Quartier résidentiel', statut: 'Actif' },
-  { nom: 'Texaco La Tsiémé', ville: 'Brazzaville', description: 'Zone commerciale et transport', statut: 'Actif' },
+  { nom: 'Centre-Ville', ville: 'Brazzaville', description: 'Zone commerciale et administrative centrale', statut: StatutUser.ACTIVE },
+  { nom: 'Bacongo', ville: 'Brazzaville', description: 'Quartier administratif et historique', statut: StatutUser.ACTIVE },
+  { nom: 'Poto-Poto', ville: 'Brazzaville', description: 'Quartier commerçant et résidentiel dense', statut: StatutUser.ACTIVE },
+  { nom: 'Ouenzé', ville: 'Brazzaville', description: 'Zone commerciale et populaire', statut: StatutUser.ACTIVE },
+  { nom: 'Talangaï', ville: 'Brazzaville', description: 'Grand quartier populaire au nord', statut: StatutUser.ACTIVE },
+  { nom: 'Moungali', ville: 'Brazzaville', description: 'Quartier populaire et résidentiel', statut: StatutUser.ACTIVE },
+  { nom: 'Makélékélé', ville: 'Brazzaville', description: 'Quartier sud, mixte commerce et habitation', statut: StatutUser.ACTIVE },
+  { nom: 'Mpila', ville: 'Brazzaville', description: 'Zone industrielle et portuaire', statut: StatutUser.ACTIVE },
+  { nom: 'Mfilou', ville: 'Brazzaville', description: 'Zone périphérique ouest', statut: StatutUser.ACTIVE },
+  { nom: 'Madibou', ville: 'Brazzaville', description: 'Extension sud, zones résidentielles', statut: StatutUser.ACTIVE },
+  { nom: 'Djiri', ville: 'Brazzaville', description: 'Zone nord en forte expansion', statut: StatutUser.ACTIVE },
+  { nom: 'Kintélé', ville: 'Brazzaville', description: 'Nouvelle zone urbaine et administrative', statut: StatutUser.ACTIVE },
+  { nom: 'Massengo', ville: 'Brazzaville', description: 'Zone périphérique et résidentielle', statut: StatutUser.ACTIVE },
+  { nom: 'Ngamakosso', ville: 'Brazzaville', description: 'Zone populaire et résidentielle', statut: StatutUser.ACTIVE },
+  { nom: 'Mikalou', ville: 'Brazzaville', description: 'Quartier résidentiel', statut: StatutUser.ACTIVE },
+  { nom: 'Texaco La Tsiémé', ville: 'Brazzaville', description: 'Zone commerciale et transport', statut: StatutUser.ACTIVE },
 
   // ======================
   // POINTE-NOIRE
   // ======================
-  { nom: 'Centre-Ville', ville: 'Pointe-Noire', description: 'Centre des affaires et administrations', statut: 'Actif' },
-  { nom: 'Lumumba', ville: 'Pointe-Noire', description: 'Quartier résidentiel et commercial', statut: 'Actif' },
-  { nom: 'Tié-Tié', ville: 'Pointe-Noire', description: 'Grand quartier populaire', statut: 'Actif' },
-  { nom: 'Loandjili', ville: 'Pointe-Noire', description: 'Zone résidentielle et aéroportuaire', statut: 'Actif' },
-  { nom: 'Ngoyo', ville: 'Pointe-Noire', description: 'Zone périphérique et résidentielle', statut: 'Actif' },
-  { nom: 'Mongo-Kamba', ville: 'Pointe-Noire', description: 'Zone populaire et artisanale', statut: 'Actif' },
-  { nom: 'Mpaka', ville: 'Pointe-Noire', description: 'Quartier résidentiel', statut: 'Actif' },
-  { nom: 'Vindoulou', ville: 'Pointe-Noire', description: 'Zone résidentielle en expansion', statut: 'Actif' },
-  { nom: 'Tchibota', ville: 'Pointe-Noire', description: 'Zone périphérique sud', statut: 'Actif' },
-  { nom: 'Siafoumou', ville: 'Pointe-Noire', description: 'Quartier populaire', statut: 'Actif' },
-  { nom: 'Songolo', ville: 'Pointe-Noire', description: 'Zone industrielle et portuaire', statut: 'Actif' },
-  { nom: 'Port Autonome', ville: 'Pointe-Noire', description: 'Zone portuaire et logistique', statut: 'Actif' }
+  { nom: 'Centre-Ville', ville: 'Pointe-Noire', description: 'Centre des affaires et administrations', statut: StatutUser.ACTIVE },
+  { nom: 'Lumumba', ville: 'Pointe-Noire', description: 'Quartier résidentiel et commercial', statut: StatutUser.ACTIVE },
+  { nom: 'Tié-Tié', ville: 'Pointe-Noire', description: 'Grand quartier populaire', statut: StatutUser.ACTIVE },
+  { nom: 'Loandjili', ville: 'Pointe-Noire', description: 'Zone résidentielle et aéroportuaire', statut: StatutUser.ACTIVE },
+  { nom: 'Ngoyo', ville: 'Pointe-Noire', description: 'Zone périphérique et résidentielle', statut: StatutUser.ACTIVE },
+  { nom: 'Mongo-Kamba', ville: 'Pointe-Noire', description: 'Zone populaire et artisanale', statut: StatutUser.ACTIVE },
+  { nom: 'Mpaka', ville: 'Pointe-Noire', description: 'Quartier résidentiel', statut: StatutUser.ACTIVE },
+  { nom: 'Vindoulou', ville: 'Pointe-Noire', description: 'Zone résidentielle en expansion', statut: StatutUser.ACTIVE },
+  { nom: 'Tchibota', ville: 'Pointe-Noire', description: 'Zone périphérique sud', statut: StatutUser.ACTIVE },
+  { nom: 'Siafoumou', ville: 'Pointe-Noire', description: 'Quartier populaire', statut: StatutUser.ACTIVE },
+  { nom: 'Songolo', ville: 'Pointe-Noire', description: 'Zone industrielle et portuaire', statut: StatutUser.ACTIVE },
+  { nom: 'Port Autonome', ville: 'Pointe-Noire', description: 'Zone portuaire et logistique', statut: StatutUser.ACTIVE }
 ];
 
 
@@ -254,6 +256,7 @@ async function seedProd() {
     await db.delete(agences);
     await db.delete(zones);
     // Users are tricky, we definitely need an admin.
+    await db.delete(userRoles); // Auth V3: Clear roles before users
     await db.delete(users);
 
     console.log('   ✅ cleanup complete');
@@ -270,8 +273,8 @@ async function seedProd() {
         adresse: a.adresse,
         ville: a.ville,
         region: a.region,
-        typeAgence: a.isSiege ? 'Principale' : 'Secondaire',
-        statut: 'En cours',
+        typeAgence: a.isSiege ? TypeAgence.MAIN : TypeAgence.SECONDARY,
+        statut: StatutUser.ACTIVE,
         latitude: a.latitude,
         longitude: a.longitude,
         telephone: a.telephone,
@@ -326,7 +329,7 @@ async function seedProd() {
         solde: '0', // Production starts with 0
         plafondEncaisse: '500000000', // 500 millions max for central vault
         soldeMinimum: '10000000', // 10 millions minimum
-        statut: 'Actif',
+        statut: StatutCoffre.ACTIVE,
         description: 'Coffre-fort central du siège',
       });
     }
@@ -391,7 +394,7 @@ async function seedProd() {
     const [produitCourant] = await db.insert(produitsCompte).values({
       code: 'COURANT_STD',
       nom: 'Compte Courant Standard',
-      typeCompte: 'Courant',
+      typeCompte: 'CURRENT',
       tauxInteret: '0',
       frais: { ouverture: 5000, tenue: 1500 },
       actif: true,
@@ -400,7 +403,7 @@ async function seedProd() {
     const [produitEpargne] = await db.insert(produitsCompte).values({
       code: 'EPARGNE_STD',
       nom: 'Compte Épargne Classique',
-      typeCompte: 'Épargne',
+      typeCompte: 'SAVINGS',
       tauxInteret: '3.5',
       frais: { ouverture: 2500 },
       actif: true,
@@ -409,7 +412,7 @@ async function seedProd() {
     const [produitTontine] = await db.insert(produitsCompte).values({
       code: 'TONTINE_STD',
       nom: 'Compte Tontine',
-      typeCompte: 'Bloqué',
+      typeCompte: 'BLOCKED',
       tauxInteret: '0',
       actif: true,
     }).returning();
@@ -618,20 +621,31 @@ async function seedProd() {
       settings: { mode: 'production' },
     });
     
-    // 6. CREATE ADMIN USER
+    // 6. CREATE ADMIN USER (Architecture V3 - userRoles)
     console.log('\n👤 Creating Standard Admin...');
     const hashedPassword = await hashPassword('password123');
-    
+
+    // 6a. Créer l'utilisateur admin
     const [adminUser] = await db.insert(users).values({
       username: 's.administrateur',
       password: hashedPassword,
       nom: 'Administrateur',
       prenom: 'Super',
       email: 'admin@cofin.com',
-      role: SystemRole.ADMIN,
-      statut: 'Actif',
+      typeCompte: 'employe',
+      canLogin: true,
+      statut: StatutUser.ACTIVE,
     }).returning();
 
+    // 6b. Créer le rôle ADMIN dans userRoles (Architecture V3)
+    await db.insert(userRoles).values({
+      userId: adminUser.id,
+      role: SystemRole.ADMIN,
+      agenceId: siegeAgenceId || null,
+      isPrimary: true,
+    });
+
+    // 6c. Ajouter l'affectation agence (pour compatibilité userAgences)
     if (siegeAgenceId) {
       await db.insert(userAgences).values({
         userId: adminUser.id,

@@ -1,12 +1,21 @@
 import type { Express } from "express";
-import { insertClientSchema, insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+import {
+  StatutCompte,
+  StatutCredit,
+  StatutDemande,
+  StatutClient,
+  TypeCompte,
+  MethodePaiement,
+} from "@shared/enum/status-constants";
 
 import { StorageService } from '../services/storage-service';
 import { storage } from "../storage";
-import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches } from "../storage/clients";
+import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches, getClientStats, createClientApiSchema, updateClientApiSchema, type ClientFull } from "../storage/clients";
 
 
 import { requireAuth, requireRole, hashPassword } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { requireAgenceAccess, validateAgenceAction, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
@@ -17,6 +26,23 @@ import { eq, sql, or, isNull, and, gte, desc } from "drizzle-orm";
 import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 
 export function registerClientRoutes(app: Express) {
+  // ============================================
+  // STATISTIQUES AGRÉGÉES (Endpoint Optimisé)
+  // MUST BE REGISTERED BEFORE /:id ROUTE TO AVOID COLLISIONS
+  // ============================================
+  app.get("/api/clients/stats", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+      const filter = agenceFilter || {};
+
+      const stats = await getClientStats(filter);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching client stats:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des statistiques" });
+    }
+  });
+
   // CLIENTS ÉLIGIBLES AU CRÉDIT: Clients actifs avec un compte courant dans l'agence
   // MUST BE REGISTERED BEFORE /:id ROUTE TO AVOID COLLISIONS
   app.get("/api/clients/eligible-credit", requireAuth, requireAgenceIdAccess(), async (req, res) => {
@@ -26,7 +52,7 @@ export function registerClientRoutes(app: Express) {
 
       // Récupérer tous les clients de l'agence
       const allClients = await storage.getAllClients(filter);
-      const activeClients = allClients.filter(c => c.status === 'Actif');
+      const activeClients = allClients.filter(c => c.statut === StatutClient.ACTIVE);
 
       // Pour chaque client, vérifier s'il a un compte courant actif dans l'agence
       const eligibleClients = [];
@@ -36,8 +62,8 @@ export function registerClientRoutes(app: Express) {
 
         // Chercher un compte courant actif dans l'agence de la demande
         const compteCourant = accounts.find((acc: any) => {
-          const isCompteCourant = acc.typeCompte === 'Courant';
-          const isActif = acc.statut === 'Actif';
+          const isCompteCourant = acc.typeCompte === TypeCompte.CURRENT;
+          const isActif = acc.statut === StatutCompte.ACTIVE ;
 
           // Vérifier l'agence du compte si un filtre agence est appliqué
           if (agenceFilter?.agenceId) {
@@ -49,10 +75,12 @@ export function registerClientRoutes(app: Express) {
         if (compteCourant) {
           // 🛑 RÈGLE MICROFINANCE : Pas de crédit actif ni demande en cours
           const credits = await getCreditsByClient(client.id);
-          const hasActiveCredit = credits.some(c => ['Actif', 'En retard', 'En cours', 'Contentieux'].includes(c.statut));
+          const activeStatuts = [StatutCredit.ACTIVE, StatutCredit.LATE] as string[];
+          const hasActiveCredit = credits.some(c => activeStatuts.includes(c.statut));
 
           const demandes = await getDemandesByClient(client.id);
-          const hasPendingDemand = demandes.some(d => d.statut && ['En attente', 'A enquêter', 'En comité', 'Approuvée'].includes(d.statut));
+          const pendingStatuts = [StatutDemande.PENDING_FEES, StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.APPROVED] as string[];
+          const hasPendingDemand = demandes.some(d => d.statut && pendingStatuts.includes(d.statut));
 
           if (!hasActiveCredit && !hasPendingDemand) {
               eligibleClients.push({
@@ -69,7 +97,7 @@ export function registerClientRoutes(app: Express) {
       const total = eligibleClients.length;
       const paged = eligibleClients.slice(offset, offset + perPage);
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(paged), total, page, perPage, {
+        paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
           filters: filter,
@@ -92,7 +120,7 @@ export function registerClientRoutes(app: Express) {
       const { page, perPage } = parsePagination(req.query);
       const { data, total } = await storage.getClientsPaginated(filter, page, perPage);
 
-      const transformed = addSnakeCaseAliasesDeep(data);
+      const transformed = addSnakeCaseAliasesDeep(data) as unknown[];
       res.json(
         paginateResponse(transformed, total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
@@ -162,7 +190,7 @@ export function registerClientRoutes(app: Express) {
             let ineligibilityReason = null;
 
             // 1. Statut Client
-            if (client.status !== 'Actif') {
+            if (client.statut !== StatutClient.ACTIVE) {
                 isEligible = false;
                 ineligibilityReason = "Client Inactif/Suspendu";
             }
@@ -170,9 +198,9 @@ export function registerClientRoutes(app: Express) {
             if (isEligible) {
                 // 2. Compte Courant
                 const accounts = await getComptesByClient(client.id);
-                const hasCompteCourant = accounts.some(acc => 
-                    acc.typeCompte === 'Courant' && 
-                    acc.statut === 'Actif'
+                const hasCompteCourant = accounts.some(acc =>
+                    acc.typeCompte === TypeCompte.CURRENT &&
+                    (acc.statut === StatutCompte.ACTIVE )
                 );
                 
                 if (!hasCompteCourant) {
@@ -184,10 +212,11 @@ export function registerClientRoutes(app: Express) {
             if (isEligible) {
                 // 3. Crédit en cours
                 const creditsList = await getCreditsByClient(client.id);
-                const activeCredit = creditsList.find(c => 
-                    ['Actif', 'En retard', 'En cours', 'Contentieux'].includes(c.statut)
+                const activeCreditStatuts = [StatutCredit.ACTIVE, StatutCredit.LATE] as string[];
+                const activeCredit = creditsList.find(c =>
+                    activeCreditStatuts.includes(c.statut)
                 );
-                
+
                 if (activeCredit) {
                     isEligible = false;
                     ineligibilityReason = "Crédit en cours";
@@ -197,8 +226,9 @@ export function registerClientRoutes(app: Express) {
             if (isEligible) {
                 // 4. Demande en cours
                 const demandes = await getDemandesByClient(client.id);
-                const pendingDemand = demandes.find(d => 
-                    d.statut && ['En attente', 'A enquêter', 'En comité', 'Approuvée'].includes(d.statut)
+                const pendingDemandeStatuts = [StatutDemande.PENDING_FEES, StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.APPROVED] as string[];
+                const pendingDemand = demandes.find(d =>
+                    d.statut && pendingDemandeStatuts.includes(d.statut)
                 );
 
                 if (pendingDemand) {
@@ -219,7 +249,7 @@ export function registerClientRoutes(app: Express) {
         const total = enrichedResults.length;
         const paged = enrichedResults.slice(offset, offset + perPage);
         res.json(
-          paginateResponse(addSnakeCaseAliasesDeep(paged), total, page, perPage, {
+          paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
             path: `${req.baseUrl}${req.path}`,
             query: req.query,
             filters: { q: query },
@@ -241,7 +271,7 @@ export function registerClientRoutes(app: Express) {
       const total = withLoc.length;
       const paged = withLoc.slice(offset, offset + perPage);
       res.json(
-        paginateResponse(addSnakeCaseAliasesDeep(paged), total, page, perPage, {
+        paginateResponse(addSnakeCaseAliasesDeep(paged) as unknown[], total, page, perPage, {
           path: `${req.baseUrl}${req.path}`,
           query: req.query,
           filters: filter,
@@ -262,14 +292,9 @@ export function registerClientRoutes(app: Express) {
     if (!client) return res.status(404).json({ message: "Client not found" });
 
     // Vérifier si l'utilisateur a le droit de voir ce client spécifique
-    const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-    if (agenceFilter) {
-      // Vérifier par agenceId (prioritaire) ou par agence (legacy)
-      if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
-        return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-      } else if (agenceFilter.agence && client.agence !== agenceFilter.agence) {
-        return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-      }
+    const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+    if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+      return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
     }
 
     // Calcule des limites de retrait
@@ -332,13 +357,9 @@ export function registerClientRoutes(app: Express) {
       const client = await storage.getClient(req.params.id);
       if (!client) return res.status(404).json({ message: "Client not found" });
 
-      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-      if (agenceFilter) {
-        if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
-          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-        } else if (agenceFilter.agence && client.agence !== agenceFilter.agence) {
-          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-        }
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
       }
 
       // Get all accounts for this client
@@ -362,13 +383,9 @@ export function registerClientRoutes(app: Express) {
       const client = await storage.getClient(req.params.id);
       if (!client) return res.status(404).json({ message: "Client not found" });
 
-      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-      if (agenceFilter) {
-        if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
-          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-        } else if (agenceFilter.agence && client.agence !== agenceFilter.agence) {
-          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-        }
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
       }
 
       // 2. Fetch accounts
@@ -381,7 +398,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // POST Account (Create)
-  app.post("/api/clients/:id/accounts", requireAuth, requireRole('admin', 'chef'), requireAgenceIdAccess(), async (req, res) => {
+  app.post("/api/clients/:id/accounts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), async (req, res) => {
       try {
         // 1. Verify access to client
         const client = await storage.getClient(req.params.id);
@@ -396,11 +413,11 @@ export function registerClientRoutes(app: Express) {
 
         // 2. Validate input
         const schema = z.object({
-            typeCompte: z.enum(['Courant', 'Épargne']),
+            typeCompte: z.enum([TypeCompte.CURRENT, TypeCompte.SAVINGS]),
             soldeInitial: z.coerce.number().min(0, "Le solde initial ne peut pas être négatif"),
             tauxInteret: z.coerce.number().min(0).default(0),
-            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).default('Actif'),
-            methodePaiement: z.enum(['Espèces', 'Mobile Money', 'Virement', 'Carte']).optional()
+            statut: z.enum([StatutCompte.ACTIVE, StatutCompte.SUSPENDED, StatutCompte.CLOSED]).default(StatutCompte.ACTIVE),
+            methodePaiement: z.enum([MethodePaiement.CASH, MethodePaiement.MOBILE_MONEY, MethodePaiement.TRANSFER, MethodePaiement.CHECK]).optional()
         });
 
         const parsed = schema.parse(req.body);
@@ -451,7 +468,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // UPDATE Account (PATCH)
-  app.patch("/api/clients/:clientId/accounts/:accountId", requireAuth, requireRole('admin', 'chef'), requireAgenceIdAccess(), async (req, res) => {
+  app.patch("/api/clients/:clientId/accounts/:accountId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), async (req, res) => {
       try {
         const { clientId, accountId } = req.params;
         
@@ -468,9 +485,9 @@ export function registerClientRoutes(app: Express) {
 
         // 2. Validate input
         const schema = z.object({
-            typeCompte: z.enum(['Courant', 'Épargne']).optional(),
+            typeCompte: z.enum([TypeCompte.CURRENT, TypeCompte.SAVINGS]).optional(),
             tauxInteret: z.coerce.number().min(0).optional(),
-            statut: z.enum(['Actif', 'Suspendu', 'Fermé']).optional(),
+            statut: z.enum([StatutCompte.ACTIVE, StatutCompte.SUSPENDED, StatutCompte.CLOSED]).optional(),
             solde: z.coerce.number().optional()
         });
 
@@ -490,7 +507,7 @@ export function registerClientRoutes(app: Express) {
                 typePaiement: (difference > 0 ? `Dépôt ${currentAccount.typeCompte}` : `Retrait ${currentAccount.typeCompte}`) as any,
                 montant: Math.abs(difference).toString(),
                 soldeApres: parsed.solde.toString(),
-                methodePaiement: 'Espèces',
+                methodePaiement: MethodePaiement.CASH,
                 referenceExterne: `CORRECTION-${Date.now()}`,
                 observations: `Correction manuelle de solde par ${req.session.user?.username || 'Admin'}`,
                 createdBy: req.session.user?.id
@@ -552,10 +569,42 @@ export function registerClientRoutes(app: Express) {
       }
   });
 
+  // BULK IMPORT
+  app.post("/api/clients/bulk", requireAuth, requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
+    try {
+      // Validation du tableau avec le nouveau schema API (Architecture V3)
+      const schema = z.array(createClientApiSchema);
+      const data = schema.parse(req.body);
+
+      // Insertion en masse via le storage (qui gère la transaction)
+      const clients = await storage.createClientsBulk(data);
+
+      await logAudit(
+        req,
+        "IMPORT_CLIENTS_BULK",
+        "client",
+        "BULK",
+        { count: clients.length },
+        "success",
+        "high"
+      );
+
+      res.status(201).json({
+        success: true,
+        count: clients.length,
+        ids: clients.map(c => c.id)
+      });
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json(e);
+      console.error("Bulk import error:", e);
+      res.status(500).json({ message: "Bulk import failed" });
+    }
+  });
+
   // CREATE: Validation de l'agence cible (supporte agenceId)
   app.post("/api/clients", requireAuth, requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
       try {
-        const data = normalizeKeysDeep(req.body);
+        const data = normalizeKeysDeep(req.body) as Record<string, unknown>;
 
         // Validate documents array separately for better error messages
         let validatedDocuments: ClientDocument[] | undefined = undefined;
@@ -580,7 +629,10 @@ export function registerClientRoutes(app: Express) {
           }
         }
 
-        const parsed = insertClientSchema.parse(data);
+
+
+        // Architecture V3: Utiliser le nouveau schema API qui sépare identité et métier
+        const parsed = createClientApiSchema.parse(data);
 
         // Use validated documents if available, otherwise use parsed
         const clientData = validatedDocuments
@@ -590,17 +642,23 @@ export function registerClientRoutes(app: Express) {
         // L'agenceId a été validée/forcée par validateAgenceIdAction
         // Si elle manquait, validateAgenceIdAction l'a ajoutée depuis req.selectedAgenceId
 
-        const client = await storage.createClient(clientData);
+        const createdClient = await storage.createClient(clientData);
+
+        // Récupérer le client complet avec les données fusionnées (nom, prenom depuis users)
+        const client = await storage.getClient(createdClient.id);
+        if (!client) {
+          throw new Error("Client créé mais non récupérable");
+        }
 
         // 🏦 Auto-création d'un compte courant pour chaque nouveau client
         // Règle microfinance : tout client doit avoir un compte courant dans son agence
         let compteCourant = null;
         try {
           compteCourant = await createClientAccount(client.id, {
-            typeCompte: 'Courant',
+            typeCompte: TypeCompte.CURRENT,
             soldeInitial: 0,
             tauxInteret: 0,
-            statut: 'Actif',
+            statut: StatutCompte.ACTIVE,
             agenceId: client.agenceId
           }, req.session.user?.id);
           console.log(`✅ Compte courant ${compteCourant.numeroCompte} créé automatiquement pour le client ${client.nom}`);
@@ -609,12 +667,8 @@ export function registerClientRoutes(app: Express) {
           // Ne pas bloquer la création du client si le compte échoue
         }
 
-        // Fetch agency details to return complete object (Item 21 fix)
-        let agenceNom = client.agence; // Fallback to legacy field
-        if (client.agenceId) {
-            const [agence] = await db.select().from(agences).where(eq(agences.id, client.agenceId));
-            if (agence) agenceNom = agence.nom;
-        }
+        // agence_nom est déjà fourni par getClient via JOIN
+        const agenceNom = client.agence_nom;
 
         await logAudit(
             req,
@@ -635,7 +689,7 @@ export function registerClientRoutes(app: Express) {
             wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
 
             // Notifier liste clients (filtrée côté client)
-            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { agenceId: client.agenceId, agence: client.agence } });
+            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { agenceId: client.agenceId } });
 
             // Activité en temps réel
             const accountInfo = compteCourant ? ` + Compte ${compteCourant.numeroCompte}` : '';
@@ -664,21 +718,17 @@ export function registerClientRoutes(app: Express) {
   });
 
   // UPDATE: Vérification accès + interdiction changer agence (roles: admin, chef, caisse, terrain, credit)
-  app.patch("/api/clients/:id", requireAuth, requireRole('admin', 'chef', 'caisse', 'terrain', 'credit'), requireAgenceIdAccess(), async (req, res) => {
+  app.patch("/api/clients/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.AGENT_TERRAIN, SystemRole.GESTIONNAIRE_CREDIT), requireAgenceIdAccess(), async (req, res) => {
       try {
         const existing = await storage.getClient(req.params.id);
         if (!existing) return res.status(404).json({ message: "Client not found" });
 
-        const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-        if (agenceFilter) {
-          if (agenceFilter.agenceId && existing.agenceId !== agenceFilter.agenceId) {
-            return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-          } else if (agenceFilter.agence && existing.agence !== agenceFilter.agence) {
-            return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-          }
+        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+        if (agenceFilter?.agenceId && existing.agenceId !== agenceFilter.agenceId) {
+          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
         }
 
-        const data = normalizeKeysDeep(req.body);
+        const data = normalizeKeysDeep(req.body) as Record<string, unknown>;
 
         // Validate documents array if provided
         let validatedDocuments: ClientDocument[] | undefined = undefined;
@@ -689,7 +739,8 @@ export function registerClientRoutes(app: Express) {
           }
         }
 
-        const parsed = insertClientSchema.partial().parse(data);
+        // Architecture V3: Utiliser le schema API pour mises à jour partielles
+        const parsed = updateClientApiSchema.parse(data);
 
         // Merge validated documents
         const updateData = validatedDocuments !== undefined
@@ -697,13 +748,8 @@ export function registerClientRoutes(app: Express) {
           : parsed;
 
         // Empêcher changement d'agence si non admin
-        if (agenceFilter) {
-          if (updateData.agenceId && updateData.agenceId !== agenceFilter.agenceId) {
-            return res.status(403).json({ message: "Impossible de changer l'agence du client" });
-          }
-          if (updateData.agence && agenceFilter.agence && updateData.agence !== agenceFilter.agence) {
-            return res.status(403).json({ message: "Impossible de changer l'agence du client" });
-          }
+        if (agenceFilter?.agenceId && updateData.agenceId && updateData.agenceId !== agenceFilter.agenceId) {
+          return res.status(403).json({ message: "Impossible de changer l'agence du client" });
         }
 
         // Check for file replacement and cleanup old file
@@ -719,24 +765,24 @@ export function registerClientRoutes(app: Express) {
         const client = await storage.updateClient(req.params.id, updateData);
 
         // ====== BUSINESS LOGIC: Account Freezing on Client Status Change ======
-        const INACTIVE_STATUSES = ['Inactif', 'Suspendu', 'Blacklisté'];
-        const wasActive = !INACTIVE_STATUSES.includes(existing.status || '');
-        const isNowInactive = INACTIVE_STATUSES.includes(client?.status || '');
+        const INACTIVE_STATUSES = [StatutClient.INACTIVE, StatutClient.SUSPENDED] as string[];
+        const wasActive = !INACTIVE_STATUSES.includes(existing.statut || '');
+        const isNowInactive = INACTIVE_STATUSES.includes(client?.statut || '');
         
         if (wasActive && isNowInactive && client) {
             // Freeze all client accounts
             const accounts = await getComptesByClient(client.id);
             for (const account of accounts) {
-                if (account.statut === 'Actif' && !account.blocageActif) {
+                if (account.statut === StatutCompte.ACTIVE && !account.blocageActif) {
                     await storage.updateCompte(account.id, {
                         blocageActif: true,
-                        blocageMotif: 'Décision interne',
-                        blocageReference: `CLIENT_STATUS:${client.status}`,
+                        blocageMotif: 'INTERNAL_DECISION',
+                        blocageReference: `CLIENT_STATUS:${client.statut}`,
                         blocageDebut: new Date()
                     });
                 }
             }
-            console.log(`🔒 Frozen ${accounts.length} accounts for client ${client.id} (status: ${client.status})`);
+            console.log(`🔒 Frozen ${accounts.length} accounts for client ${client.id} (status: ${client.statut})`);
         }
         // ====== END BUSINESS LOGIC ======
 
@@ -766,17 +812,13 @@ export function registerClientRoutes(app: Express) {
   });
 
   // DELETE: Vérification accès (roles: admin, chef only)
-  app.delete("/api/clients/:id", requireAuth, requireRole('admin', 'chef'), requireAgenceIdAccess(), async (req, res) => {
+  app.delete("/api/clients/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), async (req, res) => {
       const existing = await storage.getClient(req.params.id);
       if (!existing) return res.status(404).json({ message: "Client not found" });
 
-      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-      if (agenceFilter) {
-        if (agenceFilter.agenceId && existing.agenceId !== agenceFilter.agenceId) {
-          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-        } else if (agenceFilter.agence && existing.agence !== agenceFilter.agence) {
-          return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-        }
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && existing.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
       }
 
       const success = await storage.deleteClient(req.params.id);
@@ -805,50 +847,69 @@ export function registerClientRoutes(app: Express) {
 
 
   // Check Uniqueness
+  // Architecture V3: telephone/email sont dans users, numeroPiece dans clients
   app.post("/api/clients/check-uniqueness", requireAuth, async (req, res) => {
       try {
           const { telephone, email, numeroPiece, excludeClientId } = req.body;
-          
-          console.log('[DEBUG_V2] Params:', { 
-            phone: telephone, 
-            piece: numeroPiece, 
-            excludeId: excludeClientId, 
-            excludeType: typeof excludeClientId 
+
+          console.log('[DEBUG_V2] Params:', {
+            phone: telephone,
+            piece: numeroPiece,
+            excludeId: excludeClientId,
+            excludeType: typeof excludeClientId
           });
 
           const cleanPhone = telephone?.trim();
           const cleanEmail = email?.trim();
           const cleanPiece = numeroPiece?.trim();
 
-          const checks = [];
-          if (cleanPhone) checks.push(eq(clients.telephone, cleanPhone));
-          if (cleanEmail) checks.push(eq(clients.email, cleanEmail));
-          if (cleanPiece) checks.push(eq(clients.numeroPiece, cleanPiece));
+          // Build conditions - telephone/email are in users table, numeroPiece in clients
+          const userChecks = [];
+          if (cleanPhone) userChecks.push(eq(users.telephone, cleanPhone));
+          if (cleanEmail) userChecks.push(eq(users.email, cleanEmail));
 
-          if (checks.length === 0) return res.json({ available: true });
+          const clientChecks = [];
+          if (cleanPiece) clientChecks.push(eq(clients.numeroPiece, cleanPiece));
 
-          let query = db.select().from(clients).where(or(...checks));
-          
-          const conflicts = await query;
-          console.log('[DEBUG_V2] Raw Conflicts:', conflicts.map(c => ({ 
-              id: c.id, 
-              idType: typeof c.id, 
-              nom: c.nom, 
-              piece: c.numeroPiece 
+          if (userChecks.length === 0 && clientChecks.length === 0) {
+            return res.json({ available: true });
+          }
+
+          // Query: clients JOIN users, check all conditions
+          const allChecks = [...userChecks, ...clientChecks];
+
+          const conflicts = await db
+            .select({
+              id: clients.id,
+              numeroPiece: clients.numeroPiece,
+              nom: users.nom,
+              prenom: users.prenom,
+              telephone: users.telephone,
+              email: users.email,
+            })
+            .from(clients)
+            .leftJoin(users, eq(clients.userId, users.id))
+            .where(or(...allChecks));
+
+          console.log('[DEBUG_V2] Raw Conflicts:', conflicts.map(c => ({
+              id: c.id,
+              idType: typeof c.id,
+              nom: c.nom,
+              piece: c.numeroPiece
           })));
-          
-          // Filter out - using very explicit comparison logging
+
+          // Filter out excluded client
           const realConflicts = conflicts.filter(c => {
              if (!excludeClientId) return true;
-             
+
              const isSame = String(c.id) === String(excludeClientId);
              console.log(`[DEBUG_V2] Comparing DB ID "${c.id}" vs Exclude "${excludeClientId}" => isSame? ${isSame}`);
-             
+
              return !isSame;
           });
-          
+
           console.log('[DEBUG_V2] Final Conflicts:', realConflicts.length);
-          
+
 
           if (realConflicts.length > 0) {
               const conflict = realConflicts[0];
@@ -856,11 +917,11 @@ export function registerClientRoutes(app: Express) {
               if (telephone && conflict.telephone === telephone) field = 'telephone';
               else if (email && conflict.email === email) field = 'email';
               else if (numeroPiece && conflict.numeroPiece === numeroPiece) field = 'numeroPiece';
-              
-              return res.json({ 
-                  available: false, 
-                  field, 
-                  message: `Ce ${field === 'numeroPiece' ? 'numéro de pièce' : field} est déjà associé à ${conflict.nom} ${conflict.prenom || ''}` 
+
+              return res.json({
+                  available: false,
+                  field,
+                  message: `Ce ${field === 'numeroPiece' ? 'numéro de pièce' : field} est déjà associé à ${conflict.nom} ${conflict.prenom || ''}`
               });
           }
 
@@ -962,35 +1023,36 @@ export function registerClientRoutes(app: Express) {
         
         // Savings (Courant + Epargne + Tontine Contributions)
         const compteCourantTotal = accounts
-            .filter(a => a.typeCompte === 'Courant' && a.statut === 'Actif')
+            .filter(a => a.typeCompte === TypeCompte.CURRENT && (a.statut === StatutCompte.ACTIVE ))
             .reduce((sum, a) => sum + Number(a.soldeCourant), 0);
-            
+
         const compteEpargneTotal = accounts
-            .filter(a => a.typeCompte === 'Épargne' && a.statut === 'Actif')
+            .filter(a => a.typeCompte === TypeCompte.SAVINGS && (a.statut === StatutCompte.ACTIVE ))
             .reduce((sum, a) => sum + Number(a.soldeCourant), 0);
 
         const tontineContributionTotal = membresTontineData
-            .filter(m => m.statut === 'Actif')
+            .filter(m => m.statut === StatutCompte.ACTIVE )
             .reduce((sum, m) => sum + Number(m.totalCotisations), 0);
 
         const totalSavings = compteCourantTotal + compteEpargneTotal + tontineContributionTotal;
 
         // Credits (Active Due)
-        const activeCredits = credits.filter(c => ['Actif', 'En retard', 'En cours'].includes(c.statut));
+        const activeCreditStatuses = [StatutCredit.ACTIVE, StatutCredit.LATE] as string[];
+        const activeCredits = credits.filter(c => activeCreditStatuses.includes(c.statut));
         const totalCreditDue = activeCredits.reduce((sum, c) => sum + Number(c.soldeRestant), 0);
 
         // 3. Trends (Growth this month)
         // Simple logic: Sum of "Dépôt" operations this month vs "Retrait"
         const depositsMonth = transactionsMonth
-            .filter(t => t.sens === 'Crédit')
+            .filter(t => t.sens === 'CREDIT')
             .reduce((sum, t) => sum + Number(t.montant), 0);
             
         // Calculate newly requested counters
-        const savingsAccountsCount = accounts.filter(a => 
-            ['Épargne', 'Compte Bloqué', 'Terme'].includes(a.typeCompte) && a.statut === 'Actif'
+        const savingsAccountsCount = accounts.filter(a =>
+            [TypeCompte.SAVINGS, TypeCompte.BLOCKED].includes(a.typeCompte as any) && a.statut === StatutCompte.ACTIVE
         ).length;
 
-        const activeTontinesCount = membresTontineData.filter(m => m.statut === 'Actif').length;
+        const activeTontinesCount = membresTontineData.filter(m => m.statut === StatutCompte.ACTIVE ).length;
 
         // 4. Construct Response
         const response = {
@@ -1054,7 +1116,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // POST - Créer un client avec un compte utilisateur (pour futur portail client)
-  app.post("/api/clients/with-user", requireRole("admin", "chef"), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
+  app.post("/api/clients/with-user", requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
     try {
       const { createClientWithUser } = await import("../storage/clients");
 
@@ -1109,17 +1171,13 @@ export function registerClientRoutes(app: Express) {
       };
 
       const clientData = {
-        adresse: data.adresse,
+        adresseDomicile: data.adresse,
         ville: data.ville,
         pays: data.pays,
         profession: data.profession,
-        segment: data.segment || 'Standard',
+        segment: data.segment || 'STANDARD',
         agenceId: data.agenceId || (req as any).selectedAgenceId,
-        agence: data.agence,
-        creditTotal: '0',
-        epargneTotal: '0',
-        tauxRemboursement: '100',
-        dateInscription: new Date(),
+        statut: 'ACTIVE' as const,
       };
 
       const result = await createClientWithUser(userData, clientData);
@@ -1143,7 +1201,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // POST - Créer un profil client pour un utilisateur existant
-  app.post("/api/clients/from-user/:userId", requireRole("admin", "chef"), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
+  app.post("/api/clients/from-user/:userId", requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
     try {
       const { createClientForUser } = await import("../storage/clients");
       const { userId } = req.params;
@@ -1161,7 +1219,17 @@ export function registerClientRoutes(app: Express) {
       }
 
       const data = normalizeKeysDeep(req.body);
-      const parsed = insertClientSchema.omit({ userId: true, nom: true }).safeParse(data);
+      // Architecture V3: Pour un user existant, on ne valide que les données métier
+      // L'identité (nom, prenom, email, telephone) est déjà dans users
+      const clientBusinessSchema = createClientApiSchema.omit({
+        nom: true,
+        prenom: true,
+        email: true,
+        telephone: true,
+        photoProfile: true,
+        sexe: true,
+      });
+      const parsed = clientBusinessSchema.safeParse(data);
       if (!parsed.success) {
         return res.status(400).json({ message: "Données invalides", errors: parsed.error.errors });
       }

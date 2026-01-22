@@ -1,13 +1,15 @@
 /**
  * Routes additionnelles pour la gestion avancée des caisses
- * Force close, liquidation intelligente, et clôture flexible
+ * Force close, liquidation intelligente, historique global, et clôture flexible
  */
 
 import { Router } from "express";
 import { z } from "zod";
 import { caisseAdminService } from "../services/caisse-admin-service";
 import { caisseLiquidationService } from "../services/caisse-liquidation-service";
+import { getCaisseHistorique, getCaisseHistoriqueSummary } from "../services/caisse/session-service";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 
 export const caisseAdminRouter = Router();
 
@@ -39,7 +41,7 @@ const executeLiquidationSchema = z.object({
  */
 caisseAdminRouter.post(
   "/sessions/:id/force-close",
-  requireRole('admin', 'chef'),
+  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
   async (req, res) => {
     try {
       const sessionId = req.params.id;
@@ -95,7 +97,7 @@ caisseAdminRouter.post(
  */
 caisseAdminRouter.get(
   "/:id/liquidation/check",
-  requireRole('admin', 'chef'),
+  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
   async (req, res) => {
     try {
       const caisseId = req.params.id;
@@ -131,7 +133,7 @@ caisseAdminRouter.get(
  */
 caisseAdminRouter.post(
   "/:id/liquidation/execute",
-  requireRole('admin'),
+  requireRole(SystemRole.ADMIN),
   async (req, res) => {
     try {
       const caisseId = req.params.id;
@@ -172,6 +174,100 @@ caisseAdminRouter.post(
       });
     } catch (error: any) {
       console.error("Erreur execute liquidation:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - HISTORIQUE GLOBAL
+// ============================================================================
+
+const historiqueQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(50),
+  offset: z.coerce.number().min(0).default(0),
+  startDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+  endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+  typeOperation: z.string().optional(),
+  methodePaiement: z.string().optional(),
+});
+
+/**
+ * GET /api/caisses/:id/historique
+ * Récupère l'historique global des opérations d'une caisse (toutes sessions confondues)
+ *
+ * Query params:
+ * - limit: nombre d'opérations à retourner (max 100, default 50)
+ * - offset: décalage pour pagination
+ * - startDate: date de début (ISO string)
+ * - endDate: date de fin (ISO string)
+ * - typeOperation: filtre par type d'opération
+ * - methodePaiement: filtre par méthode de paiement
+ *
+ * Retourne:
+ * - operations: liste des opérations enrichies (client, caissier, session)
+ * - total: nombre total d'opérations
+ * - totalPages: nombre total de pages
+ * - currentPage: page courante
+ * - limit: nombre d'éléments par page
+ */
+caisseAdminRouter.get(
+  "/:id/historique",
+  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.SUPERVISEUR),
+  async (req, res) => {
+    try {
+      const caisseId = req.params.id;
+
+      const parsed = historiqueQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: "Paramètres invalides",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      const result = await getCaisseHistorique({
+        caisseId,
+        ...parsed.data,
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Erreur récupération historique caisse:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/caisses/:id/historique/summary
+ * Récupère un résumé statistique de l'historique d'une caisse
+ *
+ * Retourne:
+ * - totalOperations: nombre total d'opérations
+ * - totalEntrees: nombre d'opérations d'entrée
+ * - totalSorties: nombre d'opérations de sortie
+ * - montantEntrees: somme des entrées
+ * - montantSorties: somme des sorties
+ * - soldeNet: différence entrées - sorties
+ * - dernierOperation: date de la dernière opération
+ */
+caisseAdminRouter.get(
+  "/:id/historique/summary",
+  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.SUPERVISEUR),
+  async (req, res) => {
+    try {
+      const caisseId = req.params.id;
+
+      const summary = await getCaisseHistoriqueSummary(caisseId);
+
+      res.json(summary);
+    } catch (error: any) {
+      console.error("Erreur récupération summary historique caisse:", error);
       res.status(500).json({
         error: error.message || "Erreur interne",
       });

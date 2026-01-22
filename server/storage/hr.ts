@@ -1,15 +1,16 @@
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
 import { db } from "../db";
 import {
-  demandesConges, 
-  formations, 
-  sanctions, 
-  candidatures, 
+  demandesConges,
+  formations,
+  sanctions,
+  candidatures,
   bulletinsPaie, InsertBulletinPaie,
   avantages, Avantage,
   avantagesEmployes, InsertAvantageEmploye, AvantageEmploye,
   presences, Presence, users, horairesTravail, employes
 } from "@shared/schema";
+import { StatutUser, StatutConge, StatutCandidature, StatutPresence, StatutBulletin, ModeCalculPaie } from "@shared/enum/status-constants";
 
 // Demandes de Congés
 export async function getConges(filter?: { statut?: string; employeId?: string }) {
@@ -116,9 +117,9 @@ export async function getPresenceAujourdhui(): Promise<any> {
     const presencesList = await db.select().from(presences).where(eq(presences.date, today));
     
     // Stats calculation
-    const presents = presencesList.filter(p => p.statut === 'Présent').length;
-    const retards = presencesList.filter(p => p.statut === 'Retard').length;
-    const absents = presencesList.filter(p => p.statut === 'Absent').length;
+    const presents = presencesList.filter(p => p.statut === StatutPresence.PRESENT).length;
+    const retards = presencesList.filter(p => p.statut === StatutPresence.LATE).length;
+    const absents = presencesList.filter(p => p.statut === StatutPresence.ABSENT).length;
     
     return {
         date: today,
@@ -140,10 +141,10 @@ export async function checkIn(employeId: string): Promise<Presence> {
     
     if (existing.length > 0) return existing[0]; // Already present
 
-    // Determine status based on time (e.g. after 9:00 is Retard)
+    // Determine status based on time (e.g. after 9:00 is LATE)
     const hour = now.getHours();
-    let statut = "Présent";
-    if (hour >= 9) statut = "Retard";
+    let statut: string = StatutPresence.PRESENT;
+    if (hour >= 9) statut = StatutPresence.LATE;
 
     const [presence] = await db.insert(presences).values({
         employeId,
@@ -269,7 +270,7 @@ export async function generateMonthlyPaie(mois: string, genereParId?: string): P
     })
     .from(employes)
     .innerJoin(users, eq(employes.userId, users.id))
-    .where(eq(users.statut, 'Actif'));
+    .where(eq(users.statut, StatutUser.ACTIVE));
     
     const results = [];
 
@@ -296,28 +297,28 @@ export async function generateMonthlyPaie(mois: string, genereParId?: string): P
         );
 
         let salaireBrut = 0;
-        const modeCalcul = emp.modeCalculPaie || 'Mensuel';
+        const modeCalcul = emp.modeCalculPaie || ModeCalculPaie.MONTHLY;
 
-        if (modeCalcul === 'Horaire') {
+        if (modeCalcul === ModeCalculPaie.HOURLY) {
             // Calculate based on hours worked
             const totalMinutes = monthPresences.reduce((sum, p) => sum + (p.heuresTravaillees || 0), 0);
             const totalHours = totalMinutes / 60;
             const tauxHoraire = emp.tauxHoraire || 0;
             salaireBrut = Math.round(totalHours * tauxHoraire);
-            
+
             // Overtime (1.5x rate)
             const overtimeMinutes = monthPresences.reduce((sum, p) => sum + (p.heuresSupplementaires || 0), 0);
             const overtimeHours = overtimeMinutes / 60;
             salaireBrut += Math.round(overtimeHours * tauxHoraire * 1.5);
-            
-        } else if (modeCalcul === 'Journalier') {
+
+        } else if (modeCalcul === ModeCalculPaie.DAILY) {
             // Calculate based on days present
-            const joursPresents = monthPresences.filter(p => p.statut === 'Présent' || p.statut === 'Retard').length;
+            const joursPresents = monthPresences.filter(p => p.statut === StatutPresence.PRESENT || p.statut === StatutPresence.LATE).length;
             const tauxJournalier = emp.tauxJournalier || 0;
             salaireBrut = joursPresents * tauxJournalier;
-            
+
         } else {
-            // Mensuel (fixed monthly salary)
+            // MONTHLY (fixed monthly salary)
             salaireBrut = emp.salaireBase || 0;
         }
 
@@ -342,7 +343,7 @@ export async function generateMonthlyPaie(mois: string, genereParId?: string): P
             totalRetenues: (cnss + ipr).toString(),
             salaireNet: net.toString(),
             cnssPatronale: Math.round(salaireBrut * 0.1).toString(),
-            statut: 'Brouillon',
+            statut: StatutBulletin.DRAFT,
             genereParId: genereParId
         };
         
@@ -382,8 +383,8 @@ export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
     .from(employes)
     .innerJoin(users, eq(employes.userId, users.id))
     .where(agenceId 
-        ? and(eq(users.statut, 'Actif'), eq(employes.agenceId, agenceId))
-        : eq(users.statut, 'Actif')
+        ? and(eq(users.statut, StatutUser.ACTIVE), eq(employes.agenceId, agenceId))
+        : eq(users.statut, StatutUser.ACTIVE)
     );
     
     // Build map for quick lookup
@@ -427,8 +428,8 @@ export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
 
 export async function getHrStats(): Promise<any> {
     const employesCount = await db.select({ count: sql<number>`count(*)` }).from(employes);
-    const congesEnAttente = await db.select({ count: sql<number>`count(*)` }).from(demandesConges).where(eq(demandesConges.statut, 'En attente'));
-    const recrutementsEnCours = await db.select({ count: sql<number>`count(*)` }).from(candidatures).where(eq(candidatures.statut, 'En attente'));
+    const congesEnAttente = await db.select({ count: sql<number>`count(*)` }).from(demandesConges).where(eq(demandesConges.statut, StatutConge.PENDING));
+    const recrutementsEnCours = await db.select({ count: sql<number>`count(*)` }).from(candidatures).where(eq(candidatures.statut, StatutCandidature.PENDING));
     
     // Payroll total current month (approx)
     const currentMonth = new Date().toISOString().slice(0, 7);

@@ -7,6 +7,7 @@ import { tontineApi, membreTontineApi, clientApi, tontinePlanApi } from '../../l
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import AdminTontinePlansGestion from './AdminTontinePlansGestion';
+import { StatutClient } from '@shared/enum/status-constants';
 
 interface Tontine {
   id: string;
@@ -104,7 +105,7 @@ export default function AdminTontinesGestion() {
     try {
       const data = await clientApi.getAllList();
       // Filter active clients
-      setClients((data || []).filter((c: any) => c.status === 'Actif' || c.statut === 'Actif'));
+      setClients((data || []).filter((c: any) => c.status === StatutClient.ACTIVE || c.statut === StatutClient.ACTIVE));
     } catch (error) {
       // Silently fail
     }
@@ -180,7 +181,7 @@ export default function AdminTontinesGestion() {
         date_debut: formData.date_debut,
         nombre_membres: nombreMembres,
         membres_actuels: editMode ? selectedTontine?.membres_actuels : 0,
-        statut: 'Active',
+        statut: 'ACTIVE',
         regles: {
           frais_sortie_pourcentage: parseFloat(formData.frais_pourcentage),
           montant_par_tour: montantParTour,
@@ -236,7 +237,7 @@ export default function AdminTontinesGestion() {
         position: parseInt(membreForm.position),
         est_president: membreForm.est_president,
         est_tresorier: membreForm.est_tresorier,
-        statut: 'Actif',
+        statut: StatutClient.ACTIVE,
         date_adhesion: new Date().toISOString().split('T')[0],
         total_cotisations: 0
       };

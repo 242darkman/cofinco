@@ -7,11 +7,13 @@ import { Search, UserCheck, Clock, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { api } from '../../../lib/api-client';
+import { resolveClientPhotoUrl } from '@/lib/format';
 
 interface PendingActivationDrawerProps {
   open: boolean;
   onClose: () => void;
-  onActivate: (compteId: string, montant: number) => void;
+  /** Callback avec compteId, montant ET clientId pour pré-remplir le modal de paiement */
+  onActivate: (compteId: string, montant: number, clientId: string) => void;
 }
 
 interface PendingAccount {
@@ -31,10 +33,11 @@ interface PendingAccount {
 export function PendingActivationDrawer({ open, onClose, onActivate }: PendingActivationDrawerProps) {
   const [search, setSearch] = useState('');
 
+  // Sync cache key with CaisseDashboard
   const { data, isLoading } = useQuery({
-    queryKey: ['pending-activations'],
+    queryKey: ['comptes', 'pending-activation'],
     queryFn: async () => {
-      const res = await api.get<PendingAccount[]>('/api/comptes/pending-activation');
+      const res = await api.get<PendingAccount[]>('/comptes/pending-activation');
       return res || [];
     },
     enabled: open,
@@ -43,14 +46,21 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
 
   const accounts = data || [];
 
-  const filteredAccounts = accounts.filter(acc => 
-    acc.client.nom.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredAccounts = accounts.filter(acc =>
+    acc.client.nom.toLowerCase().includes(search.toLowerCase()) ||
     acc.client.prenom.toLowerCase().includes(search.toLowerCase()) ||
     acc.numeroCompte.includes(search)
   );
 
   const formattedMoney = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(amount);
+  };
+
+  // Handle image load error by setting a state to hide the image
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+  const handleImageError = (id: string) => {
+    setImageErrors(prev => ({ ...prev, [id]: true }));
   };
 
   return (
@@ -99,8 +109,13 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                    <div className="flex justify-between items-start">
                       <div className="flex gap-3">
                          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
-                            {account.client.photoUrl ? (
-                               <img src={account.client.photoUrl} alt="Client" className="w-full h-full object-cover" />
+                            {resolveClientPhotoUrl(account.client.photoUrl) ? (
+                               <img 
+                                 src={resolveClientPhotoUrl(account.client.photoUrl)} 
+                                 alt="Client" 
+                                 className="w-full h-full object-cover"
+                                 onError={() => handleImageError(account.id)}
+                               />
                             ) : (
                                <UserCheck size={20} className="text-slate-400" />
                             )}
@@ -130,9 +145,9 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                       </div>
                    </div>
                    
-                   <Button 
+                   <Button
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-11 font-medium shadow-lg shadow-emerald-500/10 active:scale-[0.98] transition-all"
-                      onClick={() => onActivate(account.id, account.montantInitial)}
+                      onClick={() => onActivate(account.id, account.montantInitial, account.client.id)}
                    >
                       Encaisser maintenant
                    </Button>

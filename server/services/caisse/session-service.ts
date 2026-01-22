@@ -10,9 +10,10 @@
  */
 
 import { db } from "../../db";
-import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers } from "@shared/schema";
-import { eq, and, sql, desc, lt, gte, or, isNull, isNotNull } from "drizzle-orm";
+import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers, clients } from "@shared/schema";
+import { eq, and, sql, desc, lt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
 import { ForcedCloseReason, SessionComputedStatus } from "@shared/enums";
+import { StatutTransaction } from "@shared/enum/status-constants";
 import {
   getOperationDelta,
   CAISSE_THRESHOLDS,
@@ -50,20 +51,6 @@ const DEFAULT_SESSION_TIMEOUT_HOURS = CAISSE_THRESHOLDS.TIMEOUT_AUTO_CLOSE_HOURS
 const WARNING_INACTIVE_HOURS = CAISSE_THRESHOLDS.INACTIVITE_WARNING_HOURS;
 const CRITICAL_INACTIVE_HOURS = CAISSE_THRESHOLDS.INACTIVITE_CRITICAL_HOURS;
 const MAX_ECART_THRESHOLD = CAISSE_THRESHOLDS.MAX_ECART_SANS_ALERTE;
-
-/** Types d'opérations pour compatibilité - utiliser les fonctions centralisées */
-const IN_TYPES = [
-  "Versement", "Dépôt", "Encaissement", "Remboursement", "Cotisation",
-  "Approvisionnement coffre", "Dépôt épargne", "Versement Épargne",
-  "Versement Courant", "Versement Bloqué", "Remboursement crédit",
-  "Frais Engagement", "Cotisation Tontine"
-];
-
-const OUT_TYPES = [
-  "Retrait", "Décaissement", "Frais", "Sortie", "Versement coffre",
-  "Retrait épargne", "Retrait Épargne", "Retrait Courant", "Retrait Bloqué",
-  "Décaissement crédit", "Décaissement Prêt", "Retrait Tontine"
-];
 
 // ============================================================================
 // VALIDATION DU BILLETAGE
@@ -286,8 +273,8 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
             caissierId,
             caisseId,
             agenceId: sessionAgenceId,
-            soldeInitial: billetageValidation.calculatedTotal.toString(),
-            soldeTheorique: billetageValidation.calculatedTotal.toString(),
+            montantOuverture: billetageValidation.calculatedTotal.toString(),
+            montantFermetureTheorique: billetageValidation.calculatedTotal.toString(),
             billetageOuverture,
             openedAt: new Date(),
             lastActivity: new Date(),
@@ -484,7 +471,7 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
           .from(operationsCaisse)
           .where(eq(operationsCaisse.sessionId, sessionId));
 
-        let soldeTheorique = Number(session.soldeInitial);
+        let soldeTheorique = Number(session.montantOuverture);
 
         for (const op of operations) {
           // Utiliser la fonction centralisée pour le calcul du delta
@@ -506,18 +493,18 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
         // 5. Créer un mouvement d'ajustement si écart significatif
         let mouvementAjustementId: string | null = null;
         if (Math.abs(ecart) > 0) {
-          const sensAjustement = ecart > 0 ? "Crédit" as const : "Débit" as const;
+          const sensAjustement = ecart > 0 ? "CREDIT" as const : "DEBIT" as const;
           const [mouvementAjustement] = await tx.insert(mouvementsFinanciers).values({
             montant: Math.abs(ecart).toString(),
             sens: sensAjustement,
             sourceModule: "CAISSE" as const,
             agenceId: session.agenceId,
             sessionCaisseId: sessionId,
-            typePaiement: "Ajustement" as any,
-            methodePaiement: "Espèces" as const,
+            typePaiement: "ADJUSTMENT" as any,
+            methodePaiement: "CASH" as const,
             reference: `ADJ-${sessionId.substring(0, 8)}-${Date.now()}`,
             idempotencyKey: `adj-close-${sessionId}`,
-            statut: "Posté" as const,
+            statut: StatutTransaction.POSTED,
             dateOperation: new Date(),
             metadata: {
               type: "ECART_FERMETURE",
@@ -537,12 +524,12 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
           await tx.insert(operationsCaisse).values({
             sessionId,
             mouvementId: mouvementAjustement.id,
-            typeOperation: "Ajustement",
+            typeOperation: "ADJUSTMENT",
             montant: Math.abs(ecart).toString(),
-            methodePaiement: "Espèces",
+            methodePaiement: "CASH",
             reference: mouvementAjustement.reference,
             description: `Ajustement écart de ${ecart > 0 ? "+" : ""}${ecart} FCFA à la fermeture`,
-            statut: "Posté",
+            statut: StatutTransaction.POSTED,
           });
         }
 
@@ -561,8 +548,8 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
           .update(sessionsCaisse)
           .set({
             closedAt: new Date(),
-            soldeTheorique: soldeTheorique.toString(),
-            soldeReel: soldeReelNum.toString(),
+            montantFermetureTheorique: soldeTheorique.toString(),
+            montantFermetureDeclare: soldeReelNum.toString(),
             ecart: ecart.toString(),
             billetageFermeture,
             observations,
@@ -582,7 +569,7 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
           statutAvant: SessionComputedStatus.OPEN,
           statutApres: SessionComputedStatus.CLOSED,
           details: {
-            soldeInitial: Number(session.soldeInitial),
+            soldeInitial: Number(session.montantOuverture),
             soldeTheorique,
             soldeReel: soldeReelNum,
             ecart,
@@ -703,14 +690,14 @@ export async function getRiskySessions(): Promise<
       .from(operationsCaisse)
       .where(eq(operationsCaisse.sessionId, row.session.id));
 
-    let soldeCurrent = Number(row.session.soldeInitial);
+    let soldeCurrent = Number(row.session.montantOuverture);
     for (const op of operations) {
-      const montant = Number(op.montant);
-      if (IN_TYPES.includes(op.typeOperation)) {
-        soldeCurrent += montant;
-      } else if (OUT_TYPES.includes(op.typeOperation)) {
-        soldeCurrent -= montant;
-      }
+      soldeCurrent += calculateOperationDelta({
+          typeOperation: op.typeOperation,
+          montant: op.montant,
+          reference: op.reference,
+          description: op.description,
+      });
     }
 
     results.push({
@@ -765,14 +752,14 @@ export async function closeExpiredSessions(
       .from(operationsCaisse)
       .where(eq(operationsCaisse.sessionId, session.id));
 
-    let soldeTheorique = Number(session.soldeInitial);
+    let soldeTheorique = Number(session.montantOuverture);
     for (const op of operations) {
-      const montant = Number(op.montant);
-      if (IN_TYPES.includes(op.typeOperation)) {
-        soldeTheorique += montant;
-      } else if (OUT_TYPES.includes(op.typeOperation)) {
-        soldeTheorique -= montant;
-      }
+      soldeTheorique += calculateOperationDelta({
+          typeOperation: op.typeOperation,
+          montant: op.montant,
+          reference: op.reference,
+          description: op.description,
+      });
     }
 
     // Fermer la session avec raison "timeout"
@@ -780,7 +767,7 @@ export async function closeExpiredSessions(
       .update(sessionsCaisse)
       .set({
         closedAt: now,
-        soldeTheorique: soldeTheorique.toString(),
+        montantFermetureTheorique: soldeTheorique.toString(),
         forcedCloseReason: ForcedCloseReason.TIMEOUT_AUTO,
         forceClosedAt: now,
         forceClosedBy: null,
@@ -796,7 +783,7 @@ export async function closeExpiredSessions(
       statutApres: SessionComputedStatus.CLOSED,
       details: {
         timeoutHours,
-        soldeInitial: Number(session.soldeInitial),
+        soldeInitial: Number(session.montantOuverture),
         soldeTheorique,
         nbOperations: operations.length,
         lastActivity: session.lastActivity,
@@ -860,4 +847,274 @@ export async function getSessionsWithSignificantEcarts(
       severity: Math.abs(ecart) > threshold * 2 ? ("HIGH" as const) : ("MEDIUM" as const),
     };
   });
+}
+
+// ============================================================================
+// HISTORIQUE GLOBAL DES OPÉRATIONS DE CAISSE
+// ============================================================================
+
+export interface CaisseHistoriqueFilters {
+  caisseId: string;
+  limit?: number;
+  offset?: number;
+  startDate?: Date;
+  endDate?: Date;
+  typeOperation?: string;
+  methodePaiement?: string;
+}
+
+export interface CaisseHistoriqueOperation {
+  id: string;
+  reference: string;
+  typeOperation: string;
+  montant: string;
+  methodePaiement: string;
+  description: string | null;
+  statut: string;
+  createdAt: Date;
+  sessionId: string;
+  // Client info (si disponible)
+  client: {
+    id: string;
+    nom: string;
+    prenom: string | null;
+    telephone: string | null;
+  } | null;
+  // Agent/Caissier info
+  caissier: {
+    id: string;
+    nom: string;
+    prenom: string | null;
+  } | null;
+  // Session info
+  session: {
+    id: string;
+    openedAt: Date;
+    closedAt: Date | null;
+  };
+}
+
+export interface CaisseHistoriqueResult {
+  operations: CaisseHistoriqueOperation[];
+  total: number;
+  totalPages: number;
+  currentPage: number;
+  limit: number;
+}
+
+/**
+ * Récupère l'historique global des opérations d'une caisse
+ * - Parcourt TOUTES les sessions (pas seulement la session active)
+ * - Enrichit avec les données client et agent
+ * - Supporte la pagination et les filtres de date
+ */
+export async function getCaisseHistorique(
+  filters: CaisseHistoriqueFilters
+): Promise<CaisseHistoriqueResult> {
+  const {
+    caisseId,
+    limit = 50,
+    offset = 0,
+    startDate,
+    endDate,
+    typeOperation,
+    methodePaiement,
+  } = filters;
+
+  // 1. Récupérer toutes les sessions de cette caisse
+  const sessionsSubquery = db
+    .select({ id: sessionsCaisse.id })
+    .from(sessionsCaisse)
+    .where(eq(sessionsCaisse.caisseId, caisseId));
+
+  // 2. Construire les conditions de filtre
+  const conditions = [
+    sql`${operationsCaisse.sessionId} IN (SELECT id FROM sessions_caisse WHERE caisse_id = ${caisseId})`,
+    isNull(operationsCaisse.deletedAt),
+  ];
+
+  if (startDate) {
+    conditions.push(gte(operationsCaisse.createdAt, startDate));
+  }
+
+  if (endDate) {
+    conditions.push(lte(operationsCaisse.createdAt, endDate));
+  }
+
+  if (typeOperation) {
+    conditions.push(eq(operationsCaisse.typeOperation, typeOperation as any));
+  }
+
+  if (methodePaiement) {
+    conditions.push(eq(operationsCaisse.methodePaiement, methodePaiement as any));
+  }
+
+  const whereClause = and(...conditions);
+
+  // 3. Compter le total
+  const [countResult] = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(operationsCaisse)
+    .where(whereClause);
+
+  const total = countResult?.count || 0;
+  const totalPages = Math.ceil(total / limit);
+  const currentPage = Math.floor(offset / limit) + 1;
+
+  // 4. Récupérer les opérations avec pagination
+  const operationsRaw = await db
+    .select({
+      operation: operationsCaisse,
+      session: {
+        id: sessionsCaisse.id,
+        openedAt: sessionsCaisse.openedAt,
+        closedAt: sessionsCaisse.closedAt,
+        caissierId: sessionsCaisse.caissierId,
+      },
+    })
+    .from(operationsCaisse)
+    .innerJoin(sessionsCaisse, eq(operationsCaisse.sessionId, sessionsCaisse.id))
+    .where(whereClause)
+    .orderBy(desc(operationsCaisse.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  // 5. Enrichir avec les données client et caissier
+  const operations: CaisseHistoriqueOperation[] = await Promise.all(
+    operationsRaw.map(async (row) => {
+      const op = row.operation;
+      const sess = row.session;
+
+      // Récupérer les infos client si disponible
+      let clientInfo: CaisseHistoriqueOperation["client"] = null;
+      if (op.clientId) {
+        const [clientData] = await db
+          .select({
+            id: clients.id,
+            nom: users.nom,
+            prenom: users.prenom,
+            telephone: users.telephone,
+          })
+          .from(clients)
+          .leftJoin(users, eq(clients.userId, users.id))
+          .where(eq(clients.id, op.clientId));
+
+        if (clientData) {
+          clientInfo = {
+            id: clientData.id,
+            nom: clientData.nom || "",
+            prenom: clientData.prenom || null,
+            telephone: clientData.telephone || null,
+          };
+        }
+      }
+
+      // Récupérer les infos du caissier
+      let caissierInfo: CaisseHistoriqueOperation["caissier"] = null;
+      if (sess.caissierId) {
+        const [userData] = await db
+          .select({
+            id: users.id,
+            nom: users.nom,
+            prenom: users.prenom,
+          })
+          .from(users)
+          .where(eq(users.id, sess.caissierId));
+
+        if (userData) {
+          caissierInfo = {
+            id: userData.id,
+            nom: userData.nom || "",
+            prenom: userData.prenom || null,
+          };
+        }
+      }
+
+      return {
+        id: op.id,
+        reference: op.reference,
+        typeOperation: op.typeOperation,
+        montant: op.montant,
+        methodePaiement: op.methodePaiement,
+        description: op.description,
+        statut: op.statut,
+        createdAt: op.createdAt,
+        sessionId: op.sessionId,
+        client: clientInfo,
+        caissier: caissierInfo,
+        session: {
+          id: sess.id,
+          openedAt: sess.openedAt!,
+          closedAt: sess.closedAt,
+        },
+      };
+    })
+  );
+
+  return {
+    operations,
+    total,
+    totalPages,
+    currentPage,
+    limit,
+  };
+}
+
+/**
+ * Récupère le résumé statistique de l'historique d'une caisse
+ */
+export async function getCaisseHistoriqueSummary(caisseId: string): Promise<{
+  totalOperations: number;
+  totalEntrees: number;
+  totalSorties: number;
+  montantEntrees: number;
+  montantSorties: number;
+  soldeNet: number;
+  dernierOperation: Date | null;
+}> {
+  const sessionsSubquery = db
+    .select({ id: sessionsCaisse.id })
+    .from(sessionsCaisse)
+    .where(eq(sessionsCaisse.caisseId, caisseId));
+
+  const operations = await db
+    .select({
+      typeOperation: operationsCaisse.typeOperation,
+      montant: operationsCaisse.montant,
+      createdAt: operationsCaisse.createdAt,
+    })
+    .from(operationsCaisse)
+    .where(
+      and(
+        sql`${operationsCaisse.sessionId} IN (SELECT id FROM sessions_caisse WHERE caisse_id = ${caisseId})`,
+        isNull(operationsCaisse.deletedAt)
+      )
+    )
+    .orderBy(desc(operationsCaisse.createdAt));
+
+  let totalEntrees = 0;
+  let totalSorties = 0;
+  let montantEntrees = 0;
+  let montantSorties = 0;
+
+  for (const op of operations) {
+    const montant = Number(op.montant);
+    if (isIncomingOperation(op.typeOperation)) {
+      totalEntrees++;
+      montantEntrees += montant;
+    } else if (isOutgoingOperation(op.typeOperation)) {
+      totalSorties++;
+      montantSorties += montant;
+    }
+  }
+
+  return {
+    totalOperations: operations.length,
+    totalEntrees,
+    totalSorties,
+    montantEntrees,
+    montantSorties,
+    soldeNet: montantEntrees - montantSorties,
+    dernierOperation: operations.length > 0 ? operations[0].createdAt : null,
+  };
 }

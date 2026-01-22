@@ -38,13 +38,13 @@ export const transferts = pgTable(
 
     montant: numeric("montant").notNull(),
     methodePaiement: methodePaiementEnum("methode_paiement"),
-    statut: statutTransactionEnum("statut").notNull().default("Posté"),
+    statut: statutTransactionEnum("statut").notNull().default("POSTED"),
 
     reference: text("reference").notNull(),
     referenceExterne: text("reference_externe"),
     idempotencyKey: text("idempotency_key"),
 
-    sens: text("sens").notNull(), // "Entrée" | "Sortie"
+    sens: text("sens").notNull(), // "IN" | "OUT"
     destinataire: text("destinataire"),
     numeroTelephone: text("numero_telephone"),
     motif: text("motif"),
@@ -123,7 +123,7 @@ export const transfertBlacklist = pgTable("transfert_blacklist", {
   valeur: text("valeur").notNull(),
   raison: text("raison").notNull(),
   source: text("source"),
-  severite: text("severite").notNull().default("high"),
+  severite: text("severite").notNull().default("HIGH"),
   actif: boolean("actif").notNull().default(true),
   dateExpiration: timestamp("date_expiration"),
   ajouteParId: uuid("ajoute_par_id").references(() => users.id),
@@ -140,7 +140,7 @@ export const transfertReconciliation = pgTable("transfert_reconciliation", {
   montantTotal: numeric("montant_total").notNull().default("0"),
   montantOperateur: numeric("montant_operateur").default("0"),
   ecart: numeric("ecart").default("0"),
-  statut: text("statut").notNull().default("pending"),
+  statut: text("statut").notNull().default("PENDING"),
   anomalies: json("anomalies"),
   resolvedById: uuid("resolved_by_id").references(() => users.id),
   resolvedAt: timestamp("resolved_at"),
@@ -159,7 +159,7 @@ export const otpValidations = pgTable("otp_validations", {
   otpCode: text("otp_code").notNull(),
   attempts: integer("attempts").notNull().default(0),
   maxAttempts: integer("max_attempts").notNull().default(3),
-  status: text("status").notNull().default("pending"),
+  statut: text("statut").notNull().default("PENDING"),
   createdBy: uuid("created_by").references(() => users.id),
   createdByRole: text("created_by_role"),
   validatedBy: uuid("validated_by").references(() => users.id),
@@ -174,34 +174,34 @@ export const otpValidations = pgTable("otp_validations", {
 // SCHEMAS & TYPES
 // ============================================================================
 
-export const insertKycLevelSchema = (createInsertSchema(kycLevels) as any).omit({ id: true, createdAt: true });
-export type InsertKycLevel = any;
+export const insertKycLevelSchema = createInsertSchema(kycLevels).omit({ id: true, createdAt: true });
+export type InsertKycLevel = z.infer<typeof insertKycLevelSchema>;
 export type KycLevel = typeof kycLevels.$inferSelect;
 
-export const insertTransfertSchema = (createInsertSchema(transferts) as any).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertTransfert = any;
+export const insertTransfertSchema = createInsertSchema(transferts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTransfert = z.infer<typeof insertTransfertSchema>;
 export type Transfert = typeof transferts.$inferSelect;
 
-export const insertTransfertAuditLogSchema = (createInsertSchema(transfertAuditLogs) as any).omit({ id: true, timestamp: true });
-export type InsertTransfertAuditLog = any;
+export const insertTransfertAuditLogSchema = createInsertSchema(transfertAuditLogs).omit({ id: true, timestamp: true });
+export type InsertTransfertAuditLog = z.infer<typeof insertTransfertAuditLogSchema>;
 export type TransfertAuditLog = typeof transfertAuditLogs.$inferSelect;
 
-export const insertTransfertLimitSchema = (createInsertSchema(transfertLimits) as any).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertTransfertLimit = any;
+export const insertTransfertLimitSchema = createInsertSchema(transfertLimits).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTransfertLimit = z.infer<typeof insertTransfertLimitSchema>;
 export type TransfertLimit = typeof transfertLimits.$inferSelect;
 
-export const insertTransfertWebhookSchema = (createInsertSchema(transfertWebhooks) as any).omit({ id: true, receivedAt: true });
-export type InsertTransfertWebhook = any;
+export const insertTransfertWebhookSchema = createInsertSchema(transfertWebhooks).omit({ id: true, receivedAt: true });
+export type InsertTransfertWebhook = z.infer<typeof insertTransfertWebhookSchema>;
 export type TransfertWebhook = typeof transfertWebhooks.$inferSelect;
 
-export const insertTransfertBlacklistSchema = (createInsertSchema(transfertBlacklist) as any).omit({ id: true, createdAt: true });
-export type InsertTransfertBlacklist = any;
+export const insertTransfertBlacklistSchema = createInsertSchema(transfertBlacklist).omit({ id: true, createdAt: true });
+export type InsertTransfertBlacklist = z.infer<typeof insertTransfertBlacklistSchema>;
 export type TransfertBlacklist = typeof transfertBlacklist.$inferSelect;
 
-export const insertTransfertReconciliationSchema = (createInsertSchema(transfertReconciliation) as any).omit({ id: true, createdAt: true });
-export type InsertTransfertReconciliation = any;
+export const insertTransfertReconciliationSchema = createInsertSchema(transfertReconciliation).omit({ id: true, createdAt: true });
+export type InsertTransfertReconciliation = z.infer<typeof insertTransfertReconciliationSchema>;
 export type TransfertReconciliation = typeof transfertReconciliation.$inferSelect;
 
-export const insertOtpValidationSchema = (createInsertSchema(otpValidations) as any).omit({ id: true, createdAt: true });
-export type InsertOtpValidation = any;
+export const insertOtpValidationSchema = createInsertSchema(otpValidations).omit({ id: true, createdAt: true });
+export type InsertOtpValidation = z.infer<typeof insertOtpValidationSchema>;
 export type OtpValidation = typeof otpValidations.$inferSelect;

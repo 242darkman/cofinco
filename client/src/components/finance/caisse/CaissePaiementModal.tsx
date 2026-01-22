@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, Printer, Eye, CreditCard, TrendingUp, PiggyBank } from 'lucide-react';
+import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, Printer, Eye, CreditCard, TrendingUp, PiggyBank, Receipt } from 'lucide-react';
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -11,6 +11,17 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  StatutClient,
+  StatutCompte,
+  StatutParticipationTontine,
+  StatutTransaction,
+  TYPES_OPERATIONS_CAISSE,
+  TypeOperationCaisse,
+  isOperationCaisseEntree,
+  getOperationCaisseLabel,
+  isActiveStatus
+} from '@shared/enum/status-constants';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <div className={`flex items-center justify-center font-bold text-red-500 bg-red-100 rounded-lg p-2 ${className}`}>
@@ -44,25 +55,27 @@ interface CaissePaiementModalProps {
   onClose: () => void;
   onSuccess: () => void;
   initialType?: string;
+  /** ID du compte pré-sélectionné (pour activation depuis PendingActivationDrawer) */
+  preSelectedAccountId?: string;
+  /** Montant pré-rempli (pour activation depuis PendingActivationDrawer) */
+  preFilledAmount?: number;
+  /** ID du client pré-sélectionné (pour activation depuis PendingActivationDrawer) */
+  preSelectedClientId?: string;
 }
 
-const TYPES_OPERATIONS = [
-  { value: 'Cotisation Tontine', label: 'Cotisation Tontine', isEntree: true },
-  { value: 'Retrait Tontine', label: 'Retrait Tontine', isEntree: false },
-  { value: 'Remboursement Prêt', label: 'Remboursement Prêt', isEntree: true },
-  { value: 'Décaissement Prêt', label: 'Décaissement Prêt', isEntree: false },
-  { value: 'Dépôt épargne', label: 'Versement Compte Épargne', isEntree: true },
-  { value: 'Retrait Épargne', label: 'Retrait Compte Épargne', isEntree: false },
-  { value: 'Versement Courant', label: 'Versement Compte Courant', isEntree: true },
-  { value: 'Retrait Courant', label: 'Retrait Compte Courant', isEntree: false },
-  { value: 'Versement Bloqué', label: 'Versement Compte Bloqué', isEntree: true },
-  { value: 'Retrait Bloqué', label: 'Retrait Compte Bloqué', isEntree: false },
-  { value: 'Encaissement Divers', label: 'Encaissement Divers', isEntree: true },
-  { value: 'Décaissement Divers', label: 'Décaissement Divers', isEntree: false },
-  { value: 'Frais Bancaires', label: 'Frais Bancaires', isEntree: true },
-] as const;
+// TYPES_OPERATIONS désormais importé depuis @shared/enum/status-constants
+// Alias local pour compatibilité avec le code existant
+const TYPES_OPERATIONS = TYPES_OPERATIONS_CAISSE;
 
-export default function CaissePaiementModal({ sessionId, onClose, onSuccess, initialType }: CaissePaiementModalProps) {
+export default function CaissePaiementModal({
+  sessionId,
+  onClose,
+  onSuccess,
+  initialType,
+  preSelectedAccountId,
+  preFilledAmount,
+  preSelectedClientId
+}: CaissePaiementModalProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreatePayments = hasPermission('caisse', 'create') || hasPermission('paiements', 'create');
@@ -87,48 +100,75 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
   const [activeCreditsAmount, setActiveCreditsAmount] = useState(0);
 
   const [formData, setFormData] = useState({
-    client_id: '',
-    montant: '',
-    mode_paiement: 'Espèces',
-    type_operation: initialType || 'Cotisation Tontine',
+    // Pré-remplir le client si fourni (activation de compte)
+    client_id: preSelectedClientId || '',
+    // Pré-remplir le montant si fourni (activation de compte)
+    montant: preFilledAmount ? preFilledAmount.toString() : '',
+    mode_paiement: 'CASH',
+    type_operation: initialType || TypeOperationCaisse.TONTINE_CONTRIBUTION,
     numero_telephone: '',
     numero_transaction: '',
     reference: '',
-    description: ''
+    description: '',
+    // Champs pour chèques
+    numero_cheque: '',
+    banque_emettrice: '',
+    date_emission_cheque: '',
+    // Champs pour virements
+    banque_origine: '',
+    numero_compte_origine: '',
+    reference_virement: ''
   });
 
-  // Idempotency Key
-  const [idempotencyKey, setIdempotencyKey] = useState<string>('');
-
+  // Pré-sélectionner le compte et définir la description si fourni (activation depuis drawer)
+  // Cet effet est séparé du chargement des comptes client pour garantir la priorité
   useEffect(() => {
-    setIdempotencyKey(uuidv4());
-  }, []);
+    if (preSelectedAccountId) {
+      setSelectedAccountId(preSelectedAccountId);
+      // Le selectedAccount sera défini après le chargement des comptes client
+    }
+    // Pré-remplir la description pour les activations de compte
+    if (preSelectedAccountId && preFilledAmount && !formData.description) {
+      setFormData(prev => ({
+        ...prev,
+        description: `Dépôt initial - Activation de compte`
+      }));
+    }
+  }, [preSelectedAccountId, preFilledAmount]);
 
-  // Vérifier si c'est une opération d'entrée
+  // Idempotency Key - useMemo garantit une seule génération à la création du composant
+  // Ceci est la solution correcte au bug #8 de l'audit : évite les doublons lors des re-renders
+  const idempotencyKey = useMemo(() => uuidv4(), []);
+
+  // Vérifier si c'est une opération d'entrée - utilise la fonction centralisée
   const isOperationEntree = useCallback((typeOp: string) => {
-    const found = TYPES_OPERATIONS.find(t => t.value === typeOp);
-    return found?.isEntree ?? true;
+    return isOperationCaisseEntree(typeOp);
   }, []);
 
-  // Vérifier si c'est une opération tontine
+  // Vérifier si c'est une opération tontine - utilise les constantes EN
   const isTontineOperation = useMemo(() => {
-    return formData.type_operation === 'Cotisation Tontine' || formData.type_operation === 'Retrait Tontine';
+    return formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION ||
+           formData.type_operation === TypeOperationCaisse.TONTINE_WITHDRAWAL;
   }, [formData.type_operation]);
 
-  // Vérifier si c'est une opération sur compte
+  // Vérifier si c'est une opération sur compte - utilise les constantes EN
   const isAccountOperation = useMemo(() => {
     return [
-      'Dépôt épargne', 'Retrait Épargne', 
-      'Versement Courant', 'Retrait Courant',
-      'Versement Bloqué', 'Retrait Bloqué'
-    ].includes(formData.type_operation);
+      TypeOperationCaisse.DEPOSIT_SAVINGS,
+      TypeOperationCaisse.WITHDRAWAL_SAVINGS,
+      TypeOperationCaisse.DEPOSIT_CURRENT,
+      TypeOperationCaisse.WITHDRAWAL_CURRENT,
+      TypeOperationCaisse.DEPOSIT_BLOCKED,
+      TypeOperationCaisse.WITHDRAWAL_BLOCKED
+    ].includes(formData.type_operation as any);
   }, [formData.type_operation]);
 
   // Charger les clients via api-client
+  // Utilise isActiveStatus pour gérer les données legacy FR et EN
   const loadClients = useCallback(async () => {
     try {
       const data = await clientApi.getAllList();
-      setClients(data.filter((c: any) => c.status === 'Actif'));
+      setClients(data.filter((c: any) => isActiveStatus(c.status)));
     } catch (error) {
       console.error('Error loading clients:', error);
       setClients([]);
@@ -185,9 +225,12 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                  setActiveCreditsAmount(totalCreditAmount);
 
                  // 2. Load Tontines (also needed for summary even if not tontine op)
+                 // Utilise StatutParticipationTontine (sémantiquement correct) avec fallback isActiveStatus
                  const tontines = await clientSearchApi.getTontines(formData.client_id);
                  setClientTontines(tontines || []);
-                 setActiveTontinesCount((tontines || []).filter(t => t.statut === 'Actif').length);
+                 setActiveTontinesCount((tontines || []).filter(t =>
+                   t.statut === StatutParticipationTontine.ACTIVE || isActiveStatus(t.statut)
+                 ).length);
                  
                  // Auto-select if tontine op
                  if (isTontineOperation && tontines && tontines.length === 1) {
@@ -197,11 +240,17 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                  // Load Accounts for account ops (or just pre-load)
                  const comptes = await compteEpargneApi.getByClient(formData.client_id);
                  setClientAccounts(comptes || []);
-                 
-                 // Auto-select if only 1 and match type? Or prioritize pending payment
-                 // For now, if there is a pending account, maybe auto-select it if operation matches?
-                 // Let's just create a helper logic later.
-                 if (comptes?.length === 1) {
+
+                 // Si un compte est pré-sélectionné (activation depuis drawer),
+                 // on définit l'objet complet selectedAccount
+                 if (preSelectedAccountId && comptes) {
+                     const preSelected = comptes.find((c: any) => c.id === preSelectedAccountId);
+                     if (preSelected) {
+                         setSelectedAccountId(preSelectedAccountId);
+                         setSelectedAccount(preSelected);
+                     }
+                 } else if (comptes?.length === 1) {
+                     // Auto-select si un seul compte
                      setSelectedAccountId(comptes[0].id);
                      setSelectedAccount(comptes[0]);
                  }
@@ -240,20 +289,54 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
 
     const montant = parseFloat(formData.montant);
     if (!formData.montant || isNaN(montant) || montant <= 0) {
-      newErrors.montant = 'Montant invalide';
+      newErrors.montant = 'Le montant doit être supérieur à 0';
     } else if (montant > VALIDATION_LIMITS.MAX_AMOUNT) {
       newErrors.montant = `Le montant ne peut pas dépasser ${formatMoney(VALIDATION_LIMITS.MAX_AMOUNT)}`;
     } else if (montant < VALIDATION_LIMITS.MIN_AMOUNT) {
       newErrors.montant = `Le montant minimum est ${formatMoney(VALIDATION_LIMITS.MIN_AMOUNT)}`;
     }
 
-    const isMobileMoney = formData.mode_paiement === 'Airtel Money' || formData.mode_paiement === 'MTN Mobile Money';
-    if (isMobileMoney && !formData.numero_telephone) {
-      newErrors.numero_telephone = 'Numéro requis';
+    // Validation Mobile Money
+    const isMobileMoney = formData.mode_paiement === 'MOBILE_MONEY';
+    if (isMobileMoney) {
+      if (!formData.numero_telephone) {
+        newErrors.numero_telephone = 'Numéro requis';
+      } else {
+        // Format téléphone Congo: +242 XX XXX XXXX ou 0X XXX XXXX
+        const phoneClean = formData.numero_telephone.replace(/\s/g, '');
+        const phoneRegex = /^(\+242|00242|0)?[0-9]{9}$/;
+        if (!phoneRegex.test(phoneClean)) {
+          newErrors.numero_telephone = 'Format invalide (ex: +242 06 123 4567)';
+        }
+      }
+      if (!formData.numero_transaction) {
+        newErrors.numero_transaction = 'Numéro transaction requis';
+      }
     }
-    if (isMobileMoney && !formData.numero_transaction) {
-      newErrors.numero_transaction = 'Numéro transaction requis';
+
+    // Validation Chèque
+    if (formData.mode_paiement === 'CHECK') {
+      if (!formData.numero_cheque?.trim()) {
+        newErrors.numero_cheque = 'Numéro de chèque requis';
+      }
+      if (!formData.banque_emettrice?.trim()) {
+        newErrors.banque_emettrice = 'Banque émettrice requise';
+      }
+      if (!formData.date_emission_cheque) {
+        newErrors.date_emission_cheque = "Date d'émission requise";
+      }
     }
+
+    // Validation Virement
+    if (formData.mode_paiement === 'TRANSFER') {
+      if (!formData.banque_origine?.trim()) {
+        newErrors.banque_origine = "Banque d'origine requise";
+      }
+      if (!formData.reference_virement?.trim()) {
+        newErrors.reference_virement = 'Référence virement requise';
+      }
+    }
+
     if (!formData.description.trim()) {
       newErrors.description = 'Description requise';
     }
@@ -266,7 +349,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, isTontineOperation, selectedTontine]);
+  }, [formData, isTontineOperation, selectedTontine, isAccountOperation, selectedAccountId]);
 
   // Soumettre le formulaire
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -437,7 +520,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
 
       // **Cotisations Tontine** : utiliser l'endpoint tontine qui gère déjà le ledger
       let response;
-      if (formData.type_operation === 'Cotisation Tontine' && selectedTontine) {
+      if (formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION && selectedTontine) {
         response = await tontineApi.addContribution(selectedTontine.tontineId, {
           clientId: formData.client_id,
           montant: operationData.montant,
@@ -445,7 +528,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
           reference: operationData.reference
         });
 
-      } else if (isAccountOperation && selectedAccount && selectedAccount.statut === 'EN_ATTENTE_PAIEMENT' && formData.type_operation.includes('Dépôt')) {
+      } else if (isAccountOperation && selectedAccount && selectedAccount.statut === StatutCompte.PENDING_ACTIVATION && isOperationEntree(formData.type_operation)) {
           // ACTIVATION DE COMPTE : APPEL SPECIFIQUE
           response = await compteEpargneApi.depotInitial(selectedAccount.id, {
              montant: operationData.montant,
@@ -457,7 +540,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
         // **Autres opérations** : créer l'opération de caisse
         response = await operationCaisseApi.create({
           ...operationData,
-          statut: 'Posté',
+          statut: StatutTransaction.POSTED,
           idempotencyKey
         });
       }
@@ -622,29 +705,29 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                 aria-required="true"
               >
                 <optgroup label="Tontines">
-                  <option value="Cotisation Tontine">Cotisation Tontine</option>
-                  <option value="Retrait Tontine">Retrait Tontine</option>
+                  <option value={TypeOperationCaisse.TONTINE_CONTRIBUTION}>Cotisation Tontine</option>
+                  <option value={TypeOperationCaisse.TONTINE_WITHDRAWAL}>Retrait Tontine</option>
                 </optgroup>
                 <optgroup label="Crédits / Prêts">
-                  <option value="Remboursement Prêt">Remboursement Prêt</option>
-                  <option value="Décaissement Prêt">Décaissement Prêt</option>
+                  <option value={TypeOperationCaisse.LOAN_REPAYMENT}>Remboursement Prêt</option>
+                  <option value={TypeOperationCaisse.CREDIT_DISBURSEMENT}>Décaissement Prêt</option>
                 </optgroup>
                 <optgroup label="Compte Épargne">
-                  <option value="Dépôt épargne">Versement Compte Épargne</option>
-                  <option value="Retrait Épargne">Retrait Compte Épargne</option>
+                  <option value={TypeOperationCaisse.DEPOSIT_SAVINGS}>Versement Compte Épargne</option>
+                  <option value={TypeOperationCaisse.WITHDRAWAL_SAVINGS}>Retrait Compte Épargne</option>
                 </optgroup>
                 <optgroup label="Compte Courant">
-                  <option value="Versement Courant">Versement Compte Courant</option>
-                  <option value="Retrait Courant">Retrait Compte Courant</option>
+                  <option value={TypeOperationCaisse.DEPOSIT_CURRENT}>Versement Compte Courant</option>
+                  <option value={TypeOperationCaisse.WITHDRAWAL_CURRENT}>Retrait Compte Courant</option>
                 </optgroup>
                 <optgroup label="Compte Bloqué">
-                  <option value="Versement Bloqué">Versement Compte Bloqué</option>
-                  <option value="Retrait Bloqué">Retrait Compte Bloqué</option>
+                  <option value={TypeOperationCaisse.DEPOSIT_BLOCKED}>Versement Compte Bloqué</option>
+                  <option value={TypeOperationCaisse.WITHDRAWAL_BLOCKED}>Retrait Compte Bloqué</option>
                 </optgroup>
                 <optgroup label="Autres">
-                  <option value="Encaissement Divers">Encaissement Divers</option>
-                  <option value="Décaissement Divers">Décaissement Divers</option>
-                  <option value="Frais Bancaires">Frais Bancaires</option>
+                  <option value={TypeOperationCaisse.MISC_COLLECTION}>Encaissement Divers</option>
+                  <option value={TypeOperationCaisse.MISC_DISBURSEMENT}>Décaissement Divers</option>
+                  <option value={TypeOperationCaisse.BANK_FEE}>Frais Bancaires</option>
                 </optgroup>
               </select>
             </div>
@@ -675,11 +758,11 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                                    <div className="flex items-center gap-2">
                                        <span className="font-mono font-bold text-white">{acc.numero_compte || acc.numeroCompte}</span>
                                        <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${
-                                           acc.statut === 'Actif' ? 'bg-emerald-500/20 text-emerald-400' :
-                                           acc.statut === 'EN_ATTENTE_PAIEMENT' ? 'bg-orange-500/20 text-orange-400' :
+                                           acc.statut === StatutCompte.ACTIVE ? 'bg-emerald-500/20 text-emerald-400' :
+                                           acc.statut === StatutCompte.PENDING_ACTIVATION ? 'bg-orange-500/20 text-orange-400' :
                                            'bg-slate-500/20 text-slate-400'
                                        }`}>
-                                           {acc.statut === 'EN_ATTENTE_PAIEMENT' ? 'Activation Requise' : acc.statut}
+                                           {acc.statut === StatutCompte.PENDING_ACTIVATION ? 'Activation Requise' : acc.statut}
                                        </span>
                                    </div>
                                    <div className="text-xs text-slate-400">{acc.type_compte || acc.typeCompte}</div>
@@ -800,18 +883,18 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
             </legend>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3" role="radiogroup">
               {[
-                { mode: 'Espèces', icon: Wallet, color: 'green', disabled: false },
-                { mode: 'Airtel Money', icon: null, color: 'red', logo: AirtelLogo, disabled: true },
-                { mode: 'MTN Mobile Money', icon: null, color: 'yellow', logo: MTNLogo, disabled: true },
-                { mode: 'Virement', icon: Building2, color: 'emerald', disabled: true }
-              ].map(({ mode, icon: Icon, color, logo: Logo, disabled }) => (
+                { mode: 'CASH', label: 'Espèces', icon: Wallet, color: 'green', disabled: false },
+                { mode: 'CHECK', label: 'Chèque', icon: Receipt, color: 'blue', disabled: false },
+                { mode: 'TRANSFER', label: 'Virement', icon: Building2, color: 'emerald', disabled: false },
+                { mode: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone, color: 'amber', disabled: true }
+              ].map(({ mode, label, icon: Icon, color, disabled }) => (
                 <button
-                  key={mode}
+                  key={label}
                   type="button"
                   disabled={disabled}
                   onClick={() => {
                     if (disabled) return;
-                    const needsPhone = mode === 'Airtel Money' || mode === 'MTN Mobile Money';
+                    const needsPhone = mode === 'MOBILE_MONEY';
                     setFormData({
                       ...formData,
                       mode_paiement: mode,
@@ -820,8 +903,8 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                     });
                   }}
                   className={`p-4 rounded-lg border-2 transition relative ${
-                    disabled 
-                      ? 'border-slate-800 bg-slate-800/50 opacity-50 cursor-not-allowed grayscale' 
+                    disabled
+                      ? 'border-slate-800 bg-slate-800/50 opacity-50 cursor-not-allowed grayscale'
                       : formData.mode_paiement === mode
                         ? `border-${color}-500 bg-${color}-500/20`
                         : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
@@ -831,9 +914,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                   aria-disabled={disabled}
                   data-testid={`payment-${mode.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  {Logo ? (
-                    <Logo className="h-12 w-12 mx-auto mb-2" />
-                  ) : Icon ? (
+                  {Icon && (
                     <Icon
                       size={32}
                       className={`mx-auto mb-2 ${
@@ -842,7 +923,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                       }`}
                       aria-hidden="true"
                     />
-                  ) : null}
+                  )}
                   <div
                     className={`text-sm font-semibold ${
                       disabled ? 'text-slate-500' :
@@ -863,7 +944,7 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
           </fieldset>
 
           {/* Informations Mobile Money */}
-          {(formData.mode_paiement === 'Airtel Money' || formData.mode_paiement === 'MTN Mobile Money') && (
+          {formData.mode_paiement === 'MOBILE_MONEY' && (
             <section
               className="p-4 bg-slate-700/30 border border-slate-600 rounded-lg space-y-4"
               aria-labelledby="mobile-money-title"
@@ -932,6 +1013,186 @@ export default function CaissePaiementModal({ sessionId, onClose, onSuccess, ini
                   )}
                 </div>
               </div>
+            </section>
+          )}
+
+          {/* Informations Chèque */}
+          {formData.mode_paiement === 'CHECK' && (
+            <section
+              className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg space-y-4"
+              aria-labelledby="check-info-title"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Receipt className="text-blue-400" size={20} aria-hidden="true" />
+                <h4 id="check-info-title" className="font-semibold text-white">
+                  Informations du Chèque
+                </h4>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label
+                    htmlFor="check-number-input"
+                    className="block text-sm font-semibold text-slate-300 mb-2"
+                  >
+                    Numéro du Chèque *
+                  </label>
+                  <input
+                    id="check-number-input"
+                    type="text"
+                    value={formData.numero_cheque}
+                    onChange={(e) => setFormData({ ...formData, numero_cheque: e.target.value })}
+                    className={`w-full px-4 py-3 bg-slate-700 border ${
+                      errors.numero_cheque ? 'border-red-500' : 'border-slate-600'
+                    } rounded-lg text-white font-mono`}
+                    placeholder="CHQ-0001234"
+                    aria-required="true"
+                    aria-invalid={!!errors.numero_cheque}
+                  />
+                  {errors.numero_cheque && (
+                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.numero_cheque}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="bank-input"
+                    className="block text-sm font-semibold text-slate-300 mb-2"
+                  >
+                    Banque Émettrice *
+                  </label>
+                  <input
+                    id="bank-input"
+                    type="text"
+                    value={formData.banque_emettrice}
+                    onChange={(e) => setFormData({ ...formData, banque_emettrice: e.target.value })}
+                    className={`w-full px-4 py-3 bg-slate-700 border ${
+                      errors.banque_emettrice ? 'border-red-500' : 'border-slate-600'
+                    } rounded-lg text-white`}
+                    placeholder="Ex: BGFI, UBA, Ecobank..."
+                    aria-required="true"
+                    aria-invalid={!!errors.banque_emettrice}
+                  />
+                  {errors.banque_emettrice && (
+                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.banque_emettrice}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="check-date-input"
+                    className="block text-sm font-semibold text-slate-300 mb-2"
+                  >
+                    Date d'Émission *
+                  </label>
+                  <input
+                    id="check-date-input"
+                    type="date"
+                    value={formData.date_emission_cheque}
+                    onChange={(e) => setFormData({ ...formData, date_emission_cheque: e.target.value })}
+                    className={`w-full px-4 py-3 bg-slate-700 border ${
+                      errors.date_emission_cheque ? 'border-red-500' : 'border-slate-600'
+                    } rounded-lg text-white`}
+                    aria-required="true"
+                    aria-invalid={!!errors.date_emission_cheque}
+                  />
+                  {errors.date_emission_cheque && (
+                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.date_emission_cheque}</p>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-blue-300/70 flex items-center gap-1">
+                <AlertCircle size={12} />
+                Le chèque sera vérifié avant validation de l'opération
+              </p>
+            </section>
+          )}
+
+          {/* Informations Virement */}
+          {formData.mode_paiement === 'TRANSFER' && (
+            <section
+              className="p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-lg space-y-4"
+              aria-labelledby="transfer-info-title"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 className="text-emerald-400" size={20} aria-hidden="true" />
+                <h4 id="transfer-info-title" className="font-semibold text-white">
+                  Informations du Virement
+                </h4>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label
+                    htmlFor="origin-bank-input"
+                    className="block text-sm font-semibold text-slate-300 mb-2"
+                  >
+                    Banque d'Origine *
+                  </label>
+                  <input
+                    id="origin-bank-input"
+                    type="text"
+                    value={formData.banque_origine}
+                    onChange={(e) => setFormData({ ...formData, banque_origine: e.target.value })}
+                    className={`w-full px-4 py-3 bg-slate-700 border ${
+                      errors.banque_origine ? 'border-red-500' : 'border-slate-600'
+                    } rounded-lg text-white`}
+                    placeholder="Ex: BGFI, UBA, Ecobank..."
+                    aria-required="true"
+                    aria-invalid={!!errors.banque_origine}
+                  />
+                  {errors.banque_origine && (
+                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.banque_origine}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="origin-account-input"
+                    className="block text-sm font-semibold text-slate-300 mb-2"
+                  >
+                    N° Compte Origine
+                  </label>
+                  <input
+                    id="origin-account-input"
+                    type="text"
+                    value={formData.numero_compte_origine}
+                    onChange={(e) => setFormData({ ...formData, numero_compte_origine: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono"
+                    placeholder="XXXX-XXXX-XXXX"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="transfer-ref-input"
+                    className="block text-sm font-semibold text-slate-300 mb-2"
+                  >
+                    Référence Virement *
+                  </label>
+                  <input
+                    id="transfer-ref-input"
+                    type="text"
+                    value={formData.reference_virement}
+                    onChange={(e) => setFormData({ ...formData, reference_virement: e.target.value })}
+                    className={`w-full px-4 py-3 bg-slate-700 border ${
+                      errors.reference_virement ? 'border-red-500' : 'border-slate-600'
+                    } rounded-lg text-white font-mono`}
+                    placeholder="VIR-2024-XXXXX"
+                    aria-required="true"
+                    aria-invalid={!!errors.reference_virement}
+                  />
+                  {errors.reference_virement && (
+                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.reference_virement}</p>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-emerald-300/70 flex items-center gap-1">
+                <AlertCircle size={12} />
+                Veuillez confirmer la réception du virement sur le compte de l'institution
+              </p>
             </section>
           )}
 

@@ -15,6 +15,7 @@ import { userApi, roleApi, auditApi, notificationApi } from '../../lib/api-clien
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { SystemRole, getRoleLabel, normalizeRole } from '@shared/types/roles';
+import { StatutUser } from '@shared/enum/status-constants';
 
 interface User {
   id: string;
@@ -34,6 +35,16 @@ interface User {
 interface RoleOption {
   value: SystemRole;
   label: string;
+}
+
+interface Role {
+  id: string;
+  code: string;
+  nom: string;
+  description?: string;
+  niveau: number;
+  couleur?: string;
+  actif: boolean;
 }
 
 interface Permission {
@@ -87,7 +98,7 @@ export default function AdminGestionAcces() {
 
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'sessions' | 'activity' | 'analytics' | 'alerts'>('users');
   const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -117,7 +128,7 @@ export default function AdminGestionAcces() {
   const fetchRoles = useCallback(async () => {
     try {
       const data = await roleApi.getAll();
-      setRoles((data || []) as RoleOption[]);
+      setRoles((data || []) as Role[]);
     } catch (error) {
       // Silent fail - roles are optional
     }
@@ -146,9 +157,9 @@ export default function AdminGestionAcces() {
 
       setStats({
         total_users: usersData.length,
-        active_users: usersData.filter((u: User) => u.statut === 'actif').length,
-        inactive_users: usersData.filter((u: User) => u.statut === 'inactif').length,
-        locked_users: usersData.filter((u: User) => u.statut === 'bloque').length,
+        active_users: usersData.filter((u: User) => u.statut === StatutUser.ACTIVE).length,
+        inactive_users: usersData.filter((u: User) => u.statut === StatutUser.INACTIVE).length,
+        locked_users: usersData.filter((u: User) => u.statut === StatutUser.SUSPENDED).length,
         active_sessions: sessions.length,
         users_online_now: sessions.filter(s => s.is_active).length,
         new_users_today: usersData.filter((u: User) =>
@@ -203,7 +214,7 @@ export default function AdminGestionAcces() {
       confirmText: 'Bloquer',
       onConfirm: async () => {
         try {
-          await userApi.update(userId, { statut: 'bloque' });
+          await userApi.update(userId, { statut: StatutUser.SUSPENDED });
           toast.success('Utilisateur bloqué avec succès');
           fetchUsers();
         } catch (error) {
@@ -215,7 +226,7 @@ export default function AdminGestionAcces() {
 
   const unblockUser = useCallback(async (userId: string) => {
     try {
-      await userApi.update(userId, { statut: 'actif' });
+      await userApi.update(userId, { statut: StatutUser.ACTIVE });
       toast.success('Utilisateur débloqué avec succès');
       fetchUsers();
     } catch (error) {
@@ -266,10 +277,14 @@ export default function AdminGestionAcces() {
 
   const getStatusColor = (statut?: string) => {
     switch (statut) {
-      case 'actif': return 'bg-green-500/20 text-green-400';
-      case 'inactif': return 'bg-slate-500/20 text-slate-400';
-      case 'bloque': return 'bg-blue-500/20 text-blue-400';
-      default: return 'bg-slate-500/20 text-slate-400';
+      case StatutUser.ACTIVE:
+        return 'bg-green-500/20 text-green-400';
+      case StatutUser.INACTIVE:
+        return 'bg-slate-500/20 text-slate-400';
+      case StatutUser.SUSPENDED:
+        return 'bg-blue-500/20 text-blue-400';
+      default:
+        return 'bg-slate-500/20 text-slate-400';
     }
   };
 
@@ -423,7 +438,7 @@ export default function AdminGestionAcces() {
                     >
                       <option value="">Rôles</option>
                       {roles.map((role) => (
-                        <option key={role.value} value={role.value}>{role.label}</option>
+                        <option key={role.code} value={role.code}>{role.nom}</option>
                       ))}
                     </select>
                     <select
@@ -432,9 +447,9 @@ export default function AdminGestionAcces() {
                       className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-cyan-500 outline-none"
                     >
                       <option value="">Statut</option>
-                      <option value="actif">Actif</option>
-                      <option value="inactif">Inactif</option>
-                      <option value="bloque">Bloqué</option>
+                      <option value={StatutUser.ACTIVE}>Actif</option>
+                      <option value={StatutUser.INACTIVE}>Inactif</option>
+                      <option value={StatutUser.SUSPENDED}>Bloqué</option>
                     </select>
 
                     <div className="flex items-center gap-1 ml-auto sm:ml-2">
@@ -521,8 +536,8 @@ export default function AdminGestionAcces() {
                             </td>
                             <td className="px-6 py-4 text-center">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                                    user.statut === 'actif' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                    user.statut === 'bloque' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                    user.statut === StatutUser.ACTIVE ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                    user.statut === StatutUser.SUSPENDED ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                                     'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                 }`}>
                                 {user.statut || 'inconnu'}
@@ -564,10 +579,10 @@ export default function AdminGestionAcces() {
                                     <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => user.statut === 'bloque' ? unblockUser(user.id) : blockUser(user.id)}
-                                    className={`h-8 w-8 p-0 ${user.statut === 'bloque' ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-orange-400 hover:bg-orange-500/10'}`}
+                                    onClick={() => user.statut === StatutUser.SUSPENDED ? unblockUser(user.id) : blockUser(user.id)}
+                                    className={`h-8 w-8 p-0 ${user.statut === StatutUser.SUSPENDED ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-orange-400 hover:bg-orange-500/10'}`}
                                     >
-                                        {user.statut === 'bloque' ? <Unlock size={14} /> : <Lock size={14} />}
+                                        {user.statut === StatutUser.SUSPENDED ? <Unlock size={14} /> : <Lock size={14} />}
                                     </Button>
                                 )}
                                 {canDeleteUsers && (

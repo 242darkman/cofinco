@@ -219,7 +219,7 @@ export class TransfertInterCoffresValidator {
     }
 
     // Vérifier le statut
-    const cancellableStatuts = ["Brouillon", "Soumis", "Approuvé N1", "Approuvé N2"];
+    const cancellableStatuts = ["DRAFT", "SUBMITTED", "APPROVED_L1", "APPROVED_L2"];
     if (!cancellableStatuts.includes(transfert.statut)) {
       return {
         valid: false,
@@ -306,12 +306,12 @@ export class TransfertInterCoffresValidator {
     }
 
     // RG-003: Coffre source actif
-    if (coffreSource.statut !== "Actif") {
+    if (coffreSource.statut !== "ACTIVE") {
       return { valid: false, errorCode: "TIC_006", error: "Le coffre source n'est pas actif" };
     }
 
     // RG-004: Coffre destination actif
-    if (coffreDest.statut !== "Actif") {
+    if (coffreDest.statut !== "ACTIVE") {
       return { valid: false, errorCode: "TIC_007", error: "Le coffre destination n'est pas actif" };
     }
 
@@ -394,11 +394,11 @@ export class TransfertInterCoffresValidator {
     action: string
   ): ValidationResult {
     const validTransitions: Record<string, Record<string, string>> = {
-      Brouillon: { submit: "Soumis", cancel: "Annulé" },
-      Soumis: { approve_l1: "Approuvé N1", reject: "Rejeté", cancel: "Annulé" },
-      "Approuvé N1": { approve_l2: "Approuvé N2", reject: "Rejeté", cancel: "Annulé" },
-      "Approuvé N2": { dispatch: "En transit" },
-      "En transit": { receive_ok: "Reçu", receive_ecart: "Reçu avec écart" },
+      DRAFT: { submit: "SUBMITTED", cancel: "CANCELLED" },
+      SUBMITTED: { approve_l1: "APPROVED_L1", reject: "REJECTED", cancel: "CANCELLED" },
+      APPROVED_L1: { approve_l2: "APPROVED_L2", reject: "REJECTED", cancel: "CANCELLED" },
+      APPROVED_L2: { dispatch: "IN_TRANSIT" },
+      IN_TRANSIT: { receive_ok: "RECEIVED", receive_ecart: "RECEIVED_WITH_DISCREPANCY" },
     };
 
     const transitions = validTransitions[currentStatus];

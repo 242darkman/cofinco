@@ -8,7 +8,11 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { 
+  getStatusLabel, 
+  ALL_STATUS_LABELS,
+  ALL_STATUS_COLORS 
+} from '@/lib/status-labels';
 
 interface TimelineEvent {
   id: string;
@@ -34,7 +38,7 @@ export function CreditTimeline({ demandeId, compact = false }: CreditTimelinePro
     if (!demandeId) return;
 
     setLoading(true);
-    fetch(`/api/demandes/${demandeId}/timeline`)
+    fetch(`/api/demandes-credit/${demandeId}/timeline`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -82,11 +86,23 @@ export function CreditTimeline({ demandeId, compact = false }: CreditTimelinePro
   };
 
   const getColor = (type: string, statut: string) => {
+    // Check specific timeline colors first
     const s = statut.toLowerCase();
     if (s.includes('approuv') || s.includes('décaiss')) return 'bg-emerald-500 text-white border-emerald-500';
-    if (s.includes('rejet') || s.includes('annul')) return 'bg-red-500 text-white border-red-500';
+    if (s.includes('rejet') || s.includes('annul') || s.includes('supp')) return 'bg-red-500 text-white border-red-500';
     if (s.includes('cours')) return 'bg-blue-500 text-white border-blue-500';
     if (type === 'REEVALUATION') return 'bg-amber-500 text-black border-amber-500';
+    
+    // Fallback to standard status colors if available
+    if (ALL_STATUS_COLORS[statut as keyof typeof ALL_STATUS_COLORS]) {
+      // Convert standard bg/text classes to border style used here if needed, 
+      // but for dots we usually need strong backgrounds.
+      // Let's keep manual overrides for the dot icons to ensure visibility
+    }
+    
+    // Check properly for DELETED/Supprimée
+    if (statut === 'DELETED' || statut === 'Supprimée') return 'bg-red-500 text-white border-red-500';
+
     return 'bg-slate-700 text-slate-300 border-slate-600';
   };
 
@@ -162,13 +178,14 @@ export function CreditTimeline({ demandeId, compact = false }: CreditTimelinePro
                     </div>
                   )}
                   
-                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                      <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                       event.statut.includes('Approuv') ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                       event.statut.includes('Rejet') ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                       'bg-slate-700/30 text-slate-400 border-slate-600'
+                       // Use standard colors for the badge text
+                       ALL_STATUS_COLORS[event.statut as keyof typeof ALL_STATUS_COLORS] || 
+                       (event.statut === 'DELETED' ? ALL_STATUS_COLORS['DELETED'] : 
+                       'bg-slate-700/30 text-slate-400 border-slate-600')
                      }`}>
-                       {event.statut}
+                       {getStatusLabel(event.statut, ALL_STATUS_LABELS)}
                      </span>
                   </div>
                 </div>

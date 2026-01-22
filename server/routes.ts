@@ -21,15 +21,17 @@ import { registerOtpRoutes } from "./routes/otp";
 import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/config";
 import { registerComptesRoutes } from "./routes/comptes";
 import { registerReevaluationRoutes } from "./routes/reevaluations";
+import { registerNotificationsRoutes } from "./routes/notifications";
+import { registerPushRoutes } from "./routes/push";
 
 import { coffreRouter } from "./routes/coffre";
 import { caisseAgentRouter } from "./routes/caisse-agent";
 import { caisseAdminRouter } from "./routes/caisse-admin";
-import { uploadRouter } from "./routes/upload";
 import { maintenanceRouter } from "./routes/maintenance";
 import { checkMaintenanceMode } from "./middleware/maintenance";
 import { transfertsInterCoffresRouter } from "./routes/transferts-inter-coffres";
 import storageRouter from "./routes/storage";
+import { regularisationRouter } from "./routes/regularisation";
 
 export function registerRoutes(app: Express): Server {
   // Apply Maintenance Middleware globally
@@ -39,10 +41,13 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/coffre", coffreRouter);
   app.use("/api/caisse-agent", caisseAgentRouter);
   app.use("/api/caisses", caisseAdminRouter); // Advanced caisse admin operations
-  app.use("/api/uploads", uploadRouter);
-  app.use("/api/maintenance-mode", maintenanceRouter);
   app.use("/api/maintenance-mode", maintenanceRouter);
   app.use("/api/transferts-inter-coffres", transfertsInterCoffresRouter);
+
+  // Admin - Regularisation Module (gestion des tâches de régularisation)
+  app.use("/api/admin/regularisations", regularisationRouter);
+
+  // Storage routes (unified)
   app.use("/api/storage", storageRouter);
 
   // Register modular routes
@@ -54,6 +59,8 @@ export function registerRoutes(app: Express): Server {
   registerOperationsRoutes(app); // Agents, prospection
   registerDashboardRoutes(app); // Dashboard statistics
   registerMessagesRoutes(app); // Messaging System
+  registerNotificationsRoutes(app); // Notifications System (caisse + general)
+  registerPushRoutes(app); // Push Notifications (Web Push API)
   app.use("/api/hr", hrRouter); // HR Module
   app.use("/api/loyalty", loyaltyRouter); // Loyalty Points System
 

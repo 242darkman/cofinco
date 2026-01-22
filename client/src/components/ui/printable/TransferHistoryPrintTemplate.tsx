@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Building2, Phone, Mail, MapPin } from 'lucide-react';
 import { formatMoney } from '../../../lib/format';
+import { StatutTransfertCaisse } from '@shared/enum/status-constants';
 
 export interface TransferHistoryData {
   title: string;
@@ -150,8 +151,8 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
                   <td className="py-2 px-2 text-slate-600 italic">{t.initiator}</td>
                   <td className="py-2 px-2">
                     <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
-                        t.statut === 'Validé' || t.statut === 'valide' ? 'bg-green-100 text-green-800 border-green-200' :
-                        t.statut === 'En attente' || t.statut === 'en_attente' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                        (t.statut === StatutTransfertCaisse.VALIDATED) ? 'bg-green-100 text-green-800 border-green-200' :
+                        (t.statut === StatutTransfertCaisse.PENDING) ? 'bg-amber-100 text-amber-800 border-amber-200' :
                         'bg-slate-100 text-slate-800 border-slate-200'
                     }`}>
                         {t.statut}

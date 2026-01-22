@@ -6,8 +6,10 @@ import {
   coffresForts,
   configCoffreFort,
   users,
+  userRoles,
   agences,
 } from "@shared/schema";
+import { StatutTransfertCoffre, StatutCoffre } from "@shared/enum/status-constants";
 import { eq, and, or, desc, gte, lte, count } from "drizzle-orm";
 import { executeTransfertCoffre } from "./transfer-executor";
 import { TransfertCoffreValidator } from "./transfert-validator";
@@ -126,7 +128,7 @@ export class TransfertCoffreService {
       reference,
       idempotencyKey: params.idempotencyKey,
       billetage: params.billetage,
-      statut: "Demandé",
+      statut: StatutTransfertCoffre.REQUESTED,
       requestedBy: params.requestedBy,
       requestedAt: new Date(),
     }).returning();
@@ -136,7 +138,7 @@ export class TransfertCoffreService {
       transfertId: transfert.id,
       action: "CREATED",
       statutAvant: null,
-      statutApres: "Demandé",
+      statutApres: StatutTransfertCoffre.REQUESTED,
       details: {
         typeTransfert: params.typeTransfert,
         montant: params.montant,
@@ -171,9 +173,9 @@ export class TransfertCoffreService {
     }
 
     // Vérifier l'état
-    if (transfert.statut !== "Demandé") {
-      return { 
-        success: false, 
+    if (transfert.statut !== StatutTransfertCoffre.REQUESTED) {
+      return {
+        success: false,
         errorCode: "INVALID_TRANSITION",
         error: `Le transfert doit être en statut 'Demandé' (actuel: ${transfert.statut})`,
       };
@@ -192,7 +194,7 @@ export class TransfertCoffreService {
       };
     }
 
-    const newStatut = params.approved ? "Validé" : "Rejeté";
+    const newStatut = params.approved ? StatutTransfertCoffre.VALIDATED : StatutTransfertCoffre.REJECTED;
 
     const [updated] = await db.update(transfertsCoffreCaisse)
       .set({
@@ -208,7 +210,7 @@ export class TransfertCoffreService {
     await db.insert(transfertsCoffreAuditLogs).values({
       transfertId: params.transfertId,
       action: params.approved ? "VALIDATED" : "REJECTED",
-      statutAvant: "Demandé",
+      statutAvant: StatutTransfertCoffre.REQUESTED,
       statutApres: newStatut,
       details: {
         approved: params.approved,
@@ -272,15 +274,18 @@ export class TransfertCoffreService {
     }
 
     // Seul l'initiateur ou un admin peut annuler
-    const [user] = await db.select().from(users).where(eq(users.id, params.cancelledBy));
-    const isAdmin = isAdminRole(user?.role);
+    // Get user's primary role from userRoles table (Architecture V3)
+    const [primaryRole] = await db.select({ role: userRoles.role })
+      .from(userRoles)
+      .where(and(eq(userRoles.userId, params.cancelledBy), eq(userRoles.isPrimary, true)));
+    const isAdmin = isAdminRole(primaryRole?.role);
     
     if (transfert.requestedBy !== params.cancelledBy && !isAdmin) {
       return { success: false, errorCode: "PERMISSION_DENIED", error: "Seul l'initiateur peut annuler" };
     }
 
     // Vérifier l'état
-    if (transfert.statut !== "Demandé") {
+    if (transfert.statut !== StatutTransfertCoffre.REQUESTED) {
       return {
         success: false,
         errorCode: "INVALID_TRANSITION",
@@ -290,7 +295,7 @@ export class TransfertCoffreService {
 
     const [updated] = await db.update(transfertsCoffreCaisse)
       .set({
-        statut: "Annulé",
+        statut: StatutTransfertCoffre.CANCELLED,
         reasonRejection: params.reason,
         updatedAt: new Date(),
       })
@@ -300,8 +305,8 @@ export class TransfertCoffreService {
     await db.insert(transfertsCoffreAuditLogs).values({
       transfertId: params.transfertId,
       action: "CANCELLED",
-      statutAvant: "Demandé",
-      statutApres: "Annulé",
+      statutAvant: StatutTransfertCoffre.REQUESTED,
+      statutApres: StatutTransfertCoffre.CANCELLED,
       details: { reason: params.reason },
       userId: params.cancelledBy,
       ipAddress: params.ipAddress,
@@ -498,7 +503,7 @@ export class TransfertCoffreService {
       ownerId: agenceId,
       devise: "XAF",
       solde: "0",
-      statut: "Actif",
+      statut: StatutCoffre.ACTIVE,
     }).returning();
 
     return { id: coffreFort.id, solde: coffreFort.solde, nom: coffreFort.nom };

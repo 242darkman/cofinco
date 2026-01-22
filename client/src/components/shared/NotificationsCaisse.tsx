@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, AlertCircle, CheckCircle, Clock, X, Eye, Check, User, Phone as PhoneIcon, CreditCard } from 'lucide-react';
 import { Card, Button, Modal, TabGroup, ResponsiveTable } from '../ui';
+import { authService } from '../../lib/auth';
 
 interface Notification {
   id: string;
@@ -27,6 +28,7 @@ interface NotificationsCaisseProps {
 }
 
 export default function NotificationsCaisse({ onClose, compact = false }: NotificationsCaisseProps) {
+  const user = authService.getCurrentUser();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'non_lue' | 'lue'>('all');
@@ -57,7 +59,7 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
       await fetch(`/api/notifications-caisse/${notifId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statut: 'Lue' })
+        body: JSON.stringify({ statut: 'READ' })
       });
       loadNotifications();
     } catch (error) {
@@ -67,13 +69,12 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
 
   const traiterNotification = async (notifId: string, notes?: string) => {
     try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       await fetch(`/api/notifications-caisse/${notifId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          statut: 'Traitée',
-          traite_par: currentUser.id,
+          statut: 'PROCESSED',
+          traite_par: user?.id,
           date_traitement: new Date().toISOString(),
           notes_traitement: notes
         })
@@ -90,13 +91,11 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
     if (!confirm(`Confirmer la réception du paiement de ${(notif.montant || 0).toLocaleString()} FCFA par ${notif.mode_paiement} ?`)) return;
 
     try {
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-
       // 1. Activer le compte
       await fetch(`/api/comptes-bancaires/${notif.compte_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paiement_valide: true, solde: notif.montant, statut: 'Actif' })
+        body: JSON.stringify({ paiement_valide: true, solde: notif.montant, statut: 'ACTIVE' })
       });
 
       // 2. Enregistrer la transaction
@@ -112,8 +111,8 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
           mode_paiement: notif.mode_paiement,
           reference_paiement: notif.reference_externe,
           description: 'Dépôt initial - Ouverture de compte',
-          effectue_par: currentUser.id,
-          statut: 'Validée'
+          effectue_par: user?.id,
+          statut: 'VALIDATED'
         })
       });
 

@@ -73,7 +73,7 @@ const submitToCommitteeSchema = z.object({
 });
 
 const committeeDecisionSchema = z.object({
-  decision: z.enum(["Approuvée", "Rejetée définitivement", "Montant réduit"]),
+  decision: z.enum(["APPROVED", "DEFINITIVELY_REJECTED", "REDUCED_AMOUNT"]),
   montantApprouve: z.number().optional(),
   commentaire: z.string().min(10, "Commentaire requis"),
   membresPresents: z.array(z.string().uuid()),
@@ -332,9 +332,9 @@ export function registerReevaluationRoutes(app: Express) {
           id: demande.id,
           numeroDemande: demande.numeroDemande,
           client: client ? {
-            id: client.id,
-            nom: client.nom,
-            prenom: client.prenom
+            id: client.id
+            // Note: nom/prenom sont dans users table (Architecture V3)
+            // Utiliser ClientWithIdentity pour récupérer ces champs
           } : null,
           montantInitial: demande.montantDemande,
           statutActuel: demande.statut
@@ -732,14 +732,16 @@ export function registerReevaluationRoutes(app: Express) {
         createdAt: reevaluationsCredit.createdAt,
         dateDecisionComite: reevaluationsCredit.dateDecisionComite,
         decisionComite: reevaluationsCredit.decisionComite,
+        // Architecture V3: nom/prenom sont dans users
         client: {
-          nom: clients.nom,
-          prenom: clients.prenom,
-          photo_url: clients.photoProfile
+          nom: users.nom,
+          prenom: users.prenom,
+          photo_url: users.photoProfile
         }
       })
       .from(reevaluationsCredit)
-      .leftJoin(clients, eq(reevaluationsCredit.clientId, clients.id));
+      .leftJoin(clients, eq(reevaluationsCredit.clientId, clients.id))
+      .leftJoin(users, eq(clients.userId, users.id));
 
       if (statut) {
         baseQuery = baseQuery.where(eq(reevaluationsCredit.statut, statut as any)) as any;

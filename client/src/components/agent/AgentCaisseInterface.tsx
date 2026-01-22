@@ -63,7 +63,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         peut_voir_solde_caisse: false,
         horaire_debut: '08:00',
         horaire_fin: '17:00',
-        statut: 'Actif',
+        statut: 'ACTIVE',
         user: {
           nom_complet: 'Agent de Caisse Démo'
         }
@@ -121,7 +121,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         montant: amount,
         agent_id: agentId,
         reference: reference || `TRX-${Date.now()}`,
-        statut: 'Validé',
+        statut: 'VALIDATED',
         created_at: new Date().toISOString()
       };
 

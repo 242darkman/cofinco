@@ -16,13 +16,14 @@ import type { OperationTerrainWithRelations } from '@shared/schema';
 import OperationDetailModal from './OperationDetailModal';
 import RejectOperationModal from './RejectOperationModal';
 import { formatClientName } from '../../../lib/format';
+import { StatutOperationTerrain } from '@shared/enum/status-constants';
 
 interface OperationsApprovalListProps {
   onModuleChange?: (module: string) => void;
 }
 
 type FilterType = 'all' | 'COLLECT_CASH' | 'SETTLEMENT_CASH';
-type FilterStatut = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'all';
+type FilterStatut = typeof StatutOperationTerrain.SUBMITTED | typeof StatutOperationTerrain.APPROVED | typeof StatutOperationTerrain.REJECTED | 'all';
 
 const formatMoney = (amount: string | number) => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -40,13 +41,13 @@ const formatDate = (date: string) => {
 
 const getStatutBadge = (statut: string) => {
   switch (statut) {
-    case 'SUBMITTED':
+    case StatutOperationTerrain.SUBMITTED:
       return <Badge variant="warning" size="sm" value="En attente" />;
-    case 'APPROVED':
+    case StatutOperationTerrain.APPROVED:
       return <Badge variant="success" size="sm" value="Approuvée" />;
-    case 'REJECTED':
+    case StatutOperationTerrain.REJECTED:
       return <Badge variant="danger" size="sm" value="Rejetée" />;
-    case 'CANCELLED':
+    case StatutOperationTerrain.CANCELLED:
       return <Badge variant="neutral" size="sm" value="Annulée" />;
     default:
       return <Badge variant="neutral" size="sm" value={statut} />;
@@ -62,7 +63,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
 
   // Filters
   const [filterType, setFilterType] = useState<FilterType>('all');
-  const [filterStatut, setFilterStatut] = useState<FilterStatut>('SUBMITTED');
+  const [filterStatut, setFilterStatut] = useState<FilterStatut>(StatutOperationTerrain.SUBMITTED);
   const [filterAgentId, setFilterAgentId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -167,7 +168,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
     return clientName.includes(query) || agentName.includes(query) || ref.includes(query);
   });
 
-  const pendingCount = operations.filter(op => op.statut === 'SUBMITTED').length;
+  const pendingCount = operations.filter(op => op.statut === StatutOperationTerrain.SUBMITTED).length;
 
   const agentOptions = [
     { value: '', label: 'Tous les agents' },
@@ -242,9 +243,9 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                 value={filterStatut}
                 onChange={(e) => setFilterStatut(e.target.value as FilterStatut)}
                 options={[
-                  { value: 'SUBMITTED', label: 'En attente' },
-                  { value: 'APPROVED', label: 'Approuvées' },
-                  { value: 'REJECTED', label: 'Rejetées' },
+                  { value: StatutOperationTerrain.SUBMITTED, label: 'En attente' },
+                  { value: StatutOperationTerrain.APPROVED, label: 'Approuvées' },
+                  { value: StatutOperationTerrain.REJECTED, label: 'Rejetées' },
                   { value: 'all', label: 'Tous les statuts' },
                 ]}
               />
@@ -277,45 +278,45 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
           <Card
             variant="default"
             padding="sm"
-            className={`cursor-pointer transition-all ${filterStatut === 'SUBMITTED' ? 'border-amber-500/50 bg-amber-500/5' : ''}`}
-            onClick={() => setFilterStatut('SUBMITTED')}
+            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.SUBMITTED ? 'border-amber-500/50 bg-amber-500/5' : ''}`}
+            onClick={() => setFilterStatut(StatutOperationTerrain.SUBMITTED)}
           >
             <div className="flex items-center gap-2">
               <Clock size={16} className="text-amber-400" />
               <span className="text-sm text-slate-300">En attente</span>
             </div>
             <p className="text-2xl font-bold text-amber-400 mt-1">
-              {operations.filter(op => op.statut === 'SUBMITTED').length}
+              {operations.filter(op => op.statut === StatutOperationTerrain.SUBMITTED).length}
             </p>
           </Card>
 
           <Card
             variant="default"
             padding="sm"
-            className={`cursor-pointer transition-all ${filterStatut === 'APPROVED' ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`}
-            onClick={() => setFilterStatut('APPROVED')}
+            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.APPROVED ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`}
+            onClick={() => setFilterStatut(StatutOperationTerrain.APPROVED)}
           >
             <div className="flex items-center gap-2">
               <CheckCircle size={16} className="text-emerald-400" />
               <span className="text-sm text-slate-300">Approuvées</span>
             </div>
             <p className="text-2xl font-bold text-emerald-400 mt-1">
-              {operations.filter(op => op.statut === 'APPROVED').length}
+              {operations.filter(op => op.statut === StatutOperationTerrain.APPROVED).length}
             </p>
           </Card>
 
           <Card
             variant="default"
             padding="sm"
-            className={`cursor-pointer transition-all ${filterStatut === 'REJECTED' ? 'border-red-500/50 bg-red-500/5' : ''}`}
-            onClick={() => setFilterStatut('REJECTED')}
+            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.REJECTED ? 'border-red-500/50 bg-red-500/5' : ''}`}
+            onClick={() => setFilterStatut(StatutOperationTerrain.REJECTED)}
           >
             <div className="flex items-center gap-2">
               <XCircle size={16} className="text-red-400" />
               <span className="text-sm text-slate-300">Rejetées</span>
             </div>
             <p className="text-2xl font-bold text-red-400 mt-1">
-              {operations.filter(op => op.statut === 'REJECTED').length}
+              {operations.filter(op => op.statut === StatutOperationTerrain.REJECTED).length}
             </p>
           </Card>
         </div>
@@ -323,10 +324,10 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
         {/* Liste des opérations */}
         {filteredOperations.length === 0 ? (
           <EmptyState
-            icon={filterStatut === 'SUBMITTED' ? CheckCircle : Clock}
-            title={filterStatut === 'SUBMITTED' ? 'Aucune opération en attente' : 'Aucune opération trouvée'}
+            icon={filterStatut === StatutOperationTerrain.SUBMITTED ? CheckCircle : Clock}
+            title={filterStatut === StatutOperationTerrain.SUBMITTED ? 'Aucune opération en attente' : 'Aucune opération trouvée'}
             description={
-              filterStatut === 'SUBMITTED'
+              filterStatut === StatutOperationTerrain.SUBMITTED
                 ? 'Toutes les opérations ont été traitées.'
                 : 'Modifiez vos filtres pour voir plus de résultats.'
             }
@@ -339,7 +340,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                 variant="default"
                 padding="md"
                 className={`transition-all ${
-                  op.statut === 'SUBMITTED'
+                  op.statut === StatutOperationTerrain.SUBMITTED
                     ? 'border-amber-500/20 hover:border-amber-500/40'
                     : 'hover:border-cyan-500/20'
                 }`}
@@ -402,7 +403,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                     Détails
                   </Button>
 
-                  {op.statut === 'SUBMITTED' && (
+                  {op.statut === StatutOperationTerrain.SUBMITTED && (
                     <>
                       <Button
                         variant="outline"
@@ -438,12 +439,12 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
           operation={selectedOperation}
           onClose={() => setSelectedOperation(null)}
           onApprove={
-            selectedOperation.statut === 'SUBMITTED'
+            selectedOperation.statut === StatutOperationTerrain.SUBMITTED
               ? () => handleApprove(selectedOperation)
               : undefined
           }
           onReject={
-            selectedOperation.statut === 'SUBMITTED'
+            selectedOperation.statut === StatutOperationTerrain.SUBMITTED
               ? () => {
                   setOperationToReject(selectedOperation);
                   setSelectedOperation(null);

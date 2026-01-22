@@ -1,5 +1,6 @@
 import { PiggyBank, Wallet, Lock } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { StatutCompte } from '@shared/enum/status-constants';
 
 export type AccountType = 'Courant' | 'Épargne' | 'Bloqué';
 
@@ -77,18 +78,28 @@ export function getAccountInterestRate(account: AccountLike): number {
   return Number(raw) || 0;
 }
 
+import { getStatusLabel, getStatusColor, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_COLORS } from './status-labels';
+
 export function getAccountUiConfig(account: AccountLike, role: AccountViewRole = 'client'): AccountUiConfig {
   const type = getAccountType(account);
-  const status = String(account.statut || 'Actif');
+  const status = String(account.statut || StatutCompte.ACTIVE);
   const isLocked = type === 'Bloqué' || account.blocageActif === true || account.blocage_actif === true;
-  const isActive = status === 'Actif';
-  const statusLabel = isLocked ? 'Bloqué' : status === 'EN_ATTENTE_PAIEMENT' ? 'En attente paiement' : status;
+  const isActive = status === StatutCompte.ACTIVE;
+  
+  // Use centralized labels and colors
+  const statusLabel = getStatusLabel(status, ACCOUNT_STATUS_LABELS);
+  
+  // Override color if the account is technically "Locked" but active? 
+  // Actually the pill should reflect the STATUS (Active/Closed), 
+  // lock icon shows lock state.
+  const badgeClassName = getStatusColor(status, ACCOUNT_STATUS_COLORS);
+
   const interestRate = getAccountInterestRate(account);
 
   return {
     type,
     icon: TYPE_STYLES[type].icon,
-    badgeClassName: TYPE_STYLES[type].badgeClassName,
+    badgeClassName,
     accentClassName: TYPE_STYLES[type].accentClassName,
     statusLabel,
     isLocked,

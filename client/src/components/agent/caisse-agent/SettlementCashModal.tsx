@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Modal, Button, FormField, SelectField } from '../../ui';
 import { caisseAgentApi, sessionCaisseApi } from '../../../lib/api-client';
 import { computeSessionStatus } from '../../../lib/format';
+import { StatutCaisseAgent } from '@shared/enum/status-constants';
 
 interface SettlementCashModalProps {
   agentId: string;
@@ -49,7 +50,7 @@ export default function SettlementCashModal({
         const sessions = await sessionCaisseApi.getAll();
         const activeSessions = sessions?.filter((s: any) => {
           const status = s.computedStatus || computeSessionStatus(s);
-          return status === 'OPEN';
+          return status === StatutCaisseAgent.OPEN;
         }) || [];
         setCaisses(activeSessions);
 
@@ -117,7 +118,7 @@ export default function SettlementCashModal({
         montant: montantNum,
         observations: observations || undefined,
         billetage: useBilletage ? billetage : undefined,
-        idempotencyKey: `settlement_${agentId}_${Date.now()}`
+        idempotencyKey: crypto.randomUUID()
       });
 
       onSuccess();

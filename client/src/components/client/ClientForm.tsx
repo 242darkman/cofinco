@@ -1,4 +1,4 @@
-import type { Client, InsertClient } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,16 +12,63 @@ import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole } from '@shared/types/roles';
 import { agenceApi } from '../../lib/api-client';
 import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { resolveStorageUrl } from '../../lib/format';
+import { StatutClient, StatutAgence } from '@shared/enum/status-constants';
 
 interface ClientFormProps {
-  client?: Client | null;
+  client?: ClientWithIdentity | null;
   onClose: () => void;
-  onSave: (client: InsertClient | Partial<Client>) => void;
+  onSave: (data: ClientFormData) => void;
 }
 
-// Extended form data to include structured documents
-interface ClientFormData extends InsertClient {
+/**
+ * Interface pour les données du formulaire client.
+ * Inclut les champs d'identité (users) et les champs métier (clients).
+ */
+interface ClientFormData {
+  // Champs d'identité (envoyés à la table users)
+  nom: string;
+  prenom?: string | null;
+  email?: string | null;
+  telephone?: string | null;
+  photoProfile?: string | null;
+
+  // Champs métier client (envoyés à la table clients)
+  adresse?: string | null; // Alias pour adresseDomicile
+  adresseDomicile?: string | null;
+  lieuActivite?: string | null;
+  ville?: string | null;
+  pays?: string | null;
+  dateNaissance?: string | null;
+  numeroPiece?: string | null;
+  typePiece?: string | null;
+  profession?: string | null;
+  employeur?: string | null;
+  typeActivite?: string | null;
+  revenuMensuel?: string | null;
+  typeMarcheId?: string | null;
+  segment?: string | null;
+  frequenceCarte?: string | null;
+  latitude?: string | null;
+  longitude?: string | null;
+  score?: number | null;
+  creditTotal?: string | null;
+  epargneTotal?: string | null;
+  tauxRemboursement?: string | null;
+  limiteRetraitJournalier?: string | null;
+  limiteRetraitHebdomadaire?: string | null;
+  limiteRetraitMensuel?: string | null;
+  pointsFidelite?: number | null;
+  agenceId?: string | null;
+  agentReferentId?: string | null;
+  statut?: string | null;
+  dateInscription?: Date | null;
+
+  // Documents KYC (JSONB)
   documents?: UploadedDocument[];
+
+  // Alias legacy
+  photoUrl?: string | null;
 }
 
 // ID Type options with icons
@@ -51,7 +98,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     lieuActivite: '',
     photoUrl: '',
     photoProfile: '',
-    status: 'Actif',
+    statut: StatutClient.ACTIVE,
     segment: 'Standard',
     score: 50,
     creditTotal: '0',
@@ -90,26 +137,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
   };
 
   // Helper to get display URL for uploaded files
-  const getFileDisplayUrl = (path: string | null | undefined): string => {
-    if (!path) return '';
-    if (path.startsWith('data:')) return path;
-    if (path.startsWith('/api/')) return path;
-    if (path.startsWith('/')) return path;
-    if (path.startsWith('http')) {
-      try {
-        const url = new URL(path);
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        if (pathParts.length >= 2) {
-          const key = pathParts.slice(1).join('/');
-          return `/api/uploads/files/${key}`;
-        }
-        return path;
-      } catch {
-        return path;
-      }
-    }
-    return `/api/uploads/files/${path}`;
-  };
+  const getFileDisplayUrl = resolveStorageUrl;
 
   // Parse existing documents when editing
   const parseExistingDocuments = useCallback((clientData: any) => {
@@ -193,7 +221,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         lieuActivite: c.lieuActivite || '',
         photoUrl: c.photoUrl || '',
         photoProfile: c.photoProfile || '',
-        status: c.status,
+        statut: c.statut,
         segment: c.segment,
         score: c.score || 50,
         creditTotal: c.creditTotal || 0,
@@ -231,7 +259,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     if (isAdmin) {
       const loadAgences = async () => {
         try {
-          const data = await agenceApi.getAll({ statut: 'Actif' });
+          const data = await agenceApi.getAll({ statut: StatutAgence.ACTIVE });
           setAgences(data);
         } catch (error) {
           console.error('Erreur chargement agences:', error);
@@ -487,11 +515,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           <SelectField
             label="Segment"
             name="segment"
-            value={formData.segment}
+            value={formData.segment ?? 'Standard'}
             onChange={(e) => handleChange('segment', e.target.value)}
             options={[
-              { value: 'Nouveau', label: 'Nouveau' },
               { value: 'Standard', label: 'Standard' },
+              { value: 'Premium', label: 'Premium' },
               { value: 'VIP', label: 'VIP' }
             ]}
           />

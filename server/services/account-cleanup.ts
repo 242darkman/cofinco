@@ -4,6 +4,7 @@ import { comptes, evenementsOutbox } from "@shared/schema";
 import { eq, and, lte, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
 import * as cron from "node-cron";
+import { StatutCompte } from "@shared/enum/status-constants";
 
 /**
  * Service de nettoyage des comptes en attente de paiement
@@ -71,7 +72,7 @@ export class AccountCleanupService {
                 .from(comptes)
                 .where(
                     and(
-                        eq(comptes.statut, 'EN_ATTENTE_PAIEMENT'),
+                        eq(comptes.statut, StatutCompte.PENDING_ACTIVATION),
                         lte(comptes.createdAt, cutoffDate)
                     )
                 );
@@ -87,13 +88,13 @@ export class AccountCleanupService {
                   // 2. Annulation
                   await tx.update(comptes)
                     .set({
-                        statut: 'Annulé', // Require 'Annulé' in enum
+                        statut: StatutCompte.CANCELLED,
                         closedAt: new Date(),
                         // closedBy: 'SYSTEM', // Need to handle system user ID logic if enforced FK
                         updatedAt: new Date(),
                     })
                     .where(eq(comptes.id, account.id));
-                    
+
                   // 3. Audit / Event
                   await tx.insert(evenementsOutbox).values({
                       type: 'SOLDE_COMPTE_CHANGE', // Reuse or add COMPTE_STATUT_CHANGE
@@ -103,8 +104,8 @@ export class AccountCleanupService {
                           compteId: account.id,
                           action: 'ANNULATION_AUTOMATIQUE',
                           motif: 'Délai de paiement initial dépassé (7 jours)',
-                          ancienStatut: 'EN_ATTENTE_PAIEMENT',
-                          nouveauStatut: 'Annulé',
+                          ancienStatut: StatutCompte.PENDING_ACTIVATION,
+                          nouveauStatut: StatutCompte.CANCELLED,
                           date: new Date().toISOString()
                       }
                   });

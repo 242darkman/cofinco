@@ -313,37 +313,127 @@ export function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+// ============================================
+// STORAGE URL UTILITIES
+// ============================================
+
+// Variable d'environnement pour l'URL de stockage (optionnel)
+const STORAGE_API_BASE = '/api/storage/files';
+
+// Patterns pour détecter les URLs MinIO
+const MINIO_URL_PATTERNS = [
+  /^https?:\/\/[^/]+\/public-assets\//,
+  /^https?:\/\/[^/]+\/secure-docs\//,
+];
+
+// Pattern pour double-prefix
+const DOUBLE_PREFIX_PATTERN = /^(https?:\/\/[^/]+\/[^/]+\/)(https?:\/\/.+)$/;
+
 /**
- * Resolves the full URL for a client's profile photo.
- * Handles different URL formats (data URI, relative path, raw filename).
+ * Extrait l'object key d'une URL ou chemin potentiellement malformé.
+ * Fonction utilitaire côté client, miroir de StorageService.extractKeyFromUrl
  */
-export function resolveClientPhotoUrl(url: string | null | undefined): string {
-  const raw = url || '';
-  if (!raw) return '';
-  if (raw.startsWith('data:')) return raw;
-  if (raw.startsWith('/api/')) return raw;
-  if (raw.startsWith('/')) return raw;
-  if (raw.startsWith('http')) {
-    try {
-      const urlObj = new URL(raw);
-      const pathParts = urlObj.pathname.split('/').filter(Boolean);
-      // Handle MinIO public-assets URLs: http://localhost:9000/public-assets/profiles/xxx.jpg
-      // Extract the key after the bucket name and proxy through API
-      if (pathParts.length >= 2) {
-        const bucketName = pathParts[0]; // e.g., 'public-assets' or 'secure-docs'
-        const key = pathParts.slice(1).join('/'); // e.g., 'profiles/xxx.jpg'
-        // For public-assets bucket, route through the files API
-        if (bucketName === 'public-assets') {
-          return `/api/uploads/files/${key}`;
-        }
-        // For secure-docs or other buckets, the signed URL is already usable directly
-        return raw;
-      }
-      return raw;
-    } catch {
-       return raw;
+export function extractStorageKey(input: string | null | undefined): string | null {
+  if (!input || typeof input !== 'string') return null;
+
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  // Data URIs: retourner tels quels
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  // URLs OAuth externes: retourner telles quelles
+  if (trimmed.startsWith('https://lh3.googleusercontent.com')) return trimmed;
+  if (trimmed.startsWith('https://graph.facebook.com')) return trimmed;
+
+  // Corriger les double-prefixes
+  const doubleMatch = trimmed.match(DOUBLE_PREFIX_PATTERN);
+  if (doubleMatch) {
+    return extractStorageKey(doubleMatch[2]);
+  }
+
+  // Si c'est une URL MinIO, extraire le chemin après le bucket
+  for (const pattern of MINIO_URL_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      const cleaned = trimmed.replace(pattern, '');
+      return cleaned.replace(/\/+/g, '/').replace(/^\//, '') || null;
     }
   }
-  // Default case: it's a raw filename, append the API path
-  return `/api/uploads/files/${raw}`;
+
+  // Si c'est une autre URL HTTP
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const url = new URL(trimmed);
+      const pathParts = url.pathname.split('/').filter(Boolean);
+
+      // Vérifier si c'est un bucket connu
+      if (pathParts[0] === 'public-assets' || pathParts[0] === 'secure-docs') {
+        return pathParts.slice(1).join('/').replace(/\/+/g, '/') || null;
+      }
+
+      // URL externe inconnue (OAuth etc.), retourner telle quelle
+      return trimmed;
+    } catch {
+      return null;
+    }
+  }
+
+  // C'est déjà un chemin relatif, nettoyer
+  let cleaned = trimmed.replace(/\/+/g, '/').replace(/^\//, '');
+
+  // Supprimer le préfixe bucket si présent
+  if (cleaned.startsWith('public-assets/')) {
+    cleaned = cleaned.slice('public-assets/'.length);
+  } else if (cleaned.startsWith('secure-docs/')) {
+    cleaned = cleaned.slice('secure-docs/'.length);
+  }
+
+  return cleaned || null;
+}
+
+/**
+ * Résout l'URL complète pour afficher une photo/fichier.
+ *
+ * Règles:
+ * - Si null/undefined/vide → retourne chaîne vide
+ * - Si data URI → retourne tel quel
+ * - Si URL externe (Google, Facebook OAuth) → retourne tel quel
+ * - Si déjà une URL API (/api/) → retourne tel quel
+ * - Sinon → extrait l'object key et préfixe avec l'API storage
+ */
+export function resolveStorageUrl(path: string | null | undefined): string {
+  if (!path) return '';
+
+  const trimmed = path.trim();
+  if (!trimmed) return '';
+
+  // Data URIs: retourner tels quels
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  // URLs déjà formatées pour l'API
+  if (trimmed.startsWith('/api/')) return trimmed;
+
+  // URLs externes (OAuth): retourner telles quelles
+  if (trimmed.startsWith('https://lh3.googleusercontent.com')) return trimmed;
+  if (trimmed.startsWith('https://graph.facebook.com')) return trimmed;
+
+  // Extraire la clé propre
+  const key = extractStorageKey(trimmed);
+  if (!key) return '';
+
+  // Si c'est une URL externe après extraction, retourner telle quelle
+  if (key.startsWith('http://') || key.startsWith('https://')) {
+    return key;
+  }
+
+  // Construire l'URL via l'API storage
+  return `${STORAGE_API_BASE}/${key}`;
+}
+
+/**
+ * Alias pour rétro-compatibilité - utilise resolveStorageUrl
+ * @deprecated Utiliser resolveStorageUrl à la place
+ */
+export function resolveClientPhotoUrl(url: string | null | undefined): string {
+  return resolveStorageUrl(url);
 }

@@ -3,6 +3,7 @@ import { db } from './db';
 import { modules, permissions, rolePermissions } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { MODULES_DATA, PERMISSIONS_DATA, SEED_ROLE_PERMISSIONS } from '@shared/config/rbac';
+import type { SystemRole } from '@shared/types/roles';
 
 export async function seedRBAC() {
   console.log('🔐 Seeding Modules & Permissions...');
@@ -82,14 +83,15 @@ export async function seedRBAC() {
   await db.delete(rolePermissions);
 
   for (const [role, codes] of Object.entries(SEED_ROLE_PERMISSIONS)) {
-    const valuesToInsert = [];
+    const typedRole = role as SystemRole;
+    const valuesToInsert: { role: SystemRole; permissionId: string; granted: boolean }[] = [];
 
     if (codes.includes('*')) {
       // Grant ALL permissions
       console.log(`   - Granting ALL permissions to ${role}`);
       for (const permId of allPermissionIds) {
         valuesToInsert.push({
-          role: role,
+          role: typedRole,
           permissionId: permId,
           granted: true
         });
@@ -101,7 +103,7 @@ export async function seedRBAC() {
         const permId = insertedPermissions[code];
         if (permId) {
           valuesToInsert.push({
-            role: role,
+            role: typedRole,
             permissionId: permId,
             granted: true
           });

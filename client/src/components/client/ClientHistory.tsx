@@ -33,7 +33,7 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
 
   const fetchClientDetails = async () => {
     try {
-        const res = await fetch(`/api/clients/${clientId}`);
+        const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
         if (res.ok) {
             const data = await res.json();
             setClientDetails(data);
@@ -46,7 +46,7 @@ export default function ClientHistory({ clientId }: ClientHistoryProps) {
   const fetchActivities = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/client-activities?clientId=${clientId}`);
+      const response = await fetch(`/api/client-activities?clientId=${clientId}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Erreur réseau');
       const data = await response.json();
       setActivities(data || []);

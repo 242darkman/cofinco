@@ -1,5 +1,5 @@
 import { db } from './db';
-import { smsNotifications, smsTemplates, smsProviderSettings, clients } from '@shared/schema';
+import { smsNotifications, smsTemplates, smsProviderSettings, clients, users } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 export type SmsProvider = 'twilio' | 'africas_talking' | 'bulksms' | 'easysendsms' | 'manual';
@@ -251,7 +251,7 @@ export async function sendSms(
     phoneNumber: formattedPhone,
     type: templateCode.toLowerCase(),
     message,
-    status: 'pending',
+    statut: 'pending',
     provider: providerInfo?.provider || 'manual',
     relatedEntityId: options?.relatedEntityId || null,
     relatedEntityType: options?.relatedEntityType || null,
@@ -290,7 +290,7 @@ export async function sendSms(
   
   await db.update(smsNotifications)
     .set({
-      status: result.success ? 'sent' : 'failed',
+      statut: result.success ? 'sent' : 'failed',
       providerMessageId: result.messageId || null,
       errorMessage: result.error || null,
       sentAt: result.success ? new Date() : null
@@ -306,22 +306,47 @@ export async function sendSms(
   return result;
 }
 
+/**
+ * Helper function to get client with user data (identity fields)
+ * Returns client data joined with users table for nom, prenom, telephone
+ */
+async function getClientWithUser(clientId: string) {
+  const [result] = await db
+    .select({
+      client: clients,
+      user: users,
+    })
+    .from(clients)
+    .leftJoin(users, eq(clients.userId, users.id))
+    .where(eq(clients.id, clientId))
+    .limit(1);
+
+  if (!result) return null;
+
+  return {
+    ...result.client,
+    nom: result.user?.nom || 'Client',
+    prenom: result.user?.prenom || null,
+    telephone: result.user?.telephone || null,
+  };
+}
+
 export async function sendPaymentReminder(
   clientId: string,
   dueDate: string,
   amount: number,
   createdBy?: string
 ): Promise<SendSmsResult> {
-  const [client] = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-  
+  const client = await getClientWithUser(clientId);
+
   if (!client) {
     return { success: false, error: 'Client not found' };
   }
-  
+
   if (!client.telephone) {
     return { success: false, error: 'Client telephone not available' };
   }
-  
+
   return sendSms(client.telephone, 'PAYMENT_REMINDER', {
     clientName: `${client.prenom || ''} ${client.nom}`.trim(),
     dueDate,
@@ -338,16 +363,16 @@ export async function sendCreditApprovalNotification(
   amount: number,
   createdBy?: string
 ): Promise<SendSmsResult> {
-  const [client] = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-  
+  const client = await getClientWithUser(clientId);
+
   if (!client) {
     return { success: false, error: 'Client not found' };
   }
-  
+
   if (!client.telephone) {
     return { success: false, error: 'Client telephone not available' };
   }
-  
+
   return sendSms(client.telephone, 'CREDIT_APPROVED', {
     clientName: `${client.prenom || ''} ${client.nom}`.trim(),
     amount: amount.toLocaleString()
@@ -366,16 +391,16 @@ export async function sendSavingsConfirmation(
   newBalance: number,
   createdBy?: string
 ): Promise<SendSmsResult> {
-  const [client] = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-  
+  const client = await getClientWithUser(clientId);
+
   if (!client) {
     return { success: false, error: 'Client not found' };
   }
-  
+
   if (!client.telephone) {
     return { success: false, error: 'Client telephone not available' };
   }
-  
+
   return sendSms(client.telephone, 'SAVINGS_CONFIRMED', {
     clientName: `${client.prenom || ''} ${client.nom}`.trim(),
     amount: amount.toLocaleString(),
@@ -396,16 +421,16 @@ export async function sendTontineReminder(
   amount: number,
   createdBy?: string
 ): Promise<SendSmsResult> {
-  const [client] = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-  
+  const client = await getClientWithUser(clientId);
+
   if (!client) {
     return { success: false, error: 'Client not found' };
   }
-  
+
   if (!client.telephone) {
     return { success: false, error: 'Client telephone not available' };
   }
-  
+
   return sendSms(client.telephone, 'TONTINE_REMINDER', {
     clientName: `${client.prenom || ''} ${client.nom}`.trim(),
     tontineName,
@@ -426,16 +451,16 @@ export async function sendTontineContributionConfirmation(
   amount: number,
   createdBy?: string
 ): Promise<SendSmsResult> {
-  const [client] = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-  
+  const client = await getClientWithUser(clientId);
+
   if (!client) {
     return { success: false, error: 'Client not found' };
   }
-  
+
   if (!client.telephone) {
     return { success: false, error: 'Client telephone not available' };
   }
-  
+
   return sendSms(client.telephone, 'TONTINE_CONTRIBUTION_CONFIRMED', {
     clientName: `${client.prenom || ''} ${client.nom}`.trim(),
     tontineName,
@@ -452,16 +477,16 @@ export async function sendWelcomeMessage(
   clientId: string,
   createdBy?: string
 ): Promise<SendSmsResult> {
-  const [client] = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-  
+  const client = await getClientWithUser(clientId);
+
   if (!client) {
     return { success: false, error: 'Client not found' };
   }
-  
+
   if (!client.telephone) {
     return { success: false, error: 'Client telephone not available' };
   }
-  
+
   return sendSms(client.telephone, 'WELCOME', {
     clientName: `${client.prenom || ''} ${client.nom}`.trim()
   }, {

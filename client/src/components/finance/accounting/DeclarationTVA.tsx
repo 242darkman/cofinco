@@ -6,6 +6,7 @@ import {
 import { Card, Button, Badge, ResponsiveTable } from '../../ui';
 import { comptabiliteApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { StatutDeclarationTVA, StatutDeclarationTVAType, STATUT_DECLARATION_TVA_LABELS } from '@shared/enum/status-constants';
 
 interface Declaration {
   id: string;
@@ -14,7 +15,7 @@ interface Declaration {
   tva_collectee: number;
   tva_deductible: number;
   tva_a_payer: number;
-  statut: 'Brouillon' | 'Validé' | 'Payé' | 'En retard';
+  statut: StatutDeclarationTVAType;
 }
 
 export default function DeclarationTVA() {
@@ -64,7 +65,7 @@ export default function DeclarationTVA() {
         tva_deductible: form.tva_deductible,
         tva_a_payer: tvaAPayer > 0 ? tvaAPayer : 0,
         credit_tva: creditTVA,
-        statut: 'Brouillon'
+        statut: 'DRAFT'
       });
 
       toast.success('Déclaration créée avec succès');
@@ -114,7 +115,7 @@ export default function DeclarationTVA() {
       format: (val: string) => (
         <Badge 
            value={val} 
-           variant={val === 'Payé' ? 'success' : val === 'Brouillon' ? 'neutral' : 'warning'} 
+           variant={val === StatutDeclarationTVA.PAID ? 'success' : val === StatutDeclarationTVA.DRAFT ? 'neutral' : 'warning'} 
            size="sm" 
         />
       )

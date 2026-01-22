@@ -89,7 +89,6 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Prospection',
     'Paiements Agent',
     'RH',
-    'RH',
     'Administration',
     'Virements Programmes'
   ],
@@ -124,7 +123,6 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Clients',
     'Comptes',
     'Caisse',
-    'Communications',
     'Communications',
     'RH',
     'Virements Programmes'
@@ -189,6 +187,7 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'rh': ['view', 'create', 'edit', 'manage'],
     'paie': ['view', 'create', 'approve'],
     'users': ['view', 'create', 'edit'],
+    'admin': ['users', 'logs'], // Gestion utilisateurs + logs, SANS settings/roles
     'coffre': ['view', 'transfert.init', 'transfert.validate', 'transfert.execute', 'config.view'],
     'incidents': ['view', 'manage', 'edit'],
     'visites': ['view'],
@@ -482,27 +481,45 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
   [SystemRole.ADMIN]: ['*'],
   [SystemRole.CHEF_AGENCE]: [
     'dashboard.view',
-    'admin.users',
+    // Administration - Gestion utilisateurs + logs uniquement (PAS settings/roles)
+    'admin.users', 'admin.logs',
+    'users.view', 'users.create', 'users.edit',
+    // Clients
     'clients.view', 'clients.create', 'clients.edit', 'clients.delete',
+    // Crédits
     'credits.view', 'credits.create', 'credits.edit', 'credits.approve', 'credits.delete',
     'credits.reevaluations.view', 'credits.reevaluations.create', 'credits.reevaluations.validate', 'credits.reevaluations.decide',
+    // Épargnes
     'epargnes.view', 'epargnes.create', 'epargnes.edit',
+    // Tontines
     'tontines.view', 'tontines.create', 'tontines.edit', 'tontines.manage',
+    // Comptabilité
     'comptabilite.view',
+    // Remboursements
     'remboursements.view', 'remboursements.create',
+    // Rapports
     'rapports.view', 'rapports.export',
+    // Agent Terrain
     'agent.view', 'agent.manage',
+    // Caisse
     'caisse.view', 'caisse.manage',
+    // Caisse Agent
     'caisseagent.view', 'caisseagent.manage', 'caisseagent.approve', 'caisseagent.reject', 'caisseagent.suspend',
+    // RH
     'rh.view', 'rh.create', 'rh.edit', 'rh.manage',
+    // Paie
     'paie.view', 'paie.create', 'paie.approve',
-    'users.view', 'users.create', 'users.edit',
+    // Coffre-Fort
     'coffre.view', 'coffre.transfert.init', 'coffre.transfert.validate', 'coffre.transfert.execute', 'coffre.config.view',
+    // Incidents
     'incidents.view', 'incidents.manage', 'incidents.edit',
+    // Visites & Prospection
     'visites.view',
     'prospection.view',
     'paiements.view',
+    // Virements Programmés
     'virements_programmes.view', 'virements_programmes.edit',
+    // Communications
     'communications.view',
     'messages.view', 'messages.send',
   ],

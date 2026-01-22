@@ -6,9 +6,11 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
+import { StatutCaisseType } from '@shared/enum/status-constants';
+
 interface CaisseStatusChangedEvent {
   caisseId: string;
-  status: 'Ouverte' | 'Fermée';
+  status: StatutCaisseType;
   forceClosed?: boolean;
   sessionId?: string;
 }

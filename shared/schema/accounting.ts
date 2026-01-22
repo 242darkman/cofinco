@@ -9,7 +9,7 @@ export const exercices = pgTable("exercices_comptables", {
   code: text("code").notNull().unique(), // ex: 2024
   dateDebut: date("date_debut").notNull(),
   dateFin: date("date_fin").notNull(),
-  statut: text("statut").notNull().default("Ouvert"), // Ouvert, Clôturé
+  statut: text("statut").notNull().default("OPEN"), // OPEN, CLOSED
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -61,7 +61,7 @@ export const ecritures = pgTable("ecritures_comptables", {
   dateEcriture: date("date_ecriture").notNull(),
   numeroPiece: text("numero_piece").notNull(),
   libelle: text("libelle").notNull(),
-  statut: text("statut").default("Brouillon"), // Brouillon, Validé
+  statut: text("statut").default("DRAFT"), // DRAFT, VALIDATED
   validatedBy: uuid("validated_by").references(() => users.id),
   validatedAt: timestamp("validated_at"),
   createdBy: uuid("created_by").references(() => users.id),
@@ -98,7 +98,7 @@ export const declarationsTva = pgTable("declarations_tva", {
   tvaDeductible: numeric("tva_deductible").notNull().default("0"),
   tvaAPayer: numeric("tva_a_payer").notNull().default("0"),
   creditTva: numeric("credit_tva").notNull().default("0"),
-  statut: text("statut").notNull().default("Brouillon"), // Brouillon, Validé, Payé
+  statut: text("statut").notNull().default("DRAFT"), // DRAFT, VALIDATED, PAID
   numeroQuittance: text("numero_quittance"),
   dateDepot: timestamp("date_depot"),
   createdBy: uuid("created_by").references(() => users.id),

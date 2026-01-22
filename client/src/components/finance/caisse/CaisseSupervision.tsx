@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { StatutUser } from '@shared/enum/status-constants';
 import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert, Shield, Info } from 'lucide-react';
 import Tooltip from '../../ui/Tooltip';
 import Button from '../../ui/Button';
@@ -188,13 +189,13 @@ export default function CaisseSupervision({
       let matchesStatus = true;
       switch (statusFilter) {
         case 'en_caisse':
-          matchesStatus = enCaisse && user.statut === 'Actif';
+          matchesStatus = enCaisse && user.statut === StatutUser.ACTIVE;
           break;
         case 'hors_caisse':
-          matchesStatus = !enCaisse && user.statut === 'Actif';
+          matchesStatus = !enCaisse && user.statut === StatutUser.ACTIVE;
           break;
         case 'inactif':
-          matchesStatus = user.statut !== 'Actif';
+          matchesStatus = user.statut !== StatutUser.ACTIVE;
           break;
         default:
           matchesStatus = true;
@@ -214,9 +215,9 @@ export default function CaisseSupervision({
   // Compteurs pour les filtres
   const filterCounts = useMemo(() => ({
     all: allCaissiers.length,
-    en_caisse: allCaissiers.filter(u => isUserEnCaisse(u.id) && u.statut === 'Actif').length,
-    hors_caisse: allCaissiers.filter(u => !isUserEnCaisse(u.id) && u.statut === 'Actif').length,
-    inactif: allCaissiers.filter(u => u.statut !== 'Actif').length,
+    en_caisse: allCaissiers.filter(u => isUserEnCaisse(u.id) && u.statut === StatutUser.ACTIVE).length,
+    hors_caisse: allCaissiers.filter(u => !isUserEnCaisse(u.id) && u.statut === StatutUser.ACTIVE).length,
+    inactif: allCaissiers.filter(u => u.statut !== StatutUser.ACTIVE && u.statut !== 'Actif').length,
   }), [allCaissiers, activeSessions]);
 
   // Tabs conditionnels selon les permissions
@@ -274,7 +275,8 @@ export default function CaisseSupervision({
     if (!selectedUser) return;
     setSubmitting(true);
     try {
-      const newStatus = selectedUser.statut === 'Actif' ? 'Inactif' : 'Actif';
+      const isActive = selectedUser.statut === StatutUser.ACTIVE;
+      const newStatus = isActive ? StatutUser.INACTIVE : StatutUser.ACTIVE;
       await userApi.update(selectedUser.id, { statut: newStatus });
       
       // Update local state
@@ -767,7 +769,7 @@ export default function CaisseSupervision({
                               active:scale-[0.98] transition-all touch-manipulation
                               ${enCaisse
                                 ? 'bg-emerald-500/5 border-emerald-500/30 hover:bg-emerald-500/10'
-                                : user.statut !== 'Actif'
+                                : (user.statut !== StatutUser.ACTIVE)
                                   ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10'
                                   : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/60'
                               }
@@ -791,7 +793,7 @@ export default function CaisseSupervision({
                                 w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm
                                 ${enCaisse
                                   ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
-                                  : user.statut !== 'Actif'
+                                  : (user.statut !== StatutUser.ACTIVE)
                                     ? 'bg-red-500/20 border border-red-500/30 text-red-400'
                                     : 'bg-cyan-500/20 border border-cyan-500/30 text-cyan-400'
                                 }
@@ -813,7 +815,7 @@ export default function CaisseSupervision({
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                       En caisse • {formatMoney(Number(activeSession.solde_theorique || 0))}
                                     </span>
-                                  ) : user.statut !== 'Actif' ? (
+                                  ) : (user.statut !== StatutUser.ACTIVE) ? (
                                     <span className="text-[10px] text-red-400 flex items-center gap-1">
                                       <UserX size={10} />
                                       Compte désactivé
@@ -1054,7 +1056,7 @@ export default function CaisseSupervision({
                 font-bold text-lg sm:text-xl
                 ${isUserEnCaisse(selectedUser.id)
                   ? 'bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-400'
-                  : selectedUser.statut !== 'Actif'
+                  : (selectedUser.statut !== StatutUser.ACTIVE && selectedUser.statut !== 'Actif')
                     ? 'bg-red-500/20 border-2 border-red-500/50 text-red-400'
                     : 'bg-cyan-500/20 border-2 border-cyan-500/50 text-cyan-400'
                 }
@@ -1143,25 +1145,25 @@ export default function CaisseSupervision({
                   disabled={submitting}
                   className={`
                     flex items-center gap-3 p-4 rounded-xl border transition-all group
-                    ${selectedUser.statut === 'Actif'
+                    ${selectedUser.statut === StatutUser.ACTIVE
                       ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20'
                       : 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20'
                     }
                     ${submitting ? 'opacity-50 cursor-wait' : ''}
                   `}
                 >
-                  <div className={`p-2 rounded-lg ${selectedUser.statut === 'Actif' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
-                    {selectedUser.statut === 'Actif'
+                  <div className={`p-2 rounded-lg ${selectedUser.statut === StatutUser.ACTIVE ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+                    {selectedUser.statut === StatutUser.ACTIVE
                       ? <UserX size={18} className="text-red-400" />
                       : <UserCheck size={18} className="text-emerald-400" />
                     }
                   </div>
                   <div className="text-left">
                     <div className="text-sm font-medium text-white">
-                      {selectedUser.statut === 'Actif' ? 'Désactiver le compte' : 'Activer le compte'}
+                      {selectedUser.statut === StatutUser.ACTIVE ? 'Désactiver le compte' : 'Activer le compte'}
                     </div>
-                    <div className={`text-xs ${selectedUser.statut === 'Actif' ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {selectedUser.statut === 'Actif' ? 'Bloquer l\'accès' : 'Autoriser l\'accès'}
+                    <div className={`text-xs ${selectedUser.statut === StatutUser.ACTIVE ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {selectedUser.statut === StatutUser.ACTIVE ? 'Bloquer l\'accès' : 'Autoriser l\'accès'}
                     </div>
                   </div>
                   {submitting && <RefreshCw size={16} className="ml-auto animate-spin text-slate-400" />}

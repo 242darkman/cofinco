@@ -24,6 +24,10 @@ export interface DashboardStats {
     agentsActifs: number;
     totalAgents: number;
     sessionsOuvertes: number;
+    tresorerieDispo: number;
+    encaisse: number; // NEW: Explicit field
+    par30: number;    // NEW: Backend calculated (Value based)
+    liquidityRatio: number;
   };
   daily: {
     nouveauxClients: number;

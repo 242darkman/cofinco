@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { modules, permissions, rolePermissions, userPermissions } from "@shared/schema";
+import { modules, permissions, rolePermissions, userPermissions, userRoles } from "@shared/schema";
 import { SystemRole, getRoleOptions, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { requireAuth, requireRole } from "../auth";
 import { eq, and, desc } from "drizzle-orm";
@@ -515,12 +515,21 @@ export function registerRbacRoutes(app: Express) {
     try {
       const { userId } = req.params;
 
-      // Get user info first
-      const userRes = await db.execute(`SELECT role FROM users WHERE id = '${userId}'`);
-      const userRole = (userRes.rows[0] as any)?.role;
+      // Get user's primary role from userRoles table (V3 multi-role architecture)
+      const userRoleRes = await db.select({
+        role: userRoles.role
+      })
+        .from(userRoles)
+        .where(and(
+          eq(userRoles.userId, userId),
+          eq(userRoles.isPrimary, true)
+        ))
+        .limit(1);
+
+      const userRole = userRoleRes[0]?.role;
 
       if (!userRole) {
-        return res.status(404).json({ message: "Utilisateur non trouvé" });
+        return res.status(404).json({ message: "Utilisateur non trouvé ou sans rôle principal" });
       }
 
       // Get all system permissions
@@ -742,6 +751,44 @@ export function registerRbacRoutes(app: Express) {
     } catch (error) {
       console.error("Check RBAC permission error:", error);
       res.status(500).json({ hasPermission: false });
+    }
+  });
+
+  // Reseed RBAC tables (admin only) - useful when role_permissions is empty
+  app.post("/api/rbac/reseed", requireRole(SystemRole.ADMIN), async (req, res) => {
+    try {
+      // Import dynamically to avoid circular dependencies
+      const { seedRBAC } = await import('../seed-rbac-logic');
+
+      console.log('🔄 Admin triggered RBAC reseed...');
+      await seedRBAC();
+
+      await logAudit(
+        req,
+        "RESEED_RBAC",
+        "rbac",
+        "system",
+        { triggeredBy: req.session.user?.username },
+        "success",
+        "high"
+      );
+
+      // Notify all clients to refresh permissions
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "RBAC_UPDATE",
+          payload: { type: 'reseed' }
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "RBAC reseeded successfully. All clients should refresh their permissions."
+      });
+    } catch (error) {
+      console.error("Reseed RBAC error:", error);
+      res.status(500).json({ message: "Erreur lors du reseed RBAC" });
     }
   });
 }

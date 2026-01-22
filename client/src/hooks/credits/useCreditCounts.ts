@@ -8,6 +8,7 @@ export interface CreditCounts {
   approval: number;
   commission: number;
   reevaluation: number;
+  archives: number;
 }
 
 export function useCreditCounts() {
@@ -58,7 +59,8 @@ export function useCreditCounts() {
       investigation: 0,
       approval: 0,
       commission: 0,
-      reevaluation: 0
+      reevaluation: 0,
+      archives: 0
     },
     isLoading,
     error

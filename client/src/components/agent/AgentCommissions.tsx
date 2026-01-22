@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, Calendar, Check, X, Download, Plus, Edit } from 'lucide-react';
+import { StatutPaiementCommission, STATUT_PAIEMENT_COMMISSION_LABELS } from '@shared/enum/status-constants';
 
 interface Commission {
   id: string;
@@ -130,7 +131,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
 
   const totalCommissions = commissions.reduce((sum, c) => sum + c.montant_commission, 0);
   const totalNet = commissions.reduce((sum, c) => sum + c.montant_net, 0);
-  const commissionsPayees = commissions.filter(c => c.statut_paiement === 'Payé').length;
+  const commissionsPayees = commissions.filter(c => c.statut_paiement === StatutPaiementCommission.PAID).length;
 
   const { montant_commission: previewCommission, montant_net: previewNet } = calculateCommission();
 
@@ -375,17 +376,17 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
                   <td className="px-6 py-4 text-right text-white font-bold">{commission.montant_net.toLocaleString()} FCFA</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      commission.statut_paiement === 'Payé'
+                      commission.statut_paiement === StatutPaiementCommission.PAID
                         ? 'bg-green-500/20 text-green-400'
-                        : commission.statut_paiement === 'En attente'
+                        : commission.statut_paiement === StatutPaiementCommission.PENDING
                         ? 'bg-cyan-500/20 text-cyan-400'
                         : 'bg-blue-500/20 text-blue-400'
                     }`}>
-                      {commission.statut_paiement}
+                      {STATUT_PAIEMENT_COMMISSION_LABELS[commission.statut_paiement as keyof typeof STATUT_PAIEMENT_COMMISSION_LABELS] || commission.statut_paiement}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {commission.statut_paiement === 'En attente' && (
+                    {commission.statut_paiement === StatutPaiementCommission.PENDING && (
                       <button
                         onClick={() => handlePayer(commission.id)}
                         className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition"

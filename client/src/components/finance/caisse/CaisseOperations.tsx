@@ -397,7 +397,7 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
 
       // 1. Accounts (Always available if they exist)
       clientComptes.forEach(acc => {
-          if (acc.statut !== 'Actif') return;
+          if (acc.statut !== 'ACTIVE') return;
           options.push({
               id: acc.id,
               type: 'Compte',

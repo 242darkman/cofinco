@@ -7,6 +7,7 @@ interface TransactionRowActionsProps {
   onView?: (factureId: string) => void;
   onDownload?: (factureId: string) => void;
   onShare?: (factureId: string) => void;
+  compact?: boolean;
 }
 
 export const TransactionRowActions: React.FC<TransactionRowActionsProps> = ({
@@ -14,7 +15,8 @@ export const TransactionRowActions: React.FC<TransactionRowActionsProps> = ({
   transactionId,
   onView,
   onDownload,
-  onShare
+  onShare,
+  compact = false
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -24,11 +26,14 @@ export const TransactionRowActions: React.FC<TransactionRowActionsProps> = ({
   return (
     <div className="relative">
       <button
-        onClick={() => setShowMenu(!showMenu)}
-        className="p-2 hover:bg-slate-700 rounded-lg transition"
+        onClick={(e) => {
+           e.stopPropagation();
+           setShowMenu(!showMenu);
+        }}
+        className={`hover:bg-slate-700 rounded-lg transition ${compact ? 'p-1' : 'p-2'}`}
         aria-label="Actions sur le reçu"
       >
-        <FileText size={16} className="text-slate-400 hover:text-emerald-400" />
+        <FileText size={compact ? 14 : 16} className="text-slate-400 hover:text-emerald-400" />
       </button>
 
       {showMenu && (

@@ -6,6 +6,10 @@
 
 import { differenceInDays, addDays } from 'date-fns';
 import { DemandeCredit, ConfigReevaluation, ReevaluationCredit } from '@shared/schema/finance';
+import {
+  StatutDemande,
+  StatutReevaluation,
+} from "@shared/enum/status-constants";
 
 // Type definitions
 export interface ValidationResult {
@@ -56,8 +60,8 @@ export const REEVALUATION_RULES = {
     // Statuts valides pour une réévaluation:
     // - "Rejetée": état initial permettant de créer une réévaluation
     // - "Réévaluation en cours": réévaluation déjà créée (validation/processing en cours)
-    const statutsValides = ['Rejetée', 'Réévaluation en cours'];
-    if (!statutsValides.includes(demande.statut || '')) {
+    const statutsValides = [StatutDemande.REJECTED, StatutDemande.REEVALUATION_IN_PROGRESS];
+    if (!statutsValides.includes(demande.statut as typeof statutsValides[number])) {
       return {
         valid: false,
         code: 'DEMANDE_NOT_REJECTED',
@@ -233,20 +237,20 @@ export const REEVALUATION_RULES = {
    * Rule 10: Valid state transitions
    */
   validateTransition: (
-    statutActuel: string, 
+    statutActuel: string,
     nouveauStatut: string
   ): ValidationResult => {
     const transitionsPermises: Record<string, string[]> = {
-      'Demandée': ['Éligibilité en cours', 'Annulée'],
-      'Éligibilité en cours': ['Autorisée', 'Refusée'],
-      'Autorisée': ['Enquête complémentaire', 'En comité', 'Annulée'],
-      'Enquête complémentaire': ['Enquête terminée', 'Annulée'],
-      'Enquête terminée': ['En comité', 'Annulée'],
-      'En comité': ['Approuvée', 'Rejetée définitivement'],
-      'Refusée': [], // Terminal state
-      'Approuvée': [], // Terminal state
-      'Rejetée définitivement': [], // Terminal state
-      'Annulée': [] // Terminal state
+      [StatutReevaluation.REQUESTED]: [StatutReevaluation.ELIGIBILITY_CHECK, StatutReevaluation.CANCELLED],
+      [StatutReevaluation.ELIGIBILITY_CHECK]: [StatutReevaluation.AUTHORIZED, StatutReevaluation.REFUSED],
+      [StatutReevaluation.AUTHORIZED]: [StatutReevaluation.ADDITIONAL_INVESTIGATION, StatutReevaluation.IN_COMMITTEE, StatutReevaluation.CANCELLED],
+      [StatutReevaluation.ADDITIONAL_INVESTIGATION]: [StatutReevaluation.INVESTIGATION_COMPLETE, StatutReevaluation.CANCELLED],
+      [StatutReevaluation.INVESTIGATION_COMPLETE]: [StatutReevaluation.IN_COMMITTEE, StatutReevaluation.CANCELLED],
+      [StatutReevaluation.IN_COMMITTEE]: [StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED],
+      [StatutReevaluation.REFUSED]: [], // Terminal state
+      [StatutReevaluation.APPROVED]: [], // Terminal state
+      [StatutReevaluation.DEFINITIVELY_REJECTED]: [], // Terminal state
+      [StatutReevaluation.CANCELLED]: [] // Terminal state
     };
 
     const permises = transitionsPermises[statutActuel] || [];
@@ -334,9 +338,9 @@ export function checkEligibilityQuick(
   
   const reevaluationEnCours = demande.reevaluationEnCours ?? false;
   
-  // Status check: for reevaluation validation, the status can be either 'Rejetée' (initial) 
+  // Status check: for reevaluation validation, the status can be either 'Rejetée' (initial)
   // or 'Réévaluation en cours' (after reevaluation was created)
-  const statutValide = demande.statut === 'Rejetée' || demande.statut === 'Réévaluation en cours';
+  const statutValide = demande.statut === StatutDemande.REJECTED || demande.statut === StatutDemande.REEVALUATION_IN_PROGRESS;
   
   const estEligible = 
     statutValide && 

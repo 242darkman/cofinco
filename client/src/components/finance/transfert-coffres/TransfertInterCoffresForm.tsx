@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { StatutCoffre } from '@shared/enum/status-constants';
 import {
   X,
   Vault,
@@ -65,7 +66,7 @@ export default function TransfertInterCoffresForm({
 
   // Get active coffres
   const activeCoffres = useMemo(() => {
-    return coffres.filter(c => c.statut === 'Actif');
+    return coffres.filter(c => c.statut === StatutCoffre.ACTIVE);
   }, [coffres]);
 
   // Get selected coffres

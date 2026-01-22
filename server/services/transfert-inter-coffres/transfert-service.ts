@@ -10,6 +10,7 @@ import {
   configTransfertInterCoffres,
   agences,
   users,
+  userRoles,
 } from "@shared/schema";
 import { TransfertInterCoffresValidator, UserContext, ValidationResult } from "./business-rules";
 import { executeDispatch, executeReceive } from "./transfer-executor";
@@ -186,7 +187,7 @@ export class TransfertInterCoffresService {
         typeConditionnement: typeConditionnement as any,
         numeroScelle,
         motif,
-        statut: "Brouillon",
+        statut: "DRAFT",
         createdBy: userId,
         agentsTransport,
         idempotencyKey,
@@ -198,7 +199,7 @@ export class TransfertInterCoffresService {
       transfertId: transfert.id,
       action: "CREATED",
       statutAvant: null,
-      statutApres: "Brouillon",
+      statutApres: "DRAFT",
       details: {
         coffreSourceId,
         coffreDestinationId,
@@ -236,7 +237,7 @@ export class TransfertInterCoffresService {
       return { success: false, errorCode: "TIC_050", error: "Transfert introuvable" };
     }
 
-    if (transfert.statut !== "Brouillon") {
+    if (transfert.statut !== "DRAFT") {
       return { success: false, errorCode: "TIC_020", error: `Impossible de soumettre un transfert en statut "${transfert.statut}"` };
     }
 
@@ -263,7 +264,7 @@ export class TransfertInterCoffresService {
     const [updated] = await db
       .update(transfertsInterCoffres)
       .set({
-        statut: "Soumis",
+        statut: "SUBMITTED",
         submittedBy: userId,
         submittedAt: now,
         updatedAt: now,
@@ -300,8 +301,8 @@ export class TransfertInterCoffresService {
     await db.insert(transfertsInterCoffresAuditLogs).values({
       transfertId,
       action: "SUBMITTED",
-      statutAvant: "Brouillon",
-      statutApres: "Soumis",
+      statutAvant: "DRAFT",
+      statutApres: "SUBMITTED",
       details: { documentId: document.id, documentNumber },
       userId,
       userRole,
@@ -353,19 +354,19 @@ export class TransfertInterCoffresService {
     let newStatus: string;
 
     if (level === 1) {
-      if (transfert.statut !== "Soumis") {
+      if (transfert.statut !== "SUBMITTED") {
         return { success: false, errorCode: "TIC_020", error: `Impossible d'approuver niveau 1 un transfert en statut "${transfert.statut}"` };
       }
       validationResult = await this.validator.canApproveLevel1(user, transfert, agenceId || undefined);
-      expectedStatus = "Soumis";
-      newStatus = approved ? "Approuvé N1" : "Rejeté";
+      expectedStatus = "SUBMITTED";
+      newStatus = approved ? "APPROVED_L1" : "REJECTED";
     } else {
-      if (transfert.statut !== "Approuvé N1") {
+      if (transfert.statut !== "APPROVED_L1") {
         return { success: false, errorCode: "TIC_020", error: `Impossible d'approuver niveau 2 un transfert en statut "${transfert.statut}"` };
       }
       validationResult = await this.validator.canApproveLevel2(user, transfert, agenceId || undefined);
-      expectedStatus = "Approuvé N1";
-      newStatus = approved ? "Approuvé N2" : "Rejeté";
+      expectedStatus = "APPROVED_L1";
+      newStatus = approved ? "APPROVED_L2" : "REJECTED";
     }
 
     if (!validationResult.valid) {
@@ -450,7 +451,7 @@ export class TransfertInterCoffresService {
       return { success: false, errorCode: "TIC_050", error: "Transfert introuvable" };
     }
 
-    if (transfert.statut !== "Approuvé N2") {
+    if (transfert.statut !== "APPROVED_L2") {
       return { success: false, errorCode: "TIC_020", error: `Impossible de dispatcher un transfert en statut "${transfert.statut}"` };
     }
 
@@ -647,7 +648,7 @@ export class TransfertInterCoffresService {
     const [updated] = await db
       .update(transfertsInterCoffres)
       .set({
-        statut: "Annulé",
+        statut: "CANCELLED",
         cancellationReason: reason,
         cancelledBy: userId,
         cancelledAt: now,
@@ -661,7 +662,7 @@ export class TransfertInterCoffresService {
       transfertId,
       action: "CANCELLED",
       statutAvant,
-      statutApres: "Annulé",
+      statutApres: "CANCELLED",
       details: { reason },
       userId,
       userRole,
@@ -738,8 +739,12 @@ export class TransfertInterCoffresService {
     ].filter(Boolean) as string[];
 
     const usersData = userIds.length > 0
-      ? await db.select({ id: users.id, nom: users.nom, prenom: users.prenom, role: users.role })
+      ? await db.select({ id: users.id, nom: users.nom, prenom: users.prenom, role: userRoles.role })
           .from(users)
+          .leftJoin(userRoles, and(
+            eq(userRoles.userId, users.id),
+            eq(userRoles.isPrimary, true)
+          ))
           .where(sql`${users.id} IN ${userIds}`)
       : [];
 

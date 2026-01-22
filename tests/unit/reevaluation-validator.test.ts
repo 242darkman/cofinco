@@ -3,13 +3,14 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { 
+import {
   REEVALUATION_RULES,
   validateReevaluationCreation,
   checkEligibilityQuick,
   CreateReevaluationPayload
 } from '../../server/services/reevaluation-validator';
 import { DemandeCredit, ConfigReevaluation, ReevaluationCredit } from '../../shared/schema/finance';
+import { StatutDemande, StatutReevaluation } from '../../shared/enum/status-constants';
 import { addDays, subDays } from 'date-fns';
 
 describe('Reevaluation Validation Rules', () => {
@@ -41,7 +42,7 @@ describe('Reevaluation Validation Rules', () => {
     dureeValeur: 12,
     dureeUnite: 'Mois',
     objetCredit: 'Test',
-    statut: 'Rejetée',
+    statut: StatutDemande.REJECTED,
     motifRejet: 'Capacité de remboursement insuffisante',
     dateRejet: subDays(new Date(), 45),
     scoreCredit: 45,
@@ -53,13 +54,13 @@ describe('Reevaluation Validation Rules', () => {
 
   describe('validateDemandeStatus', () => {
     it('should pass for rejected demande', () => {
-      const demande = createMockDemande({ statut: 'Rejetée' });
+      const demande = createMockDemande({ statut: StatutDemande.REJECTED });
       const result = REEVALUATION_RULES.validateDemandeStatus(demande);
       expect(result.valid).toBe(true);
     });
 
     it('should fail for non-rejected demande', () => {
-      const demande = createMockDemande({ statut: 'Approuvée' });
+      const demande = createMockDemande({ statut: StatutDemande.APPROVED });
       const result = REEVALUATION_RULES.validateDemandeStatus(demande);
       expect(result.valid).toBe(false);
       expect(result.code).toBe('DEMANDE_NOT_REJECTED');
@@ -204,9 +205,9 @@ describe('Reevaluation Validation Rules', () => {
   describe('validateTransition', () => {
     it('should allow valid transitions', () => {
       const validTransitions = [
-        ['Demandée', 'Éligibilité en cours'],
-        ['Autorisée', 'Enquête complémentaire'],
-        ['En comité', 'Approuvée'],
+        [StatutReevaluation.REQUESTED, StatutReevaluation.ELIGIBILITY_CHECK],
+        [StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION],
+        [StatutReevaluation.IN_COMMITTEE, StatutReevaluation.APPROVED],
       ];
 
       for (const [from, to] of validTransitions) {
@@ -217,9 +218,9 @@ describe('Reevaluation Validation Rules', () => {
 
     it('should reject invalid transitions', () => {
       const invalidTransitions = [
-        ['Approuvée', 'Demandée'],
-        ['Rejetée définitivement', 'En comité'],
-        ['Annulée', 'Autorisée'],
+        [StatutReevaluation.APPROVED, StatutReevaluation.REQUESTED],
+        [StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.IN_COMMITTEE],
+        [StatutReevaluation.CANCELLED, StatutReevaluation.AUTHORIZED],
       ];
 
       for (const [from, to] of invalidTransitions) {

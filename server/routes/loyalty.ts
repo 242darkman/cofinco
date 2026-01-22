@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { requireRole } from "../middleware";
+import { SystemRole } from "@shared/types/roles";
 import { getWsInstance } from "../ws-server";
 
 const loyaltyRouter = Router();
@@ -31,7 +32,7 @@ loyaltyRouter.get("/:clientId/score", requireAuth, async (req, res) => {
 });
 
 // POST /api/loyalty/:clientId/bonus - Ajouter bonus manuel (admin only)
-loyaltyRouter.post("/:clientId/bonus", requireAuth, requireRole(['admin', 'rh']), async (req, res) => {
+loyaltyRouter.post("/:clientId/bonus", requireAuth, requireRole([SystemRole.ADMIN]), async (req, res) => {
     try {
         const { clientId } = req.params;
         const { points, description } = req.body;

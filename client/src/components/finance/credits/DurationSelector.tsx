@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Star, Calendar, AlertCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { DurationOption } from '../../../hooks/credits/useSmartDuration';
-import { FREQUENCE_UNITE_MAP, FrequenceRemboursement, DureeUnite } from '@shared/config/credit-durations';
+import { FREQUENCE_UNITE_MAP } from '@shared/config/credit-durations';
+import { FrequenceRemboursement, DureeUnite, FREQUENCE_REMBOURSEMENT_LABELS } from '@shared/enum/status-constants';
+import type { FrequenceRemboursementType, DureeUniteType } from '@shared/enum/status-constants';
 import { useEffect } from 'react';
 
 interface DurationSelectorProps {
@@ -69,15 +71,15 @@ export default function DurationSelector({
   isLoading = false,
 }: DurationSelectorProps) {
   // Get available units for the current frequency
-  // Use 'Mensuel' as fallback if frequency is not yet set or invalid
+  // Use MONTHLY as fallback if frequency is not yet set or invalid
   const availableUnits = useMemo(() => {
-    const freq = (frequence || 'Mensuel') as FrequenceRemboursement;
-    return FREQUENCE_UNITE_MAP[freq] || FREQUENCE_UNITE_MAP['Mensuel'];
+    const freq = (frequence || FrequenceRemboursement.MONTHLY) as FrequenceRemboursementType;
+    return FREQUENCE_UNITE_MAP[freq] || FREQUENCE_UNITE_MAP[FrequenceRemboursement.MONTHLY];
   }, [frequence]);
 
   // Auto-correct unit if the current one is not allowed for the new frequency
   useEffect(() => {
-    if (manualUnit && !availableUnits.includes(manualUnit as DureeUnite)) {
+    if (manualUnit && !availableUnits.includes(manualUnit as DureeUniteType)) {
       // Default to the first allowed unit (usually the most common one)
       // For Hebdomadaire: 'Semaine', 'Mois', 'Jour' -> 'Semaine' fits well as first choice
       onUnitChange(availableUnits[0]);
@@ -147,7 +149,7 @@ export default function DurationSelector({
         >
           {availableUnits.map(unit => (
             <option key={unit} value={unit}>
-              {unit === 'Jour' ? 'Jours' : unit === 'Semaine' ? 'Semaines' : 'Mois'}
+              {unit === DureeUnite.DAY ? 'Jours' : unit === DureeUnite.WEEK ? 'Semaines' : 'Mois'}
             </option>
           ))}
         </select>
@@ -255,7 +257,7 @@ export default function DurationSelector({
             hoveredOption ? 'text-blue-400' : 'text-cyan-400'
           )}>
             ~{formatCurrency(previewInstallment)}
-            <span className="text-xs text-slate-500 ml-1">/{frequence === 'Journalier' ? 'jour' : frequence === 'Hebdomadaire' ? 'sem' : 'mois'}</span>
+            <span className="text-xs text-slate-500 ml-1">/{frequence === 'Journalier' || frequence === 'DAILY' ? 'jour' : frequence === 'Hebdomadaire' || frequence === 'WEEKLY' ? 'sem' : 'mois'}</span>
           </span>
         </div>
       )}

@@ -11,6 +11,12 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { usePagination } from '../../../hooks/usePagination';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
 import { formatClientName } from '../../../lib/format';
+import {
+  StatutClient,
+  StatutMembreTontine,
+  STATUT_MEMBRE_TONTINE_LABELS,
+  TypeCompte
+} from '@shared/enum/status-constants';
 
 interface Client {
   id: string;
@@ -23,14 +29,16 @@ interface Client {
   status?: string;
 }
 
+type StatutMembreTontineValue = typeof StatutMembreTontine[keyof typeof StatutMembreTontine];
+
 interface TontineMembre {
   id: string;
   tontine_id: string;
   client_id: string;
   position_ordre: number;
   position?: number;
-  status: 'Actif' | 'Inactif' | 'Exclu';
-  statut?: 'Actif' | 'Inactif' | 'Exclu';
+  status: StatutMembreTontineValue | string;
+  statut?: StatutMembreTontineValue | string;
   montant_total_contribue: number;
   totalCotisations?: string;
   a_recu_benefice: boolean;
@@ -143,7 +151,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
   const fetchClients = useCallback(async () => {
     try {
       const data = await clientApi.getAllList();
-      setClients(data?.filter((c: Client) => c.status === 'Actif') || []);
+      setClients(data?.filter((c: Client) => c.status === StatutClient.ACTIVE) || []);
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     }
@@ -236,15 +244,20 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
 
   const getStatutColor = useCallback((statut: string) => {
     switch (statut) {
-      case 'Actif':
+      case StatutMembreTontine.ACTIVE:
         return 'text-green-400 bg-green-500/20';
-      case 'Inactif':
+      case StatutMembreTontine.INACTIVE:
         return 'text-cyan-400 bg-cyan-500/20';
-      case 'Exclu':
+      case StatutMembreTontine.EXCLUDED:
         return 'text-red-400 bg-red-500/20';
       default:
         return 'text-slate-400 bg-slate-500/20';
     }
+  }, []);
+
+  // Helper to get label for member status
+  const getStatutLabel = useCallback((statut: string) => {
+    return STATUT_MEMBRE_TONTINE_LABELS[statut as StatutMembreTontineValue] || statut;
   }, []);
 
   const handleCloseModal = useCallback(() => {
@@ -379,9 +392,9 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                         </h4>
                         <div className="flex items-center gap-2 text-[10px] mt-0.5">
                           <span
-                            className={`px-1.5 py-0.5 rounded font-medium ${getStatutColor(membre.status || membre.statut || 'Actif')} bg-opacity-10`}
+                            className={`px-1.5 py-0.5 rounded font-medium ${getStatutColor(membre.status || membre.statut || StatutMembreTontine.ACTIVE)} bg-opacity-10`}
                           >
-                            {membre.status || membre.statut}
+                            {getStatutLabel(membre.status || membre.statut || StatutMembreTontine.ACTIVE)}
                           </span>
                           <span className="text-slate-500">
                             {new Date(membre.date_adhesion || membre.dateAdhesion || '').toLocaleDateString('fr-FR')}
@@ -624,7 +637,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                         <input 
                             type="checkbox" 
                             checked={!!configMember.cotisationAutomatique} 
-                            onChange={(e) => handleUpdateConfig(e.target.checked, configMember.cotisationCompteId || memberAccounts.find(a => a.typeCompte === 'Courant')?.id)}
+                            onChange={(e) => handleUpdateConfig(e.target.checked, configMember.cotisationCompteId || memberAccounts.find(a => a.typeCompte === TypeCompte.CURRENT)?.id)}
                             className="sr-only peer"
                             disabled={updatingConfig}
                         />

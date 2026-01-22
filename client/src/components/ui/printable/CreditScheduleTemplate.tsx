@@ -1,7 +1,8 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Installment } from '../../../lib/credit-logic';
+import { Installment, getInstallmentStatusLabel } from '../../../lib/credit-logic';
+import { StatutEcheanceCredit } from '@shared/enum/status-constants';
 import { MapPin, Phone, Mail, QrCode } from 'lucide-react';
 import { formatClientName } from '../../../lib/format';
 
@@ -114,11 +115,11 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
                   <td className="text-right font-mono">{item.remainingBalance.toLocaleString()} FCFA</td>
                   <td className="text-center">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${
-                      item.status === 'Payé' || item.status === 'Soldé' ? 'bg-green-100 text-green-700' :
-                      item.status === 'Retard' ? 'bg-red-100 text-red-700' :
+                      item.status === StatutEcheanceCredit.PAID || item.status === StatutEcheanceCredit.SETTLED ? 'bg-green-100 text-green-700' :
+                      item.status === StatutEcheanceCredit.LATE ? 'bg-red-100 text-red-700' :
                       'bg-slate-100 text-slate-600'
                     }`}>
-                      {item.status}
+                      {getInstallmentStatusLabel(item.status)}
                     </span>
                   </td>
                 </tr>
@@ -145,3 +146,4 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
 );
 
 CreditSchedulePDF.displayName = 'CreditSchedulePDF';
+

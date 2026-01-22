@@ -1,11 +1,11 @@
-import { 
-  offlineDb, 
-  getPendingOperations, 
-  updateOperationStatus, 
+import {
+  offlineDb,
+  getPendingOperations,
+  updateOperationStatus,
   addConflict,
   OfflineOperation,
   OperationStatus
-} from './offlineDb';
+} from './offline-db';
 import { connectivityService } from './connectivityService';
 
 type SyncCallback = (stats: SyncStats) => void;

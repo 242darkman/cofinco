@@ -154,7 +154,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
         montant: montantNum,
         frais: fraisNum,
         type_operation: typeOperation,
-        statut: 'Validé'
+        statut: 'VALIDATED'
       };
 
       setOperationData({ operation, mobileMoney: mobileMoneyData });

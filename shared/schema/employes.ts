@@ -7,6 +7,11 @@ import { agences } from "./agences";
 /**
  * Table des employés - Données métier RH
  * Liée à la table users pour l'identité commune
+ *
+ * IMPORTANT: Les rôles sont gérés via la table user_roles (voir auth.ts)
+ * - Un employé peut avoir plusieurs rôles
+ * - Le rôle principal (isPrimary=true) est utilisé par défaut
+ * - Les rôles peuvent être scopés par agence
  */
 export const employes = pgTable("employes", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -22,13 +27,14 @@ export const employes = pgTable("employes", {
   // Organisation
   agenceId: uuid("agence_id").references(() => agences.id),
   managerId: uuid("manager_id"), // Self-reference vers employes.id (géré au niveau app)
-  roleSystem: text("role_system").notNull().default("agent"), // 'admin', 'chef_agence', 'comptable', 'caissier', 'agent', 'terrain', 'credit'
+  // NOTE: roleSystem a été supprimé - utiliser user_roles à la place
+  statut: text("statut").notNull().default("ACTIVE"),
 
   // Rémunération
   salaireBase: integer("salaire_base").default(0),
   tauxHoraire: integer("taux_horaire").default(0),
   tauxJournalier: integer("taux_journalier").default(0),
-  modeCalculPaie: varchar("mode_calcul_paie", { length: 20 }).default("Mensuel"), // 'Mensuel', 'Horaire', 'Journalier'
+  modeCalculPaie: varchar("mode_calcul_paie", { length: 20 }).default("MONTHLY"), // 'MONTHLY', 'HOURLY', 'DAILY'
 
   // Sécurité Caisse
   caissePin: text("caisse_pin"), // PIN hashé pour autorisation caisse

@@ -37,35 +37,20 @@ export const users = pgTable("users", {
   // Type de compte et accès
   typeCompte: text("type_compte").notNull().default("employe"), // 'employe', 'client', 'both'
   canLogin: boolean("can_login").notNull().default(true), // Permet de désactiver l'accès sans supprimer
-  statut: text("statut").notNull().default("Actif"), // 'Actif', 'Inactif', 'Suspendu'
+  statut: text("statut").notNull().default("ACTIVE"), // 'ACTIVE', 'INACTIVE', 'SUSPENDED'
   mustChangePassword: boolean("must_change_password").notNull().default(false),
 
-  // ===== CHAMPS LEGACY (à migrer vers employes) =====
-  // Ces champs sont conservés temporairement pour la rétro-compatibilité
-  // Ils seront supprimés après migration complète
-  role: roleEnum("role").notNull().default(SystemRole.CAISSIER), // LEGACY: Remplacé par employes.roleSystem
-  lastLatitude: text("last_latitude"), // LEGACY: Déplacé vers agents_terrain
-  lastLongitude: text("last_longitude"), // LEGACY: Déplacé vers agents_terrain
-  matricule: varchar("matricule"), // LEGACY: Déplacé vers employes
-  poste: varchar("poste"), // LEGACY: Déplacé vers employes
-  departement: varchar("departement"), // LEGACY: Déplacé vers employes
-  dateEmbauche: date("date_embauche"), // LEGACY: Déplacé vers employes
-  typeContrat: varchar("type_contrat").default("CDI"), // LEGACY: Déplacé vers employes
-  managerId: uuid("manager_id"), // LEGACY: Déplacé vers employes
-  salaireBase: integer("salaire_base").default(0), // LEGACY: Déplacé vers employes
-  tauxHoraire: integer("taux_horaire").default(0), // LEGACY: Déplacé vers employes
-  tauxJournalier: integer("taux_journalier").default(0), // LEGACY: Déplacé vers employes
-  modeCalculPaie: varchar("mode_calcul_paie").default("Mensuel"), // LEGACY: Déplacé vers employes
-  caissePin: text("caisse_pin"), // LEGACY: Déplacé vers employes
-  // ===== FIN CHAMPS LEGACY =====
+  // ====================================================================
+  // Métadonnées
+  // ====================================================================
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
 });
 
-export const insertUserSchema = (createInsertSchema(users) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertUser = any;
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Types de compte possibles
@@ -95,8 +80,8 @@ export const loginAttempts = pgTable("login_attempts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertLoginAttemptSchema = (createInsertSchema(loginAttempts) as any).omit({ id: true, createdAt: true });
-export type InsertLoginAttempt = any;
+export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).omit({ id: true, createdAt: true });
+export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
 
 // User Permissions table - Permissions personnalisées par utilisateur (granulaire)
@@ -114,8 +99,8 @@ export const userPermissions = pgTable("user_permissions", {
   unq: unique().on(t.userId, t.permissionId),
 }));
 
-export const insertUserPermissionSchema = (createInsertSchema(userPermissions) as any).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertUserPermission = any;
+export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
 export type UserPermission = typeof userPermissions.$inferSelect;
 
 // Active Sessions table - Tracking précis des sessions utilisateurs
@@ -135,8 +120,8 @@ export const activeSessions = pgTable("active_sessions", {
   isActive: boolean("is_active").notNull().default(true),
 });
 
-export const insertActiveSessionSchema = (createInsertSchema(activeSessions) as any).omit({ id: true });
-export type InsertActiveSession = any;
+export const insertActiveSessionSchema = createInsertSchema(activeSessions).omit({ id: true });
+export type InsertActiveSession = z.infer<typeof insertActiveSessionSchema>;
 export type ActiveSession = typeof activeSessions.$inferSelect;
 
 // ============================================
@@ -155,8 +140,8 @@ export const modules = pgTable("modules", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertModuleSchema = (createInsertSchema(modules) as any).omit({ id: true, createdAt: true });
-export type InsertModule = any;
+export const insertModuleSchema = createInsertSchema(modules).omit({ id: true, createdAt: true });
+export type InsertModule = z.infer<typeof insertModuleSchema>;
 export type Module = typeof modules.$inferSelect;
 
 // Permissions table - Liste des types de permissions disponibles
@@ -169,8 +154,8 @@ export const permissions = pgTable("permissions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertPermissionSchema = (createInsertSchema(permissions) as any).omit({ id: true, createdAt: true });
-export type InsertPermission = any;
+export const insertPermissionSchema = createInsertSchema(permissions).omit({ id: true, createdAt: true });
+export type InsertPermission = z.infer<typeof insertPermissionSchema>;
 export type Permission = typeof permissions.$inferSelect;
 
 // Role Permissions table - Permissions par défaut pour chaque rôle
@@ -183,6 +168,62 @@ export const rolePermissions = pgTable("role_permissions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertRolePermissionSchema = (createInsertSchema(rolePermissions) as any).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertRolePermission = any;
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
 export type RolePermission = typeof rolePermissions.$inferSelect;
+
+// ============================================
+// Multi-Role Architecture: User Roles Table
+// ============================================
+
+/**
+ * Table userRoles - Architecture Multi-Rôles V3 (Source de Vérité Unique)
+ *
+ * Cette table est la SEULE source de vérité pour les rôles utilisateurs.
+ * employes.roleSystem a été supprimé - tous les rôles sont gérés ici.
+ *
+ * Caractéristiques:
+ * - Un utilisateur peut avoir plusieurs rôles (ex: CAISSIER + AGENT_TERRAIN)
+ * - Un rôle peut être scopé à une agence spécifique (agenceId)
+ * - Le rôle marqué isPrimary est utilisé par défaut dans getEffectiveRole()
+ * - Contrainte d'unicité: (userId, role, agenceId)
+ *
+ * Usage:
+ * - Création employé: transaction(users + employes + userRoles)
+ * - Lecture rôle: getEffectiveRole() ou getUserRoles()
+ * - Mise à jour: updateUserRole() dans storage/employes.ts
+ *
+ * Note: agenceId référence agences.id (FK gérée au niveau migration SQL)
+ */
+export const userRoles = pgTable("user_roles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: roleEnum("role").notNull(),
+
+  // Scope optionnel: agence à laquelle ce rôle s'applique (null = toutes agences)
+  // FK vers agences.id gérée au niveau SQL migration
+  agenceId: uuid("agence_id"),
+
+  // Un seul rôle principal par utilisateur (utilisé par défaut dans getEffectiveRole)
+  isPrimary: boolean("is_primary").notNull().default(false),
+
+  // Métadonnées
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  // Un utilisateur ne peut avoir le même rôle qu'une fois par agence
+  uniqueUserRoleAgence: unique().on(t.userId, t.role, t.agenceId),
+}));
+
+export const insertUserRoleSchema = createInsertSchema(userRoles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
+export type UserRole = typeof userRoles.$inferSelect;
+
+// Type pour les rôles avec informations étendues
+export interface UserRoleWithAgence extends UserRole {
+  agence?: {
+    id: string;
+    nom: string;
+    code: string;
+  } | null;
+}

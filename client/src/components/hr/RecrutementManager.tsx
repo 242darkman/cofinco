@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Briefcase, Eye, Calendar, Mail, Phone } from 'lucide-react';
 import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { StatutCandidature, STATUT_CANDIDATURE_LABELS } from '@shared/enum/status-constants';
 
 interface Candidat {
   id: number;
@@ -12,7 +13,7 @@ interface Candidat {
   posteVise: string;
   experience?: string;
   datePostulation: string;
-  statut: 'En attente' | 'Entretien' | 'Accepté' | 'Refusé';
+  statut: string; // EN values: 'PENDING' | 'INTERVIEW' | 'ACCEPTED' | 'REJECTED'
   cv?: string;
 }
 
@@ -78,18 +79,18 @@ export default function RecrutementManager({
 
   const getStatutVariant = (statut: Candidat['statut']) => {
     switch (statut) {
-      case 'Accepté': return 'success';
-      case 'Refusé': return 'danger';
-      case 'Entretien': return 'warning';
+      case StatutCandidature.ACCEPTED: return 'success';
+      case StatutCandidature.REJECTED: return 'danger';
+      case StatutCandidature.INTERVIEW: return 'warning';
       default: return 'info';
     }
   };
 
   const stats = {
     total: candidats.length,
-    enAttente: candidats.filter(c => c.statut === 'En attente').length,
-    entretien: candidats.filter(c => c.statut === 'Entretien').length,
-    acceptes: candidats.filter(c => c.statut === 'Accepté').length
+    enAttente: candidats.filter(c => c.statut === StatutCandidature.PENDING).length,
+    entretien: candidats.filter(c => c.statut === StatutCandidature.INTERVIEW).length,
+    acceptes: candidats.filter(c => c.statut === StatutCandidature.ACCEPTED).length
   };
 
   const columns = [
@@ -144,10 +145,10 @@ export default function RecrutementManager({
               onClick={(e) => e.stopPropagation()}
               className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-[10px] focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
-              <option value="En attente">En attente</option>
-              <option value="Entretien">Entretien</option>
-              <option value="Accepté">Accepté</option>
-              <option value="Refusé">Refusé</option>
+              <option value={StatutCandidature.PENDING}>{STATUT_CANDIDATURE_LABELS[StatutCandidature.PENDING]}</option>
+              <option value={StatutCandidature.INTERVIEW}>{STATUT_CANDIDATURE_LABELS[StatutCandidature.INTERVIEW]}</option>
+              <option value={StatutCandidature.ACCEPTED}>{STATUT_CANDIDATURE_LABELS[StatutCandidature.ACCEPTED]}</option>
+              <option value={StatutCandidature.REJECTED}>{STATUT_CANDIDATURE_LABELS[StatutCandidature.REJECTED]}</option>
             </select>
           )}
         </div>

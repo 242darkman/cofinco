@@ -3,6 +3,7 @@ import { type AgentTerrain, type InsertAgentTerrain, type Prospection, type Inse
 import { db } from "../db";
 import { notDeleted } from "./query-helpers";
 import { eq, desc, and, or, sql, gte } from "drizzle-orm";
+import { StatutOtp, StatutPaiementTerrain } from "@shared/enum/status-constants";
 
 async function resolveAgentPrimaryAgenceId(agentId: string): Promise<string | undefined> {
   const [row] = await db
@@ -30,13 +31,18 @@ export async function getAgentTerrain(id: string): Promise<AgentTerrain | undefi
 }
 
 export async function getAllAgentsTerrain(): Promise<any[]> {
-  const agents = await db
-    .select()
+  const results = await db
+    .select({
+      agent: agentsTerrain,
+      user: users
+    })
     .from(agentsTerrain)
+    .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .leftJoin(users, eq(employes.userId, users.id))
     .where(notDeleted(agentsTerrain))
     .orderBy(desc(agentsTerrain.createdAt));
   
-  const enrichedAgents = await Promise.all(agents.map(async (agent) => {
+  const enrichedAgents = await Promise.all(results.map(async ({ agent, user }) => {
     // 1. Nombre de clients (distinct clients visited or having paid)
     // Using simple count of related visits/payments for now as proxy if exact portfolio not defined
     const clientsCount = await db
@@ -67,6 +73,8 @@ export async function getAllAgentsTerrain(): Promise<any[]> {
 
     return {
       ...agent,
+      nom: user?.nom || "Inconnu",
+      prenom: user?.prenom || "",
       nombreClients: clientsCount[0]?.count || 0,
       collectesJour: collectesCount[0]?.count || 0,
       performance: perf,
@@ -89,15 +97,20 @@ export async function getAgentsTerrainPaginated(
     .where(notDeleted(agentsTerrain));
   const total = totalResult[0]?.count ? Number(totalResult[0].count) : 0;
 
-  const agents = await db
-    .select()
+  const results = await db
+    .select({
+      agent: agentsTerrain,
+      user: users
+    })
     .from(agentsTerrain)
+    .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .leftJoin(users, eq(employes.userId, users.id))
     .where(notDeleted(agentsTerrain))
     .orderBy(desc(agentsTerrain.createdAt))
     .limit(perPage)
     .offset((page - 1) * perPage);
 
-  const enrichedAgents = await Promise.all(agents.map(async (agent) => {
+  const enrichedAgents = await Promise.all(results.map(async ({ agent, user }) => {
     const clientsCount = await db
       .select({ count: sql<number>`count(distinct ${visitesTerrain.clientId})` })
       .from(visitesTerrain)
@@ -122,6 +135,11 @@ export async function getAgentsTerrainPaginated(
 
     return {
       ...agent,
+      nom: user?.nom || "Inconnu",
+      prenom: user?.prenom || "",
+      telephone: user?.telephone || null,
+      photoUrl: user?.photoProfile || null,
+      photo_url: user?.photoProfile || null, // Alias snake_case pour le frontend
       nombreClients: clientsCount[0]?.count || 0,
       collectesJour: collectesCount[0]?.count || 0,
       performance: perf,
@@ -145,6 +163,32 @@ export async function updateAgentTerrain(id: string, updateData: Partial<InsertA
     .where(eq(agentsTerrain.id, id))
     .returning();
   return agent || undefined;
+}
+
+/**
+ * Update agent location (GPS tracking)
+ * This updates the lastLatitude and lastLongitude fields on agents_terrain table
+ * Called from ws-server for real-time location tracking
+ */
+export async function updateAgentLocation(userId: string, latitude: string, longitude: string): Promise<void> {
+  // Find agent by userId through employes table
+  const [agentResult] = await db
+    .select({ agentId: agentsTerrain.id })
+    .from(agentsTerrain)
+    .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+    .where(eq(employes.userId, userId))
+    .limit(1);
+
+  if (agentResult) {
+    await db
+      .update(agentsTerrain)
+      .set({
+        lastLatitude: latitude,
+        lastLongitude: longitude,
+        lastSeenAt: new Date(),
+      })
+      .where(eq(agentsTerrain.id, agentResult.agentId));
+  }
 }
 
 // Prospections
@@ -194,14 +238,22 @@ export async function getProspectionsPaginated(
 }
 
 export async function createProspection(insertProspection: InsertProspection): Promise<Prospection> {
-  const [prospection] = await db.insert(prospections).values(insertProspection).returning();
+  const [prospection] = await db.insert(prospections).values({
+    ...insertProspection,
+    latitude: insertProspection.latitude ? insertProspection.latitude.toString() : null,
+    longitude: insertProspection.longitude ? insertProspection.longitude.toString() : null
+  }).returning();
   return prospection;
 }
 
 export async function updateProspection(id: string, updateData: Partial<InsertProspection>): Promise<Prospection | undefined> {
+  const updatePayload: any = { ...updateData };
+  if (updateData.latitude !== undefined) updatePayload.latitude = updateData.latitude ? updateData.latitude.toString() : null;
+  if (updateData.longitude !== undefined) updatePayload.longitude = updateData.longitude ? updateData.longitude.toString() : null;
+
   const [prospection] = await db
     .update(prospections)
-    .set(updateData)
+    .set(updatePayload)
     .where(eq(prospections.id, id))
     .returning();
   return prospection || undefined;
@@ -289,12 +341,17 @@ export async function getAllPaiementsTerrain(): Promise<PaiementTerrain[]> {
     .select({
       paiement: paiementsTerrain,
       client: clients,
+      clientUserNom: sql<string>`client_users.nom`.as('client_user_nom'),
+      clientUserPrenom: sql<string>`client_users.prenom`.as('client_user_prenom'),
+      clientUserTelephone: sql<string>`client_users.telephone`.as('client_user_telephone'),
+      clientUserPhoto: sql<string>`client_users.photo_profile`.as('client_user_photo'),
       agent: agentsTerrain,
       employe: employes,
       user: users
     })
     .from(paiementsTerrain)
     .leftJoin(clients, eq(paiementsTerrain.clientId, clients.id))
+    .leftJoin(sql`users as client_users`, sql`client_users.id = ${clients.userId}`)
     .leftJoin(agentsTerrain, eq(paiementsTerrain.agentId, agentsTerrain.id))
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
@@ -302,21 +359,21 @@ export async function getAllPaiementsTerrain(): Promise<PaiementTerrain[]> {
     .orderBy(desc(paiementsTerrain.createdAt));
 
   return results.map(row => {
-    // Determine agent name: prefer User (via employe), fallback to Agent Legacy
-    const agentNom = row.user?.nom || row.agent?.nom || "Inconnu";
-    const agentPrenom = row.user?.prenom || row.agent?.prenom || "";
-    
+    // Determine agent name: prefer User (via employe), fallback to legacy
+    const agentNom = row.user?.nom || "Inconnu";
+    const agentPrenom = row.user?.prenom || "";
+
     return {
       ...row.paiement,
-      clients: row.client ? { 
-        nom: row.client.nom, 
-        prenom: row.client.prenom, 
-        telephone: row.client.telephone,
-        photoProfile: row.client.photoProfile
+      clients: row.client ? {
+        nom: row.clientUserNom || 'Client',
+        prenom: row.clientUserPrenom || null,
+        telephone: row.clientUserTelephone || null,
+        photoProfile: row.clientUserPhoto || null
       } : undefined,
-      agents_terrain: row.agent ? { 
-        nom: agentNom, 
-        prenom: agentPrenom 
+      agents_terrain: row.agent ? {
+        nom: agentNom,
+        prenom: agentPrenom
       } : undefined
     };
   });
@@ -331,18 +388,23 @@ export async function getPendingPaiementsByAgencePaginated(
     .select({
       paiement: paiementsTerrain,
       client: clients,
+      clientUserNom: sql<string>`client_users.nom`.as('client_user_nom'),
+      clientUserPrenom: sql<string>`client_users.prenom`.as('client_user_prenom'),
+      clientUserTelephone: sql<string>`client_users.telephone`.as('client_user_telephone'),
+      clientUserPhoto: sql<string>`client_users.photo_profile`.as('client_user_photo'),
       agent: agentsTerrain,
       employe: employes,
       user: users,
     })
     .from(paiementsTerrain)
     .leftJoin(clients, eq(paiementsTerrain.clientId, clients.id))
+    .leftJoin(sql`users as client_users`, sql`client_users.id = ${clients.userId}`)
     .leftJoin(agentsTerrain, eq(paiementsTerrain.agentId, agentsTerrain.id))
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
     .$dynamic();
 
-  const conditions = [eq(paiementsTerrain.statut, "Pending"), notDeleted(paiementsTerrain)];
+  const conditions = [eq(paiementsTerrain.statut, StatutPaiementTerrain.PENDING), notDeleted(paiementsTerrain)];
   if (agenceId) {
     conditions.push(eq(paiementsTerrain.agenceId, agenceId));
   }
@@ -361,16 +423,16 @@ export async function getPendingPaiementsByAgencePaginated(
     .offset((page - 1) * perPage);
 
   const data = results.map(row => {
-    const agentNom = row.user?.nom || row.agent?.nom || "Inconnu";
-    const agentPrenom = row.user?.prenom || row.agent?.prenom || "";
+    const agentNom = row.user?.nom || "Inconnu";
+    const agentPrenom = row.user?.prenom || "";
 
     return {
       ...row.paiement,
       clients: row.client ? {
-        nom: row.client.nom,
-        prenom: row.client.prenom,
-        telephone: row.client.telephone,
-        photoProfile: row.client.photoProfile,
+        nom: row.clientUserNom || 'Client',
+        prenom: row.clientUserPrenom || null,
+        telephone: row.clientUserTelephone || null,
+        photoProfile: row.clientUserPhoto || null,
       } : undefined,
       agents_terrain: row.agent ? {
         nom: agentNom,
@@ -391,12 +453,17 @@ export async function getPendingPaiementsByAgence(agenceId?: string): Promise<Pa
     .select({
       paiement: paiementsTerrain,
       client: clients,
+      clientUserNom: sql<string>`client_users.nom`.as('client_user_nom'),
+      clientUserPrenom: sql<string>`client_users.prenom`.as('client_user_prenom'),
+      clientUserTelephone: sql<string>`client_users.telephone`.as('client_user_telephone'),
+      clientUserPhoto: sql<string>`client_users.photo_profile`.as('client_user_photo'),
       agent: agentsTerrain,
       employe: employes,
       user: users
     })
     .from(paiementsTerrain)
     .leftJoin(clients, eq(paiementsTerrain.clientId, clients.id))
+    .leftJoin(sql`users as client_users`, sql`client_users.id = ${clients.userId}`)
     .leftJoin(agentsTerrain, eq(paiementsTerrain.agentId, agentsTerrain.id))
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
@@ -404,7 +471,7 @@ export async function getPendingPaiementsByAgence(agenceId?: string): Promise<Pa
 
   // Filter by pending status and optionally by agency
   const conditions = [
-    eq(paiementsTerrain.statut, "Pending"),
+    eq(paiementsTerrain.statut, StatutPaiementTerrain.PENDING),
     notDeleted(paiementsTerrain),
   ];
 
@@ -417,21 +484,21 @@ export async function getPendingPaiementsByAgence(agenceId?: string): Promise<Pa
   const results = await query.orderBy(desc(paiementsTerrain.createdAt));
 
   return results.map(row => {
-    // Determine agent name: prefer User (via employe), fallback to Agent Legacy
-    const agentNom = row.user?.nom || row.agent?.nom || "Inconnu";
-    const agentPrenom = row.user?.prenom || row.agent?.prenom || "";
-    
+    // Determine agent name: prefer User (via employe)
+    const agentNom = row.user?.nom || "Inconnu";
+    const agentPrenom = row.user?.prenom || "";
+
     return {
       ...row.paiement,
-      clients: row.client ? { 
-        nom: row.client.nom, 
-        prenom: row.client.prenom, 
-        telephone: row.client.telephone,
-        photoProfile: row.client.photoProfile
+      clients: row.client ? {
+        nom: row.clientUserNom || 'Client',
+        prenom: row.clientUserPrenom || null,
+        telephone: row.clientUserTelephone || null,
+        photoProfile: row.clientUserPhoto || null
       } : undefined,
-      agents_terrain: row.agent ? { 
-        nom: agentNom, 
-        prenom: agentPrenom 
+      agents_terrain: row.agent ? {
+        nom: agentNom,
+        prenom: agentPrenom
       } : undefined
     };
   });
@@ -595,8 +662,8 @@ export async function getOtpByReference(transactionReference: string): Promise<O
     return otp;
 }
 
-export async function updateOtpStatus(id: string, status: string, attempts?: number): Promise<OtpValidation | undefined> {
-    const update: any = { status };
+export async function updateOtpStatus(id: string, statut: string, attempts?: number): Promise<OtpValidation | undefined> {
+    const update: any = { statut };
     if (attempts !== undefined) update.attempts = attempts;
     const [updated] = await db.update(otpValidations).set(update).where(eq(otpValidations.id, id)).returning();
     return updated;
@@ -609,8 +676,8 @@ export async function updateOtpAttempts(id: string, attempts: number): Promise<O
 
 export async function validateOtp(id: string, validatedBy?: string, validatedByName?: string, validatedByRole?: string): Promise<OtpValidation | undefined> {
     const [updated] = await db.update(otpValidations)
-        .set({ 
-            status: "validated",
+        .set({
+            statut: StatutOtp.VALIDATED,
             validatedBy,
             validatedByName,
             validatedByRole,
@@ -751,10 +818,10 @@ export async function createPendingPaiementTerrain(data: {
     referenceExterne: data.numeroTransaction,
     reference: data.reference,
     observations: data.notes,
-    latitude: data.latitude,
-    longitude: data.longitude,
+    latitude: data.latitude ? data.latitude.toString() : null,
+    longitude: data.longitude ? data.longitude.toString() : null,
     idempotencyKey: data.idempotencyKey,
-    statut: "Pending", // En attente de validation
+    statut: StatutPaiementTerrain.PENDING, // En attente de validation
     validationOTP: data.presenceVerification ? "REQUIRED" : null, // Marqueur simple pour indiquer verification requise
     // Si présence déjà vérifiée à la soumission, on peut le stocker dans observations ou un champ dédié si ajouté
     createdBy: userId
@@ -776,18 +843,18 @@ export async function validatePaiementTerrain(
   
   const paiement = await getPaiementTerrain(paiementId);
   if (!paiement) throw new Error("Paiement non trouvé");
-  if (paiement.statut !== "Pending") throw new Error(`Paiement déjà traité (Statut: ${paiement.statut})`);
+  if (paiement.statut !== StatutPaiementTerrain.PENDING) throw new Error(`Paiement déjà traité (Statut: ${paiement.statut})`);
 
   return executeWithLedger(
     "TERRAIN",
     {
       montant: paiement.montant,
-      sens: "Crédit", // Entrée d'argent
+      sens: "CREDIT", // Entrée d'argent
       clientId: paiement.clientId,
       creditId: paiement.creditId || undefined,
       compteId: paiement.compteId || undefined,
       agentId: paiement.agentId,
-      methodePaiement: paiement.methodePaiement || "Espèces",
+      methodePaiement: paiement.methodePaiement || "CASH",
       typePaiement: paiement.typePaiement || "Autre",
       referenceExterne: paiement.referenceExterne || undefined,
       // On utilise l'ID du paiement comme idempotency key pour le mouvement pour garantir 1-1
@@ -815,7 +882,7 @@ export async function validatePaiementTerrain(
       // 3. Update paiement terrain status
       const [updatedPaiement] = await tx.update(paiementsTerrain)
         .set({
-          statut: "Posté", // Contrat: Posté = Validé avec impact financier
+          statut: StatutPaiementTerrain.POSTED, // Posté = Validé avec impact financier
           mouvementId: mouvement.id,
           dateValidation: new Date(),
           // Nous n'avons pas de champ validePar dans le schema actuel de paiementsTerrain, 
@@ -824,7 +891,7 @@ export async function validatePaiementTerrain(
         } as any)
         .where(and(
           eq(paiementsTerrain.id, paiementId),
-          eq(paiementsTerrain.statut, "Pending")
+          eq(paiementsTerrain.statut, StatutPaiementTerrain.PENDING)
         ))
         .returning();
 
@@ -850,12 +917,12 @@ export async function validatePaiementTerrain(
 export async function rejectPaiementTerrain(id: string, reason: string): Promise<PaiementTerrain> {
   const [paiement] = await db.update(paiementsTerrain)
     .set({
-      statut: "Annulé",
+      statut: StatutPaiementTerrain.CANCELLED,
       observations: sql`${paiementsTerrain.observations} || '\nRejeté: ' || ${reason}`
     } as any)
     .where(and(
       eq(paiementsTerrain.id, id),
-      eq(paiementsTerrain.statut, "Pending")
+      eq(paiementsTerrain.statut, StatutPaiementTerrain.PENDING)
     ))
     .returning();
   
@@ -886,7 +953,7 @@ export async function createPaiementTerrainWithLedger(data: {
   // 1. Create pending
   const pending = await createPendingPaiementTerrain({
     ...data,
-    methodePaiement: "Espèces",
+    methodePaiement: "CASH",
     reference: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`
   } as any, userId);
 

@@ -1,8 +1,9 @@
 import { db } from "../db";
 import { comptes, credits, transactionsCompte } from "@shared/schema";
-import { eq, and, lte, sql, isNotNull, gt } from "drizzle-orm";
+import { eq, and, lte, sql, isNotNull, gt, or } from "drizzle-orm";
 import { executeWithLedger } from "./ledger";
 import { updateCompteSolde, updateCreditSolde, generateReference } from "./ledger";
+import { StatutCredit, TypeCompte, TypeOperationCaisse, MethodePaiement, FrequenceRemboursement } from "@shared/enum/status-constants";
 
 export async function processAutomaticCreditRepayments() {
   const now = new Date();
@@ -11,7 +12,7 @@ export async function processAutomaticCreditRepayments() {
   const creditsToRepay = await db.query.credits.findMany({
     where: and(
       eq(credits.remboursementAutomatique, true),
-      eq(credits.statut, 'Actif'),
+      eq(credits.statut, StatutCredit.ACTIVE),
       lte(credits.prochaineEcheance, now),
       isNotNull(credits.montantEcheance),
       gt(credits.soldeRestant, "0") // Ensure we don't try to pay if already fully paid
@@ -49,7 +50,7 @@ async function executeAutomaticRepayment(credit: any) {
   
   if (!sourceAccountId) {
     // If not set, try to find default current account
-    const accounts = await db.select().from(comptes).where(and(eq(comptes.clientId, credit.clientId), eq(comptes.typeCompte, 'Courant')));
+    const accounts = await db.select().from(comptes).where(and(eq(comptes.clientId, credit.clientId), eq(comptes.typeCompte, TypeCompte.CURRENT)));
     if (accounts.length === 0) throw new Error("No source account found for automatic repayment");
     // Use first one found locally (in a real scenario, we might want to be more specific)
     // For now, let's assume we need a specific ID or fail.
@@ -84,13 +85,13 @@ async function executeAutomaticRepayment(credit: any) {
     "CREDIT",
     {
       montant: amountToPay.toString(),
-      sens: "Crédit", // Input to Credit module
+      sens: "CREDIT", // Input to Credit module
       clientId: credit.clientId,
       creditId: credit.id,
       compteId: sourceAccountId, // Determines which account is debited in the event logic?
       
       typePaiement: "Remboursement Automatique",
-      methodePaiement: "Virement",
+      methodePaiement: "TRANSFER",
       referenceExterne: `AUTO-${generateReference("CREDIT")}`,
       metadata: {
         description: `Remboursement automatique échéance du ${credit.prochaineEcheance?.toLocaleDateString()}`,
@@ -108,25 +109,25 @@ async function executeAutomaticRepayment(credit: any) {
       await tx.insert(transactionsCompte).values({
         compteId: sourceAccountId,
         mouvementId: mouvement.id,
-        typePaiement: "Remboursement Crédit",
+        typePaiement: TypeOperationCaisse.CREDIT_REPAYMENT,
         montant: amountToPay.toString(),
         soldeApres: nouveauSoldeCompte,
-        methodePaiement: "Virement",
+        methodePaiement: MethodePaiement.TRANSFER,
         observations: `Remboursement automatique crédit ${credit.numeroCredit}`,
       });
 
       // 4. Update Next Due Date (Advance by frequency)
       let nextDate = new Date(credit.prochaineEcheance);
       // Fallback if null (shouldn't be based on query)
-      
-      const freq = credit.echeance || "Mensuel"; // Default
-      
+
+      const freq = credit.echeance || FrequenceRemboursement.MONTHLY;
+
       switch(freq) {
-        case "Journalier": nextDate.setDate(nextDate.getDate() + 1); break;
-        case "Hebdomadaire": nextDate.setDate(nextDate.getDate() + 7); break;
-        case "Bi-mensuel": nextDate.setDate(nextDate.getDate() + 14); break; // Or 15 days?
-        case "Mensuel": nextDate.setMonth(nextDate.getMonth() + 1); break;
-        default: nextDate.setMonth(nextDate.getMonth() + 1); 
+        case FrequenceRemboursement.DAILY: nextDate.setDate(nextDate.getDate() + 1); break;
+        case FrequenceRemboursement.WEEKLY: nextDate.setDate(nextDate.getDate() + 7); break;
+        case FrequenceRemboursement.BI_MONTHLY: nextDate.setDate(nextDate.getDate() + 14); break;
+        case FrequenceRemboursement.MONTHLY: nextDate.setMonth(nextDate.getMonth() + 1); break;
+        default: nextDate.setMonth(nextDate.getMonth() + 1);
       }
 
       await tx.update(credits).set({

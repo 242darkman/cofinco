@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, Printer } from 'lucide-react';
+import { toast } from 'sonner';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
 import { Modal, Button, FormField, SelectField, TextareaField } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -10,6 +11,7 @@ import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi, clientApi, agentTerrainApi } from '../../lib/api-client';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { usePOSPrint } from '@/hooks/usePOSPrint';
+import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <img src={airtelLogo} alt="Airtel Money" className={className} />
@@ -100,7 +102,20 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [lastPaymentInfo, setLastPaymentInfo] = useState<any>(null);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    agent_id: string;
+    client_id: string;
+    visite_id: string;
+    montant: string;
+    methode_paiement: string;
+    numero_telephone: string;
+    numero_transaction: string;
+    type_paiement: string;
+    reference: string;
+    notes: string;
+    credit_id: string;
+    compte_id: string;
+  }>({
     agent_id: agentId || '',
     client_id: clientId || '',
     visite_id: visiteId || '',
@@ -108,16 +123,16 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     methode_paiement: 'Espèces',
     numero_telephone: '',
     numero_transaction: '',
-    type_paiement: 'Versement Tontine',
+    type_paiement: TypeOperationTerrain.TONTINE_CONTRIBUTION,
     reference: '',
     notes: '',
     credit_id: '',
     compte_id: ''
   });
 
-  const isTontinePayment = formData.type_paiement === 'Versement Tontine';
-  const isCreditPayment = formData.type_paiement === 'Remboursement Crédit';
-  const isComptePayment = ['Dépôt Épargne', 'Dépôt Courant', 'Dépôt Bloqué'].includes(formData.type_paiement);
+  const isTontinePayment = formData.type_paiement === TypeOperationTerrain.TONTINE_CONTRIBUTION;
+  const isCreditPayment = formData.type_paiement === TypeOperationTerrain.LOAN_REPAYMENT;
+  const isComptePayment = formData.type_paiement === TypeOperationTerrain.SAVINGS_DEPOSIT || formData.type_paiement === TypeOperationTerrain.MISC_COLLECTION;
 
   // Auth context for auto-select agent
   const { user } = useUserProfile();
@@ -198,7 +213,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const loadAgents = async () => {
     try {
       const data = await agentTerrainApi.getAllList();
-      setAgents(data.filter((a: any) => a.statut === 'Actif'));
+      setAgents(data.filter((a: any) => a.statut === StatutUser.ACTIVE));
     } catch (error) {
       console.error('Error loading agents:', error);
     }
@@ -207,7 +222,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const loadClients = async () => {
     try {
       const data = await clientApi.getAllList();
-      setClients(data.filter((c: any) => c.status === 'Actif'));
+      setClients(data.filter((c: any) => c.status === StatutClient.ACTIVE));
     } catch (error) {
       console.error('Error loading clients:', error);
     }
@@ -239,8 +254,11 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           selectTontine(tontines[0]);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading client tontines:', error);
+      toast.error('Erreur lors du chargement des tontines', {
+        description: error.message || 'Veuillez réessayer'
+      });
     } finally {
       setLoadingTontines(false);
     }
@@ -250,9 +268,12 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     setLoadingCredits(true);
     try {
       const credits = await creditApi.getByClient(clientId);
-      setClientCredits((credits || []).filter((c: any) => c.statut === 'Actif' || c.statut === 'En retard'));
-    } catch (error) {
+      setClientCredits((credits || []).filter((c: any) => c.statut === StatutCredit.ACTIVE || c.statut === StatutCredit.LATE));
+    } catch (error: any) {
       console.error('Error loading client credits:', error);
+      toast.error('Erreur lors du chargement des crédits', {
+        description: error.message || 'Veuillez réessayer'
+      });
       setClientCredits([]);
     } finally {
       setLoadingCredits(false);
@@ -264,8 +285,11 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     try {
       const comptes = await compteEpargneApi.getByClient(clientId);
       setClientComptes(comptes || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading client accounts:', error);
+      toast.error('Erreur lors du chargement des comptes', {
+        description: error.message || 'Veuillez réessayer'
+      });
       setClientComptes([]);
     } finally {
       setLoadingComptes(false);
@@ -333,7 +357,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         type_paiement: formData.type_paiement,
         reference,
         notes: formData.notes.trim(),
-        statut: 'Pending',
+        statut: StatutOperationTerrain.SUBMITTED,
         tontineId: selectedTontine?.tontineId || null,
         membreId: selectedTontine?.id || null,
         creditId: formData.credit_id || null,
@@ -401,7 +425,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           credentials: 'include',
           body: JSON.stringify({
             montant_collecte: paiementData.montant,
-            statut: 'Effectuée'
+            statut: 'COMPLETED'
           })
         });
       }
@@ -419,7 +443,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         compteSelectionne?.numeroCompte || selectedClient?.numero_compte
       );
 
-      if (paiementData.type_paiement === 'Versement Tontine' && selectedTontine) {
+      if (paiementData.type_paiement === TypeOperationTerrain.TONTINE_CONTRIBUTION && selectedTontine) {
         const miseParTour = Number(selectedTontine.tontine.montantCotisation || 0);
         const toursRegles = miseParTour > 0 ? Math.floor(montant / miseParTour) : 0;
         const statut = resolveTontineStatus(montant, miseParTour);
@@ -596,11 +620,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 setSelectedTontine(null);
               }}
               options={[
-                { value: 'Versement Tontine', label: 'Tontine' },
-                { value: 'Remboursement Crédit', label: 'Crédit' },
-                { value: 'Dépôt Épargne', label: 'Épargne' },
-                { value: 'Dépôt Courant', label: 'Compte Courant' },
-                { value: 'Dépôt Bloqué', label: 'Compte Bloqué' }
+                { value: TypeOperationTerrain.TONTINE_CONTRIBUTION, label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.TONTINE_CONTRIBUTION] },
+                { value: TypeOperationTerrain.LOAN_REPAYMENT, label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.LOAN_REPAYMENT] },
+                { value: TypeOperationTerrain.SAVINGS_DEPOSIT, label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.SAVINGS_DEPOSIT] },
+                { value: TypeOperationTerrain.MISC_COLLECTION, label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.MISC_COLLECTION] }
               ]}
             />
             {/* Amount Input with Quick Buttons - POS Optimized */}
@@ -695,12 +718,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               value={formData.compte_id}
               onChange={(e) => setFormData({ ...formData, compte_id: e.target.value })}
               options={clientComptes
-                .filter((compte: any) => {
-                  const type = (compte.type_compte || compte.typeCompte || '').toLowerCase();
-                  if (formData.type_paiement === 'Dépôt Courant') return type.includes('courant');
-                  if (formData.type_paiement === 'Dépôt Bloqué') return type.includes('bloqué') || type.includes('bloque');
-                  return type.includes('épargne') || type.includes('epargne');
-                })
                 .map((compte: any) => ({
                   value: compte.id,
                   label: `${compte.type_compte || compte.typeCompte || 'Compte'} - ${compte.numero || compte.numero_compte || compte.numeroCompte || compte.id.slice(0, 8)}`

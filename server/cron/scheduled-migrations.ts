@@ -1,7 +1,7 @@
-import cron from "node-cron";
+import cron, { ScheduledTask } from "node-cron";
 import { agencyMigrationService } from "../services/agency-migration";
 
-let scheduledMigrationsCron: cron.ScheduledTask | null = null;
+let scheduledMigrationsCron: ScheduledTask | null = null;
 
 /**
  * Cron job pour exécuter les migrations d'agence planifiées

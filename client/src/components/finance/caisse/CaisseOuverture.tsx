@@ -127,7 +127,7 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
                 }
                 
                 // Pre-select first available if any
-                const firstAvailable = res.data.find(c => !c.isOccupied && c.statut !== 'Fermée');
+                const firstAvailable = res.data.find(c => !c.isOccupied && c.statut !== 'CLOSED');
                 if (firstAvailable) setSelectedCaisseId(firstAvailable.id);
             }
         } catch (e) {
@@ -280,7 +280,7 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
         dateOuverture: new Date().toISOString(),
         soldeInitial: totalCalcule.toString(),
         soldeTheorique: totalCalcule.toString(),
-        statut: 'Ouverte',
+        statut: 'OPEN',
         observations: formData.observations,
         billetageOuverture: billetage,
         // Removed non-schema fields to avoid validation errors

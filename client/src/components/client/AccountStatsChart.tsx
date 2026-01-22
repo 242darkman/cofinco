@@ -45,7 +45,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/comptes/${compteId}/stats?period=${period}`);
+      const res = await fetch(`/api/comptes/${compteId}/stats?period=${period}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur chargement statistiques');
       const json = await res.json();
       setData(json);

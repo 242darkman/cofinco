@@ -31,7 +31,7 @@ export const coffresForts = pgTable("coffres_forts", {
   solde: numeric("solde", { precision: 15, scale: 2 }).notNull().default("0"),
   plafondEncaisse: numeric("plafond_encaisse", { precision: 15, scale: 2 }), // Maximum autorisé
   soldeMinimum: numeric("solde_minimum", { precision: 15, scale: 2 }).default("0"), // Minimum requis
-  statut: statutCoffreEnum("statut").notNull().default("Actif"),
+  statut: statutCoffreEnum("statut").notNull().default("ACTIVE"),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -96,7 +96,7 @@ export const transfertsInterCoffres = pgTable("transferts_inter_coffres", {
   motif: text("motif").notNull(),
 
   // Statut workflow
-  statut: statutTransfertInterCoffreEnum("statut").notNull().default("Brouillon"),
+  statut: statutTransfertInterCoffreEnum("statut").notNull().default("DRAFT"),
 
   // Phase 1: Création
   createdBy: uuid("created_by").notNull().references(() => users.id),
@@ -238,7 +238,7 @@ export const reconciliationsLiaison = pgTable("reconciliations_liaison", {
   transfertId: uuid("transfert_id").references(() => transfertsInterCoffres.id),
   montant: numeric("montant", { precision: 15, scale: 2 }).notNull(),
   dateOperation: date("date_operation").notNull(),
-  statut: statutReconciliationEnum("statut").notNull().default("En attente"),
+  statut: statutReconciliationEnum("statut").notNull().default("PENDING"),
   ecritureSourceId: uuid("ecriture_source_id"), // FK vers lignesEcritures si besoin
   ecritureDestId: uuid("ecriture_dest_id"),
   dateRapprochement: timestamp("date_rapprochement"),
@@ -268,9 +268,9 @@ export const tachesRegularisation = pgTable("taches_regularisation", {
   type: typeTacheRegularisationEnum("type").notNull(),
   description: text("description").notNull(),
   montantEcart: numeric("montant_ecart", { precision: 15, scale: 2 }),
-  statut: statutTacheRegularisationEnum("statut").notNull().default("Ouverte"),
+  statut: statutTacheRegularisationEnum("statut").notNull().default("OPEN"),
   assignedTo: uuid("assigned_to").references(() => users.id),
-  priorite: prioriteTacheEnum("priorite").notNull().default("Normale"),
+  priorite: prioriteTacheEnum("priorite").notNull().default("NORMAL"),
   dateEcheance: date("date_echeance"),
   resolution: text("resolution"),
   resolvedBy: uuid("resolved_by").references(() => users.id),

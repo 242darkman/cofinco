@@ -19,6 +19,7 @@ import {
   operationsCaisse,
   transactionsCompte,
 } from "@shared/schema";
+import { StatutTransaction, StatutCompte } from "@shared/enum/status-constants";
 import { eq, sql, and, isNull, isNotNull, gte, inArray } from "drizzle-orm";
 
 // ============================================================================
@@ -80,8 +81,8 @@ async function calculateCaisseSoldeFromLedger(caisseId: string): Promise<number>
         COALESCE(
           SUM(
             CASE
-              WHEN ${mouvementsFinanciers.sens} = 'Crédit' THEN CAST(${mouvementsFinanciers.montant} AS NUMERIC)
-              WHEN ${mouvementsFinanciers.sens} = 'Débit' THEN -CAST(${mouvementsFinanciers.montant} AS NUMERIC)
+              WHEN ${mouvementsFinanciers.sens} IN ('CREDIT', 'Crédit') THEN CAST(${mouvementsFinanciers.montant} AS NUMERIC)
+              WHEN ${mouvementsFinanciers.sens} IN ('DEBIT', 'Débit') THEN -CAST(${mouvementsFinanciers.montant} AS NUMERIC)
               ELSE 0
             END
           ),
@@ -93,7 +94,7 @@ async function calculateCaisseSoldeFromLedger(caisseId: string): Promise<number>
     .where(
       and(
         inArray(mouvementsFinanciers.sessionCaisseId, sessionIds),
-        eq(mouvementsFinanciers.statut, "Posté")
+        eq(mouvementsFinanciers.statut, StatutTransaction.POSTED)
       )
     );
 
@@ -172,7 +173,7 @@ async function calculateSessionSoldeFromOperations(sessionId: string): Promise<n
 
   if (!session) return 0;
 
-  const soldeInitial = parseFloat(session.soldeInitial || "0");
+  const soldeInitial = parseFloat(session.montantOuverture || "0");
 
   // Récupérer les opérations de la session
   const operations = await db
@@ -212,7 +213,7 @@ export async function reconcileOpenSessions(autoFix: boolean = false): Promise<R
     .where(isNull(sessionsCaisse.closedAt));
 
   for (const { session, caisseNom } of openSessions) {
-    const soldeCached = parseFloat(session.soldeTheorique || "0");
+    const soldeCached = parseFloat(session.montantFermetureTheorique || "0");
     const soldeCalculated = await calculateSessionSoldeFromOperations(session.id);
     const ecart = Math.abs(soldeCached - soldeCalculated);
     const ecartPercent = soldeCached !== 0 ? (ecart / soldeCached) * 100 : (ecart > 0 ? 100 : 0);
@@ -232,7 +233,7 @@ export async function reconcileOpenSessions(autoFix: boolean = false): Promise<R
       await db
         .update(sessionsCaisse)
         .set({
-          soldeTheorique: soldeCalculated.toString(),
+          montantFermetureTheorique: soldeCalculated.toString(),
           updatedAt: new Date(),
         })
         .where(eq(sessionsCaisse.id, session.id));
@@ -269,9 +270,15 @@ async function calculateCompteSoldeFromTransactions(compteId: string): Promise<n
         COALESCE(
           SUM(
             CASE
-              WHEN ${transactionsCompte.typePaiement} IN ('Dépôt Épargne', 'Dépôt Courant', 'Dépôt Bloqué', 'Intérêt', 'Dépôt Initial', 'Transfert Entrant')
+              WHEN ${transactionsCompte.typePaiement} IN (
+                'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED', 'INTEREST', 'INITIAL_DEPOSIT', 'TRANSFER_IN',
+                'Dépôt Épargne', 'Dépôt Courant', 'Dépôt Bloqué', 'Intérêt', 'Dépôt Initial', 'Transfert Entrant'
+              )
                 THEN CAST(${transactionsCompte.montant} AS NUMERIC)
-              WHEN ${transactionsCompte.typePaiement} IN ('Retrait Épargne', 'Retrait Courant', 'Retrait Bloqué', 'Frais', 'Transfert Sortant')
+              WHEN ${transactionsCompte.typePaiement} IN (
+                'WITHDRAWAL_SAVINGS', 'WITHDRAWAL_CURRENT', 'WITHDRAWAL_BLOCKED', 'FEE', 'TRANSFER_OUT',
+                'Retrait Épargne', 'Retrait Courant', 'Retrait Bloqué', 'Frais', 'Transfert Sortant'
+              )
                 THEN -CAST(${transactionsCompte.montant} AS NUMERIC)
               ELSE 0
             END
@@ -284,7 +291,7 @@ async function calculateCompteSoldeFromTransactions(compteId: string): Promise<n
     .where(
       and(
         eq(transactionsCompte.compteId, compteId),
-        eq(transactionsCompte.statut, "Posté")
+        eq(transactionsCompte.statut, StatutTransaction.POSTED)
       )
     );
 
@@ -302,7 +309,7 @@ export async function reconcileComptes(autoFix: boolean = false): Promise<Reconc
     .from(comptes)
     .where(
       and(
-        eq(comptes.statut, "Actif"),
+        eq(comptes.statut, StatutCompte.ACTIVE),
         isNull(comptes.deletedAt)
       )
     );
@@ -412,7 +419,7 @@ export async function verifyDoubleEntryIntegrity(
   totalCredits: number;
   difference: number;
 }> {
-  const conditions = [eq(mouvementsFinanciers.statut, "Posté")];
+  const conditions = [eq(mouvementsFinanciers.statut, StatutTransaction.POSTED)];
 
   if (startDate) {
     conditions.push(gte(mouvementsFinanciers.dateOperation, startDate));
@@ -421,10 +428,10 @@ export async function verifyDoubleEntryIntegrity(
   const [result] = await db
     .select({
       totalDebits: sql<string>`
-        COALESCE(SUM(CASE WHEN ${mouvementsFinanciers.sens} = 'Débit' THEN CAST(${mouvementsFinanciers.montant} AS NUMERIC) ELSE 0 END), 0)
+        COALESCE(SUM(CASE WHEN ${mouvementsFinanciers.sens} IN ('DEBIT', 'Débit') THEN CAST(${mouvementsFinanciers.montant} AS NUMERIC) ELSE 0 END), 0)
       `,
       totalCredits: sql<string>`
-        COALESCE(SUM(CASE WHEN ${mouvementsFinanciers.sens} = 'Crédit' THEN CAST(${mouvementsFinanciers.montant} AS NUMERIC) ELSE 0 END), 0)
+        COALESCE(SUM(CASE WHEN ${mouvementsFinanciers.sens} IN ('CREDIT', 'Crédit') THEN CAST(${mouvementsFinanciers.montant} AS NUMERIC) ELSE 0 END), 0)
       `,
     })
     .from(mouvementsFinanciers)

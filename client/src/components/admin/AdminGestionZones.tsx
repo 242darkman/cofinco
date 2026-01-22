@@ -4,6 +4,7 @@ import { Card, Button, SearchInput, Badge, FormField, LoadingSpinner, IconButton
 import AdminGestionZonesMap from '../maps/AdminGestionZonesMap';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { agentTerrainApi } from '../../lib/api-client';
+import { StatutClient } from '@shared/enum/status-constants';
 
 interface Agent {
   id: string;
@@ -139,7 +140,7 @@ export default function AdminGestionZones() {
       agent.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       agent.zoneAffectation.toLowerCase().includes(searchTerm.toLowerCase());
     const matchZone = !showOnlyWithZone || (agent.zoneLatitude && agent.zoneLongitude);
-    return matchSearch && matchZone && agent.statut === 'Actif';
+    return matchSearch && matchZone && agent.statut === StatutClient.ACTIVE;
   });
 
   // Pagination logic
@@ -154,8 +155,8 @@ export default function AdminGestionZones() {
     setCurrentPage(1);
   }, [searchTerm, showOnlyWithZone]);
 
-  const agentsWithZones = agents.filter(a => a.zoneLatitude && a.zoneLongitude && a.statut === 'Actif');
-  const activeAgentsCount = agents.filter(a => a.statut === 'Actif').length;
+  const agentsWithZones = agents.filter(a => a.zoneLatitude && a.zoneLongitude && a.statut === StatutClient.ACTIVE);
+  const activeAgentsCount = agents.filter(a => a.statut === StatutClient.ACTIVE).length;
 
   if (loading) {
     return (

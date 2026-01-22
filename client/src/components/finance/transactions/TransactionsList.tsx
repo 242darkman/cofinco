@@ -1,4 +1,5 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, type CSSProperties, type ReactElement } from 'react';
+import { List as VirtualList } from 'react-window';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -11,8 +12,12 @@ import {
 } from 'lucide-react';
 import { formatMoney } from '../../../lib/format';
 import { Badge } from '../../ui';
+import { getStatusLabel, OPERATION_STATUS_LABELS, OPERATION_STATUS_COLORS } from '../../../lib/status-labels';
 
 // --- Types ---
+
+/** Operation status - strict EN values */
+export type OperationStatus = 'SUCCESS' | 'FAILED' | 'PENDING' | 'CANCELLED';
 
 export interface TransactionItem {
   id: string;
@@ -20,7 +25,7 @@ export interface TransactionItem {
   amount: number;
   type: string;
   type_operation?: string;
-  status: 'Succès' | 'Échec' | 'En attente' | 'Annulé' | 'completed' | 'pending' | 'failed';
+  status: OperationStatus | string; // Accept any string for compatibility, normalize internally
   date: string | Date;
   description?: string;
   client?: {
@@ -69,49 +74,52 @@ const isEntree = (type: string): boolean => {
   );
 };
 
-const normalizeStatus = (status: string): 'Succès' | 'Échec' | 'En attente' | 'Annulé' => {
-  const s = status.toLowerCase();
-  if (s === 'completed' || s === 'succès' || s === 'success') return 'Succès';
-  if (s === 'failed' || s === 'échec' || s === 'error') return 'Échec';
-  if (s === 'pending' || s === 'en attente' || s === 'en cours') return 'En attente';
-  if (s === 'annulé' || s === 'cancelled' || s === 'canceled') return 'Annulé';
-  return 'Succès';
+// Normalize status to canonical EN values for consistent handling
+const normalizeStatus = (status: string): OperationStatus => {
+  const s = status.toUpperCase();
+  if (s === 'SUCCESS' || s === 'COMPLETED') return 'SUCCESS';
+  if (s === 'FAILED' || s === 'ERROR') return 'FAILED';
+  if (s === 'PENDING') return 'PENDING';
+  if (s === 'CANCELLED' || s === 'CANCELED') return 'CANCELLED';
+  return 'SUCCESS';
 };
 
 const getStatusConfig = (status: string) => {
   const normalized = normalizeStatus(status);
+  const label = getStatusLabel(normalized, OPERATION_STATUS_LABELS);
+
   switch (normalized) {
-    case 'Succès':
+    case 'SUCCESS':
       return {
         icon: CheckCircle,
         color: 'text-emerald-400',
         bg: 'bg-emerald-500/10',
         border: 'border-emerald-500/20',
-        label: 'Succès'
+        label
       };
-    case 'Échec':
+    case 'FAILED':
       return {
         icon: XCircle,
         color: 'text-red-400',
         bg: 'bg-red-500/10',
         border: 'border-red-500/20',
-        label: 'Échec'
+        label
       };
-    case 'En attente':
+    case 'PENDING':
       return {
         icon: Hourglass,
         color: 'text-amber-400',
         bg: 'bg-amber-500/10',
         border: 'border-amber-500/20',
-        label: 'En attente'
+        label
       };
-    case 'Annulé':
+    case 'CANCELLED':
       return {
         icon: XCircle,
         color: 'text-slate-400',
         bg: 'bg-slate-500/10',
         border: 'border-slate-500/20',
-        label: 'Annulé'
+        label
       };
     default:
       return {
@@ -119,10 +127,93 @@ const getStatusConfig = (status: string) => {
         color: 'text-emerald-400',
         bg: 'bg-emerald-500/10',
         border: 'border-emerald-500/20',
-        label: 'Succès'
+        label: getStatusLabel('SUCCESS', OPERATION_STATUS_LABELS)
       };
   }
 };
+
+// --- Row Props Type for react-window v2 ---
+interface TransactionRowProps {
+  transactions: TransactionItem[];
+  onTransactionClick?: (transaction: TransactionItem) => void;
+}
+
+// --- Row Component for react-window v2 ---
+function MobileTransactionRow({
+  index,
+  style,
+  transactions,
+  onTransactionClick,
+}: {
+  ariaAttributes: {
+    "aria-posinset": number;
+    "aria-setsize": number;
+    role: "listitem";
+  };
+  index: number;
+  style: CSSProperties;
+} & TransactionRowProps): ReactElement | null {
+  const tx = transactions[index];
+  if (!tx) return null;
+
+  const isCredit = isEntree(tx.type_operation || tx.type);
+  const statusConfig = getStatusConfig(tx.status);
+  const StatusIcon = statusConfig.icon;
+  const dateObj = new Date(tx.created_at || tx.date);
+  const timeStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+
+  const handleClick = () => {
+    if (onTransactionClick) {
+      onTransactionClick(tx);
+    }
+  };
+
+  return (
+    <div
+      style={style}
+      onClick={handleClick}
+      className="p-4 active:bg-slate-800/50 transition-colors cursor-pointer border-b border-edge"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`
+          w-11 h-11 rounded-full flex items-center justify-center shrink-0
+          ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
+        `}>
+          {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate">
+                {tx.description || tx.type_operation || tx.type}
+              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-slate-500">{timeStr}</span>
+                <span className="text-slate-600">·</span>
+                <span className="text-xs text-slate-500">{dateStr}</span>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <p className={`text-base font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
+              </p>
+              {normalizeStatus(tx.status) !== 'SUCCESS' && (
+                <div className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusConfig.bg} ${statusConfig.color}`}>
+                  <StatusIcon size={10} />
+                  {statusConfig.label}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // --- Component ---
 
@@ -145,6 +236,10 @@ export default function TransactionsList({
       onTransactionClick(transaction);
     }
   }, [onTransactionClick]);
+
+  // Virtualization threshold - use virtual list for large datasets
+  const VIRTUALIZATION_THRESHOLD = 50;
+  const useVirtualization = displayedTransactions.length > VIRTUALIZATION_THRESHOLD;
 
   // Loading skeleton
   if (isLoading) {
@@ -219,71 +314,77 @@ export default function TransactionsList({
         </div>
       )}
 
-      {/* Mobile Card View */}
-      <div className="md:hidden divide-y divide-edge">
-        {displayedTransactions.map((tx) => {
-          const isCredit = isEntree(tx.type_operation || tx.type);
-          const statusConfig = getStatusConfig(tx.status);
-          const StatusIcon = statusConfig.icon;
-          const dateObj = new Date(tx.created_at || tx.date);
-          const timeStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-          const dateStr = dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+      {/* Mobile Card View - Virtualized for large lists */}
+      <div className="md:hidden">
+        {useVirtualization ? (
+          <VirtualList<TransactionRowProps>
+            style={{ height: Math.min(displayedTransactions.length * 88, 600), width: '100%' }}
+            rowCount={displayedTransactions.length}
+            rowHeight={88}
+            className="divide-y divide-edge"
+            rowComponent={MobileTransactionRow}
+            rowProps={useMemo(() => ({
+              transactions: displayedTransactions,
+              onTransactionClick,
+            }), [displayedTransactions, onTransactionClick])}
+          />
+        ) : (
+          <div className="divide-y divide-edge">
+            {displayedTransactions.map((tx) => {
+              const isCredit = isEntree(tx.type_operation || tx.type);
+              const statusConfig = getStatusConfig(tx.status);
+              const StatusIcon = statusConfig.icon;
+              const dateObj = new Date(tx.created_at || tx.date);
+              const timeStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+              const dateStr = dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 
-          return (
-            <div
-              key={tx.id}
-              onClick={() => handleClick(tx)}
-              className="p-4 active:bg-slate-800/50 transition-colors cursor-pointer"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && handleClick(tx)}
-            >
-              <div className="flex items-start gap-3">
-                {/* Icon */}
-                <div className={`
-                  w-11 h-11 rounded-full flex items-center justify-center shrink-0
-                  ${isCredit
-                    ? 'bg-emerald-500/10 text-emerald-400'
-                    : 'bg-red-500/10 text-red-400'
-                  }
-                `}>
-                  {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">
-                        {tx.description || tx.type_operation || tx.type}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-slate-500">{timeStr}</span>
-                        <span className="text-slate-600">·</span>
-                        <span className="text-xs text-slate-500">{dateStr}</span>
-                      </div>
+              return (
+                <div
+                  key={tx.id}
+                  onClick={() => handleClick(tx)}
+                  className="p-4 active:bg-slate-800/50 transition-colors cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && handleClick(tx)}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`
+                      w-11 h-11 rounded-full flex items-center justify-center shrink-0
+                      ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
+                    `}>
+                      {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
                     </div>
-
-                    {/* Amount */}
-                    <div className="text-right shrink-0">
-                      <p className={`text-base font-bold font-mono ${
-                        isCredit ? 'text-emerald-400' : 'text-red-400'
-                      }`}>
-                        {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
-                      </p>
-                      {normalizeStatus(tx.status) !== 'Succès' && (
-                        <div className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusConfig.bg} ${statusConfig.color}`}>
-                          <StatusIcon size={10} />
-                          {statusConfig.label}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">
+                            {tx.description || tx.type_operation || tx.type}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-slate-500">{timeStr}</span>
+                            <span className="text-slate-600">·</span>
+                            <span className="text-xs text-slate-500">{dateStr}</span>
+                          </div>
                         </div>
-                      )}
+                        <div className="text-right shrink-0">
+                          <p className={`text-base font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
+                          </p>
+                          {normalizeStatus(tx.status) !== 'SUCCESS' && (
+                            <div className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusConfig.bg} ${statusConfig.color}`}>
+                              <StatusIcon size={10} />
+                              {statusConfig.label}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Desktop Table View */}
@@ -353,11 +454,7 @@ export default function TransactionsList({
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <Badge value={statusConfig.label} variant={
-                      statusConfig.label === 'Succès' ? 'success' :
-                      statusConfig.label === 'Échec' ? 'danger' :
-                      statusConfig.label === 'En attente' ? 'warning' : 'neutral'
-                    } size="sm" />
+                    <Badge value={statusConfig.label} size="sm" />
                   </td>
                 </tr>
               );

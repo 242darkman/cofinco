@@ -11,6 +11,7 @@ import {
   type CaisseAgentSummary,
 } from "@shared/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
+import { StatutCaisseAgent } from "@shared/enum/status-constants";
 
 export class CaisseAgentService {
   /**
@@ -57,7 +58,7 @@ export class CaisseAgentService {
           agentId: params.agentId,
           soldeValide: "0",
           devise: params.devise || "XOF",
-          statut: "Active",
+          statut: StatutCaisseAgent.ACTIVE,
           createdBy: params.createdBy,
         })
         .returning();
@@ -198,14 +199,14 @@ export class CaisseAgentService {
       return { success: false, error: "Caisse non trouvée" };
     }
 
-    if (caisseAgent.statut === "Suspendue") {
+    if (caisseAgent.statut === StatutCaisseAgent.SUSPENDED) {
       return { success: false, error: "La caisse est déjà suspendue" };
     }
 
     const [updated] = await db
       .update(caissesAgent)
       .set({
-        statut: "Suspendue",
+        statut: StatutCaisseAgent.SUSPENDED,
         updatedAt: new Date(),
       })
       .where(eq(caissesAgent.id, caisseAgent.id))
@@ -230,18 +231,18 @@ export class CaisseAgentService {
       return { success: false, error: "Caisse non trouvée" };
     }
 
-    if (caisseAgent.statut === "Active") {
+    if (caisseAgent.statut === StatutCaisseAgent.ACTIVE) {
       return { success: false, error: "La caisse est déjà active" };
     }
 
-    if (caisseAgent.statut === "Clôturée") {
+    if (caisseAgent.statut === StatutCaisseAgent.CLOSED) {
       return { success: false, error: "Impossible de réactiver une caisse clôturée" };
     }
 
     const [updated] = await db
       .update(caissesAgent)
       .set({
-        statut: "Active",
+        statut: StatutCaisseAgent.ACTIVE,
         updatedAt: new Date(),
       })
       .where(eq(caissesAgent.id, caisseAgent.id))
@@ -259,7 +260,7 @@ export class CaisseAgentService {
       .from(caissesAgent)
       .where(and(eq(caissesAgent.id, caisseId), isNull(caissesAgent.deletedAt)));
 
-    return caisseAgent?.statut === "Active";
+    return caisseAgent?.statut === StatutCaisseAgent.ACTIVE;
   }
 
   /**

@@ -17,16 +17,32 @@ import {
   operationsCaisse,
   clients,
   demandesCredit,
+  credits,
   coffresForts,
   transactionsCompte
 } from "@shared/schema";
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
 import { getComptesByClient, DecaissementInsufficientFundsError } from "../storage/finance";
+// State Machine errors for proper error handling
+import { CreditTransitionError } from "@shared/machines/credit-workflow";
+import { DemandeTransitionError } from "@shared/machines/demande-workflow";
+import {
+  StatutCompte,
+  StatutCredit,
+  StatutDemande,
+  StatutTransfertCaisse,
+  StatutClient,
+  StatutEnquete,
+  StatutCaisse,
+  TypeCompte,
+  DureeUnite as DureeUniteEnum,
+} from "@shared/enum/status-constants";
 import { requireAuth, requireRole } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
+import { sendCreditApprovalNotification } from "../sms-service";
 import { db } from "../db";
 import { z } from "zod";
 import {
@@ -39,6 +55,7 @@ import { getWsInstance } from "../ws-server";
 import { eq, desc, and, sql, count } from "drizzle-orm";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import * as sessionService from "../services/caisse/session-service";
+import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_OPERATIONS } from "@shared/config/caisse-operations";
 
 export function registerFinanceRoutes(app: Express) {
   // Credit Plans Routes
@@ -56,7 +73,7 @@ export function registerFinanceRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(plans));
   });
 
-  app.post("/api/credit-plans", requireAuth, requireRole('admin', 'chef', 'Administrateur'), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/credit-plans", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
     const data = normalizeKeysDeep(req.body) as any;
     
     // Validation basique
@@ -67,14 +84,14 @@ export function registerFinanceRoutes(app: Express) {
     res.status(201).json(addSnakeCaseAliasesDeep(plan));
   });
 
-  app.patch("/api/credit-plans/:id", requireAuth, requireRole('admin', 'chef', 'Administrateur'), async (req, res) => {
+  app.patch("/api/credit-plans/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
     const data = normalizeKeysDeep(req.body) as any;
     const plan = await storage.updateCreditPlan(req.params.id, data);
     if (!plan) return res.status(404).json({ message: "Plan non trouvé" });
     res.json(addSnakeCaseAliasesDeep(plan));
   });
 
-  app.delete("/api/credit-plans/:id", requireAuth, requireRole('admin', 'chef', 'Administrateur'), async (req, res) => {
+  app.delete("/api/credit-plans/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
     const success = await storage.deleteCreditPlan(req.params.id);
     if (!success) return res.status(404).json({ message: "Plan non trouvé" });
     res.json({ success: true });
@@ -99,7 +116,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Create credit (roles: admin, chef, credit only)
-  app.post("/api/credits", requireAuth, requireRole('admin', 'chef', 'credit'), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/credits", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), requireAgenceAccess(), async (req, res) => {
      try {
        const data = normalizeKeysDeep(req.body) as any;
        
@@ -118,11 +135,11 @@ export function registerFinanceRoutes(app: Express) {
        const parsed = insertCreditSchema.parse(data);
        
        // Vérifier que le client appartient à l'agence de l'utilisateur
-       const agenceFilter = req.agenceFilter as { agence?: string } | null;
-       if (agenceFilter) {
+       const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+       if (agenceFilter?.agenceId) {
          const client = await storage.getClient(parsed.clientId);
          // Si le client n'existe pas ou n'est pas de la bonne agence => Refusé
-         if (!client || client.agence !== agenceFilter.agence) {
+         if (!client || client.agenceId !== agenceFilter.agenceId) {
            return res.status(403).json({ message: "Accès refusé : ce client appartient à une autre agence" });
          }
        }
@@ -152,7 +169,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Décaissement de crédit (crée le crédit + crédite le compte courant du client)
-  app.post("/api/credits/decaissement", requireAuth, requireRole('admin', 'chef', 'credit'), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/credits/decaissement", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), requireAgenceAccess(), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body) as any;
       const user = req.session.user;
@@ -168,8 +185,8 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(404).json({ message: "Demande de crédit non trouvée" });
       }
 
-      // Accept both 'Approuvée' and 'Approuvée après réévaluation' for disbursement
-      const statutsEligiblesDecaissement = ['Approuvée', 'Approuvée après réévaluation'];
+      // Only APPROVED and APPROVED_AFTER_REEVALUATION are eligible for disbursement
+      const statutsEligiblesDecaissement = [StatutDemande.APPROVED, StatutDemande.APPROVED_AFTER_REEVALUATION] as string[];
       if (!demande.statut || !statutsEligiblesDecaissement.includes(demande.statut)) {
         return res.status(400).json({ message: `La demande doit être approuvée pour être décaissée (statut actuel: ${demande.statut})` });
       }
@@ -179,8 +196,8 @@ export function registerFinanceRoutes(app: Express) {
       const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
 
       const compteCourant = comptesClient.find((c: any) => {
-        const isCompteCourant = c.typeCompte === 'Courant';
-        const isActif = c.statut === 'Actif';
+        const isCompteCourant = c.typeCompte === TypeCompte.CURRENT;
+        const isActif = c.statut === StatutCompte.ACTIVE;
 
         // Vérifier l'agence si nécessaire
         if (agenceFilter?.agenceId) {
@@ -218,8 +235,8 @@ export function registerFinanceRoutes(app: Express) {
         typeCredit: demande.typeCredit || 'Personnel',
         objetCredit: demande.objetCredit,
         demandeId: demande.id, // Link to the original application
-        // Si programmé, le crédit est "En attente" (du décaissement), sinon "Actif"
-        statut: estProgramme ? 'En attente' as const : 'Actif' as const,
+        // Si programmé, le crédit est "PENDING" (du décaissement), sinon "ACTIVE"
+        statut: estProgramme ? StatutCredit.PENDING : StatutCredit.ACTIVE,
         echeance: demande.frequenceRemboursement,
         dateDebut: new Date(dateDecaissement),
         dateFin: data.dateFin ? new Date(data.dateFin) : null,
@@ -258,7 +275,7 @@ export function registerFinanceRoutes(app: Express) {
       // 7. Mettre à jour le statut de la demande
       // Note: On met "Décaissée" dans les deux cas car le décaissement est engagé.
       // L'information de programmation est stockée dans le crédit (statut "En attente de décaissement")
-      await storage.updateDemandeCredit(demande.id, { statut: 'Décaissée' });
+      await storage.updateDemandeCredit(demande.id, { statut: StatutDemande.DISBURSED });
 
       // 8. Log audit
       await logAudit(
@@ -337,10 +354,10 @@ export function registerFinanceRoutes(app: Express) {
       if (!credit) return res.status(404).json({ message: "Credit not found" });
       
       // Vérifier accès via client
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
-      if (agenceFilter) {
+      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+      if (agenceFilter?.agenceId) {
         const client = await storage.getClient(credit.clientId);
-        if (!client || client.agence !== agenceFilter.agence) {
+        if (!client || client.agenceId !== agenceFilter.agenceId) {
           return res.status(403).json({ message: "Accès refusé : crédit d'une autre agence" });
         }
       }
@@ -384,35 +401,38 @@ export function registerFinanceRoutes(app: Express) {
         
         const results = await query;
 
-        // Map to frontend tabs
-        // toProcess = 'En attente' + 'Rejetée' + 'Annulée' (as per Credits.tsx 'demandes' tab)
-        // investigation = 'A enquêter'
-        // approval = 'En enquête' + 'Enquête terminée'
-        // commission = 'Approuvée' + 'Approuvée après réévaluation'
-        // reevaluation = 'Réévaluation en cours'
+        // Map to frontend tabs using standardized EN enum values
+        // toProcess = PENDING_FEES + REJECTED + CANCELLED
+        // investigation = READY_FOR_INVESTIGATION
+        // approval = UNDER_INVESTIGATION + INVESTIGATION_COMPLETE
+        // commission = APPROVED + APPROVED_AFTER_REEVALUATION
+        // reevaluation = REEVALUATION_IN_PROGRESS
 
         const mapping = {
             toProcess: 0,
             investigation: 0,
             approval: 0,
             commission: 0,
-            reevaluation: 0
+            reevaluation: 0,
+            archives: 0
         };
 
         for (const row of results) {
             const s = row.status || '';
             const c = Number(row.count);
 
-            if (['En attente', 'Rejetée', 'Annulée'].includes(s)) {
+            if ([StatutDemande.PENDING_FEES].includes(s as any)) {
                 mapping.toProcess += c;
-            } else if (s === 'A enquêter') {
+            } else if (s === StatutDemande.READY_FOR_INVESTIGATION) {
                 mapping.investigation += c;
-            } else if (['En enquête', 'Enquête terminée'].includes(s)) {
+            } else if ([StatutDemande.UNDER_INVESTIGATION, StatutDemande.INVESTIGATION_COMPLETE].includes(s as any)) {
                 mapping.approval += c;
-            } else if (['Approuvée', 'Approuvée après réévaluation'].includes(s)) {
+            } else if ([StatutDemande.APPROVED, StatutDemande.APPROVED_AFTER_REEVALUATION].includes(s as any)) {
                 mapping.commission += c;
-            } else if (s === 'Réévaluation en cours') {
+            } else if (s === StatutDemande.REEVALUATION_IN_PROGRESS) {
                 mapping.reevaluation += c;
+            } else if ([StatutDemande.REJECTED, StatutDemande.CANCELLED].includes(s as any)) {
+                mapping.archives += c;
             }
         }
 
@@ -425,7 +445,8 @@ export function registerFinanceRoutes(app: Express) {
 
   app.get("/api/demandes-credit", requireAuth, requireAgenceAccess(), async (req, res) => {
       const agenceFilter = req.agenceFilter as { agence?: string } | null;
-      const filter = agenceFilter ? { agence: agenceFilter.agence } : {};
+      const includeDeleted = req.query.includeDeleted === 'true';
+      const filter = agenceFilter ? { agence: agenceFilter.agence, includeDeleted } : { includeDeleted };
       
       const demandes = await storage.getAllDemandes(filter);
       
@@ -433,7 +454,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Create demande credit (roles: admin, chef, credit, superviseur, terrain)
-  app.post("/api/demandes-credit", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur', 'terrain'), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/demandes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR, SystemRole.AGENT_TERRAIN), requireAgenceAccess(), async (req, res) => {
       const data = normalizeKeysDeep(req.body) as any;
 
       // Auto-generate numeroDemande if not provided
@@ -486,10 +507,10 @@ export function registerFinanceRoutes(app: Express) {
       const parsed = insertDemandeCreditSchema.parse(data);
 
       // Vérifier agence du client
-      const agenceFilter = req.agenceFilter as { agence?: string } | null;
-      if (agenceFilter) {
+      const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
+      if (agenceFilter?.agenceId) {
         const client = await storage.getClient(parsed.clientId);
-        if (!client || client.agence !== agenceFilter.agence) {
+        if (!client || client.agenceId !== agenceFilter.agenceId) {
           return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
         }
       }
@@ -529,7 +550,8 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(demande));
   });
 
-  app.patch("/api/demandes-credit/:id", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur'), async (req, res) => {
+  app.patch("/api/demandes-credit/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR), async (req, res) => {
+    try {
       const { id } = req.params;
       const updateData = normalizeKeysDeep(req.body) as any;
 
@@ -540,9 +562,9 @@ export function registerFinanceRoutes(app: Express) {
       let updated;
 
       // Logic for Refund on Rejection
-      if (updateData.statut === 'Rejetée' && updateData.montantRemboursement && Number(updateData.montantRemboursement) > 0) {
+      if (updateData.statut === StatutDemande.REJECTED && updateData.montantRemboursement && Number(updateData.montantRemboursement) > 0) {
           const refundAmount = Number(updateData.montantRemboursement);
-          
+
           updated = await db.transaction(async (tx) => {
             // 1. Validation
             if (!existing.fraisEngagementPayes) {
@@ -567,8 +589,8 @@ export function registerFinanceRoutes(app: Express) {
               makerId: req.session.user?.id,
               makerAt: new Date(),
             }, tx);
-  
-            // 3. Update Demande Status
+
+            // 3. Update Demande Status (State Machine guard in storage layer)
             // Motif Rejet Update
             if (updateData.motifRejet) {
                  updateData.motifRejet += ` (Remboursement de ${refundAmount} FCFA en attente)`;
@@ -577,24 +599,24 @@ export function registerFinanceRoutes(app: Express) {
             return await storage.updateDemandeCredit(id, updateData, tx);
           });
       } else {
-          // Normal update
+          // Normal update (State Machine guard in storage layer)
           updated = await storage.updateDemandeCredit(id, updateData);
       }
-      
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ 
-            type: "CREDIT_UPDATE", 
-            payload: { 
-              type: 'demande_updated', 
-              id, 
-              statut: updateData.statut 
-            } 
+          wsInstance.broadcast({
+            type: "CREDIT_UPDATE",
+            payload: {
+              type: 'demande_updated',
+              id,
+              statut: updateData.statut
+            }
           });
 
-           // Si approuvée, notifier en temps réel
-           if (updateData.statut === 'Approuvée') {
+           // Si approuvée, notifier en temps réel + SMS
+           if (updateData.statut === StatutDemande.APPROVED) {
               const userAgence = req.session.user?.agence;
               if (userAgence) {
                 wsInstance.broadcastToAgency(userAgence, {
@@ -607,13 +629,41 @@ export function registerFinanceRoutes(app: Express) {
                   }
                 });
               }
+
+              // Send SMS notification to client (async, non-blocking)
+              const montantNotification = existing.montantApprouve || existing.montantDemande;
+              if (existing.clientId && montantNotification) {
+                sendCreditApprovalNotification(
+                  existing.clientId,
+                  existing.id,
+                  Number(montantNotification),
+                  req.user?.id
+                ).catch(err => {
+                  console.error(`[SMS] Failed to send credit approval notification for demande ${existing.id}:`, err);
+                });
+              }
            }
       }
 
       res.json(addSnakeCaseAliasesDeep(updated));
+    } catch (error: any) {
+      console.error("Erreur mise à jour demande crédit:", error);
+
+      // State Machine error: return 400 with clear message
+      if (error instanceof DemandeTransitionError) {
+        return res.status(400).json({
+          code: error.code,
+          message: error.message,
+          fromStatus: error.fromStatus,
+          toStatus: error.toStatus
+        });
+      }
+
+      res.status(500).json({ message: error.message || "Erreur lors de la mise à jour de la demande" });
+    }
   });
 
-  app.delete("/api/demandes-credit/:id", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+  app.delete("/api/demandes-credit/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
       const success = await storage.deleteDemandeCredit(req.params.id);
       if (!success) return res.status(404).json({ message: "Demande non trouvée" });
       
@@ -625,22 +675,39 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ success: true });
   });
 
-  app.put("/api/demandes-credit/:id/cancel", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+  app.put("/api/demandes-credit/:id/cancel", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+    try {
       const { motif } = req.body;
+      // State Machine guard is in storage.cancelDemandeCredit
       const demande = await storage.cancelDemandeCredit(req.params.id, motif);
-      
+
       if (!demande) return res.status(404).json({ message: "Demande non trouvée" });
-      
+
       const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_cancelled', id: req.params.id } });
       }
-      
+
       res.json(addSnakeCaseAliasesDeep(demande));
+    } catch (error: any) {
+      console.error("Erreur annulation demande crédit:", error);
+
+      // State Machine error: return 400 with clear message
+      if (error instanceof DemandeTransitionError) {
+        return res.status(400).json({
+          code: error.code,
+          message: error.message,
+          fromStatus: error.fromStatus,
+          toStatus: error.toStatus
+        });
+      }
+
+      res.status(500).json({ message: error.message || "Erreur lors de l'annulation de la demande" });
+    }
   });
 
   // Reject a credit application from Commission Crédit phase
-  app.post("/api/demandes/:id/reject-from-commission", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+  app.post("/api/demandes/:id/reject-from-commission", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
     try {
       const { id } = req.params;
       const { motif_rejet } = req.body;
@@ -665,16 +732,16 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       // Verify status is eligible for commission rejection
-      const statutsEligiblesCommission = ['Approuvée', 'Approuvée après réévaluation'];
+      const statutsEligiblesCommission = [StatutDemande.APPROVED, StatutDemande.APPROVED_AFTER_REEVALUATION] as string[];
       if (!demande.statut || !statutsEligiblesCommission.includes(demande.statut)) {
         return res.status(400).json({
           message: `Cette demande ne peut pas être rejetée depuis la commission (statut actuel: ${demande.statut}). Seules les demandes approuvées peuvent être rejetées à cette étape.`
         });
       }
 
-      // Update demande status to Rejetée
-      const updated = await storage.updateDemandeCredit(id, { 
-        statut: 'Rejetée',
+      // Update demande status to REJECTED
+      const updated = await storage.updateDemandeCredit(id, {
+        statut: StatutDemande.REJECTED,
         motifRejet: motif_rejet.trim(),
         dateRejet: new Date()
       });
@@ -688,8 +755,8 @@ export function registerFinanceRoutes(app: Express) {
         {
           numeroDemande: demande.numeroDemande,
           motifRejet: motif_rejet.trim(),
-          statusAvant: 'Approuvée',
-          statusApres: 'Rejetée'
+          statusAvant: StatutDemande.APPROVED,
+          statusApres: StatutDemande.REJECTED
         },
         "success",
         "high"
@@ -732,7 +799,7 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/demandes-credit/:id/payer-frais", requireAuth, requireRole('admin', 'chef', 'caisse', 'credit'), async (req, res) => {
+  app.post("/api/demandes-credit/:id/payer-frais", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
       try {
           const data = normalizeKeysDeep(req.body) as any;
           const user = req.session.user;
@@ -822,9 +889,9 @@ export function registerFinanceRoutes(app: Express) {
 
       // Convertir la durée en mois
       let dureeMois = demande.dureeValeur || 1;
-      if (demande.dureeUnite === 'Jour') {
+      if (demande.dureeUnite === DureeUniteEnum.DAY) {
         dureeMois = Math.ceil(dureeMois / 30);
-      } else if (demande.dureeUnite === 'Semaine') {
+      } else if (demande.dureeUnite === DureeUniteEnum.WEEK) {
         dureeMois = Math.ceil(dureeMois / 4);
       }
 
@@ -848,7 +915,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Recalculer le score d'une demande
-  app.post("/api/demandes-credit/:id/recalculer-score", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+  app.post("/api/demandes-credit/:id/recalculer-score", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
     try {
       const demande = await storage.getDemandeCredit(req.params.id);
       if (!demande) {
@@ -859,9 +926,9 @@ export function registerFinanceRoutes(app: Express) {
 
       // Convertir la durée en mois
       let dureeMois = demande.dureeValeur || 1;
-      if (demande.dureeUnite === 'Jour') {
+      if (demande.dureeUnite === DureeUniteEnum.DAY) {
         dureeMois = Math.ceil(dureeMois / 30);
-      } else if (demande.dureeUnite === 'Semaine') {
+      } else if (demande.dureeUnite === DureeUniteEnum.WEEK) {
         dureeMois = Math.ceil(dureeMois / 4);
       }
 
@@ -894,8 +961,116 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
+  // Timeline d'une demande
+  app.get("/api/demandes-credit/:id/timeline", requireAuth, async (req, res) => {
+      try {
+          // Allow fetching timeline for deleted/archived requests
+          const demande = await storage.getDemandeCredit(req.params.id, true);
+          if (!demande) return res.status(404).json({ message: "Demande non trouvée" });
+
+          const timeline = [];
+
+          // 1. Demande Créée
+          if (demande.createdAt) {
+              timeline.push({
+                  id: 'creation',
+                  type: 'DEMANDE',
+                  date: demande.createdAt,
+                  titre: 'Demande Créée',
+                  description: `Dossier N° ${demande.numeroDemande} initié`,
+                  statut: 'Créée'
+              });
+          }
+
+          // 2. Frais
+          if (demande.fraisEngagementPayes) {
+             timeline.push({
+                 id: 'frais',
+                 type: 'FRAIS',
+                 date: demande.updatedAt || demande.createdAt,
+                 titre: 'Frais Payés',
+                 description: 'Frais de dossier réglés',
+                 statut: 'PAID'
+             });
+          }
+
+          // 3. Enquête
+          const enquetes = await storage.getEnqueteByDemandeId(demande.id);
+          const enquete = enquetes?.[0];
+          if (enquete) {
+              const enqueteStatus = enquete.statut || StatutEnquete.IN_PROGRESS;
+
+              timeline.push({
+                  id: 'enquete_start',
+                  type: 'ENQUETE',
+                  date: enquete.createdAt,
+                  titre: 'Enquête Terrain',
+                  description: `Enquête assignée (${enquete.typeActivite || 'Activité'})`,
+                  statut: enqueteStatus
+              });
+          }
+
+          // 4. Decision (Comité)
+          // Check if status implies approval or rejection using enum constants
+          const decisionStatuses = [
+            StatutDemande.APPROVED,
+            StatutDemande.APPROVED_AFTER_REEVALUATION,
+            StatutDemande.REJECTED,
+            StatutDemande.DEFINITIVELY_REJECTED
+          ];
+          const isDecided = decisionStatuses.includes(demande.statut as any);
+          if (isDecided || demande.dateRejet) {
+              const isRejected = demande.statut === StatutDemande.REJECTED || demande.statut === StatutDemande.DEFINITIVELY_REJECTED;
+              timeline.push({
+                  id: 'decision',
+                  type: 'DECISION',
+                  date: demande.dateRejet || demande.updatedAt || new Date(),
+                  titre: isRejected ? 'Demande Rejetée' : 'Approbation Comité',
+                  description: isRejected ? (demande.motifRejet || 'Dossier rejeté') : `Montant approuvé: ${demande.montantApprouve || demande.montantDemande}`,
+                  statut: demande.statut
+              });
+          }
+
+          // 5. Décaissement (Link via Credit)
+          // Use direct DB query as storage method might be missing for this specific lookup
+          const [credit] = await db.select().from(credits).where(eq(credits.demandeId, demande.id));
+          
+          if (credit) {
+              timeline.push({
+                 id: 'decaissement',
+                 type: 'DECAISSEMENT',
+                 date: credit.dateDebut || credit.createdAt || new Date(),
+                 titre: 'Crédit Décaissé',
+                 description: `Crédit N° ${credit.numeroCredit} actif.`,
+                 statut: StatutDemande.DISBURSED
+              });
+          }
+
+          // 6. Suppression
+          if (demande.deletedAt) {
+              timeline.push({
+                  id: 'suppression',
+                  type: 'SUPPRESSION',
+                  date: demande.deletedAt,
+                  titre: 'Demande Supprimée',
+                  description: 'Le dossier a été supprimé.',
+                  statut: StatutDemande.DELETED
+              });
+          }
+
+          // Sort by date
+          timeline.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+          res.json({ success: true, timeline, demande });
+
+      } catch (error: any) {
+          console.error("Timeline error:", error);
+          res.status(500).json({ message: error.message });
+      }
+  });
+
   // Enquetes (roles: admin, chef, credit, superviseur)
-  app.get("/api/enquetes-credit", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur', 'agent_terrain'), async (req, res) => {
+  app.get("/api/enquetes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR, SystemRole.AGENT_TERRAIN), async (req, res) => {
       // Return both completed/in-progress enquetes AND demandes ready for investigation
       // Actually, for now, let's just return enquetes. Frontend can merge if needed, 
       // or we can handle it here.
@@ -904,7 +1079,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enquetes));
   });
 
-  app.post("/api/enquetes-credit", requireAuth, requireRole('admin', 'chef', 'credit', 'superviseur'), async (req, res) => {
+  app.post("/api/enquetes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertEnqueteCreditSchema.parse(data);
       const enquete = await storage.createEnqueteCredit(parsed);
@@ -912,7 +1087,7 @@ export function registerFinanceRoutes(app: Express) {
       // Update Demande Status
       if (enquete.demandeId) {
           // Si l'enquête est créée, on considère qu'elle est terminée et prête pour approbation
-          await storage.updateDemandeCredit(enquete.demandeId, { statut: 'Enquête terminée' as any });
+          await storage.updateDemandeCredit(enquete.demandeId, { statut: StatutDemande.INVESTIGATION_COMPLETE as any });
       }
 
       // Notify Credit Update
@@ -924,15 +1099,15 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enquete));
   });
 
-  app.post("/api/enquetes-credit/:id/valider", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+  app.post("/api/enquetes-credit/:id/valider", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
       const { decision, montant_approuve, commentaire, raison } = req.body;
 
       const enquete = await storage.getEnqueteCredit(req.params.id);
       if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
 
-      // IDEMPOTENCE CHECK: Vérifier si l'enquête n'est pas déjà validée
-      const statutsTerminaux = ['Approuvé', 'Rejeté', 'Réduit'];
-      if (statutsTerminaux.includes(enquete.statut || '')) {
+      // IDEMPOTENCE CHECK: Verify enquete is not already processed
+      const terminalStatuses = [StatutEnquete.APPROVED, StatutEnquete.REJECTED, StatutEnquete.REDUCED];
+      if (terminalStatuses.includes(enquete.statut as any)) {
           return res.status(409).json({
               message: "Cette enquête a déjà été traitée",
               statut_actuel: enquete.statut,
@@ -940,18 +1115,25 @@ export function registerFinanceRoutes(app: Express) {
           });
       }
 
+      // Map decision to standardized enum value
+      const statutEnquete = decision === 'approuve'
+        ? StatutEnquete.APPROVED
+        : decision === 'rejete'
+          ? StatutEnquete.REJECTED
+          : StatutEnquete.REDUCED;
+
       const updatedEnquete = await storage.updateEnqueteCredit(req.params.id, {
-          statut: decision === 'approuve' ? 'Approuvé' : decision === 'rejete' ? 'Rejeté' : 'Réduit',
+          statut: statutEnquete,
           recommandation: commentaire || raison // Store comment
       });
 
       // Update Demande status if enquete is approved/rejected
       if (enquete.demandeId) {
-          let nouveauStatutDemande = 'En enquête'; // Default
+          let nouveauStatutDemande: string = StatutDemande.UNDER_INVESTIGATION; // Default
           if (decision === 'approuve' || decision === 'reduit') {
-              nouveauStatutDemande = 'Approuvée'; // Prêt pour décaissement
+              nouveauStatutDemande = StatutDemande.APPROVED; // Prêt pour décaissement
           } else if (decision === 'rejete') {
-              nouveauStatutDemande = 'Rejetée'; // Rejetée suite enquête
+              nouveauStatutDemande = StatutDemande.REJECTED; // Rejetée suite enquête
           }
 
           await storage.updateDemandeCredit(enquete.demandeId, {
@@ -972,7 +1154,7 @@ export function registerFinanceRoutes(app: Express) {
 
   // Remboursements (roles: admin, chef, caisse, credit)
   // Now using atomic ledger flow
-  app.post("/api/remboursements", requireAuth, requireRole('admin', 'chef', 'caisse', 'credit'), async (req, res) => {
+  app.post("/api/remboursements", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user;
@@ -1044,34 +1226,30 @@ export function registerFinanceRoutes(app: Express) {
       
       const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
          const activeSession = activeSessions.find(s => s.caisseId === c.id && !s.closedAt);
-         let currentSolde = c.solde || "0";
+         let currentSolde = "0";
 
          if (activeSession) {
-            // Calculate real-time balance
+            // Calculate real-time balance for active session
             const ops = await storage.getOperationsBySession(activeSession.id);
-            let solde = Number(activeSession.soldeInitial || 0);
-            
+            let solde = Number(activeSession.montantOuverture || 0);
+
             for (const op of ops) {
                 const montant = Number(op.montant || 0);
-                
-                // Logic In/Out expanded for new Enum types
-                const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre'];
-                const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre'];
 
-                if (IN_TYPES.includes(op.typeOperation)) {
-                    solde += montant;
-                } else if (OUT_TYPES.includes(op.typeOperation)) {
-                    solde -= montant;
-                } else if (op.typeOperation === 'Transfert caisse') {
-                    // Check reference/description to determine direction for Transfer
-                    if (op.reference?.includes('TRF-IN') || op.description?.includes('Réception')) {
-                        solde += montant;
-                    } else {
-                        solde -= montant;
-                    }
-                }
+                // Use centralized helper functions from caisse-operations.ts
+                const delta = getOperationDelta(op.typeOperation, montant, {
+                    reference: op.reference,
+                    description: op.description
+                });
+                solde += delta;
             }
             currentSolde = solde.toString();
+         } else {
+            // Get balance from last closed session
+            const lastClosedSession = await storage.getLastClosedSession(c.id);
+            if (lastClosedSession) {
+               currentSolde = lastClosedSession.montantFermetureDeclare || lastClosedSession.montantFermetureTheorique || "0";
+            }
          }
 
          const assignments = await storage.getCaisseAssignments(c.id);
@@ -1088,7 +1266,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
   });
 
-  app.get("/api/caisses", requireAuth, requireRole('admin', 'Administrateur', 'admin_generale'), async (req, res) => {
+  app.get("/api/caisses", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
       // Admin only: Get ALL caisses
       const caisses = await storage.getAllCaisses();
       const activeSessions = await storage.getActiveSessions();
@@ -1101,23 +1279,30 @@ export function registerFinanceRoutes(app: Express) {
 
       const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
          const activeSession = activeSessions.find(s => s.caisseId === c.id && !s.closedAt);
-         let currentSolde = c.solde || "0";
+         let currentSolde = "0";
 
          if (activeSession) {
             // Calculate real-time balance using Ledger SENS (Source of Truth)
             // This fixes discrepancies where some operation types were missing from the hardcoded list
             const ops = await storage.getOperationsBySessionWithSens(activeSession.id);
-            let solde = Number(activeSession.soldeInitial || 0);
-            
+            let solde = Number(activeSession.montantOuverture || 0);
+
             for (const op of ops) {
                 const montant = Number(op.montant || 0);
-                if (op.sens === 'Crédit') {
+                // Support both old FR and new EN values
+                if (op.sens === 'CREDIT' || op.sens === 'Crédit') {
                     solde += montant;
-                } else if (op.sens === 'Débit') {
+                } else if (op.sens === 'DEBIT' || op.sens === 'Débit') {
                     solde -= montant;
                 }
             }
             currentSolde = solde.toString();
+         } else {
+            // Get balance from last closed session
+            const lastClosedSession = await storage.getLastClosedSession(c.id);
+            if (lastClosedSession) {
+               currentSolde = lastClosedSession.montantFermetureDeclare || lastClosedSession.montantFermetureTheorique || "0";
+            }
          }
 
          const assignments = await storage.getCaisseAssignments(c.id);
@@ -1134,7 +1319,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
   });
 
-  app.post("/api/caisses/:id/assign", requireAuth, requireRole('admin', 'chef'), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/caisses/:id/assign", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
       const { id } = req.params;
       const { userIds } = req.body; // Expect array of user IDs
       
@@ -1146,7 +1331,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ success: true });
   });
 
-  app.post("/api/caisses", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/caisses", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
       const data = normalizeKeysDeep(req.body) as any;
       const user = req.session.user!;
       
@@ -1168,7 +1353,7 @@ export function registerFinanceRoutes(app: Express) {
       res.status(201).json(addSnakeCaseAliasesDeep(caisse));
   });
 
-  app.delete("/api/caisses/:id", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+  app.delete("/api/caisses/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
     const { id } = req.params;
     const user = req.session.user!;
 
@@ -1194,7 +1379,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(session || null));
   });
 
-  app.get("/api/sessions-caisse", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence', 'superviseur'), requireAgenceIdAccess(), async (req, res) => {
+  app.get("/api/sessions-caisse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), requireAgenceIdAccess(), async (req, res) => {
       // Use requireAgenceIdAccess for more robust agence filtering (uses UUIDs from userAgences)
       const agenceId = req.selectedAgenceId || req.query.agenceId as string;
       const requestedStatut = req.query.statut as string;
@@ -1292,7 +1477,7 @@ export function registerFinanceRoutes(app: Express) {
           "SESSION_OPENED",
           "caisse",
           result.session.id,
-          { caisseId: data.caisseId, soldeInitial: result.session.soldeInitial },
+          { caisseId: data.caisseId, soldeInitial: result.session.montantOuverture },
           "success",
           "low"
       );
@@ -1338,26 +1523,18 @@ export function registerFinanceRoutes(app: Express) {
       // This logic should be robust. For now, we trust the frontend 'soldeTheorique' if provided, BUT better to recalculate.
       // Let's recalculate for security.
       const ops = await storage.getOperationsBySession(id);
-      let soldeTheorique = Number(session.soldeInitial);
+      let soldeTheorique = Number(session.montantOuverture);
       
       // Add Operations
       for (const op of ops) {
           const montant = Number(op.montant);
-          
-          const IN_TYPES = ['Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre'];
-          const OUT_TYPES = ['Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre'];
 
-          if (IN_TYPES.includes(op.typeOperation)) {
-              soldeTheorique += montant;
-          } else if (OUT_TYPES.includes(op.typeOperation)) {
-              soldeTheorique -= montant;
-          } else if (op.typeOperation === 'Transfert caisse') {
-               if (op.reference?.includes('TRF-IN') || op.description?.includes('Réception')) {
-                   soldeTheorique += montant;
-               } else {
-                   soldeTheorique -= montant;
-               }
-          }
+          // Use centralized helper functions from caisse-operations.ts
+          const delta = getOperationDelta(op.typeOperation, montant, {
+              reference: op.reference,
+              description: op.description
+          });
+          soldeTheorique += delta;
       }
 
       // Add Transfers (IN/OUT)
@@ -1414,7 +1591,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Sessions à risque (inactives depuis trop longtemps)
-  app.get("/api/sessions-caisse/risky", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+  app.get("/api/sessions-caisse/risky", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
       try {
           const riskySessions = await sessionService.getRiskySessions();
           res.json(addSnakeCaseAliasesDeep(riskySessions));
@@ -1425,7 +1602,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Sessions avec écarts significatifs (monitoring)
-  app.get("/api/sessions-caisse/ecarts", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+  app.get("/api/sessions-caisse/ecarts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
       try {
           const threshold = req.query.threshold ? Number(req.query.threshold) : undefined;
           const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
@@ -1437,7 +1614,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Fermer les sessions expirées (route admin pour déclencher manuellement ou via cron)
-  app.post("/api/sessions-caisse/close-expired", requireAuth, requireRole('admin', 'Administrateur'), async (req, res) => {
+  app.post("/api/sessions-caisse/close-expired", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
       try {
           const timeoutHours = req.body.timeoutHours ? Number(req.body.timeoutHours) : 12;
           const closedSessions = await sessionService.closeExpiredSessions(timeoutHours);
@@ -1466,7 +1643,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Forcer la fermeture d'une session (admin)
-  app.post("/api/sessions-caisse/:id/force-close", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence'), async (req, res) => {
+  app.post("/api/sessions-caisse/:id/force-close", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
       const { id } = req.params;
       const user = req.session.user!;
 
@@ -1506,7 +1683,7 @@ export function registerFinanceRoutes(app: Express) {
 
   // ============================================================================
 
-  app.get("/api/caisses/status", requireAuth, requireRole('admin', 'Administrateur', 'Chef d\'Agence', 'agent', 'terrain'), async (req, res) => {
+  app.get("/api/caisses/status", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.AGENT_TERRAIN), async (req, res) => {
     const agenceId = req.query.agenceId as string;
     const caisses = await storage.getCaissesWithStatus(agenceId);
     res.json(addSnakeCaseAliasesDeep(caisses));
@@ -1535,7 +1712,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Opération caisse (roles: admin, chef, caisse)
-  app.post("/api/operations-caisse", requireAuth, requireRole('admin', 'chef', 'caisse', 'Administrateur'), async (req, res) => {
+  app.post("/api/operations-caisse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user!;
@@ -1572,16 +1749,16 @@ export function registerFinanceRoutes(app: Express) {
                  
                  // Smart matching based on operation name
                  let targetType: string | undefined;
-                 if (opType.includes('courant')) targetType = 'Courant';
-                 else if (opType.includes('bloqué') || opType.includes('bloque')) targetType = 'Bloqué';
-                 else if (opType.includes('épargne') || opType.includes('epargne')) targetType = 'Épargne';
+                 if (opType.includes('courant')) targetType = TypeCompte.CURRENT;
+                 else if (opType.includes('bloqué') || opType.includes('bloque')) targetType = TypeCompte.BLOCKED;
+                 else if (opType.includes('épargne') || opType.includes('epargne')) targetType = TypeCompte.SAVINGS;
                  
                  let foundAccount;
                  if (targetType) {
-                     foundAccount = clientAccounts.find(c => c.typeCompte === targetType && c.statut === 'Actif');
+                     foundAccount = clientAccounts.find(c => c.typeCompte === targetType && c.statut === StatutCompte.ACTIVE);
                  } else {
                      // Default fallback (usually Epargne)
-                     foundAccount = clientAccounts.find(c => c.typeCompte === 'Épargne' && c.statut === 'Actif') || clientAccounts[0];
+                     foundAccount = clientAccounts.find(c => c.typeCompte === TypeCompte.SAVINGS && c.statut === StatutCompte.ACTIVE) || clientAccounts[0];
                  }
 
                  if (foundAccount) {
@@ -1619,9 +1796,9 @@ export function registerFinanceRoutes(app: Express) {
                 // Also check if client is frozen
                 if (parsed.clientId) {
                     const client = await storage.getClient(parsed.clientId);
-                    if (client && ['Inactif', 'Suspendu', 'Blacklisté'].includes(client.status || '')) {
+                    if (client && [StatutClient.INACTIVE, StatutClient.SUSPENDED].includes(client.statut as any)) {
                         return res.status(403).json({
-                            message: `Client ${client.status}. Les opérations de débit ne sont pas autorisées.`
+                            message: `Client ${client.statut}. Les opérations de débit ne sont pas autorisées.`
                         });
                     }
                 }
@@ -1643,8 +1820,9 @@ export function registerFinanceRoutes(app: Express) {
 
             // Side Effects (Loyalty, WS) - Kept outside transaction critical path for now or could be moved to events
             try {
-                 // Loyalty Points
-                if (parsed.clientId && parsed.typeOperation === 'Dépôt épargne' && parsed.montant) {
+                 // Loyalty Points - Check if it's a savings deposit operation (EN or FR legacy)
+                const isSavingsDeposit = ['DEPOSIT_SAVINGS', 'SAVINGS_DEPOSIT', 'Dépôt épargne', 'Versement Épargne', 'Dépôt Épargne'].includes(parsed.typeOperation);
+                if (parsed.clientId && isSavingsDeposit && parsed.montant) {
                     const points = Math.floor(Number(parsed.montant) / 1000);
                     await storage.addLoyaltyPoints(
                         parsed.clientId,
@@ -1693,7 +1871,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Update Opération caisse (PATCH)
-  app.patch("/api/operations-caisse/:id", requireAuth, requireRole('admin', 'chef', 'caisse', 'Administrateur'), async (req, res) => {
+  app.patch("/api/operations-caisse/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
       try {
         const { id } = req.params;
         const data = normalizeKeysDeep(req.body) as any;
@@ -1719,21 +1897,33 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Update credit (roles: admin, chef, credit)
-  app.patch("/api/credits/:id", requireAuth, requireRole('admin', 'chef', 'credit'), async (req, res) => {
+  // State Machine guard is in storage.updateCredit
+  app.patch("/api/credits/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body);
       const credit = await storage.getCredit(req.params.id);
-      
+
       if (!credit) return res.status(404).json({ message: "Crédit non trouvé" });
 
       // Clean up fields that shouldn't be updated directly usually, but flexible for now
       // Especially crucial for automated repayment toggle
-      
+
       const updated = await storage.updateCredit(req.params.id, data as any);
       res.json(addSnakeCaseAliasesDeep(updated));
-    } catch (e: any) {
-      console.error("Erreur mise à jour crédit:", e);
-      res.status(400).json({ message: e.message || "Erreur lors de la mise à jour du crédit" });
+    } catch (error: any) {
+      console.error("Erreur mise à jour crédit:", error);
+
+      // State Machine error: return 400 with clear message
+      if (error instanceof CreditTransitionError) {
+        return res.status(400).json({
+          code: error.code,
+          message: error.message,
+          fromStatus: error.fromStatus,
+          toStatus: error.toStatus
+        });
+      }
+
+      res.status(400).json({ message: error.message || "Erreur lors de la mise à jour du crédit" });
     }
   });
 
@@ -1779,7 +1969,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Create facture (roles: admin, chef, comptable)
-  app.post("/api/factures", requireAuth, requireRole('admin', 'chef', 'comptable'), async (req, res) => {
+  app.post("/api/factures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertFactureSchema.parse(data);
       const facture = await storage.createFacture(parsed);
@@ -1793,7 +1983,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Initier un transfert
-  app.post("/api/caisse-transferts", requireAuth, requireRole('admin', 'chef', 'caisse'), async (req, res) => {
+  app.post("/api/caisse-transferts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body as any) as any;
       
@@ -1812,7 +2002,7 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       // 2. Vérification solde disponible (Temps réel)
-      const soldeActuel = Number(sessionSource.soldeReel || sessionSource.soldeTheorique); 
+      const soldeActuel = Number(sessionSource.montantFermetureDeclare || sessionSource.montantFermetureTheorique); 
       // Note: soldeReel est souvent null si pas cloturé, on utilise le théorique par défaut.
       // Idéalement on recalcule: Initial + Entrées - Sorties
       // Pour l'instant on se base sur le frontend mais le backend DOIT vérifier.
@@ -1823,7 +2013,7 @@ export function registerFinanceRoutes(app: Express) {
          // Ajuster selon type ('depot' vs 'retrait')
          // Simplification: le frontend envoie le montant, on verifie juste grossièrement ici ou on fait confiance au process
          return acc; 
-      }, Number(sessionSource.soldeInitial));
+      }, Number(sessionSource.montantOuverture));
 
       // Pour simplifier dans cette étape, on fait confiance au solde théorique stocké s'il est à jour, 
       // ou on vérifie juste que montant < solde (si on avait la logique de calcul de solde ici).
@@ -1853,7 +2043,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Recevoir/Valider un transfert
-  app.patch("/api/caisse-transferts/:id/recevoir", requireAuth, requireRole('admin', 'chef', 'caisse'), async (req, res) => {
+  app.patch("/api/caisse-transferts/:id/recevoir", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
       const { id } = req.params;
       const { sessionId } = req.body; // Session qui reçoit
 
@@ -1863,13 +2053,13 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       const transfert = await storage.getCaisseTransfert(id);
-      if (!transfert || transfert.statut !== 'En attente') {
+      if (!transfert || transfert.statut !== StatutTransfertCaisse.PENDING) {
           return res.status(400).json({ message: "Transfert non disponible" });
       }
 
       // Valider
       const updated = await storage.updateCaisseTransfert(id, {
-          statut: 'Validé',
+          statut: StatutTransfertCaisse.VALIDATED,
           sessionDestId: sessionDest.id,
           dateValidation: new Date(),
           validatedBy: req.session.user!.id
@@ -1879,22 +2069,22 @@ export function registerFinanceRoutes(app: Express) {
       // 1. Sortie chez l'expéditeur (Transfert caisse - Sortant)
       await storage.createOperationCaisse({
           sessionId: transfert.sessionSourceId,
-          typeOperation: 'Transfert caisse',
+          typeOperation: 'CASH_TRANSFER',
           montant: transfert.montant,
           reference: `TRF-OUT-${transfert.reference}`,
           description: `Transfert vers ${sessionDest.agenceId} (Ref: ${transfert.reference})`,
-          methodePaiement: 'Virement',
+          methodePaiement: 'TRANSFER',
           createdBy: req.session.user!.id
       });
 
       // 2. Entrée chez le destinataire (Transfert caisse - Entrant)
       await storage.createOperationCaisse({
           sessionId: sessionDest.id,
-          typeOperation: 'Transfert caisse',
-          montant: transfert.montant, 
+          typeOperation: 'CASH_TRANSFER',
+          montant: transfert.montant,
           reference: `TRF-IN-${transfert.reference}`,
           description: `Réception transfert de ${transfert.sessionSourceId} (Ref: ${transfert.reference})`,
-          methodePaiement: 'Virement',
+          methodePaiement: 'TRANSFER',
           createdBy: req.session.user!.id
       });
 
@@ -1908,19 +2098,19 @@ export function registerFinanceRoutes(app: Express) {
   });
   
   // Annuler un transfert
-  app.post("/api/caisse-transferts/:id/annuler", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+  app.post("/api/caisse-transferts/:id/annuler", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
       const { id } = req.params;
       const transfert = await storage.getCaisseTransfert(id);
-      
-      if (!transfert || transfert.statut !== 'En attente') {
+
+      if (!transfert || transfert.statut !== StatutTransfertCaisse.PENDING) {
           return res.status(400).json({ message: "Transfert ne peut pas être annulé" });
       }
-      
+
       // Seul l'émetteur ou un admin peut annuler
       // Implementation simplifiée...
-      
+
       const updated = await storage.updateCaisseTransfert(id, {
-          statut: 'Annulé'
+          statut: StatutTransfertCaisse.CANCELLED
       });
       
       const wsInstance = getWsInstance();
@@ -2012,7 +2202,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * GET /api/finance/credit-refunds - List refunds with filters
    */
-  app.get("/api/finance/credit-refunds", requireAuth, requireRole('admin', 'chef', 'credit', 'caisse'), requireAgenceAccess(), async (req, res) => {
+  app.get("/api/finance/credit-refunds", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       let query = db.select({
@@ -2030,7 +2220,7 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       if (req.query.statut) {
-        conditions.push(eq(creditRefundRequests.statut, req.query.statut as string));
+        conditions.push(eq(creditRefundRequests.statut, req.query.statut as typeof creditRefundRequests.statut.enumValues[number]));
       }
 
       if (conditions.length > 0) {
@@ -2050,7 +2240,7 @@ export function registerFinanceRoutes(app: Express) {
    * GET /api/finance/credit-refunds/pending/count - Count pending refunds (SUBMITTED + APPROVED)
    * Used for sidebar badge notification
    */
-  app.get("/api/finance/credit-refunds/pending/count", requireAuth, requireRole('admin', 'chef', 'credit', 'caisse'), requireAgenceAccess(), async (req, res) => {
+  app.get("/api/finance/credit-refunds/pending/count", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       const conditions = [
@@ -2091,7 +2281,7 @@ export function registerFinanceRoutes(app: Express) {
    * POST /api/finance/credit-refunds/:id/approve - Approve Refund Request
    * Requires N+1 Validation (Checker must be different from Maker)
    */
-  app.post("/api/finance/credit-refunds/:id/approve", requireAuth, requireRole('admin', 'chef', 'audit'), async (req, res) => {
+  app.post("/api/finance/credit-refunds/:id/approve", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
      try {
        const user = req.session.user!;
        const refund = await storage.getCreditRefundRequest(req.params.id);
@@ -2125,7 +2315,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * POST /api/finance/credit-refunds/:id/pay - Execute Payment (Cash or Account)
    */
-  app.post("/api/finance/credit-refunds/:id/pay", requireAuth, requireRole('admin', 'caisse', 'chef'), async (req, res) => {
+  app.post("/api/finance/credit-refunds/:id/pay", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CAISSIER, SystemRole.CHEF_AGENCE), async (req, res) => {
     const { method, sessionCaisseId } = req.body; // method: 'CASH' | 'ACCOUNT'
     const user = req.session.user!;
 
@@ -2155,7 +2345,7 @@ export function registerFinanceRoutes(app: Express) {
           if (method === 'ACCOUNT') {
              // Credit Client Account
              const clientAccounts = await storage.getComptesByClient(refundData.clientId);
-             const courantAccount = clientAccounts.find(c => c.typeCompte === 'Courant' && c.statut === 'Actif');
+             const courantAccount = clientAccounts.find(c => c.typeCompte === TypeCompte.CURRENT && c.statut === StatutCompte.ACTIVE);
              if (!courantAccount) throw new Error("No active current account found for client");
 
 
@@ -2201,7 +2391,7 @@ export function registerFinanceRoutes(app: Express) {
              // 4b. Create Debit Mouvement (Coffre)
              const coffreMouvement = await createMouvementFinancier(tx, {
                montant: refundAmount.toString(),
-               sens: 'Débit',
+               sens: 'DEBIT',
                sourceModule: 'COFFRE', // Money leaves the safe
                typePaiement: 'Transfert Sortant',
                sourceId: agencyCoffre.id,
@@ -2218,7 +2408,7 @@ export function registerFinanceRoutes(app: Express) {
              // 5a. Create Credit Mouvement (Account) linked to source
              mouvement = await createMouvementFinancier(tx, {
                montant: refundAmount.toString(),
-               sens: 'Crédit',
+               sens: 'CREDIT',
                sourceModule: 'SYSTEME', // Or 'COFFRE' but functionally it's a deposit
                typePaiement: 'Dépôt Courant',
                clientId: refundData.clientId,
@@ -2247,10 +2437,10 @@ export function registerFinanceRoutes(app: Express) {
              await tx.insert(transactionsCompte).values({
                compteId: courantAccount.id,
                mouvementId: mouvement.id,
-               typePaiement: 'Dépôt Courant',
+               typePaiement: 'DEPOSIT_CURRENT',
                montant: refundAmount.toString(),
                soldeApres: updatedAccount.soldeCourant,
-               methodePaiement: 'Virement',
+               methodePaiement: 'TRANSFER',
                observations: `Remboursement Frais Dossier (Ref: ${refundData.id})`,
                createdBy: user.id
              });
@@ -2268,9 +2458,9 @@ export function registerFinanceRoutes(app: Express) {
              // Debit Caisse -> Insert Operation
              const [op] = await tx.insert(operationsCaisse).values({
                sessionId: sessionCaisseId,
-               typeOperation: 'Retrait Courant', 
+               typeOperation: 'WITHDRAWAL_CURRENT',
                montant: amount.toString(),
-               methodePaiement: 'Espèces',
+               methodePaiement: 'CASH',
                reference: `REFUND-${refundData.id.substring(0,8)}`,
                description: `Remboursement Frais (Ref: ${refundData.id})`,
                clientId: refundData.clientId,
@@ -2280,7 +2470,7 @@ export function registerFinanceRoutes(app: Express) {
              // Ledger Mouvement
              mouvement = await createMouvementFinancier(tx, {
                montant: amount.toString(),
-               sens: 'Débit',
+               sens: 'DEBIT',
                sourceModule: 'SYSTEME',
                sourceId: op.id,
                typePaiement: 'Retrait Courant',
@@ -2321,7 +2511,7 @@ export function registerFinanceRoutes(app: Express) {
   // ==========================================
 
   // LIQUIDATION CAISSE
-  app.post("/api/caisses/:id/liquidate", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+  app.post("/api/caisses/:id/liquidate", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -2330,7 +2520,7 @@ export function registerFinanceRoutes(app: Express) {
       const [caisse] = await db.select().from(schema.caisses).where(eq(schema.caisses.id, id));
       if (!caisse) return res.status(404).json({ error: "Caisse not found" });
 
-      if (caisse.statut === 'Fermée') {
+      if (caisse.statut === StatutCaisse.CLOSED) {
          // If already closed, check balance. If 0, just delete.
          if (Number(caisse.solde) === 0) {
             await db.delete(schema.caisses).where(eq(schema.caisses.id, id));
@@ -2369,7 +2559,7 @@ export function registerFinanceRoutes(app: Express) {
                 status: "COMPLETED",
                 description: `Liquidation Caisse ${caisse.nom} -> Coffre`,
                 createdBy: userId,
-                sens: "Débit", // Débit from caisse perspective
+                sens: "DEBIT", // Débit from caisse perspective
                 sourceModule: "CAISSE",
                 agenceId: caisse.agenceId
             } as any);
@@ -2390,3 +2580,4 @@ export function registerFinanceRoutes(app: Express) {
   });
 
 }
+ 

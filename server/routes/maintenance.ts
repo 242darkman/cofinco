@@ -3,6 +3,7 @@ import { db } from "../db";
 import { maintenanceModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { logAudit } from "../audit";
 import { z } from "zod";
 
@@ -32,7 +33,7 @@ const toggleModuleSchema = z.object({
   updated_at: z.string().optional()
 });
 
-maintenanceRouter.patch("/:moduleId", requireAuth, requireRole("admin"), async (req, res) => {
+maintenanceRouter.patch("/:moduleId", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
   try {
     const { moduleId } = req.params;
     const Validation = toggleModuleSchema.safeParse(req.body);
@@ -119,7 +120,7 @@ const platformLockSchema = z.object({
   reason: z.string().nullable().optional()
 });
 
-maintenanceRouter.patch("/:moduleId/platform", requireAuth, requireRole("admin"), async (req, res) => {
+maintenanceRouter.patch("/:moduleId/platform", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
   try {
     const { moduleId } = req.params; // Should be the ID of the PLATFORM module
     const Validation = platformLockSchema.safeParse(req.body);
@@ -196,7 +197,7 @@ maintenanceRouter.patch("/:moduleId/platform", requireAuth, requireRole("admin")
 // ============================================
 // POST - Seed/Init Default Modules (Internal/Dev)
 // ============================================
-maintenanceRouter.post("/seed", requireAuth, requireRole("admin"), async (req, res) => {
+maintenanceRouter.post("/seed", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
   try {
     const defaultModules = [
       'PLATFORM',

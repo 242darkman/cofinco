@@ -9,6 +9,7 @@ import { toast } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Button, FormField } from '../../ui';
+import { StatutCoffre } from '@shared/enum/status-constants';
 
 interface Demande {
   id: string;
@@ -598,7 +599,7 @@ function TransfertInterCoffresFormWithPrefill({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const activeCoffres = useMemo(() => {
-    return coffres.filter(c => c.statut === 'Actif');
+    return coffres.filter(c => c.statut === StatutCoffre.ACTIVE);
   }, [coffres]);
 
   const coffreSource = useMemo(() => {

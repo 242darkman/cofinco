@@ -1,11 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { Card, Badge, IconButton, ProgressBar } from '../../ui';
+import { tontineApi } from '../../../lib/api-client';
+import { toast, handleApiError } from '../../../lib/toast';
+import {
+  FrequenceTontine,
+  FrequenceTontineType,
+  FREQUENCE_TONTINE_LABELS,
+  StatutEcheanceTontine,
+  StatutEcheanceTontineType,
+  STATUT_ECHEANCE_TONTINE_LABELS,
+} from '@shared/enum/status-constants';
 
 interface TontineCalendarProps {
   tontineId: string;
   dateDebut: string;
-  frequence: 'Hebdomadaire' | 'Bimensuel' | 'Mensuel';
+  frequence: string;
   tourActuel: number;
   nombreMembres: number;
 }
@@ -14,10 +24,26 @@ interface EcheanceItem {
   tour: number;
   date: Date;
   beneficiaire: string | null;
-  statut: 'complete' | 'en_cours' | 'a_venir';
+  statut: StatutEcheanceTontineType;
   contributionsRecues: number;
   contributionsAttendues: number;
 }
+
+// Helper pour obtenir le nombre de jours entre échéances
+const getFrequenceJours = (frequence: string): number => {
+  switch (frequence as FrequenceTontineType) {
+    case FrequenceTontine.DAILY: return 1;
+    case FrequenceTontine.WEEKLY: return 7;
+    case FrequenceTontine.BIWEEKLY: return 14;
+    case FrequenceTontine.MONTHLY: return 30;
+    default: return 30;
+  }
+};
+
+// Helper pour obtenir le label du statut d'échéance
+const getStatutEcheanceLabel = (statut: StatutEcheanceTontineType): string => {
+  return STATUT_ECHEANCE_TONTINE_LABELS[statut] || statut;
+};
 
 export default function TontineCalendar({
   tontineId,
@@ -36,36 +62,16 @@ export default function TontineCalendar({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    generateEcheances();
-  }, [tontineId, dateDebut, frequence, tourActuel, nombreMembres]);
-
-  const getFrequenceJours = () => {
-    switch (frequence) {
-      case 'Hebdomadaire': return 7;
-      case 'Bimensuel': return 14;
-      case 'Mensuel': return 30;
-      default: return 30;
-    }
-  };
-
-  const generateEcheances = async () => {
+  const generateEcheances = useCallback(async () => {
     if (!tontineId) return;
     setLoading(true);
     try {
-      const [membresRes, contribRes] = await Promise.all([
-        fetch(`/api/tontines/${tontineId}/membres`, { credentials: 'include' }),
-        fetch(`/api/tontines/${tontineId}/contributions`, { credentials: 'include' })
+      const [membres, contributions] = await Promise.all([
+        tontineApi.getMembres(tontineId),
+        tontineApi.getContributions(tontineId)
       ]);
 
-      if (!membresRes.ok || !contribRes.ok) {
-        throw new Error('Erreur lors du chargement des données');
-      }
-
-      const membres = await membresRes.json() || [];
-      const contributions = await contribRes.json() || [];
-
-      const joursFrequence = getFrequenceJours();
+      const joursFrequence = getFrequenceJours(frequence);
       const startDate = new Date(dateDebut);
       const echeancesList: EcheanceItem[] = [];
 
@@ -73,11 +79,11 @@ export default function TontineCalendar({
         const echeanceDate = new Date(startDate);
         echeanceDate.setDate(startDate.getDate() + ((i - 1) * joursFrequence));
 
-        const membre = membres.find((m: any) => m.position_ordre === i);
+        const membre = (membres || []).find((m: any) => m.position_ordre === i);
 
         // Count unique members who contributed to this tour
         const contributors = new Set();
-        contributions.forEach((c: any) => {
+        (contributions || []).forEach((c: any) => {
            if (c.tour_numero === i) {
                // Handle both camelCase and snake_case just in case
                const id = c.clientId || c.client_id || c.client?.id;
@@ -86,13 +92,13 @@ export default function TontineCalendar({
         });
         const contributionsTour = contributors.size;
 
-        let statut: 'complete' | 'en_cours' | 'a_venir';
+        let statut: StatutEcheanceTontineType;
         if (i < currentTour) {
-          statut = 'complete';
+          statut = StatutEcheanceTontine.COMPLETED;
         } else if (i === currentTour) {
-          statut = 'en_cours';
+          statut = StatutEcheanceTontine.IN_PROGRESS;
         } else {
-          statut = 'a_venir';
+          statut = StatutEcheanceTontine.UPCOMING;
         }
 
         echeancesList.push({
@@ -107,11 +113,15 @@ export default function TontineCalendar({
 
       setEcheances(echeancesList);
     } catch (error) {
-      console.error('Erreur génération échéances:', error);
+      toast.error(handleApiError(error, 'Erreur génération échéances'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [tontineId, dateDebut, frequence, currentTour, totalMembres]);
+
+  useEffect(() => {
+    generateEcheances();
+  }, [generateEcheances]);
 
   const getEcheancesForMonth = () => {
     return echeances.filter(e => {
@@ -129,9 +139,18 @@ export default function TontineCalendar({
   };
 
   const echeancesMonth = getEcheancesForMonth();
-  const prochaines = echeances.filter(e => e.statut === 'a_venir').slice(0, 3);
-  
+  const prochaines = echeances.filter(e => e.statut === StatutEcheanceTontine.UPCOMING).slice(0, 3);
+
   const progressGlobal = totalMembres > 0 ? (currentTour / totalMembres) * 100 : 0;
+
+  // Badge variant pour le statut
+  const getStatutBadgeVariant = (statut: StatutEcheanceTontineType): 'success' | 'primary' | 'neutral' => {
+    switch (statut) {
+      case StatutEcheanceTontine.COMPLETED: return 'success';
+      case StatutEcheanceTontine.IN_PROGRESS: return 'primary';
+      default: return 'neutral';
+    }
+  };
 
   if (loading) {
     return <div className="text-center py-12 text-slate-400">Chargement...</div>;
@@ -150,7 +169,7 @@ export default function TontineCalendar({
                 <p className="text-xs text-slate-500 uppercase font-semibold">Échéances</p>
              </div>
           </div>
-          
+
           <div className="flex items-center gap-1 bg-slate-900/50 p-1 rounded-lg border border-slate-700/50">
             <IconButton icon={ChevronLeft} onClick={prevMonth} size="sm" aria-label="Mois précédent" />
             <span className="text-white text-xs font-bold px-3 min-w-[100px] text-center capitalize">
@@ -168,14 +187,12 @@ export default function TontineCalendar({
           <div className="space-y-2">
             {echeancesMonth.map((echeance) => {
                const daysDiff = Math.ceil((echeance.date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-               const isToday = daysDiff === 0;
-               const isPast = daysDiff < 0;
 
                return (
                 <div key={echeance.tour} className={`
                     group relative flex flex-col gap-2 p-3 rounded-xl border transition-all
-                    ${echeance.statut === 'en_cours' 
-                      ? 'bg-cyan-500/5 border-cyan-500/30 shadow-[0_0_15px_-5px_rgba(6,182,212,0.15)]' 
+                    ${echeance.statut === StatutEcheanceTontine.IN_PROGRESS
+                      ? 'bg-cyan-500/5 border-cyan-500/30 shadow-[0_0_15px_-5px_rgba(6,182,212,0.15)]'
                       : 'bg-slate-700/20 border-slate-700/40 hover:bg-slate-700/30'
                     }
                 `}>
@@ -183,8 +200,8 @@ export default function TontineCalendar({
                      <div className="flex items-center gap-3">
                          <div className={`
                              w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0 border
-                             ${echeance.statut === 'complete' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 
-                               echeance.statut === 'en_cours' ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' :
+                             ${echeance.statut === StatutEcheanceTontine.COMPLETED ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+                               echeance.statut === StatutEcheanceTontine.IN_PROGRESS ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' :
                                'bg-slate-800 border-slate-700 text-slate-400'}
                          `}>
                              <span className="text-[10px] font-bold uppercase">{echeance.date.toLocaleDateString('fr-FR', { month: 'short' }).slice(0, 3)}</span>
@@ -193,9 +210,11 @@ export default function TontineCalendar({
                          <div>
                              <div className="flex items-center gap-2">
                                 <span className="text-sm font-bold text-white">Tour #{echeance.tour}</span>
-                                {echeance.statut === 'complete' ? <Badge variant="success" value="Terminé" className="py-0 px-1.5 text-[9px]" /> :
-                                 echeance.statut === 'en_cours' ? <Badge variant="primary" value="En cours" className="py-0 px-1.5 text-[9px]" /> :
-                                 <Badge variant="neutral" value="À venir" className="py-0 px-1.5 text-[9px]" />}
+                                <Badge
+                                  variant={getStatutBadgeVariant(echeance.statut)}
+                                  value={getStatutEcheanceLabel(echeance.statut)}
+                                  className="py-0 px-1.5 text-[9px]"
+                                />
                              </div>
                              <div className="text-xs text-slate-400 mt-0.5">
                                  {echeance.beneficiaire ? (
@@ -207,7 +226,7 @@ export default function TontineCalendar({
                              </div>
                          </div>
                      </div>
-                     
+
                      <div className="text-right">
                          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Progression</div>
                          <div className="text-xs font-bold text-white">
@@ -216,10 +235,10 @@ export default function TontineCalendar({
                      </div>
                   </div>
 
-                  {echeance.statut === 'en_cours' && (
+                  {echeance.statut === StatutEcheanceTontine.IN_PROGRESS && (
                      <div className="mt-1">
-                        <ProgressBar 
-                            value={(echeance.contributionsRecues / echeance.contributionsAttendues) * 100} 
+                        <ProgressBar
+                            value={(echeance.contributionsRecues / echeance.contributionsAttendues) * 100}
                             size="sm"
                             color="primary"
                             showValue={false}
@@ -245,10 +264,10 @@ export default function TontineCalendar({
                     prochaines.map(e => {
                         const diffTime = e.date.getTime() - Date.now();
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        
+
                         let timeText = '';
                         let timeColor = 'text-slate-500';
-                        
+
                         if (diffDays < 0) {
                             timeText = `Retard de ${Math.abs(diffDays)}j`;
                             timeColor = 'text-red-400';

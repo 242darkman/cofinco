@@ -5,10 +5,11 @@ import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { userApi, employeApi } from '../../lib/api-client';
 import { useAgence } from '../../contexts/AgenceContext';
-// ObjectUploader removed as it is no longer used
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
+import { StatutUser } from '@shared/enum/status-constants';
+import { resolveStorageUrl } from '../../lib/format';
 
 // Import hooks and component for permissions
 import { getRoleBadgeStyle, getStatusBadgeStyle } from '../../lib/role-utils';
@@ -273,17 +274,21 @@ export default function AdminGestionProfils() {
       const formData = new FormData();
       formData.append('file', file);
 
-      // Upload directly to our local server
-      const response = await fetch('/api/uploads/upload', {
+      // Upload directly to storage server
+      formData.append('path', 'profiles');
+      formData.append('isPublic', 'true');
+
+      const response = await fetch('/api/storage/upload', {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       });
 
       if (!response.ok) {
         throw new Error('Erreur lors de l\'upload de l\'image');
       }
 
-      const { objectPath } = await response.json();
+      const { key: objectPath } = await response.json();
 
       // Update State
       setFormData(prev => ({ ...prev, photoProfile: objectPath }));
@@ -329,8 +334,8 @@ export default function AdminGestionProfils() {
 
   const toggleUserStatus = useCallback(async (emp: any) => {
     const user = emp.user || emp;
-    const isActive = user.statut === 'Actif';
-    const newStatus = isActive ? 'Inactif' : 'Actif';
+    const isActive = user.statut === StatutUser.ACTIVE;
+    const newStatus = isActive ? StatutUser.INACTIVE : StatutUser.ACTIVE;
 
     openConfirm({
       title: isActive ? 'Désactiver le profil ?' : 'Activer le profil ?',
@@ -342,7 +347,7 @@ export default function AdminGestionProfils() {
       onConfirm: async () => {
         try {
           await userApi.update(user.id, { statut: newStatus });
-          toast.success(`Profil ${newStatus === 'Actif' ? 'activé' : 'désactivé'} avec succès`);
+          toast.success(`Profil ${newStatus === StatutUser.ACTIVE ? 'activé' : 'désactivé'} avec succès`);
           loadUsers();
         } catch (error) {
           toast.error(handleApiError(error, 'Erreur lors du changement de statut'));
@@ -516,9 +521,9 @@ export default function AdminGestionProfils() {
                         <div className="flex items-center gap-3 py-1">
                           <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 shrink-0 overflow-hidden">
                             {user.photoProfile ? (
-                              <img 
-                                src={`/api/uploads/files/${user.photoProfile}`} 
-                                alt={`${user.nom} ${user.prenom}`} 
+                              <img
+                                src={resolveStorageUrl(user.photoProfile)}
+                                alt={`${user.nom} ${user.prenom}`}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -567,7 +572,7 @@ export default function AdminGestionProfils() {
                     format: (_, emp) => {
                       const status = emp.user ? emp.user.statut : emp.statut;
                       const style = getStatusBadgeStyle(status);
-                      const isActif = (status || '').toLowerCase().includes('actif');
+                      const isActif = status === StatutUser.ACTIVE;
                       return (
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium border min-w-[90px] justify-center transition-colors ${style.classes}`}>
                           {isActif ? <CheckCircle size={12} /> : <XCircle size={12} />}
@@ -579,7 +584,7 @@ export default function AdminGestionProfils() {
                 ]}
                 actions={(emp) => {
                   const user = emp.user || emp;
-                  const isActive = user.statut === 'Actif';
+                  const isActive = user.statut === StatutUser.ACTIVE;
                   return (
                     <div className="flex items-center gap-1">
                       {canEditUsers && (
@@ -778,9 +783,9 @@ export default function AdminGestionProfils() {
                     ) : null}
                     
                     {formData.photoProfile ? (
-                      <img 
-                        src={`/api/uploads/files/${formData.photoProfile}`} 
-                        alt="Profil" 
+                      <img
+                        src={resolveStorageUrl(formData.photoProfile)}
+                        alt="Profil"
                         className="w-full h-full object-cover"
                       />
                     ) : (

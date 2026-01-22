@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Map as MapIcon, Calendar, Clock, Activity, TrendingUp, Users } from 'lucide-react';
 import { agentTerrainApi } from '../../lib/api-client';
+import { StatutUser } from '@shared/enum/status-constants';
 
 interface GeoLocation {
   id: string;
@@ -52,7 +53,7 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
   const loadAgents = async () => {
     try {
       const data = await agentTerrainApi.getAllList();
-      const actifs = (data || []).filter((agent: Agent) => agent.statut === 'Actif');
+      const actifs = (data || []).filter((agent: Agent) => agent.statut === StatutUser.ACTIVE);
       setAgents(actifs);
       if (actifs.length > 0 && !selectedAgent) {
         setSelectedAgent(actifs[0].id);

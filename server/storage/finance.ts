@@ -1,10 +1,37 @@
 import {
     credits, demandesCredit, enquetesCredit, remboursements,
     comptes, transactionsCompte, plansEpargne, objectifsEpargne,
-    sessionsCaisse, operationsCaisse, shiftsCaisse, caisseSecurityCodes, caisseCodeUsages, comptageBillets,
+    sessionsCaisse, operationsCaisse, caisseSecurityCodes, caisseCodeUsages, comptageBillets,
     factures, lignesFactures, modelesFactures, caisses, clients, agences, caisseAssignations, users,
     dureesSuggerees, mouvementsFinanciers, evenementsOutbox, coffresForts, produitsCompte
   } from "@shared/schema";
+
+// State Machine Guards for Credit & Demande Workflow
+import {
+  validateCreditTransition,
+  CreditTransitionError,
+  normalizeCreditStatus,
+} from "@shared/machines/credit-workflow";
+import {
+  validateDemandeTransition,
+  DemandeTransitionError,
+  normalizeDemandeStatus,
+} from "@shared/machines/demande-workflow";
+import {
+  StatutCompte,
+  StatutCredit,
+  StatutDemande,
+  FrequenceRemboursement,
+  TypeCompte,
+  DureeUnite,
+  MethodePaiement,
+  TypeOperationCaisse,
+  StatutCaisseAgent,
+  StatutTransaction,
+  TypeTransactionEpargne,
+  StatutFacture,
+  TypeDocument,
+} from "@shared/enum/status-constants";
 
 // ============================================================================
 // ERREUR TYPÉE : SOLDE INSUFFISANT POUR DÉCAISSEMENT
@@ -55,7 +82,7 @@ export class DecaissementInsufficientFundsError extends Error {
     type Compte, type InsertCompte, type TransactionCompte, type InsertTransactionCompte,
     type PlanEpargne, type InsertPlanEpargne, type ObjectifEpargne, type InsertObjectifEpargne,
     type SessionCaisse, type InsertSessionCaisse, type OperationCaisse, type InsertOperationCaisse,
-    type ShiftCaisse, type InsertShiftCaisse, type ComptageBillets, type InsertComptageBillets,
+    type ComptageBillets, type InsertComptageBillets,
     type Facture, type InsertFacture, type LigneFacture, type InsertLigneFacture,
     type ModeleFacture, type InsertModeleFacture, type Caisse, type InsertCaisse,
     caisseTransferts, type CaisseTransfert, type InsertCaisseTransfert,
@@ -96,7 +123,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     }
 
     // Calcul du retard uniquement pour les crédits actifs non soldés
-    if (credit.dateDebut && ['Actif', 'En retard', 'En cours', 'Contentieux'].includes(credit.statut)) {
+    // Calcul du retard uniquement pour les crédits actifs non soldés
+    if (credit.dateDebut && [StatutCredit.ACTIVE, StatutCredit.LATE].includes(credit.statut as any)) {
         // Normaliser les dates à minuit pour éviter les problèmes de timezone
         const start = new Date(credit.dateDebut);
         start.setHours(0, 0, 0, 0);
@@ -107,10 +135,14 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         // Convertir la fréquence en jours
         let frequencyDays = 30; // Par défaut Mensuel
         switch (credit.echeance) {
-          case 'Journalier': frequencyDays = 1; break;
-          case 'Hebdomadaire': frequencyDays = 7; break;
-          case 'Bimensuel': frequencyDays = 15; break;
-          case 'Trimestriel': frequencyDays = 90; break;
+          case FrequenceRemboursement.DAILY:
+            frequencyDays = 1; break;
+          case FrequenceRemboursement.WEEKLY:
+            frequencyDays = 7; break;
+          case FrequenceRemboursement.BI_MONTHLY:
+            frequencyDays = 60; break;
+          case FrequenceRemboursement.QUARTERLY:
+            frequencyDays = 90; break;
         }
 
         // Si crédit totalement remboursé, pas de retard
@@ -132,18 +164,23 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         }
     }
 
+
     // Calcul de la prochaine échéance si manquante
     let prochaine_echeance_calc = credit.prochaineEcheance;
-    if (!prochaine_echeance_calc && credit.dateDebut && ['Actif', 'En retard', 'En cours'].includes(credit.statut)) {
+    if (!prochaine_echeance_calc && credit.dateDebut && [StatutCredit.ACTIVE, StatutCredit.LATE].includes(credit.statut as any)) {
         const start = new Date(credit.dateDebut);
         start.setHours(0, 0, 0, 0);
 
         let frequencyDays = 30;
         switch (credit.echeance) {
-          case 'Journalier': frequencyDays = 1; break;
-          case 'Hebdomadaire': frequencyDays = 7; break;
-          case 'Bimensuel': frequencyDays = 15; break;
-          case 'Trimestriel': frequencyDays = 90; break;
+          case FrequenceRemboursement.DAILY:
+            frequencyDays = 1; break;
+          case FrequenceRemboursement.WEEKLY:
+            frequencyDays = 7; break;
+          case FrequenceRemboursement.BI_MONTHLY:
+            frequencyDays = 60; break;
+          case FrequenceRemboursement.QUARTERLY:
+            frequencyDays = 90; break;
         }
 
         const nextInstallmentNumber = nombre_echeances_payees + 1;
@@ -197,7 +234,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     const conditions = [];
 
     if (filter.agence && filter.agence !== "all") {
-      conditions.push(eq(clients.agence, filter.agence));
+      conditions.push(eq(clients.agenceId, filter.agence));
     }
 
     if (filter.clientId) {
@@ -206,15 +243,20 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     
     let baseQuery = db.select({
       credit: credits,
-      client: clients
-    }).from(credits).leftJoin(clients, eq(credits.clientId, clients.id)).$dynamic();
+      client: clients,
+      user: users
+    })
+    .from(credits)
+    .leftJoin(clients, eq(credits.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
+    .$dynamic();
     
     if (conditions.length > 0) {
       baseQuery = baseQuery.where(and(...conditions));
     }
     
     const results = await baseQuery.orderBy(desc(credits.createdAt));
-    return results.map(({ credit, client }) => enrichCreditData(credit, client));
+    return results.map(({ credit, client, user }) => enrichCreditData(credit, { ...client, nom: user?.nom, prenom: user?.prenom, telephone: user?.telephone, photoProfile: user?.photoProfile }));
   }
   
   export async function createCredit(insertCredit: InsertCredit): Promise<Credit> {
@@ -223,6 +265,15 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
   
   export async function updateCredit(id: string, updateData: Partial<InsertCredit>): Promise<Credit | undefined> {
+    // State Machine Guard: Validate status transition if statut is being updated
+    if (updateData.statut) {
+      const [currentCredit] = await db.select({ statut: credits.statut }).from(credits).where(eq(credits.id, id));
+      if (currentCredit) {
+        // validateCreditTransition throws CreditTransitionError if invalid
+        validateCreditTransition(currentCredit.statut, updateData.statut);
+      }
+    }
+
     const [credit] = await db.update(credits).set({ ...updateData, updatedAt: new Date() }).where(eq(credits.id, id)).returning();
     return credit || undefined;
   }
@@ -259,8 +310,12 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
   
   // Demandes Credit
-  export async function getDemandeCredit(id: string): Promise<DemandeCredit | undefined> {
-    const [demande] = await db.select().from(demandesCredit).where(and(eq(demandesCredit.id, id), sql`${demandesCredit.deletedAt} IS NULL`));
+  export async function getDemandeCredit(id: string, includeDeleted = false): Promise<DemandeCredit | undefined> {
+    const conditions = [eq(demandesCredit.id, id)];
+    if (!includeDeleted) {
+      conditions.push(sql`${demandesCredit.deletedAt} IS NULL`);
+    }
+    const [demande] = await db.select().from(demandesCredit).where(and(...conditions));
     return demande || undefined;
   }
   
@@ -270,20 +325,26 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       .orderBy(desc(demandesCredit.createdAt));
   }
   
-  export async function getAllDemandes(filter: { agence?: string } = {}): Promise<DemandeCredit[]> {
-    const conditions = [sql`${demandesCredit.deletedAt} IS NULL`];
+  export async function getAllDemandes(filter: { agence?: string, includeDeleted?: boolean } = {}): Promise<DemandeCredit[]> {
+    const conditions = [];
+
+    if (!filter.includeDeleted) {
+        conditions.push(sql`${demandesCredit.deletedAt} IS NULL`);
+    }
 
     if (filter.agence && filter.agence !== "all") {
-      conditions.push(eq(clients.agence, filter.agence));
+      conditions.push(eq(clients.agenceId, filter.agence));
     }
     
     let baseQuery = db.select({
       demande: demandesCredit,
       client: clients,
+      user: users,
       agence: agences
     })
     .from(demandesCredit)
     .leftJoin(clients, eq(demandesCredit.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
     .leftJoin(agences, eq(clients.agenceId, agences.id))
     .$dynamic();
 
@@ -293,16 +354,16 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     
     const results = await baseQuery.orderBy(desc(demandesCredit.createdAt));
 
-    return results.map(({ demande, client, agence }) => ({
+    return results.map(({ demande, client, user, agence }) => ({
       ...demande,
       numero_demande: demande.numeroDemande,
       montant_demande: Number(demande.montantDemande),
       clients: client ? {
-        nom: client.nom,
-        prenom: client.prenom,
-        phone: client.telephone,
-        photo_url: client.photoProfile,
-        agence: client.agence || agence?.nom,
+        nom: user?.nom,
+        prenom: user?.prenom,
+        phone: user?.telephone,
+        photo_url: user?.photoProfile,
+        agence: agence?.nom,
         agenceId: client.agenceId
       } : undefined
     }));
@@ -317,9 +378,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     try {
       // Convertir la durée en mois selon l'unité
       let dureeMois = insertDemande.dureeValeur || 1;
-      if (insertDemande.dureeUnite === 'Jour') {
+      if (insertDemande.dureeUnite === DureeUnite.DAY) {
         dureeMois = Math.ceil(dureeMois / 30);
-      } else if (insertDemande.dureeUnite === 'Semaine') {
+      } else if (insertDemande.dureeUnite === DureeUnite.WEEK) {
         dureeMois = Math.ceil(dureeMois / 4);
       }
 
@@ -340,10 +401,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       // Continuer sans score en cas d'erreur
     }
 
-    // Forcer le statut "En attente" - les frais d'engagement sont obligatoires avant toute enquête
+    // Forcer le statut "PENDING_FEES" - les frais d'engagement sont obligatoires avant toute enquête
     const demandeAvecStatut = {
       ...insertDemande,
-      statut: 'En attente' as const, // Toujours "En attente" à la création
+      statut: StatutDemande.PENDING_FEES as any, // Toujours "PENDING_FEES" à la création
       fraisEngagementPayes: false,
       scoreCredit: scoreCredit ?? insertDemande.scoreCredit ?? null
     };
@@ -352,19 +413,41 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
   
   export async function updateDemandeCredit(id: string, updateData: Partial<InsertDemandeCredit>, tx?: PgTransaction<any, any, any>): Promise<DemandeCredit | undefined> {
+    // State Machine Guard: Validate status transition if statut is being updated
+    if (updateData.statut) {
+      const [currentDemande] = await (tx || db).select({ statut: demandesCredit.statut }).from(demandesCredit).where(eq(demandesCredit.id, id));
+      if (currentDemande && currentDemande.statut) {
+        // validateDemandeTransition throws DemandeTransitionError if invalid
+        validateDemandeTransition(currentDemande.statut, updateData.statut);
+      }
+    }
+
     const [demande] = await (tx || db).update(demandesCredit).set(updateData).where(eq(demandesCredit.id, id)).returning();
     return demande || undefined;
   }
 
   export async function deleteDemandeCredit(id: string): Promise<boolean> {
-    const [demande] = await db.update(demandesCredit).set({ deletedAt: new Date() }).where(eq(demandesCredit.id, id)).returning();
+    const [demande] = await db.update(demandesCredit)
+      .set({ 
+        deletedAt: new Date(),
+        statut: StatutDemande.DELETED 
+      })
+      .where(eq(demandesCredit.id, id))
+      .returning();
     return !!demande;
   }
 
   export async function cancelDemandeCredit(id: string, motif?: string): Promise<DemandeCredit | undefined> {
+    // State Machine Guard: Validate transition to 'CANCELLED'
+    const [currentDemande] = await db.select({ statut: demandesCredit.statut }).from(demandesCredit).where(eq(demandesCredit.id, id));
+    if (currentDemande && currentDemande.statut) {
+      // validateDemandeTransition throws DemandeTransitionError if invalid
+      validateDemandeTransition(currentDemande.statut, StatutDemande.CANCELLED);
+    }
+
     const [demande] = await db.update(demandesCredit)
-      .set({ 
-        statut: 'Annulée' as any,
+      .set({
+        statut: StatutDemande.CANCELLED as any,
         motifRejet: motif // On utilise motifRejet pour stocker la raison de l'annulation
       })
       .where(eq(demandesCredit.id, id))
@@ -389,20 +472,22 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   export async function getAllEnquetes(): Promise<EnqueteCredit[]> {
     const results = await db.select({
       enquete: enquetesCredit,
-      client: clients
+      client: clients,
+      user: users
     })
     .from(enquetesCredit)
     .leftJoin(clients, eq(enquetesCredit.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
     .orderBy(desc(enquetesCredit.createdAt));
     
-    return results.map(({ enquete, client }) => ({
+    return results.map(({ enquete, client, user }) => ({
       ...enquete,
       montant_demande: Number(enquete.montantDemande),
       clients: client ? {
-        nom: client.nom,
-        prenom: client.prenom,
-        phone: client.telephone,
-        photo_url: client.photoProfile
+        nom: user?.nom,
+        prenom: user?.prenom,
+        phone: user?.telephone,
+        photo_url: user?.photoProfile
       } : undefined
     }));
   }
@@ -493,7 +578,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       const results = await db.select({ compte: comptes })
         .from(comptes)
         .innerJoin(clients, eq(comptes.clientId, clients.id))
-        .where(eq(clients.agence, filter.agence))
+        .where(eq(clients.agenceId, filter.agence))
         .orderBy(desc(comptes.createdAt));
       return results.map(r => r.compte);
     }
@@ -518,7 +603,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     // Agency filter
     if (filter.agence && filter.agence !== 'all') {
-      conditions.push(eq(clients.agence, filter.agence));
+      conditions.push(eq(clients.agenceId, filter.agence));
     }
 
     // Type filter
@@ -536,12 +621,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       const searchTerm = `%${options.search.trim().toLowerCase()}%`;
       conditions.push(
         or(
-          sql`LOWER(${clients.nom}) LIKE ${searchTerm}`,
-          sql`LOWER(${clients.prenom}) LIKE ${searchTerm}`,
           sql`LOWER(${users.nom}) LIKE ${searchTerm}`,
           sql`LOWER(${users.prenom}) LIKE ${searchTerm}`,
           sql`LOWER(${comptes.numeroCompte}) LIKE ${searchTerm}`,
-          sql`LOWER(${clients.telephone}) LIKE ${searchTerm}`,
           sql`LOWER(${users.telephone}) LIKE ${searchTerm}`
         )
       );
@@ -567,11 +649,13 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       client: clients,
       user: users,
       produit: produitsCompte,
+      agence: agences,
     })
     .from(comptes)
     .leftJoin(clients, eq(comptes.clientId, clients.id))
     .leftJoin(users, eq(clients.userId, users.id))
     .leftJoin(produitsCompte, eq(comptes.produitId, produitsCompte.id))
+    .leftJoin(agences, eq(clients.agenceId, agences.id))
     .orderBy(desc(comptes.createdAt))
     .limit(limit)
     .offset(offset);
@@ -581,7 +665,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       : await dataQuery;
 
     // Transform data with client info embedded
-    const data = results.map(({ compte, client, user, produit }) => {
+    const data = results.map(({ compte, client, user, produit, agence }) => {
       const produitInfo = produit
         ? {
             id: produit.id,
@@ -600,13 +684,13 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       // Embedded client info
       clients: client ? {
         id: client.id,
-        nom: user?.nom || client.nom,
-        prenom: user?.prenom || client.prenom,
-        telephone: user?.telephone || client.telephone,
-        phone: user?.telephone || client.telephone, // Alias
-        email: user?.email || client.email,
-        agence: client.agence,
-        photo_url: user?.photoProfile || client.photoProfile
+        nom: user?.nom,
+        prenom: user?.prenom,
+        telephone: user?.telephone,
+        phone: user?.telephone, // Alias
+        email: user?.email,
+        agence: agence?.nom,
+        photo_url: user?.photoProfile
       } : null
       };
     });
@@ -638,7 +722,13 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   ): Promise<Compte> {
     return await db.transaction(async (tx) => {
       // 1. Generate unique account number
-      const prefix = data.typeCompte === 'Courant' ? 'CC' : 'CE';
+      // Normaliser le type de compte vers l'Enum
+      const typeCompteEnum = data.typeCompte === TypeCompte.CURRENT ? TypeCompte.CURRENT :
+                              data.typeCompte === TypeCompte.SAVINGS ? TypeCompte.SAVINGS :
+                              data.typeCompte === TypeCompte.BLOCKED ? TypeCompte.BLOCKED :
+                              TypeCompte.SAVINGS; // Défaut: SAVINGS
+
+      const prefix = typeCompteEnum === TypeCompte.CURRENT ? 'CC' : 'CE';
       const timestamp = Date.now().toString().slice(-6);
       const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
       const numeroCompte = `${prefix}-${timestamp}-${random}`;
@@ -648,7 +738,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         clientId,
         agenceId: data.agenceId, // Add this line
         numeroCompte,
-        typeCompte: data.typeCompte as any,
+        typeCompte: typeCompteEnum,
         soldeCourant: data.soldeInitial.toString(),
         // tauxInteret: data.tauxInteret?.toString() || "0", // Removed from schema?
         statut: data.statut as any,
@@ -661,10 +751,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
           compteId: compte.id,
           // typeTransaction removed as it does not exist in schema
           montant: data.soldeInitial.toString(),
-          methodePaiement: (data.methodePaiement || 'Espèces') as any,
+          methodePaiement: (data.methodePaiement || MethodePaiement.CASH) as any,
           observations: 'Solde initial à la création',
           createdBy: userId,
-          typePaiement: (data.typeCompte === 'Courant' ? 'Dépôt Courant' : 'Dépôt Épargne') as any,
+          typePaiement: (typeCompteEnum === TypeCompte.CURRENT ? TypeOperationCaisse.DEPOSIT_CURRENT : TypeOperationCaisse.DEPOSIT_SAVINGS) as any,
         });
       }
 
@@ -816,7 +906,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     if (filter.statut) {
       const normalized = filter.statut.toUpperCase();
       const now = new Date();
-      if (normalized === "OPEN" || normalized === "OUVERTE") {
+      if (normalized === StatutCaisseAgent.OPEN) {
         conditions.push(
           and(
             isNull(sessionsCaisse.closedAt),
@@ -825,7 +915,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         );
       } else if (normalized === "TIMED_OUT" || normalized === "TIMEOUT") {
         conditions.push(and(isNull(sessionsCaisse.closedAt), lt(sessionsCaisse.timeoutAt, now)));
-      } else if (normalized === "CLOSED" || normalized === "FERMEE" || normalized === "FERMÉE") {
+      } else if (normalized === StatutCaisseAgent.CLOSED) {
         conditions.push(isNotNull(sessionsCaisse.closedAt));
       }
     }
@@ -869,10 +959,11 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   export async function closeSessionCaisse(id: string, closeData: { soldeReel: string; ecart: string; billetageFermeture: any; observations?: string }): Promise<SessionCaisse | undefined> {
     const [session] = await db.update(sessionsCaisse)
       .set({
-        ...closeData,
+        montantFermetureDeclare: closeData.soldeReel,
+        ecart: closeData.ecart,
+        billetageFermeture: closeData.billetageFermeture,
+        observations: closeData.observations,
         closedAt: new Date(),
-        soldeReel: closeData.soldeReel,
-        ecart: closeData.ecart
       })
       .where(eq(sessionsCaisse.id, id))
       .returning();
@@ -886,6 +977,22 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
   export async function getSessionsByCaissier(caissierId: string): Promise<SessionCaisse[]> {
     return db.select().from(sessionsCaisse).where(eq(sessionsCaisse.caissierId, caissierId)).orderBy(desc(sessionsCaisse.openedAt));
+  }
+
+  /**
+   * Get the last closed session for a caisse
+   * Returns the most recent session that has been closed (closedAt IS NOT NULL)
+   */
+  export async function getLastClosedSession(caisseId: string): Promise<SessionCaisse | undefined> {
+    const [session] = await db.select()
+      .from(sessionsCaisse)
+      .where(and(
+        eq(sessionsCaisse.caisseId, caisseId),
+        isNotNull(sessionsCaisse.closedAt)
+      ))
+      .orderBy(desc(sessionsCaisse.closedAt))
+      .limit(1);
+    return session || undefined;
   }
 
   export async function getAllOperationsCaisse(): Promise<OperationCaisse[]> {
@@ -919,13 +1026,13 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     if (type) {
       // Handle generic type filters by mapping to actual typeOperationCaisseEnum values
       if (type === 'retrait') {
-        // For operationsCaisse table, only "Retrait épargne" exists as withdrawal type
-        conditions.push(eq(operationsCaisse.typeOperation, 'Retrait épargne'));
+        // For operationsCaisse table, withdrawal types
+        conditions.push(eq(operationsCaisse.typeOperation, TypeOperationCaisse.SAVINGS_WITHDRAWAL));
       } else if (type === 'depot') {
-        // For operationsCaisse table, only "Dépôt épargne" exists as deposit type
-        conditions.push(eq(operationsCaisse.typeOperation, 'Dépôt épargne'));
+        // For operationsCaisse table, deposit types
+        conditions.push(eq(operationsCaisse.typeOperation, TypeOperationCaisse.SAVINGS_DEPOSIT));
       } else {
-        // Direct enum value (e.g., "Décaissement crédit", "Remboursement crédit", etc.)
+        // Direct enum value (e.g., CREDIT_DISBURSEMENT, CREDIT_REPAYMENT, etc.)
         conditions.push(eq(operationsCaisse.typeOperation, type as any));
       }
     }
@@ -935,20 +1042,20 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       .orderBy(desc(operationsCaisse.createdAt));
   }
 
-  // Withdrawal types from typePaiementTerrainEnum
+  // Withdrawal types from typePaiementTerrainEnum (EN)
   const WITHDRAWAL_TYPES = [
-    'Retrait Épargne',
-    'Retrait Courant',
-    'Retrait Bloqué',
-    'Retrait Tontine',
+    TypeOperationCaisse.WITHDRAWAL_SAVINGS,
+    TypeOperationCaisse.WITHDRAWAL_CURRENT,
+    TypeOperationCaisse.WITHDRAWAL_BLOCKED,
+    TypeOperationCaisse.TONTINE_WITHDRAWAL,
   ] as const;
 
-  // Deposit types from typePaiementTerrainEnum
+  // Deposit types from typePaiementTerrainEnum (EN)
   const DEPOSIT_TYPES = [
-    'Dépôt Épargne',
-    'Dépôt Courant',
-    'Dépôt Bloqué',
-    'Versement Tontine',
+    TypeOperationCaisse.DEPOSIT_SAVINGS,
+    TypeOperationCaisse.DEPOSIT_CURRENT,
+    TypeOperationCaisse.DEPOSIT_BLOCKED,
+    TypeOperationCaisse.TONTINE_CONTRIBUTION,
   ] as const;
 
   /**
@@ -965,7 +1072,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       eq(mouvementsFinanciers.clientId, clientId),
       gte(mouvementsFinanciers.dateOperation, start),
       lte(mouvementsFinanciers.dateOperation, end),
-      eq(mouvementsFinanciers.statut, 'Posté'), // Only count posted transactions
+      eq(mouvementsFinanciers.statut, StatutTransaction.POSTED), // Only count posted transactions
     ];
 
     if (type) {
@@ -1092,11 +1199,6 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       });
   }
 
-  // Shifts Caisse
-  export async function getShiftCaisse(id: string): Promise<ShiftCaisse | undefined> {
-    const [shift] = await db.select().from(shiftsCaisse).where(eq(shiftsCaisse.id, id));
-    return shift || undefined;
-  }
 
   // Factures
     export async function getFacture(id: string): Promise<Facture | undefined> {
@@ -1181,38 +1283,14 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         const [comptage] = await db.select().from(comptageBillets).where(eq(comptageBillets.id, id));
         return comptage || undefined;
     }
-    export async function getComptagesByShift(shiftId: string): Promise<ComptageBillets[]> {
-         return db.select().from(comptageBillets).where(eq(comptageBillets.shiftId, shiftId));
+    export async function getComptagesBySession(sessionId: string): Promise<ComptageBillets[]> {
+         return db.select().from(comptageBillets).where(eq(comptageBillets.sessionId, sessionId));
     }
     export async function createComptageBillets(insertComptage: InsertComptageBillets): Promise<ComptageBillets> {
         const [comptage] = await db.insert(comptageBillets).values(insertComptage).returning();
         return comptage;
     }
     
-    // Shifts - Additional
-    export async function getActiveShiftByAgent(agentId: string): Promise<ShiftCaisse | undefined> {
-        const [shift] = await db.select().from(shiftsCaisse)
-            .where(and(eq(shiftsCaisse.agentId, agentId), eq(shiftsCaisse.statut, 'ouvert')));
-        return shift || undefined;
-    }
-    
-    export async function getShiftsByCaisse(caisseId: string): Promise<ShiftCaisse[]> {
-        return db.select().from(shiftsCaisse).where(eq(shiftsCaisse.caisseId, caisseId)).orderBy(desc(shiftsCaisse.dateOuverture));
-    }
-    
-    export async function getAllShiftsCaisse(): Promise<ShiftCaisse[]> {
-        return db.select().from(shiftsCaisse).orderBy(desc(shiftsCaisse.dateOuverture));
-    }
-    
-    export async function createShiftCaisse(insertShift: InsertShiftCaisse): Promise<ShiftCaisse> {
-        const [shift] = await db.insert(shiftsCaisse).values(insertShift).returning();
-        return shift || undefined; 
-    }
-    
-    export async function updateShiftCaisse(id: string, updateData: Partial<InsertShiftCaisse>): Promise<ShiftCaisse | undefined> {
-         const [shift] = await db.update(shiftsCaisse).set(updateData).where(eq(shiftsCaisse.id, id)).returning();
-         return shift || undefined;
-    }
 
     // Caisse Transferts
     export async function getCaisseTransfert(id: string): Promise<CaisseTransfert | undefined> {
@@ -1272,25 +1350,27 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     export async function getUpcomingEcheances(filter: { agence?: string } = {}): Promise<{ client: string; amount: number; date: string; status: string }[]> {
         // 1. Get active credits
         const conditions = [
-            eq(credits.statut, 'En cours'), 
+            eq(credits.statut, StatutCredit.ACTIVE),
             gt(credits.soldeRestant, "0")
         ];
 
         if (filter.agence) {
-            conditions.push(eq(clients.agence, filter.agence));
+            conditions.push(eq(clients.agenceId, filter.agence));
         }
 
         const activeCredits = await db.select({
             credit: credits,
-            client: clients
+            client: clients,
+            user: users
         })
         .from(credits)
         .innerJoin(clients, eq(credits.clientId, clients.id))
+        .innerJoin(users, eq(clients.userId, users.id))
         .where(and(...conditions));
         const upcomingPayments: { client: string; amount: number; date: string; status: string }[] = [];
         const now = new Date();
 
-        for (const { credit, client } of activeCredits) {
+        for (const { credit, client, user } of activeCredits) {
             if (!credit.dateDebut || !credit.montant || !credit.duree || !clients) continue;
 
             const dateDebut = new Date(credit.dateDebut);
@@ -1311,7 +1391,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
                 // If date is within [Now - 5 days, Now + 30 days]
                 if (diffDays >= -5 && diffDays <= 30) {
                      upcomingPayments.push({
-                        client: `${client?.nom} ${client?.prenom}`,
+                        client: `${user?.nom} ${user?.prenom}`,
                         amount: mensualite,
                         date: nextDate.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
                         status: diffDays < 0 ? 'due' : 'pending' 
@@ -1393,27 +1473,32 @@ import {
  */
 export async function createTransactionCompteWithLedger(data: {
   compteId: string;
-  typeTransaction: "Dépôt" | "Retrait" | "Intérêt" | "Frais" | "Ajustement";
+  typeTransaction: "DEPOSIT" | "WITHDRAWAL" | "INTEREST" | "FEE" | "ADJUSTMENT";
   montant: string;
   methodePaiement: string;
   sessionCaisseId?: string;
   observations?: string;
   idempotencyKey?: string;
 }, userId?: string): Promise<{ transaction: TransactionCompte; mouvement: MouvementFinancier }> {
-  
+
   // Determine sens based on transaction type
-  const isDebit = ["Retrait", "Frais"].includes(data.typeTransaction);
-  const sens: SensMouvement = isDebit ? "Débit" : "Crédit";
+
+  const isDebit = ["WITHDRAWAL", "FEE"].includes(data.typeTransaction);
+  const sens: SensMouvement = isDebit ? "DEBIT" : "CREDIT";
   const delta = isDebit ? -parseFloat(data.montant) : parseFloat(data.montant);
 
   // Get compte for clientId
   const [compte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
   if (!compte) throw new Error(`Compte ${data.compteId} not found`);
 
-  // Map typeTransaction to typePaiement for terrain enum
+  // Map typeTransaction to typePaiement for terrain enum (EN values)
   const typePaiementMap: Record<string, string> = {
-    "Dépôt": compte.typeCompte === "Courant" ? "Dépôt Courant" : "Dépôt Épargne",
-    "Retrait": compte.typeCompte === "Courant" ? "Retrait Courant" : "Retrait Épargne",
+    "DEPOSIT": compte.typeCompte === TypeCompte.CURRENT ? TypeOperationCaisse.DEPOSIT_CURRENT : TypeOperationCaisse.DEPOSIT_SAVINGS,
+    "WITHDRAWAL": compte.typeCompte === TypeCompte.CURRENT ? TypeOperationCaisse.WITHDRAWAL_CURRENT : TypeOperationCaisse.WITHDRAWAL_SAVINGS,
+    "FEE": TypeOperationCaisse.FEE,
+    "ADJUSTMENT": TypeOperationCaisse.ADJUSTMENT,
+    // Interest is essentially a deposit
+    "INTEREST": TypeOperationCaisse.SAVINGS_DEPOSIT, 
   };
   const typePaiement = typePaiementMap[data.typeTransaction];
 
@@ -1469,7 +1554,40 @@ export async function createTransactionCompteWithLedger(data: {
 }
 
 /**
+ * Métadonnées pour opérations par chèque
+ */
+export interface CheckMetadata {
+  numeroCheque: string;
+  banqueEmettrice: string;
+  dateEmission?: string;
+  titulaireCheque?: string;
+}
+
+/**
+ * Métadonnées pour opérations par virement
+ */
+export interface TransferMetadata {
+  banqueOrigine: string;
+  numeroCompteOrigine?: string;
+  referenceVirement?: string;
+  nomEmetteur?: string;
+}
+
+/**
+ * Données de vérification de présence physique (remplace l'OTP)
+ */
+export interface PhysicalVerificationData {
+  verificationMethod: 'piece_identite' | 'reconnaissance_visuelle' | 'signature';
+  identityConfirmed: boolean;
+  responsibilityAccepted: boolean;
+  agentNotes?: string;
+  confirmedAt: string;
+  passwordVerified?: boolean;
+}
+
+/**
  * Create an operation caisse with full ledger flow
+ * Supports metadata for checks/transfers and physical presence verification
  */
 export async function createOperationCaisseWithLedger(data: {
   sessionId: string;
@@ -1479,16 +1597,21 @@ export async function createOperationCaisseWithLedger(data: {
   clientId?: string;
   description?: string;
   idempotencyKey?: string;
+  // Nouvelles données pour métadonnées chèques/virements
+  checkMetadata?: CheckMetadata;
+  transferMetadata?: TransferMetadata;
+  // Données de vérification de présence physique
+  presenceVerification?: PhysicalVerificationData;
 }, userId?: string): Promise<{ operation: OperationCaisse; mouvement: MouvementFinancier }> {
-  
+
   // Determine sens based on operation type
   const opLower = data.typeOperation.toLowerCase();
-  const isDebit = opLower.startsWith("retrait") || 
-                  opLower.startsWith("décaissement") || 
+  const isDebit = opLower.startsWith("retrait") ||
+                  opLower.startsWith("décaissement") ||
                   opLower.startsWith("sort") || // Sortie
                   opLower.startsWith("frais");
-                  
-  const sens: SensMouvement = isDebit ? "Débit" : "Crédit";
+
+  const sens: SensMouvement = isDebit ? "DEBIT" : "CREDIT";
   const sessionDelta = isDebit ? -parseFloat(data.montant) : parseFloat(data.montant);
 
   // Get session for agenceId
@@ -1498,6 +1621,15 @@ export async function createOperationCaisseWithLedger(data: {
   // Generate reference
   const timestamp = Date.now().toString().slice(-8);
   const reference = `OP-${timestamp}-${Math.floor(Math.random() * 1000)}`;
+
+  // Construire les métadonnées
+  const metadata: Record<string, unknown> = {};
+  if (data.checkMetadata) {
+    metadata.check = data.checkMetadata;
+  }
+  if (data.transferMetadata) {
+    metadata.transfer = data.transferMetadata;
+  }
 
   return executeWithLedger(
     "CAISSE",
@@ -1509,6 +1641,7 @@ export async function createOperationCaisseWithLedger(data: {
       agenceId: session.agenceId || undefined,
       methodePaiement: data.methodePaiement,
       idempotencyKey: data.idempotencyKey,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     },
     async (tx, mouvement) => {
       // 1. Update session solde théorique
@@ -1517,7 +1650,7 @@ export async function createOperationCaisseWithLedger(data: {
       // 2. Validate userId
       const validatedUserId = await validateUserId(tx, userId);
 
-      // 3. Create operation caisse
+      // 3. Create operation caisse with metadata
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionId,
         mouvementId: mouvement.id,
@@ -1529,6 +1662,10 @@ export async function createOperationCaisseWithLedger(data: {
         clientId: data.clientId,
         createdBy: validatedUserId,
         idempotencyKey: data.idempotencyKey,
+        // Stocker les métadonnées chèques/virements
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        // Stocker la vérification de présence physique
+        presenceVerification: data.presenceVerification || undefined,
       }).returning();
 
       return {
@@ -1559,7 +1696,7 @@ export async function createRemboursementWithLedger(data: {
   if (!credit) throw new Error(`Credit ${data.creditId} not found`);
 
   // Force Session for Cash
-  if (data.methodePaiement === 'Espèces' && !data.sessionCaisseId) {
+  if (data.methodePaiement === 'CASH' && !data.sessionCaisseId) {
       throw new Error("Une session de caisse active est requise pour les remboursements en espèces");
   }
 
@@ -1567,12 +1704,12 @@ export async function createRemboursementWithLedger(data: {
     "CREDIT",
     {
       montant: data.montant,
-      sens: "Crédit", // Money coming in
+      sens: "CREDIT", // Money coming in
       clientId: credit.clientId,
       creditId: data.creditId,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
-      typePaiement: "Remboursement Crédit" as any,
+      typePaiement: "CREDIT_REPAYMENT" as any,
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
@@ -1642,7 +1779,7 @@ export async function payerFraisEngagement(data: {
   if (demande.fraisEngagementPayes) throw new Error(`Les frais ont déjà été payés pour cette demande`);
 
   // Force Session for Cash
-  if (data.methodePaiement === 'Espèces' && !data.sessionCaisseId) {
+  if (data.methodePaiement === 'CASH' && !data.sessionCaisseId) {
       throw new Error("Une session de caisse active est requise pour le paiement des frais en espèces");
   }
 
@@ -1650,11 +1787,11 @@ export async function payerFraisEngagement(data: {
     "CREDIT",
     {
       montant: data.montant,
-      sens: "Crédit", // L'argent entre dans l'institution
+      sens: "CREDIT", // L'argent entre dans l'institution
       clientId: demande.clientId,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
-      typePaiement: "Frais Engagement" as any,
+      typePaiement: "ENGAGEMENT_FEE" as any,
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
@@ -1663,7 +1800,7 @@ export async function payerFraisEngagement(data: {
         .set({ 
           fraisEngagementPayes: true, 
           montantFraisEngagement: data.montant,
-          statut: "A enquêter" as any // Passe automatiquement à l'étape suivante
+          statut: StatutDemande.READY_FOR_INVESTIGATION
         })
         .where(eq(demandesCredit.id, data.demandeId))
         .returning();
@@ -1743,7 +1880,7 @@ export async function createFactureForFraisEngagement(data: {
       nom: "Reçu Frais d'Engagement",
       code: "FRAIS_ENGAGEMENT",
       description: "Reçu de paiement des frais d'engagement pour demande de crédit",
-      typeDocument: "recu",
+      typeDocument: TypeDocument.RECEIPT,
       prefixeNumero: "REC",
       dernierNumero: 0,
       mentionsLegales: "Ce reçu atteste du paiement des frais d'engagement. Ce document ne constitue pas une approbation de crédit.",
@@ -1776,12 +1913,12 @@ export async function createFactureForFraisEngagement(data: {
     montantTva: "0",
     montantTotal: data.montant,
     montantPaye: data.montant,
-    statut: "payee",
-    modePaiement: "Espèces",
+    statut: StatutFacture.PAID,
+    modePaiement: "CASH",
     operationCaisseId: data.operationCaisseId,
     notes: `Frais d'engagement pour demande de crédit ${data.numeroDemande}`,
   }).returning();
-  
+
   // 5. Create ligne facture
   await db.insert(lignesFactures).values({
     factureId: facture.id,
@@ -1789,7 +1926,7 @@ export async function createFactureForFraisEngagement(data: {
     quantite: 1,
     prixUnitaire: data.montant,
     montant: data.montant,
-    typeOperation: "Frais Engagement",
+    typeOperation: "ENGAGEMENT_FEE",
     referenceId: data.demandeId,
   });
   
@@ -1810,10 +1947,11 @@ export async function createFactureForDepot(data: {
   sessionCaisseId?: string;
   transactionId?: string; // ← NOUVEAU: Pour lier la facture à la transaction
 }): Promise<Facture> {
+  // Mapping TypeCompte (EN) vers code facture
   const codeMap: Record<string, string> = {
-    'Épargne': 'DEPOT_EPARGNE',
-    'Courant': 'DEPOT_COURANT',
-    'Bloqué': 'DEPOT_BLOQUE',
+    [TypeCompte.SAVINGS]: 'DEPOT_EPARGNE',
+    [TypeCompte.CURRENT]: 'DEPOT_COURANT',
+    [TypeCompte.BLOCKED]: 'DEPOT_BLOQUE',
   };
   const code = codeMap[data.typeCompte] || 'DEPOT_EPARGNE';
   
@@ -1828,7 +1966,7 @@ export async function createFactureForDepot(data: {
       nom: `Reçu Dépôt ${data.typeCompte}`,
       code,
       description: `Reçu de dépôt sur compte ${data.typeCompte.toLowerCase()}`,
-      typeDocument: "recu",
+      typeDocument: TypeDocument.RECEIPT,
       prefixeNumero: prefixMap[code],
       dernierNumero: 0,
       mentionsLegales: "Ce reçu atteste du dépôt effectué sur votre compte.",
@@ -1851,19 +1989,20 @@ export async function createFactureForDepot(data: {
     montantTva: "0",
     montantTotal: data.montant,
     montantPaye: data.montant,
-    statut: "payee",
-    modePaiement: "Espèces",
+    statut: StatutFacture.PAID,
+    modePaiement: "CASH",
     operationCaisseId: data.operationCaisseId,
     notes: `Dépôt sur compte ${data.typeCompte} N° ${data.numeroCompte}`,
   }).returning();
-  
+
   await db.insert(lignesFactures).values({
     factureId: facture.id,
     description: `Dépôt - Compte ${data.typeCompte} N° ${data.numeroCompte}`,
     quantite: 1,
     prixUnitaire: data.montant,
     montant: data.montant,
-    typeOperation: `Dépôt ${data.typeCompte}`,
+    typeOperation: data.typeCompte === TypeCompte.CURRENT ? "DEPOSIT_CURRENT" :
+                   data.typeCompte === TypeCompte.BLOCKED ? "DEPOSIT_BLOCKED" : "DEPOSIT_SAVINGS",
     referenceId: data.compteId,
   });
   
@@ -1891,10 +2030,11 @@ export async function createFactureForRetrait(data: {
   sessionCaisseId?: string;
   transactionId?: string; // ← NOUVEAU
 }): Promise<Facture> {
+  // Mapping TypeCompte (EN) vers code facture
   const codeMap: Record<string, string> = {
-    'Épargne': 'RETRAIT_EPARGNE',
-    'Courant': 'RETRAIT_COURANT',
-    'Bloqué': 'RETRAIT_BLOQUE',
+    [TypeCompte.SAVINGS]: 'RETRAIT_EPARGNE',
+    [TypeCompte.CURRENT]: 'RETRAIT_COURANT',
+    [TypeCompte.BLOCKED]: 'RETRAIT_BLOQUE',
   };
   const code = codeMap[data.typeCompte] || 'RETRAIT_EPARGNE';
   
@@ -1909,7 +2049,7 @@ export async function createFactureForRetrait(data: {
       nom: `Reçu Retrait ${data.typeCompte}`,
       code,
       description: `Reçu de retrait sur compte ${data.typeCompte.toLowerCase()}`,
-      typeDocument: "recu",
+      typeDocument: TypeDocument.RECEIPT,
       prefixeNumero: prefixMap[code],
       dernierNumero: 0,
       mentionsLegales: "Ce reçu atteste du retrait effectué sur votre compte.",
@@ -1932,19 +2072,20 @@ export async function createFactureForRetrait(data: {
     montantTva: "0",
     montantTotal: data.montant,
     montantPaye: data.montant,
-    statut: "payee",
-    modePaiement: "Espèces",
+    statut: StatutFacture.PAID,
+    modePaiement: "CASH",
     operationCaisseId: data.operationCaisseId,
     notes: `Retrait sur compte ${data.typeCompte} N° ${data.numeroCompte}`,
   }).returning();
-  
+
   await db.insert(lignesFactures).values({
     factureId: facture.id,
     description: `Retrait - Compte ${data.typeCompte} N° ${data.numeroCompte}`,
     quantite: 1,
     prixUnitaire: data.montant,
     montant: data.montant,
-    typeOperation: `Retrait ${data.typeCompte}`,
+    typeOperation: data.typeCompte === TypeCompte.CURRENT ? "WITHDRAWAL_CURRENT" :
+                   data.typeCompte === TypeCompte.BLOCKED ? "WITHDRAWAL_BLOCKED" : "WITHDRAWAL_SAVINGS",
     referenceId: data.compteId,
   });
   
@@ -1977,7 +2118,7 @@ export async function createFactureForRemboursement(data: {
       nom: "Reçu Remboursement Crédit",
       code: 'REMBOURSEMENT_CREDIT',
       description: "Reçu de remboursement de crédit",
-      typeDocument: "recu",
+      typeDocument: TypeDocument.RECEIPT,
       prefixeNumero: 'RMB-CRD',
       dernierNumero: 0,
       mentionsLegales: "Ce reçu atteste du remboursement effectué sur votre crédit.",
@@ -2000,19 +2141,19 @@ export async function createFactureForRemboursement(data: {
     montantTva: "0",
     montantTotal: data.montant,
     montantPaye: data.montant,
-    statut: "payee",
-    modePaiement: "Espèces",
+    statut: StatutFacture.PAID,
+    modePaiement: "CASH",
     operationCaisseId: data.operationCaisseId,
     notes: `Remboursement crédit N° ${data.numeroCredit}`,
   }).returning();
-  
+
   await db.insert(lignesFactures).values({
     factureId: facture.id,
     description: `Remboursement - Crédit N° ${data.numeroCredit}`,
     quantite: 1,
     prixUnitaire: data.montant,
     montant: data.montant,
-    typeOperation: "Remboursement Crédit",
+    typeOperation: "CREDIT_REPAYMENT",
     referenceId: data.creditId,
   });
   
@@ -2038,7 +2179,7 @@ export async function createFactureForContributionTontine(data: {
       nom: "Reçu Contribution Tontine",
       code: 'CONTRIBUTION_TONTINE',
       description: "Reçu de contribution tontine",
-      typeDocument: "recu",
+      typeDocument: TypeDocument.RECEIPT,
       prefixeNumero: 'CTB-TON',
       dernierNumero: 0,
       mentionsLegales: "Ce reçu atteste de votre contribution à la tontine.",
@@ -2061,19 +2202,19 @@ export async function createFactureForContributionTontine(data: {
     montantTva: "0",
     montantTotal: data.montant,
     montantPaye: data.montant,
-    statut: "payee",
-    modePaiement: "Espèces",
+    statut: StatutFacture.PAID,
+    modePaiement: "CASH",
     operationCaisseId: data.operationCaisseId,
     notes: `Contribution tontine "${data.nomTontine}" - Tour ${data.tourNumero}`,
   }).returning();
-  
+
   await db.insert(lignesFactures).values({
     factureId: facture.id,
     description: `Contribution - Tontine "${data.nomTontine}" - Tour ${data.tourNumero}`,
     quantite: 1,
     prixUnitaire: data.montant,
     montant: data.montant,
-    typeOperation: "Contribution Tontine",
+    typeOperation: "TONTINE_CONTRIBUTION",
     referenceId: data.tontineId,
   });
   
@@ -2113,7 +2254,7 @@ export async function provisionCoffreWithLedger(data: {
         "CAISSE", 
         {
             montant: data.montant,
-            sens: "Crédit", // Money IN
+            sens: "CREDIT", // Money IN
             agenceId: data.agenceId,
             typePaiement: "Approvisionnement coffre" as any,
             methodePaiement: "Autre", 
@@ -2198,15 +2339,15 @@ export async function createDecaissementWithLedger(data: {
         "CREDIT",
         {
             montant: data.montant,
-            sens: "Débit", // Money leaving the institution (to user account)
+            sens: "DEBIT", // Money leaving the institution (to user account)
             clientId: credit.clientId,
             creditId: data.creditId,
             compteId: data.compteId, // Target Account
-            methodePaiement: "Virement", // Internal Transfer
-            typePaiement: "Décaissement Crédit",
+            methodePaiement: "TRANSFER", // Internal Transfer
+            typePaiement: "CREDIT_DISBURSEMENT",
             agenceId: credit.agenceId, // Pass the agency ID for history filtering
             referenceExterne: data.numeroCredit,
-            metadata: { 
+            metadata: {
                 description: `Décaissement crédit ${data.numeroCredit}`,
                 coffreId: targetCoffre.id,
                 coffreCode: targetCoffre.code,
@@ -2227,10 +2368,10 @@ export async function createDecaissementWithLedger(data: {
              await tx.insert(transactionsCompte).values({
                  compteId: data.compteId,
                  mouvementId: mouvement.id,
-                 typePaiement: "Décaissement Crédit",
+                 typePaiement: "CREDIT_DISBURSEMENT",
                  montant: data.montant,
                  soldeApres: nouveauSoldeCompte,
-                 methodePaiement: "Virement",
+                 methodePaiement: "TRANSFER",
                  observations: `Décaissement crédit ${data.numeroCredit}`,
              });
 
@@ -2387,11 +2528,11 @@ export async function createCashTransactionWithLedger(data: {
   let accountDelta: number = 0; // Impact on Client Account (+ = crédit, - = débit)
 
   if (isIncoming) {
-    sens = "Crédit"; // Argent entrant dans l'institution
+    sens = "CREDIT"; // Argent entrant dans l'institution
     cashDelta = montantNum;
     accountDelta = montantNum; // Compte client crédité (sa créance augmente)
   } else if (isOutgoing) {
-    sens = "Débit"; // Argent sortant de l'institution
+    sens = "DEBIT"; // Argent sortant de l'institution
     cashDelta = -montantNum;
     accountDelta = -montantNum; // Compte client débité (sa créance diminue)
   } else {
@@ -2484,12 +2625,12 @@ export async function createCashTransactionWithLedger(data: {
       if (data.compteId && compte) {
         nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, accountDelta);
 
-        // Déterminer le type de transaction selon le type de compte
+        // Déterminer le type de transaction selon le type de compte (EN values)
         const transType = (accountDelta > 0)
-          ? (compte.typeCompte === 'Courant' ? 'Dépôt Courant' :
-             compte.typeCompte === 'Bloqué' ? 'Dépôt Bloqué' : 'Dépôt Épargne')
-          : (compte.typeCompte === 'Courant' ? 'Retrait Courant' :
-             compte.typeCompte === 'Bloqué' ? 'Retrait Bloqué' : 'Retrait Épargne');
+          ? (compte.typeCompte === TypeCompte.CURRENT ? 'DEPOSIT_CURRENT' :
+             compte.typeCompte === TypeCompte.BLOCKED ? 'DEPOSIT_BLOCKED' : 'DEPOSIT_SAVINGS')
+          : (compte.typeCompte === TypeCompte.CURRENT ? 'WITHDRAWAL_CURRENT' :
+             compte.typeCompte === TypeCompte.BLOCKED ? 'WITHDRAWAL_BLOCKED' : 'WITHDRAWAL_SAVINGS');
 
         const validatedUserIdForTx = await validateUserId(tx, userId);
 
@@ -2521,7 +2662,7 @@ export async function createCashTransactionWithLedger(data: {
         clientId: data.clientId,
         createdBy: validatedUserIdForOp,
         idempotencyKey: data.idempotencyKey,
-        statut: "Posté",
+        statut: "POSTED",
       }).returning();
 
       return {
@@ -2561,7 +2702,7 @@ export async function validateTransfertWithLedger(
     // 1. Get Transfer
     const [transfert] = await tx.select().from(caisseTransferts).where(eq(caisseTransferts.id, transfertId));
     if (!transfert) throw new Error("Transfert non trouvé");
-    if (transfert.statut !== 'En attente') throw new Error("Transfert déjà traité");
+    if (transfert.statut !== 'PENDING') throw new Error("Transfert déjà traité");
 
     // 2. Get Sessions
     const [sessionSource] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, transfert.sessionSourceId));
@@ -2572,7 +2713,7 @@ export async function validateTransfertWithLedger(
     if (sessionDest.closedAt) throw new Error("La session de destination doit être ouverte");
 
     // Check Sufficient Funds
-    const currentSolde = Number(sessionSource.soldeTheorique || sessionSource.soldeInitial || 0);
+    const currentSolde = Number(sessionSource.montantFermetureTheorique || sessionSource.montantOuverture || 0);
     const amount = Number(transfert.montant);
 
     if (currentSolde < amount) {
@@ -2583,46 +2724,46 @@ export async function validateTransfertWithLedger(
     const refSource = `TRF-OUT-${transfert.reference}`;
     const mouvementSource = await createMouvementFinancier(tx, {
       montant: transfert.montant,
-      sens: "Débit",
+      sens: "DEBIT",
       sourceModule: "TRANSFERT",
       sessionCaisseId: sessionSource.id,
       agenceId: sessionSource.agenceId || undefined,
-      typePaiement: "Transfert Caisse",
+      typePaiement: "TRANSFER_OUT",
       referenceExterne: refSource,
-      methodePaiement: "Virement",
+      methodePaiement: "TRANSFER",
       metadata: {
         description: `Transfert vers ${sessionDest.caisseId} (Ref: ${transfert.reference})`
       }
     }, userId);
 
     const soldeSource = await updateSessionSolde(tx, sessionSource.id, -parseFloat(transfert.montant));
-    
+
     await tx.insert(operationsCaisse).values({
       sessionId: sessionSource.id,
       mouvementId: mouvementSource.id,
-      typeOperation: "Transfert caisse" as any,
+      typeOperation: "CASH_TRANSFER" as any,
       montant: transfert.montant,
-      methodePaiement: "Virement" as any,
+      methodePaiement: "TRANSFER" as any,
       reference: refSource,
       description: `Transfert émis vers ${sessionDest.caisseId}`,
       createdBy: userId
     });
 
-    await createMouvementEvents(tx, mouvementSource, { 
-      nouveauSoldeSession: soldeSource 
+    await createMouvementEvents(tx, mouvementSource, {
+      nouveauSoldeSession: soldeSource
     });
 
     // 4. Process DEST (CREDIT / IN)
     const refDest = `TRF-IN-${transfert.reference}`;
     const mouvementDest = await createMouvementFinancier(tx, {
       montant: transfert.montant,
-      sens: "Crédit",
+      sens: "CREDIT",
       sourceModule: "TRANSFERT",
       sessionCaisseId: sessionDest.id,
       agenceId: sessionDest.agenceId || undefined,
-      typePaiement: "Transfert Caisse",
+      typePaiement: "TRANSFER_IN",
       referenceExterne: refDest,
-      methodePaiement: "Virement",
+      methodePaiement: "TRANSFER",
       metadata: {
         description: `Réception transfert de ${sessionSource.caisseId} (Ref: ${transfert.reference})`
       }
@@ -2633,9 +2774,9 @@ export async function validateTransfertWithLedger(
     await tx.insert(operationsCaisse).values({
       sessionId: sessionDest.id,
       mouvementId: mouvementDest.id,
-      typeOperation: "Transfert caisse" as any,
+      typeOperation: "CASH_TRANSFER" as any,
       montant: transfert.montant,
-      methodePaiement: "Virement" as any,
+      methodePaiement: "TRANSFER" as any,
       reference: refDest,
       description: `Transfert reçu de ${sessionSource.caisseId}`,
       createdBy: userId
@@ -2648,7 +2789,7 @@ export async function validateTransfertWithLedger(
     // 5. Update Transfer Status
     const [updatedTransfert] = await tx.update(caisseTransferts)
       .set({
-        statut: 'Validé',
+        statut: 'VALIDATED',
         sessionDestId: sessionDest.id,
         dateValidation: new Date(),
         validatedBy: userId
@@ -2725,7 +2866,7 @@ export async function createFactureForDepotInitial(data: {
       nom: "Reçu Dépôt Initial - Ouverture de Compte",
       code: 'DEPOT_INITIAL',
       description: "Reçu de dépôt initial lors de l'ouverture de compte",
-      typeDocument: "recu",
+      typeDocument: TypeDocument.RECEIPT,
       prefixeNumero: 'DI',
       dernierNumero: 0,
       mentionsLegales: "Ce reçu atteste du dépôt initial effectué lors de l'ouverture de votre compte.",
@@ -2748,7 +2889,7 @@ export async function createFactureForDepotInitial(data: {
     montantTva: "0",
     montantTotal: data.montant,
     montantPaye: data.montant,
-    statut: "payee",
+    statut: StatutFacture.PAID,
     modePaiement: data.modePaiement,
     notes: `Dépôt initial - Ouverture compte ${data.typeCompte} N° ${data.numeroCompte}`,
   }).returning();
@@ -2759,7 +2900,7 @@ export async function createFactureForDepotInitial(data: {
     quantite: 1,
     prixUnitaire: data.montant,
     montant: data.montant,
-    typeOperation: "Dépôt Initial",
+    typeOperation: "INITIAL_DEPOSIT",
     referenceId: data.compteId,
   });
   

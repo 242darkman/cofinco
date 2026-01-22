@@ -1,16 +1,17 @@
+import { StatutTransfertCoffre } from "@shared/enum/status-constants";
 
 export const TRANSFERT_COFFRE_TRANSITIONS: Record<string, string[]> = {
-  "Demandé": ["Validé", "Rejeté", "Annulé"],
-  "Validé": ["Exécuté"],
-  "Exécuté": [],  // Terminal
-  "Rejeté": [],   // Terminal
-  "Annulé": [],   // Terminal
+  [StatutTransfertCoffre.REQUESTED]: [StatutTransfertCoffre.VALIDATED, StatutTransfertCoffre.REJECTED, StatutTransfertCoffre.CANCELLED],
+  [StatutTransfertCoffre.VALIDATED]: [StatutTransfertCoffre.EXECUTED],
+  [StatutTransfertCoffre.EXECUTED]: [],  // Terminal
+  [StatutTransfertCoffre.REJECTED]: [],   // Terminal
+  [StatutTransfertCoffre.CANCELLED]: [],   // Terminal
 };
 
-export const TERMINAL_STATES = ["Exécuté", "Rejeté", "Annulé"];
+export const TERMINAL_STATES = [StatutTransfertCoffre.EXECUTED, StatutTransfertCoffre.REJECTED, StatutTransfertCoffre.CANCELLED];
 
 export function isTerminalState(statut: string): boolean {
-  return TERMINAL_STATES.includes(statut);
+  return (TERMINAL_STATES as readonly string[]).includes(statut);
 }
 
 export function canTransition(from: string, to: string): boolean {

@@ -21,7 +21,16 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import { toast, handleApiError } from '../../lib/toast';
 import { Pagination } from '../ui/Pagination';
-import { formatClientName } from '../../lib/format';
+import { formatClientName, resolveStorageUrl } from '../../lib/format';
+import { StatutClient } from '@shared/enum/status-constants';
+import { 
+  getStatusLabel, 
+  getStatusColor, 
+  CLIENT_STATUS_LABELS, 
+  CLIENT_STATUS_COLORS,
+  CLIENT_SEGMENT_LABELS,
+  CLIENT_SEGMENT_COLORS
+} from '../../lib/status-labels';
 
 interface ClientModuleProps {
   onModuleChange?: (module: string, subModule?: string, data?: any) => void;
@@ -89,27 +98,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   const getPhotoUrl = (client: any) => {
     const raw = client.photoProfile || client.photoUrl || '';
-    if (!raw) return '';
-    if (raw.startsWith('data:')) return raw;
-    if (raw.startsWith('/api/')) return raw;
-    if (raw.startsWith('/')) return raw;
-    if (raw.startsWith('http')) {
-      try {
-        const url = new URL(raw);
-        const pathParts = url.pathname.split('/').filter(Boolean);
-        // Special handling for MinIO URLs if needed, or generic
-        if (pathParts.length >= 2) {
-             // Assuming structure might be /bucket/key or similar
-             // But following the pattern from AdminGestionUtilisateurs which seemed to work for user
-             const key = pathParts.slice(1).join('/');
-             return `/api/uploads/files/${key}`;
-        }
-        return raw;
-      } catch {
-         return raw;
-      }
-    }
-    return `/api/uploads/files/${raw}`;
+    return resolveStorageUrl(raw);
   };
 
   const handleSaveClient = async (clientData: any) => {
@@ -206,7 +195,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                   alt={viewingClient.nom || ''} 
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-slate-700 shadow-lg"
                 />
-                <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-slate-800 ${viewingClient.status === 'Actif' ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-slate-800 ${viewingClient.statut === StatutClient.ACTIVE ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
               </div>
             ) : (
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-700 flex items-center justify-center border-4 border-slate-600 shadow-lg">
@@ -221,7 +210,11 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                 {formatClientName(viewingClient.nom, viewingClient.prenom)}
               </h1>
               <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Badge value={viewingClient.segment} size="sm" />
+                <Badge 
+                  value={getStatusLabel(viewingClient.segment?.toUpperCase(), CLIENT_SEGMENT_LABELS)} 
+                  className={getStatusColor(viewingClient.segment?.toUpperCase(), CLIENT_SEGMENT_COLORS)}
+                  size="sm" 
+                />
                 {(viewingClient.agence || viewingClient.agence_nom) && (
                   <>
                     <span>•</span>
@@ -493,17 +486,31 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                     {
                       key: 'segment',
                       label: 'Segment',
-                      badge: true,
                       hideOnMobile: true,
                       headerAlign: 'center',
                       align: 'center',
+                      format: (_, item) => (
+                        <div className="flex justify-center">
+                          <Badge 
+                            value={getStatusLabel(item.segment?.toUpperCase(), CLIENT_SEGMENT_LABELS)} 
+                            className={getStatusColor(item.segment?.toUpperCase(), CLIENT_SEGMENT_COLORS)}
+                          />
+                        </div>
+                      )
                     },
                     {
-                      key: 'status',
+                      key: 'statut',
                       label: 'Statut',
-                      badge: true,
                       headerAlign: 'center',
                       align: 'center',
+                      format: (_, item) => (
+                        <div className="flex justify-center">
+                          <Badge 
+                            value={getStatusLabel(item.statut, CLIENT_STATUS_LABELS)} 
+                            className={getStatusColor(item.statut, CLIENT_STATUS_COLORS)}
+                          />
+                        </div>
+                      )
                     }
                   ]}
                   actions={(client) => (

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   X,
   ArrowRightLeft,
@@ -23,9 +23,12 @@ import {
   ChevronRight,
   Tag,
   Calendar,
+  Printer,
 } from 'lucide-react';
 import { Button, Badge } from '@/components/ui';
 import { formatMoney } from '../../../lib/format';
+import { InternalOperationReceipt, InternalOperationReceiptData } from '../../ui/printable';
+import { useReactToPrint } from 'react-to-print';
 
 interface CoffreFort {
   id: string;
@@ -125,6 +128,59 @@ export default function TransfertInterCoffresDetail({
   onClose,
   onAction,
 }: TransfertInterCoffresDetailProps) {
+  // Print functionality
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef,
+    documentTitle: `Transfert-${transfert.reference}`,
+  });
+
+  // Build receipt data for printing
+  const buildReceiptData = (): InternalOperationReceiptData => ({
+    reference: transfert.reference,
+    date: transfert.dateTransfert || transfert.createdAt,
+    type: 'TRANSFER_INTER_CAISSE',
+    montant: parseFloat(transfert.montant),
+    devise: transfert.devise || 'XAF',
+    source: transfert.coffreSource ? {
+      type: 'COFFRE',
+      id: transfert.coffreSource.id,
+      nom: transfert.coffreSource.agenceNom || transfert.coffreSource.nom,
+      code: transfert.coffreSource.code,
+    } : undefined,
+    destination: transfert.coffreDestination ? {
+      type: 'COFFRE',
+      id: transfert.coffreDestination.id,
+      nom: transfert.coffreDestination.agenceNom || transfert.coffreDestination.nom,
+      code: transfert.coffreDestination.code,
+    } : undefined,
+    autorisation: transfert.approbateurN2 ? {
+      par: `${transfert.approbateurN2.prenom || ''} ${transfert.approbateurN2.nom || ''}`.trim(),
+      role: 'Approbateur N2',
+      date: transfert.approvedAtN2 || undefined,
+    } : transfert.approbateurN1 ? {
+      par: `${transfert.approbateurN1.prenom || ''} ${transfert.approbateurN1.nom || ''}`.trim(),
+      role: 'Approbateur N1',
+      date: transfert.approvedAtN1 || undefined,
+    } : undefined,
+    motif: transfert.motif || undefined,
+    statut: transfert.statut === 'Reçu' ? 'VALIDE'
+      : transfert.statut === 'Annulé' ? 'ANNULE'
+      : transfert.statut === 'Rejeté' ? 'REJETE'
+      : 'EN_ATTENTE',
+    operateur: transfert.createur ? {
+      nom: transfert.createur.nom || '',
+      prenom: transfert.createur.prenom,
+    } : undefined,
+    details: [
+      { label: 'Type de transfert', value: transfert.typeTransfert.replace(/_/g, ' → ') },
+      { label: 'Conditionnement', value: transfert.typeConditionnement },
+      ...(transfert.numeroScelle ? [{ label: 'N° Scellé', value: transfert.numeroScelle }] : []),
+    ],
+    footerMessage: transfert.commentaireReception || undefined,
+  });
+
   // Status configuration
   const getStatutConfig = (statut: string) => {
     const configs: Record<string, { color: string; bg: string; border: string; icon: React.ReactNode }> = {
@@ -269,12 +325,21 @@ export default function TransfertInterCoffresDetail({
                   </div>
                 </div>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all border border-slate-700/50"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePrint()}
+                  className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-cyan-600/20 text-slate-400 hover:text-cyan-400 transition-all border border-slate-700/50"
+                  title="Imprimer le reçu"
+                >
+                  <Printer size={20} />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all border border-slate-700/50"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* ─────────────────────────────────────────────────────────────────
@@ -708,6 +773,11 @@ export default function TransfertInterCoffresDetail({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Hidden Receipt for Printing */}
+      <div className="hidden">
+        <InternalOperationReceipt ref={receiptRef} data={buildReceiptData()} />
       </div>
     </>
   );

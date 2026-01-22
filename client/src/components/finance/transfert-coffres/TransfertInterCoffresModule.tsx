@@ -360,9 +360,9 @@ export default function TransfertInterCoffresModule({
 
     return {
       total: totalItems,
-      enAttente: (byStatut['Soumis'] || 0) + (byStatut['Approuvé N1'] || 0),
-      enTransit: byStatut['En transit'] || 0,
-      recus: (byStatut['Reçu'] || 0) + (byStatut['Reçu avec écart'] || 0),
+      enAttente: (byStatut['SUBMITTED'] || 0) + (byStatut['APPROVED_L1'] || 0),
+      enTransit: byStatut['IN_TRANSIT'] || 0,
+      recus: (byStatut['RECEIVED'] || 0) + (byStatut['RECEIVED_WITH_DISCREPANCY'] || 0),
       soldeTotalCoffres: stats?.soldeTotal || 0,
     };
   }, [transferts, totalItems, stats]);
@@ -370,15 +370,15 @@ export default function TransfertInterCoffresModule({
   // Get status badge variant
   const getStatutBadge = (statut: string) => {
     const variants: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary'> = {
-      'Brouillon': 'neutral',
-      'Soumis': 'warning',
-      'Approuvé N1': 'info',
-      'Approuvé N2': 'primary',
-      'En transit': 'warning',
-      'Reçu': 'success',
-      'Reçu avec écart': 'danger',
-      'Rejeté': 'danger',
-      'Annulé': 'neutral',
+      'DRAFT': 'neutral',
+      'SUBMITTED': 'warning',
+      'APPROVED_L1': 'info',
+      'APPROVED_L2': 'primary',
+      'IN_TRANSIT': 'warning',
+      'RECEIVED': 'success',
+      'RECEIVED_WITH_DISCREPANCY': 'danger',
+      'REJECTED': 'danger',
+      'CANCELLED': 'neutral',
     };
     return variants[statut] || 'neutral';
   };
@@ -388,19 +388,19 @@ export default function TransfertInterCoffresModule({
     const actions: string[] = [];
 
     switch (transfert.statut) {
-      case 'Brouillon':
+      case 'DRAFT':
         actions.push('submit', 'cancel');
         break;
-      case 'Soumis':
+      case 'SUBMITTED':
         actions.push('approve_l1', 'reject', 'cancel');
         break;
-      case 'Approuvé N1':
+      case 'APPROVED_L1':
         actions.push('approve_l2', 'reject', 'cancel');
         break;
-      case 'Approuvé N2':
+      case 'APPROVED_L2':
         actions.push('dispatch');
         break;
-      case 'En transit':
+      case 'IN_TRANSIT':
         actions.push('receive');
         break;
     }
@@ -559,15 +559,15 @@ export default function TransfertInterCoffresModule({
               className="px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all"
             >
               <option value="all">Tous les statuts</option>
-              <option value="Brouillon">Brouillon</option>
-              <option value="Soumis">Soumis</option>
-              <option value="Approuvé N1">Approuvé N1</option>
-              <option value="Approuvé N2">Approuvé N2</option>
-              <option value="En transit">En transit</option>
-              <option value="Reçu">Reçu</option>
-              <option value="Reçu avec écart">Reçu avec écart</option>
-              <option value="Rejeté">Rejeté</option>
-              <option value="Annulé">Annulé</option>
+              <option value="DRAFT">Brouillon</option>
+              <option value="SUBMITTED">Soumis</option>
+              <option value="APPROVED_L1">Approuvé N1</option>
+              <option value="APPROVED_L2">Approuvé N2</option>
+              <option value="IN_TRANSIT">En transit</option>
+              <option value="RECEIVED">Reçu</option>
+              <option value="RECEIVED_WITH_DISCREPANCY">Reçu avec écart</option>
+              <option value="REJECTED">Rejeté</option>
+              <option value="CANCELLED">Annulé</option>
             </select>
 
             {/* Date filters on desktop */}

@@ -6,6 +6,7 @@ import * as operations from "./operations";
 import * as accounting from "./accounting";
 import * as hr from "./hr";
 import * as employesStorage from "./employes";
+import type { ClientFull, CreateClientApiInput } from "./clients";
 
 // Import types for IStorage interface definition
 import {
@@ -22,7 +23,7 @@ import {
     Notification, InsertNotification, OtpValidation, InsertOtpValidation, PushSubscription, InsertPushSubscription,
     NotificationPreferences, InsertNotificationPreferences, PushNotificationLog, InsertPushNotificationLog,
 
-    Caisse, InsertCaisse, ShiftCaisse, InsertShiftCaisse, ComptageBillets, InsertComptageBillets,
+    Caisse, InsertCaisse, ComptageBillets, InsertComptageBillets,
     ModeleFacture, InsertModeleFacture, Facture, InsertFacture, LigneFacture, InsertLigneFacture,
 
     PosDevice, InsertPosDevice, Employe, InsertEmploye, EmployeWithUser, Zone, InsertZone, Agence,
@@ -45,18 +46,21 @@ export interface IStorage {
     getAllUsers(): Promise<User[]>;
     createUser(user: InsertUser): Promise<User>;
     updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
-    updateUserLocation(userId: string, latitude: string, longitude: string): Promise<void>;
+
+    // Agent Location (GPS Tracking) - updates agents_terrain table
+    updateAgentLocation(userId: string, latitude: string, longitude: string): Promise<void>;
 
     // Clients
-    getClient(id: string): Promise<Client | undefined>;
-    getAllClients(filter?: { agence?: string; agenceId?: string }): Promise<(Client & { type_marche_nom?: string | null; agence_nom?: string | null })[]>;
+    getClient(id: string): Promise<ClientFull | undefined>;
+    getAllClients(filter?: { agence?: string; agenceId?: string }): Promise<ClientFull[]>;
     getClientsPaginated(
       filter?: { agence?: string; agenceId?: string },
       page?: number,
       perPage?: number
-    ): Promise<{ data: (Client & { type_marche_nom?: string | null; agence_nom?: string | null })[]; total: number }>;
-    createClient(client: InsertClient): Promise<Client>;
-    updateClient(id: string, client: Partial<InsertClient>): Promise<Client | undefined>;
+    ): Promise<{ data: ClientFull[]; total: number }>;
+    createClient(client: CreateClientApiInput): Promise<Client>;
+    updateClient(id: string, client: Partial<CreateClientApiInput>): Promise<ClientFull | undefined>;
+    createClientsBulk(clients: CreateClientApiInput[]): Promise<Client[]>;
     deleteClient(id: string): Promise<boolean>;
 
     // Credits
@@ -81,9 +85,9 @@ export interface IStorage {
     deleteCreditPlan(id: string): Promise<boolean>;
 
     // Demandes
-    getDemandeCredit(id: string): Promise<DemandeCredit | undefined>;
+    getDemandeCredit(id: string, includeDeleted?: boolean): Promise<DemandeCredit | undefined>;
     getDemandesByClient(clientId: string): Promise<DemandeCredit[]>;
-    getAllDemandes(filter?: { agence?: string }): Promise<DemandeCredit[]>;
+    getAllDemandes(filter?: { agence?: string; includeDeleted?: boolean }): Promise<DemandeCredit[]>;
     createDemandeCredit(demande: InsertDemandeCredit): Promise<DemandeCredit>;
     updateDemandeCredit(id: string, demande: Partial<InsertDemandeCredit>, tx?: PgTransaction<any, any, any>): Promise<DemandeCredit | undefined>;
     deleteDemandeCredit(id: string): Promise<boolean>;
@@ -146,7 +150,7 @@ export interface IStorage {
     createTransactionCompte(transaction: InsertTransactionCompte, tx?: PgTransaction<any, any, any>): Promise<TransactionCompte>;
     createTransactionCompteWithLedger(data: {
       compteId: string;
-      typeTransaction: "Dépôt" | "Retrait" | "Intérêt" | "Frais" | "Ajustement";
+      typeTransaction: "DEPOSIT" | "WITHDRAWAL" | "INTEREST" | "FEE" | "ADJUSTMENT";
       montant: string;
       methodePaiement: string;
       sessionCaisseId?: string;
@@ -264,6 +268,7 @@ export interface IStorage {
     updateUserConnectionStatus(userId: string, status: 'CONNECTED' | 'DISCONNECTED'): Promise<void>;
     closeSessionCaisse(id: string, closeData: { soldeReel: string; ecart: string; billetageFermeture: any; observations?: string }): Promise<SessionCaisse | undefined>;
     getSessionsByCaissier(caissierId: string): Promise<SessionCaisse[]>;
+    getLastClosedSession(caisseId: string): Promise<SessionCaisse | undefined>;
 
     // Operations Caisse
     getOperationsBySession(sessionId: string): Promise<OperationCaisse[]>;
@@ -446,17 +451,10 @@ export interface IStorage {
     setCaisseAssignments(caisseId: string, userIds: string[], assignedBy: string): Promise<void>;
     getCaissesWithStatus(agenceId?: string): Promise<any[]>;
 
-    // Shifts
-    getShiftCaisse(id: string): Promise<ShiftCaisse | undefined>;
-    getActiveShiftByAgent(caisseAgentId: string): Promise<ShiftCaisse | undefined>;
-    getShiftsByCaisse(caisseAgentId: string): Promise<ShiftCaisse[]>;
-    getAllShiftsCaisse(): Promise<ShiftCaisse[]>;
-    createShiftCaisse(shift: InsertShiftCaisse): Promise<ShiftCaisse>;
-    updateShiftCaisse(id: string, shift: Partial<InsertShiftCaisse>): Promise<ShiftCaisse | undefined>;
 
     // Comptage Billets
     getComptageBillets(id: string): Promise<ComptageBillets | undefined>;
-    getComptagesByShift(shiftId: string): Promise<ComptageBillets[]>;
+    getComptagesBySession(sessionId: string): Promise<ComptageBillets[]>;
     createComptageBillets(comptage: InsertComptageBillets): Promise<ComptageBillets>;
 
     // Modeles Factures
@@ -496,9 +494,9 @@ export interface IStorage {
     getAllEmployesWithUsers(): Promise<EmployeWithUser[]>;
     getEmployesByAgence(agenceId: string): Promise<EmployeWithUser[]>;
     createEmploye(employe: InsertEmploye): Promise<Employe>;
-    createEmployeForUser(userId: string, employeData: Omit<InsertEmploye, 'userId'>): Promise<Employe>;
+    createEmployeForUser(userId: string, employeData: Omit<InsertEmploye, 'userId'>, role?: import("@shared/types/roles").SystemRole): Promise<Employe>;
     updateEmploye(id: string, employe: Partial<InsertEmploye>): Promise<Employe | undefined>;
-    updateEmployeWithUser(employeId: string, userData?: Partial<{ nom: string; prenom: string; email: string; telephone: string; sexe: string; photoProfile: string; statut: string; }>, employeData?: Partial<InsertEmploye>): Promise<EmployeWithUser | undefined>;
+    updateEmployeWithUser(employeId: string, userData?: Partial<{ nom: string; prenom: string; email: string; telephone: string; sexe: string; photoProfile: string; statut: string; }>, employeData?: Partial<InsertEmploye>, newRole?: import("@shared/types/roles").SystemRole): Promise<EmployeWithUser | undefined>;
     deleteEmploye(id: string): Promise<boolean>;
 
     // Accounting

@@ -7,6 +7,8 @@ export interface DemandeCredit {
   client_id: string;
   date_demande: string;
   created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
   montant_demande: number;
   montant_approuve?: number | null;
   duree_mois: number;
@@ -37,7 +39,7 @@ export function useDemandes() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/demandes-credit');
+      const response = await fetch('/api/demandes-credit?includeDeleted=true');
       if (!response.ok) throw new Error('Erreur serveur');
       
       const data = await response.json();

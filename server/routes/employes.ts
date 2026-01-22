@@ -2,8 +2,9 @@ import type { Express } from "express";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { users, employes, insertEmployeSchema, agentsTerrain } from "@shared/schema";
-import { SystemRole, normalizeRole } from "@shared/types/roles";
+import { users, employes, agentsTerrain, userRoles } from "@shared/schema";
+import { SystemRole } from "@shared/types/roles";
+import { StatutUser } from "@shared/enum/status-constants";
 import { storage } from "../storage";
 import { requireAuth, requireRole, hashPassword } from "../auth";
 import { logAudit } from "../audit";
@@ -30,12 +31,13 @@ const createEmployeWithUserSchema = z.object({
   typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim']).optional(),
   agenceId: z.string().uuid().optional().nullable(),
   managerId: z.string().uuid().optional().nullable(),
-  roleSystem: z.string().optional(),
+  // Rôle via userRoles table (Architecture V3)
+  role: z.nativeEnum(SystemRole).optional(),
   salaireBase: z.number().optional(),
   tauxHoraire: z.number().optional(),
   tauxJournalier: z.number().optional(),
   modeCalculPaie: z.enum(['Mensuel', 'Horaire', 'Journalier']).optional(),
-  // Agent Terrain specific fields (optional, used when roleSystem === 'terrain')
+  // Agent Terrain specific fields (optional, used when role === AGENT_TERRAIN)
   zonesAffectation: z.array(z.string()).optional(),
   objectifMensuel: z.string().optional(),
 });
@@ -49,9 +51,9 @@ const updateEmployeWithUserSchema = z.object({
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
   photoProfile: z.string().optional().nullable(),
-  statut: z.enum(['Actif', 'Inactif', 'Suspendu']).optional(),
+  statut: z.enum([StatutUser.ACTIVE, StatutUser.INACTIVE, StatutUser.SUSPENDED]).optional(),
 
-  // Données employé
+  // Données employé (RH - sans rôle, géré par userRoles)
   matricule: z.string().optional().nullable(),
   poste: z.string().optional().nullable(),
   departement: z.string().optional().nullable(),
@@ -59,7 +61,8 @@ const updateEmployeWithUserSchema = z.object({
   typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim']).optional(),
   agenceId: z.string().uuid().optional().nullable(),
   managerId: z.string().uuid().optional().nullable(),
-  roleSystem: z.string().optional(),
+  // Rôle géré via userRoles table (Architecture V3) - passé séparément à updateEmployeWithUser
+  role: z.nativeEnum(SystemRole).optional(),
   salaireBase: z.number().optional(),
   tauxHoraire: z.number().optional(),
   tauxJournalier: z.number().optional(),
@@ -192,7 +195,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // POST - Créer un nouvel employé (user + employe)
   // ============================================
-  app.post("/api/employes", requireRole("admin"), async (req, res) => {
+  app.post("/api/employes", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const parsed = createEmployeWithUserSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -200,10 +203,8 @@ export function registerEmployesRoutes(app: Express) {
       }
 
       const data = parsed.data;
-      const resolvedRole = normalizeRole(data.roleSystem);
-      if (data.roleSystem && !resolvedRole) {
-        return res.status(400).json({ message: "Rôle employé invalide" });
-      }
+      // Valider le rôle si fourni
+      const resolvedRole = data.role || SystemRole.AGENT_TERRAIN;
 
       // Vérifier si username existe déjà
       if (data.username) {
@@ -219,7 +220,7 @@ export function registerEmployesRoutes(app: Express) {
         hashedPassword = await hashPassword(data.password);
       }
 
-      // Créer dans une transaction
+      // Créer dans une transaction (Architecture V3: user + employe + userRoles)
       const result = await db.transaction(async (tx) => {
         // 1. Créer l'utilisateur
         const [user] = await tx.insert(users).values({
@@ -233,11 +234,10 @@ export function registerEmployesRoutes(app: Express) {
           password: hashedPassword,
           typeCompte: 'employe',
           canLogin: !!data.username,
-          statut: 'Actif',
-          role: resolvedRole || SystemRole.AGENT_TERRAIN,
+          statut: StatutUser.ACTIVE,
         }).returning();
 
-        // 2. Créer l'employé lié
+        // 2. Créer l'employé lié (sans roleSystem - géré par userRoles)
         const [employe] = await tx.insert(employes).values({
           userId: user.id,
           matricule: data.matricule || null,
@@ -247,24 +247,31 @@ export function registerEmployesRoutes(app: Express) {
           typeContrat: data.typeContrat || 'CDI',
           agenceId: data.agenceId || null,
           managerId: data.managerId || null,
-          roleSystem: data.roleSystem || 'agent',
           salaireBase: data.salaireBase || 0,
           tauxHoraire: data.tauxHoraire || 0,
           tauxJournalier: data.tauxJournalier || 0,
           modeCalculPaie: data.modeCalculPaie || 'Mensuel',
+          statut: StatutUser.ACTIVE,
         }).returning();
+
+        // 3. Créer le rôle dans userRoles (Architecture V3)
+        await tx.insert(userRoles).values({
+          userId: user.id,
+          role: resolvedRole,
+          agenceId: data.agenceId || null,
+          isPrimary: true,
+        });
 
         return { user, employe };
       });
 
-      // 3. If role is terrain, create agent terrain entry
-      if (data.roleSystem === 'terrain' && result.employe.id) {
+      // 4. If role is AGENT_TERRAIN, create agent terrain entry
+      if (resolvedRole === SystemRole.AGENT_TERRAIN && result.employe.id) {
         await db.insert(agentsTerrain).values({
           employeId: result.employe.id,
-          // Store first zone if multiple provided (legacy field is single zone)
           zoneAffectation: data.zonesAffectation?.length ? data.zonesAffectation.join(', ') : null,
           objectifMensuel: data.objectifMensuel || '100000',
-          statut: 'Actif',
+          statut: StatutUser.ACTIVE,
         });
       }
 
@@ -302,7 +309,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // PUT - Mettre à jour un employé (user + employe)
   // ============================================
-  app.put("/api/employes/:id", requireRole("admin"), async (req, res) => {
+  app.put("/api/employes/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const employeId = req.params.id;
 
@@ -332,7 +339,7 @@ export function registerEmployesRoutes(app: Express) {
       if (data.photoProfile !== undefined) userData.photoProfile = data.photoProfile;
       if (data.statut !== undefined) userData.statut = data.statut;
 
-      // Données employe
+      // Données employe (sans roleSystem - géré par userRoles)
       if (data.matricule !== undefined) employeData.matricule = data.matricule;
       if (data.poste !== undefined) employeData.poste = data.poste;
       if (data.departement !== undefined) employeData.departement = data.departement;
@@ -340,21 +347,13 @@ export function registerEmployesRoutes(app: Express) {
       if (data.typeContrat !== undefined) employeData.typeContrat = data.typeContrat;
       if (data.agenceId !== undefined) employeData.agenceId = data.agenceId;
       if (data.managerId !== undefined) employeData.managerId = data.managerId;
-      if (data.roleSystem !== undefined) {
-        const normalizedRole = normalizeRole(data.roleSystem);
-        if (!normalizedRole) {
-          return res.status(400).json({ message: "Rôle employé invalide" });
-        }
-        employeData.roleSystem = data.roleSystem;
-        userData.role = normalizedRole;
-      }
       if (data.salaireBase !== undefined) employeData.salaireBase = data.salaireBase;
       if (data.tauxHoraire !== undefined) employeData.tauxHoraire = data.tauxHoraire;
       if (data.tauxJournalier !== undefined) employeData.tauxJournalier = data.tauxJournalier;
       if (data.modeCalculPaie !== undefined) employeData.modeCalculPaie = data.modeCalculPaie;
 
-      // Mise à jour
-      const updated = await storage.updateEmployeWithUser(employeId, userData, employeData);
+      // Mise à jour (Architecture V3: passe le nouveau rôle à updateEmployeWithUser)
+      const updated = await storage.updateEmployeWithUser(employeId, userData, employeData, data.role);
 
       if (!updated) {
         return res.status(500).json({ message: "Erreur lors de la mise à jour" });
@@ -388,7 +387,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // DELETE - Supprimer un employé (soft delete)
   // ============================================
-  app.delete("/api/employes/:id", requireRole("admin"), async (req, res) => {
+  app.delete("/api/employes/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const employeId = req.params.id;
 
@@ -431,7 +430,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // POST - Créer un employé pour un utilisateur existant
   // ============================================
-  app.post("/api/employes/from-user/:userId", requireRole("admin"), async (req, res) => {
+  app.post("/api/employes/from-user/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
     try {
       const { userId } = req.params;
 
@@ -447,25 +446,21 @@ export function registerEmployesRoutes(app: Express) {
         return res.status(400).json({ message: "Cet utilisateur a déjà un profil employé" });
       }
 
-      const parsed = insertEmployeSchema.omit({ userId: true }).safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Données invalides", errors: parsed.error.errors });
-      }
-      const normalizedRole = normalizeRole(parsed.data.roleSystem);
-      if (parsed.data.roleSystem && !normalizedRole) {
-        return res.status(400).json({ message: "Rôle employé invalide" });
-      }
+      // Valider les données employé
+      const { role: requestedRole, ...employeFields } = req.body;
+      const resolvedRole = requestedRole && Object.values(SystemRole).includes(requestedRole)
+        ? requestedRole
+        : SystemRole.AGENT_TERRAIN;
 
       // Mettre à jour le type_compte de l'utilisateur
       await db.update(users)
         .set({
           typeCompte: user.typeCompte === 'client' ? 'both' : 'employe',
-          role: normalizedRole || SystemRole.AGENT_TERRAIN,
         })
         .where(eq(users.id, userId));
 
-      // Créer l'employé
-      const employe = await storage.createEmployeForUser(userId, parsed.data);
+      // Créer l'employé avec rôle (Architecture V3)
+      const employe = await storage.createEmployeForUser(userId, employeFields, resolvedRole);
 
       await logAudit(
         req,

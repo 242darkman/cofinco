@@ -3,6 +3,14 @@ import { User, Calendar, FileText, DollarSign, Clock, CheckCircle, Info, AlertTr
 import { agentTerrainApi, clientApi } from '../../lib/api-client';
 import { Modal, Button, FormField, SelectField, TextareaField } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+import {
+  StatutUser,
+  StatutClient,
+  StatutVisiteTerrain,
+  TypeVisiteTerrain,
+  STATUT_VISITE_TERRAIN_OPTIONS,
+  TYPE_VISITE_TERRAIN_OPTIONS
+} from '@shared/enum/status-constants';
 
 interface VisiteTerrainFormProps {
   onClose: () => void;
@@ -21,12 +29,20 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
   const [agents, setAgents] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    agent_id: string;
+    client_id: string;
+    date_visite: string;
+    type_visite: string;
+    statut: string;
+    notes: string;
+    montant_collecte: string;
+  }>({
     agent_id: agentId || '',
     client_id: clientId || '',
     date_visite: new Date().toISOString().slice(0, 16),
-    type_visite: 'Recouvrement prêt',
-    statut: 'Planifiée',
+    type_visite: TypeVisiteTerrain.LOAN_RECOVERY,
+    statut: StatutVisiteTerrain.PLANNED,
     notes: '',
     montant_collecte: ''
   });
@@ -39,7 +55,7 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
   const loadAgents = async () => {
     try {
       const data = await agentTerrainApi.getAllList();
-      setAgents(data.filter((a: any) => a.statut === 'Actif'));
+      setAgents(data.filter((a: any) => a.statut === StatutUser.ACTIVE));
     } catch (error) {
       console.error('Erreur chargement agents:', error);
     }
@@ -48,7 +64,7 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
   const loadClients = async () => {
     try {
       const data = await clientApi.getAllList();
-      setClients(data.filter((c: any) => c.statut === 'Actif' || c.status === 'Actif').slice(0, 100));
+      setClients(data.filter((c: any) => c.statut === StatutClient.ACTIVE).slice(0, 100));
     } catch (error) {
       console.error('Erreur chargement clients:', error);
     }
@@ -195,15 +211,7 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
             name="type_visite"
             value={formData.type_visite}
             onChange={(e) => setFormData({ ...formData, type_visite: e.target.value })}
-            options={[
-              'Recouvrement prêt',
-              'Collecte épargne',
-              'Collecte ristourne',
-              'Prospection',
-              'Suivi',
-              'Formation',
-              'Autre'
-            ]}
+            options={TYPE_VISITE_TERRAIN_OPTIONS}
           />
         </div>
 
@@ -213,7 +221,7 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
             name="statut"
             value={formData.statut}
             onChange={(e) => setFormData({ ...formData, statut: e.target.value })}
-            options={['Planifiée', 'En cours', 'Effectuée', 'Annulée']}
+            options={STATUT_VISITE_TERRAIN_OPTIONS}
           />
 
           <FormField

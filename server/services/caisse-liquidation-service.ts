@@ -13,6 +13,7 @@ import {
   type MouvementFinancier,
 } from "@shared/schema";
 import { coffresForts } from "@shared/schema/coffres-forts";
+import { StatutTransaction, MethodePaiement } from "@shared/enum/status-constants";
 import { eq, and, isNull } from "drizzle-orm";
 
 export interface LiquidationDestination {
@@ -292,9 +293,9 @@ export class CaisseLiquidationService {
         
         const [mouvementDebit] = await tx.insert(mouvementsFinanciers).values({
           montant: soldeActuel.toString(),
-          sens: 'Débit',
-          statut: 'Posté',
-          methodePaiement: 'Virement',
+          sens: 'DEBIT',
+          statut: StatutTransaction.POSTED,
+          methodePaiement: MethodePaiement.TRANSFER,
           reference: `${reference}-DEBIT`,
           sourceModule: 'CAISSE',
           sourceTable: 'caisses',
@@ -313,9 +314,9 @@ export class CaisseLiquidationService {
         // 3b. Créer mouvement CREDIT sur la destination
         const [mouvementCredit] = await tx.insert(mouvementsFinanciers).values({
           montant: soldeActuel.toString(),
-          sens: 'Crédit',
-          statut: 'Posté',
-          methodePaiement: 'Virement',
+          sens: 'CREDIT',
+          statut: StatutTransaction.POSTED,
+          methodePaiement: MethodePaiement.TRANSFER,
           reference: `${reference}-CREDIT`,
           sourceModule: params.destinationType === 'COFFRE' ? 'COFFRE' : 'CAISSE',
           sourceTable: params.destinationType === 'COFFRE' ? 'coffres_forts' : 'caisses',

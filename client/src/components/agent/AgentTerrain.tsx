@@ -9,6 +9,7 @@ import AgentSelector from './AgentSelector';
 import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { StatutUser, StatutOperationTerrain } from '@shared/enum/status-constants';
 
 interface Agent {
   id: string;
@@ -76,7 +77,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       
       // For non-admin, set current agent automatically
       if (!isAdmin) {
-        const activeAgent = agents.find((a: Agent) => a.statut === 'Actif') || agents[0];
+        const activeAgent = agents.find((a: Agent) => a.statut === StatutUser.ACTIVE) || agents[0];
         setCurrentAgent(activeAgent);
       }
     } catch (error) {
@@ -373,13 +374,13 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     {tx.type === 'Collecte' ? '+' : '-'}{formatMoney(tx.montant)}
                   </p>
                   <div className="flex items-center justify-end gap-1 text-[10px]">
-                    {tx.statut === 'APPROVED' ? (
+                    {tx.statut === StatutOperationTerrain.APPROVED ? (
                       <CheckCircle size={10} className="text-emerald-400" />
                     ) : (
                       <Clock size={10} className="text-amber-400" />
                     )}
-                    <span className={tx.statut === 'APPROVED' ? 'text-emerald-400' : 'text-amber-400'}>
-                      {tx.statut === 'APPROVED' ? 'Validé' : 'En attente'}
+                    <span className={tx.statut === StatutOperationTerrain.APPROVED ? 'text-emerald-400' : 'text-amber-400'}>
+                      {tx.statut === StatutOperationTerrain.APPROVED ? 'Validé' : 'En attente'}
                     </span>
                   </div>
                 </div>

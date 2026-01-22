@@ -1,11 +1,12 @@
 /**
- * Types pour la nouvelle architecture Users/Employes/Clients
+ * Types pour l'architecture V3 Users/Employes/Clients/UserRoles
  *
  * Architecture:
  * - User: Source de vérité pour l'identité (nom, prenom, email, telephone, etc.)
  * - Employe: Données RH liées à un User (matricule, poste, salaire, etc.)
- * - Client: Données métier client liées optionnellement à un User (score, limites, etc.)
- * - AgentTerrain: Données terrain liées à un Employe (zone, GPS, objectifs, etc.)
+ * - UserRole: Rôles utilisateurs (source unique de vérité pour les rôles)
+ * - Client: Données métier client liées optionnellement à un User
+ * - AgentTerrain: Données terrain liées à un Employe
  */
 
 // ============================================
@@ -14,9 +15,14 @@
 
 export type TypeCompte = 'employe' | 'client' | 'both';
 export type Sexe = 'M' | 'F';
-export type Statut = 'Actif' | 'Inactif' | 'Suspendu';
+export type Statut = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type TypeContrat = 'CDI' | 'CDD' | 'Stage' | 'Intérim';
 export type ModeCalculPaie = 'Mensuel' | 'Horaire' | 'Journalier';
+
+// SystemRole - Enum des rôles système (Architecture V3)
+export type SystemRole = 'ADMIN' | 'CHEF_AGENCE' | 'CAISSIER' | 'AGENT_TERRAIN' | 'COMPTABLE' | 'SUPERVISEUR' | 'GESTIONNAIRE_CREDIT' | 'CLIENT';
+
+// @deprecated - Utilisé pour la rétro-compatibilité, préférer SystemRole
 export type RoleSystem = 'admin' | 'chef_agence' | 'comptable' | 'caissier' | 'agent' | 'terrain' | 'credit' | 'superviseur';
 
 // ============================================
@@ -61,7 +67,8 @@ export interface Employe {
   typeContrat: TypeContrat;
   agenceId: string | null;
   managerId: string | null;
-  roleSystem: RoleSystem;
+  // NOTE: roleSystem supprimé en V3 - utiliser UserRole à la place
+  statut: string;
   salaireBase: number;
   tauxHoraire: number;
   tauxJournalier: number;
@@ -69,6 +76,22 @@ export interface Employe {
   caissePin?: string; // Jamais renvoyé par l'API
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================
+// USER ROLE - Architecture V3
+// ============================================
+
+export interface UserRole {
+  id: string;
+  userId: string;
+  role: SystemRole;
+  agenceId: string | null;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Enrichi par l'API
+  agenceNom?: string | null;
 }
 
 // Employe avec données utilisateur jointes
@@ -239,11 +262,13 @@ export interface CreateEmployeWithUserData {
   typeContrat?: TypeContrat;
   agenceId?: string;
   managerId?: string;
-  roleSystem?: RoleSystem;
   salaireBase?: number;
   tauxHoraire?: number;
   tauxJournalier?: number;
   modeCalculPaie?: ModeCalculPaie;
+
+  // Rôle (Architecture V3)
+  role?: SystemRole;
 }
 
 export interface UpdateEmployeWithUserData {
@@ -264,11 +289,13 @@ export interface UpdateEmployeWithUserData {
   typeContrat?: TypeContrat;
   agenceId?: string;
   managerId?: string;
-  roleSystem?: RoleSystem;
   salaireBase?: number;
   tauxHoraire?: number;
   tauxJournalier?: number;
   modeCalculPaie?: ModeCalculPaie;
+
+  // Rôle (Architecture V3)
+  role?: SystemRole;
 }
 
 export interface CreateClientWithUserData {

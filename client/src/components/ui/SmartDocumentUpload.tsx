@@ -189,7 +189,7 @@ export function SmartDocumentUpload({
     }
 
     // For public docs or as fallback, route through API
-    return `/api/uploads/files/${docUrl}`;
+    return `/api/storage/files/${docUrl}`;
   }, [currentDocument, isPrivate, signedUrl, localPreview]);
 
   // Validate file

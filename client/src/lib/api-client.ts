@@ -237,21 +237,38 @@ export interface AuthUser {
   mustChangePassword?: boolean;
 }
 
+// Permissions response type (from login)
+export interface PermissionsData {
+  role: string;
+  permissions: Record<string, string[]>;
+  isAdmin: boolean;
+}
+
 // Login response wrapper type
 interface LoginResponse {
   user: AuthUser;
   message: string;
   mustChangePassword: boolean;
+  permissions?: PermissionsData; // Inclus pour éviter race condition
+}
+
+// Full login result with permissions
+export interface LoginResult {
+  user: AuthUser;
+  permissions?: PermissionsData;
 }
 
 // Auth API
 export const authApi = {
-  login: async (username: string, password: string): Promise<AuthUser> => {
+  login: async (username: string, password: string): Promise<LoginResult> => {
     const response = await request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
-    return response.user;
+    return {
+      user: response.user,
+      permissions: response.permissions
+    };
   },
   logout: () => request<{ message: string }>('/auth/logout', {
     method: 'POST',
@@ -287,6 +304,51 @@ export const api = {
   }),
 };
 
+// Interfaces pour l'historique de caisse
+export interface CaisseHistoriqueFilters {
+  limit?: number;
+  offset?: number;
+  startDate?: string;
+  endDate?: string;
+  typeOperation?: string;
+  methodePaiement?: string;
+}
+
+export interface CaisseHistoriqueOperation {
+  id: string;
+  typeOperation: string;
+  montant: string;
+  modePaiement: string;
+  reference: string;
+  description: string;
+  createdAt: string;
+  clientNom: string | null;
+  clientPrenom: string | null;
+  clientTelephone: string | null;
+  sessionId: string;
+  caissierNom: string | null;
+}
+
+export interface CaisseHistoriqueSummary {
+  totalOperations: number;
+  totalEntrees: string;
+  totalSorties: string;
+  soldeNet: string;
+  operationsParType: Record<string, number>;
+  operationsParMode: Record<string, number>;
+}
+
+export interface CaisseHistoriqueResult {
+  operations: CaisseHistoriqueOperation[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+  summary: CaisseHistoriqueSummary;
+}
+
 // Caisse API (Admin Management)
 export const caisseApi = {
   liquidate: (id: string) => request<any>(`/caisses/${id}/liquidate`, {
@@ -299,7 +361,37 @@ export const caisseApi = {
   delete: (id: string) => request<void>(`/caisses/${id}`, {
     method: 'DELETE',
   }),
+  /**
+   * Récupérer l'historique global d'une caisse avec pagination et filtres
+   */
+  getHistorique: (caisseId: string, filters?: CaisseHistoriqueFilters) =>
+    request<CaisseHistoriqueResult>(`/caisses/${caisseId}/historique${buildQuery(filters as Record<string, unknown>) ? `?${buildQuery(filters as Record<string, unknown>)}` : ''}`),
+  /**
+   * Récupérer le résumé de l'historique d'une caisse
+   */
+  getHistoriqueSummary: (caisseId: string) =>
+    request<CaisseHistoriqueSummary>(`/caisses/${caisseId}/historique/summary`),
 };
+
+// Client Stats Response Type
+export interface ClientStatsResponse {
+  totalClients: number;
+  activeClients: number;
+  inactiveClients: number;
+  suspendedClients: number;
+  newClientsThisMonth: number;
+  segmentDistribution: {
+    vip: number;
+    premium: number;
+    standard: number;
+  };
+  financialSummary: {
+    totalCredit: number;
+    totalEpargne: number;
+    avgRepaymentRate: number;
+    totalLoyaltyPoints: number;
+  };
+}
 
 // Client API
 export const clientApi = {
@@ -308,6 +400,8 @@ export const clientApi = {
   getAllList: (params?: { perPage?: number; statut?: string; segment?: string; search?: string }) =>
     requestAllPages<any>('/clients', params),
   getById: (id: string) => request<any>(`/clients/${id}`),
+  // Statistiques agrégées (optimisé - SQL COUNT)
+  getStats: () => request<ClientStatsResponse>('/clients/stats'),
   // Clients éligibles au crédit (avec compte courant actif dans l'agence)
   getEligibleForCredit: (params?: { page?: number; perPage?: number }) =>
     requestPaginated<any>('/clients/eligible-credit', params),
@@ -871,9 +965,26 @@ export const distributionTontineApi = {
 
 // Alertes Tontine API
 export const alerteTontineApi = {
-  getByTontine: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/alertes`),
+  getByTontine: (tontineId: string, params?: { statut?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.statut && params.statut !== 'all') queryParams.append('status', params.statut);
+    const query = queryParams.toString();
+    return request<any[]>(`/tontines/${tontineId}/alertes${query ? `?${query}` : ''}`);
+  },
   markAsRead: (id: string) => request<any>(`/alertes-tontine/${id}/read`, {
     method: 'PATCH',
+  }),
+  update: (id: string, data: { statut?: string }) => request<any>(`/tontine-alertes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  resolve: (id: string) => request<any>(`/tontine-alertes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ statut: 'RESOLVED' }),
+  }),
+  ignore: (id: string) => request<any>(`/tontine-alertes/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ statut: 'IGNORED' }),
   }),
 };
 
@@ -1110,22 +1221,29 @@ export const validationOtpApi = {
 };
 
 // Comptes Bloqués API
+// Comptes Bloqués API
 export const compteBloqueApi = {
+  // Use specific endpoint for list (returns transformed data for UI)
   getAll: () => request<any[]>('/comptes-bloques'),
+  // Use specific endpoint for detail (returns transformed data for UI)
   getById: (id: string) => request<any>(`/comptes-bloques/${id}`),
-  create: (data: any) => request<any>('/comptes-bloques', {
+  // Use generic create endpoint (payload must include typeCompte: 'BLOCKED')
+  create: (data: any) => request<any>('/comptes', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, typeCompte: 'BLOCKED' }),
   }),
-  update: (id: string, data: any) => request<any>(`/comptes-bloques/${id}`, {
+  update: (id: string, data: any) => request<any>(`/comptes/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
+  // This specific endpoint needs to be implemented on server if missing
+  // For now, redirecting to generic retrait but this might not handle penalty logic
   withdraw: (id: string, data: any) => request<any>(`/comptes-bloques/${id}/withdraw`, {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  getTransactions: (compteId: string) => request<any[]>(`/transactions-comptes-bloques?compte_bloque_id=${compteId}`),
+  // Use generic transactions endpoint
+  getTransactions: (compteId: string) => request<any[]>(`/comptes/${compteId}/transactions`),
 };
 
 // HR Presence API

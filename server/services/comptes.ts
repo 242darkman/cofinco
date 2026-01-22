@@ -22,11 +22,12 @@ import {
   sessionsCaisse,
   clients,
   users,
+  userRoles,
   credits,
   type Compte,
   type TransactionCompte,
 } from "@shared/schema";
-import { eq, and, isNull, desc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, gte, lte, asc } from "drizzle-orm";
 import { subMonths, subYears, startOfDay, endOfDay, eachDayOfInterval, format, isSameDay } from "date-fns";
 import {
   executeWithLedger,
@@ -45,29 +46,35 @@ import {
 import type { Facture } from "@shared/schema";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
-// Types
-export type TypeCompte = "Épargne" | "Courant" | "Bloqué";
-export type StatutCompte = "Actif" | "Suspendu" | "Clôturé" | "EN_ATTENTE_PAIEMENT";
-export type MotifBlocage =
-  | "Garantie crédit"
-  | "Garantie tontine"
-  | "Épargne forcée"
-  | "Décision interne"
-  | "Litige"
-  | "Autre";
+// Import standardized status constants
+import {
+  StatutCompte as StatutCompteConst,
+  StatutCredit as StatutCreditConst,
+  TypeCompte as TypeCompteEnum,
+  MotifBlocage as MotifBlocageEnum,
+  type StatutCompteType,
+  type TypeCompteType,
+  type MotifBlocageType,
+} from "@shared/enum/status-constants";
 
-// State Machine Transitions
-// Actif <-> Suspendu
-// Actif -> Clôturé (Final)
-// Suspendu -> Clôturé (Final)
-// EN_ATTENTE_PAIEMENT -> Actif (via premier versement)
-// EN_ATTENTE_PAIEMENT -> Clôturé (via rejet/timeout)
+// Types - Re-export from status-constants for consistency
+export type TypeCompte = TypeCompteType;
+export type StatutCompte = StatutCompteType;
+export type MotifBlocage = MotifBlocageType;
+
+// State Machine Transitions (using EN constants)
+// ACTIVE <-> SUSPENDED
+// ACTIVE -> CLOSED (Final)
+// SUSPENDED -> CLOSED (Final)
+// PENDING_ACTIVATION -> ACTIVE (via premier versement)
+// PENDING_ACTIVATION -> CLOSED (via rejet/timeout)
 
 export const VALID_TRANSITIONS: Record<StatutCompte, StatutCompte[]> = {
-  "Actif": ["Suspendu", "Clôturé"],
-  "Suspendu": ["Actif", "Clôturé"],
-  "Clôturé": [], // Terminal state
-  "EN_ATTENTE_PAIEMENT": ["Actif", "Clôturé"]
+  [StatutCompteConst.ACTIVE]: [StatutCompteConst.SUSPENDED, StatutCompteConst.CLOSED],
+  [StatutCompteConst.SUSPENDED]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSED],
+  [StatutCompteConst.CLOSED]: [], // Terminal state
+  [StatutCompteConst.PENDING_ACTIVATION]: [StatutCompteConst.ACTIVE, StatutCompteConst.CLOSED],
+  [StatutCompteConst.CANCELLED]: [], // Terminal state
 };
 
 export interface CreateCompteData {
@@ -158,17 +165,17 @@ export function canWithdraw(compte: typeof comptes.$inferSelect): {
   reason?: string;
 } {
   // Statut check
-  if (compte.statut === "Suspendu") {
+  if (compte.statut === StatutCompteConst.SUSPENDED) {
     return { allowed: false, reason: "Compte suspendu" };
   }
-  if (compte.statut === "Clôturé") {
+  if (compte.statut === StatutCompteConst.CLOSED) {
     return { allowed: false, reason: "Compte clôturé" };
   }
 
   // Blocage check for Bloqué accounts
   // Admin role check should be done at the call site (retirerDuCompte),
   // but here we just check the account state.
-  if (compte.typeCompte === "Bloqué" && compte.blocageActif) {
+  if (compte.typeCompte === TypeCompteEnum.BLOCKED && compte.blocageActif) {
     return {
       allowed: false,
       reason: `Compte bloqué: ${compte.blocageMotif || "Raison non spécifiée"}`,
@@ -196,7 +203,7 @@ export function canDeposit(compte: typeof comptes.$inferSelect): {
   allowed: boolean;
   reason?: string;
 } {
-  if (compte.statut === "Clôturé") {
+  if (compte.statut === StatutCompteConst.CLOSED) {
     return { allowed: false, reason: "Compte clôturé" };
   }
   // Les dépôts sont toujours autorisés sur les comptes bloqués
@@ -229,9 +236,9 @@ async function validateSessionCaisse(sessionId: string): Promise<void> {
  */
 function generateNumeroCompte(typeCompte: TypeCompte): string {
   const prefixes: Record<TypeCompte, string> = {
-    Épargne: "CE",
-    Courant: "CC",
-    Bloqué: "CB",
+    [TypeCompteEnum.SAVINGS]: "CE",
+    [TypeCompteEnum.CURRENT]: "CC",
+    [TypeCompteEnum.BLOCKED]: "CB",
   };
   const timestamp = Date.now().toString().slice(-8);
   const random = Math.floor(Math.random() * 10000)
@@ -269,7 +276,7 @@ export async function createCompte(
   return await db.transaction(async (tx) => {
     const numeroCompte = generateNumeroCompte(data.typeCompte);
 
-    // Create account
+    // Create account with standardized EN status
     const [compte] = await tx
       .insert(comptes)
       .values({
@@ -278,9 +285,9 @@ export async function createCompte(
         produitId: data.produitId,
         numeroCompte,
         typeCompte: data.typeCompte,
-        statut: "Actif",
+        statut: StatutCompteConst.ACTIVE,
         soldeCourant: (data.soldeInitial || 0).toString(),
-        blocageActif: data.blocageActif || data.typeCompte === "Bloqué",
+        blocageActif: data.blocageActif || data.typeCompte === TypeCompteEnum.BLOCKED,
         blocageMotif: data.blocageMotif,
         blocageReference: data.blocageReference,
         blocageDebut: data.blocageActif ? new Date() : null,
@@ -300,9 +307,9 @@ export async function createCompte(
     // If there's an initial deposit, create mouvement
     if (data.soldeInitial && data.soldeInitial > 0) {
       const typePaiementMap: Record<TypeCompte, string> = {
-        Épargne: "Dépôt Épargne",
-        Courant: "Dépôt Courant",
-        Bloqué: "Dépôt Bloqué",
+        [TypeCompteEnum.SAVINGS]: "DEPOSIT_SAVINGS",
+        [TypeCompteEnum.CURRENT]: "DEPOSIT_CURRENT",
+        [TypeCompteEnum.BLOCKED]: "DEPOSIT_BLOCKED",
       };
 
       // Create mouvement
@@ -312,13 +319,13 @@ export async function createCompte(
         .values({
           reference,
           sourceModule: "EPARGNE",
-          sens: "Crédit",
+          sens: "CREDIT",
           montant: data.soldeInitial.toString(),
           dateOperation: new Date(),
           clientId: data.clientId,
           compteId: compte.id,
           agenceId: data.agenceId,
-          methodePaiement: "Espèces",
+          methodePaiement: "CASH",
           typePaiement: typePaiementMap[data.typeCompte] as any,
           createdBy: userId,
         })
@@ -331,7 +338,7 @@ export async function createCompte(
         typePaiement: typePaiementMap[data.typeCompte] as any,
         montant: data.soldeInitial.toString(),
         soldeApres: data.soldeInitial.toString(),
-        methodePaiement: "Espèces",
+        methodePaiement: "CASH",
         observations: "Dépôt initial à la création",
         createdBy: userId,
       });
@@ -345,7 +352,7 @@ export async function createCompte(
           mouvementId: mouvement.id,
           compteId: compte.id,
           montant: data.soldeInitial,
-          type: "Dépôt initial",
+          type: "INITIAL_DEPOSIT",
         },
       });
 
@@ -402,7 +409,7 @@ export async function deposerSurCompte(
   }
 
   // 3. Validate session if provided or required
-  if (data.methodePaiement === "Espèces" && !data.sessionCaisseId) {
+  if (data.methodePaiement === "CASH" && !data.sessionCaisseId) {
     throw new CompteError(
       "Une session de caisse active est requise pour les dépôts en espèces",
       "SESSION_REQUIRED"
@@ -413,20 +420,20 @@ export async function deposerSurCompte(
     await validateSessionCaisse(data.sessionCaisseId);
   }
 
-  // 4. Determine type paiement based on account type
-  const typePaiementMap: Record<string, string> = {
-    Épargne: "Dépôt Épargne",
-    Courant: "Dépôt Courant",
-    Bloqué: "Dépôt Bloqué",
+  // 4. Determine type paiement based on account type (EN values)
+  const typePaiementMap: Record<TypeCompteType, string> = {
+    [TypeCompteEnum.SAVINGS]: "DEPOSIT_SAVINGS",
+    [TypeCompteEnum.CURRENT]: "DEPOSIT_CURRENT",
+    [TypeCompteEnum.BLOCKED]: "DEPOSIT_BLOCKED",
   };
-  const typePaiement = typePaiementMap[compte.typeCompte];
+  const typePaiement = typePaiementMap[compte.typeCompte as TypeCompteType];
 
   // 5. Execute with ledger
   return executeWithLedger(
     "EPARGNE",
     {
       montant: data.montant.toString(),
-      sens: "Crédit",
+      sens: "CREDIT",
       clientId: compte.clientId,
       compteId: data.compteId,
       sessionCaisseId: data.sessionCaisseId,
@@ -503,14 +510,18 @@ export async function retirerDuCompte(
   // 2. Validate withdrawal is allowed (CRITICAL for Bloqué accounts)
   const withdrawCheck = canWithdraw(compte);
   if (!withdrawCheck.allowed) {
-    // Check if user is Admin to override
+    // Check if user is Admin to override (Architecture V3: rôle via userRoles)
     let isAdmin = false;
     if (userId) {
-       const user = await db.query.users.findFirst({
-           where: eq(users.id, userId)
-       });
-       const { isAdminRole } = await import("@shared/types/roles");
-       if (user && isAdminRole(user.role)) {
+       const { isAdminRole, SystemRole } = await import("@shared/types/roles");
+       // Récupérer le rôle principal depuis userRoles
+       const [primaryRole] = await db.select({ role: userRoles.role })
+         .from(userRoles)
+         .where(and(eq(userRoles.userId, userId), eq(userRoles.isPrimary, true)))
+         .limit(1);
+
+       const effectiveRole = primaryRole?.role;
+       if (effectiveRole && isAdminRole(effectiveRole as string)) {
            isAdmin = true;
        }
     }
@@ -532,7 +543,7 @@ export async function retirerDuCompte(
   }
 
   // 4. Validate session if provided or required
-  if (data.methodePaiement === "Espèces" && !data.sessionCaisseId) {
+  if (data.methodePaiement === "CASH" && !data.sessionCaisseId) {
     throw new CompteError(
       "Une session de caisse active est requise pour les retraits en espèces",
       "SESSION_REQUIRED"
@@ -543,20 +554,20 @@ export async function retirerDuCompte(
     await validateSessionCaisse(data.sessionCaisseId);
   }
 
-  // 5. Determine type paiement based on account type
-  const typePaiementMap: Record<string, string> = {
-    Épargne: "Retrait Épargne",
-    Courant: "Retrait Courant",
-    Bloqué: "Retrait Bloqué",
+  // 5. Determine type paiement based on account type (EN values)
+  const typePaiementMap: Record<TypeCompteType, string> = {
+    [TypeCompteEnum.SAVINGS]: "WITHDRAWAL_SAVINGS",
+    [TypeCompteEnum.CURRENT]: "WITHDRAWAL_CURRENT",
+    [TypeCompteEnum.BLOCKED]: "WITHDRAWAL_BLOCKED",
   };
-  const typePaiement = typePaiementMap[compte.typeCompte];
+  const typePaiement = typePaiementMap[compte.typeCompte as TypeCompteType];
 
   // 6. Execute with ledger
   return executeWithLedger(
     "EPARGNE",
     {
       montant: data.montant.toString(),
-      sens: "Débit",
+      sens: "DEBIT",
       clientId: compte.clientId,
       compteId: data.compteId,
       sessionCaisseId: data.sessionCaisseId,
@@ -928,15 +939,15 @@ export async function getClientPortfolio(clientId: string) {
 
   // Calculate totals
   const totalEpargne = comptesResult
-    .filter((c) => c.typeCompte === "Épargne")
+    .filter((c) => c.typeCompte === TypeCompteEnum.SAVINGS)
     .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
 
   const totalCourant = comptesResult
-    .filter((c) => c.typeCompte === "Courant")
+    .filter((c) => c.typeCompte === TypeCompteEnum.CURRENT)
     .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
 
   const totalBloque = comptesResult
-    .filter((c) => c.typeCompte === "Bloqué")
+    .filter((c) => c.typeCompte === TypeCompteEnum.BLOCKED)
     .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
 
   const totalCreditsRestant = creditsResult.reduce(
@@ -998,17 +1009,12 @@ export async function getCompteTransactions(compteId: string, limit = 50) {
     .limit(limit);
 
   return rawResult.map(t => {
-    // Logic moved to JS for safety
-    let finalSens = 'DEBIT'; // Default
-    if (t.sens === 'Crédit') finalSens = 'CREDIT';
-    else if (t.sens === 'Débit') finalSens = 'DEBIT';
-
     // Priority for description
     const description = t.observations || t.typePaiement || 'Opération';
 
     return {
       ...t,
-      sens: finalSens,
+      sens: t.sens || 'DEBIT',
       type: t.typePaiement, // Maintain compatibility
       description,
       factureId: t.factureId, // ← NOUVEAU: Exposé dans l'API
@@ -1027,7 +1033,7 @@ export async function cloturerCompte(
       throw new CompteError("Compte non trouvé", "COMPTE_NOT_FOUND");
     }
 
-    if (compte.statut === "Clôturé") {
+    if (compte.statut === StatutCompteConst.CLOSED) {
       throw new CompteError("Le compte est déjà clôturé", "ALREADY_CLOSED");
     }
 
@@ -1047,7 +1053,7 @@ export async function cloturerCompte(
       .where(
         and(
           eq(transactionsCompte.compteId, compteId),
-          eq(transactionsCompte.statut, "Pending")
+          eq(transactionsCompte.statut, "PENDING")
         )
       )
       .limit(1);
@@ -1071,7 +1077,7 @@ export async function cloturerCompte(
       .where(
         and(
           eq(credits.clientId, compte.clientId),
-          sql`${credits.statut} IN ('Actif', 'En retard')`
+          sql`${credits.statut} IN ('${sql.raw(StatutCreditConst.ACTIVE)}', '${sql.raw(StatutCreditConst.LATE)}')`
         )
       )
       .limit(1);
@@ -1083,11 +1089,11 @@ export async function cloturerCompte(
       );
     }
 
-    // 5. Close Account
+    // 5. Close Account with standardized EN status
     const [closedCompte] = await tx
       .update(comptes)
       .set({
-        statut: "Clôturé",
+        statut: StatutCompteConst.CLOSED,
         closedAt: new Date(),
         closedBy: userId,
         updatedAt: new Date(),
@@ -1241,24 +1247,30 @@ export async function createCompteWithInitialDeposit(
     agenceId: string;
     produitId?: string;
     montantInitial: number;
-    modePaiement: 'Espèces' | 'Virement';
+    modePaiement: 'CASH' | 'TRANSFER';
     compteSourceId?: string; // Required for Transfer
     blocageActif?: boolean;
     blocageMotif?: MotifBlocage;
   },
   userId: string
 ): Promise<{ compte: Compte; transaction?: TransactionCompte; facture?: Facture }> {
-  
+
   return await db.transaction(async (tx) => {
-    // 1. Determine Status
-    const statut = data.modePaiement === 'Espèces' && data.montantInitial > 0
-      ? 'EN_ATTENTE_PAIEMENT' 
-      : 'Actif';
+    // 1. Determine Status (using standardized EN values)
+    const statut = data.modePaiement === 'CASH' && data.montantInitial > 0
+      ? StatutCompteConst.PENDING_ACTIVATION
+      : StatutCompteConst.ACTIVE;
     
     // 2. Generate Account Number
     const numeroCompte = await generateNumeroCompte(data.typeCompte);
 
     // 3. Create Account
+    // For PENDING_ACTIVATION accounts, store the requested initial amount in soldeCourant
+    // This will be the amount the cashier needs to collect for activation
+    const initialBalance = statut === StatutCompteConst.PENDING_ACTIVATION
+      ? data.montantInitial.toString()
+      : '0';
+
     const [compte] = await tx.insert(comptes).values({
       clientId: data.clientId,
       agenceId: data.agenceId,
@@ -1266,8 +1278,7 @@ export async function createCompteWithInitialDeposit(
       produitId: data.produitId,
       numeroCompte,
       statut: statut,
-      // If Transfer, balance will be set immediately via transaction flow
-      soldeCourant: '0', 
+      soldeCourant: initialBalance,
       blocageActif: data.blocageActif || false,
       blocageMotif: data.blocageMotif,
       blocageDebut: data.blocageActif ? new Date() : null,
@@ -1284,47 +1295,47 @@ export async function createCompteWithInitialDeposit(
     });
     
     // 5. Handle Transfer Payment (Immediate Activation)
-    if (data.modePaiement === 'Virement' && data.montantInitial > 0) {
+    if (data.modePaiement === 'TRANSFER' && data.montantInitial > 0) {
       if (!data.compteSourceId) throw new Error('Compte source requis pour virement');
 
       // A. Verify Source Account
       const [compteSource] = await tx.select()
         .from(comptes)
         .where(eq(comptes.id, data.compteSourceId));
-      
+
       if (!compteSource) throw new Error('Compte source introuvable');
-      
+
       const soldeSource = parseFloat(compteSource.soldeCourant);
       if (soldeSource < data.montantInitial) {
         throw new Error(`Solde insuffisant. Disponible: ${soldeSource}, Requis: ${data.montantInitial}`);
       }
-      
+
       // B. Create Financial Movement (Internal Transfer)
       const reference = `VIR-OUVERTURE-${Date.now()}`;
       const [mouvement] = await tx.insert(mouvementsFinanciers).values({
         dateOperation: new Date(),
         montant: data.montantInitial.toString(),
-        sens: 'Crédit',
-        statut: 'Posté',
-        methodePaiement: 'Virement',
+        sens: 'CREDIT',
+        statut: 'POSTED',
+        methodePaiement: 'TRANSFER',
         reference,
         sourceModule: 'COMPTE',
         compteId: compte.id, // Linked to the new account
         clientId: data.clientId,
         agenceId: data.agenceId,
-        typePaiement: "Dépôt Initial" as any, 
+        typePaiement: "INITIAL_DEPOSIT" as any,
         createdBy: userId,
         metadata: { description: `Virement ouverture depuis ${compteSource.numeroCompte}` }
       }).returning();
-      
+
       // C. Transaction 1: DEBIT Source Account
       await tx.insert(transactionsCompte).values({
         compteId: data.compteSourceId,
         mouvementId: mouvement.id,
-        typePaiement: 'Virement Interne' as any,
+        typePaiement: 'INTERNAL_TRANSFER' as any,
         montant: data.montantInitial.toString(),
         soldeApres: (soldeSource - data.montantInitial).toString(),
-        methodePaiement: 'Virement',
+        methodePaiement: 'TRANSFER',
         observations: `Virement vers nouveau compte ${compte.numeroCompte}`,
         createdBy: userId,
       } as any);
@@ -1341,22 +1352,22 @@ export async function createCompteWithInitialDeposit(
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId: compte.id,
         mouvementId: mouvement.id,
-        typePaiement: 'Dépôt Initial' as any,
+        typePaiement: 'INITIAL_DEPOSIT' as any,
         montant: data.montantInitial.toString(),
         soldeApres: data.montantInitial.toString(),
-        methodePaiement: 'Virement',
+        methodePaiement: 'TRANSFER',
         observations: 'Dépôt initial - Ouverture de compte',
         createdBy: userId,
       }).returning();
 
       // Update New Account Balance
       await tx.update(comptes)
-        .set({ 
+        .set({
           soldeCourant: data.montantInitial.toString(),
           updatedAt: new Date()
         })
         .where(eq(comptes.id, compte.id));
-      
+
       // E. Generate Receipt (Facture)
       const facture = await createFactureForDepotInitial({
         compteId: compte.id,
@@ -1364,7 +1375,7 @@ export async function createCompteWithInitialDeposit(
         clientId: data.clientId,
         montant: data.montantInitial.toString(),
         typeCompte: data.typeCompte,
-        modePaiement: 'Virement',
+        modePaiement: 'TRANSFER',
         transactionId: transaction.id,
         agentId: userId,
       });
@@ -1397,11 +1408,11 @@ export async function payerDepotInitialCompte(
     "COMPTE",
     {
       montant: data.montant.toString(),
-      sens: "Crédit",
+      sens: "CREDIT",
       compteId,
       sessionCaisseId: data.sessionCaisseId,
-      typePaiement: "Dépôt Initial" as any,
-      methodePaiement: "Espèces",
+      typePaiement: "INITIAL_DEPOSIT" as any,
+      methodePaiement: "CASH",
       metadata: { description: "Paiement dépôt initial - Activation compte" },
       agenceId: undefined, // Will be inferred or can be passed if needed
     },
@@ -1410,54 +1421,59 @@ export async function payerDepotInitialCompte(
     const [compte] = await tx.select()
         .from(comptes)
         .where(eq(comptes.id, compteId));
-      
+
       if (!compte) {
         throw new Error("Compte introuvable");
       }
 
-      if (compte.statut !== 'EN_ATTENTE_PAIEMENT') {
+      if (compte.statut !== StatutCompteConst.PENDING_ACTIVATION) {
           throw new Error("Ce compte n'est pas en attente de paiement initial");
       }
-      
-      // 2. Create Transaction
+
+      // 2. Validate payment amount matches expected initial deposit
+      const expectedAmount = parseFloat(compte.soldeCourant || '0');
+      if (expectedAmount > 0 && data.montant !== expectedAmount) {
+          throw new Error(`Le montant doit correspondre au dépôt initial demandé: ${expectedAmount} FCFA`);
+      }
+
+      // 3. Create Transaction for account history
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId,
         mouvementId: mouvement.id,
-        typePaiement: 'Dépôt Initial' as any,
+        typePaiement: 'DEPOSIT',
         montant: data.montant.toString(),
-        soldeApres: data.montant.toString(), // Assuming 0 start
-        methodePaiement: 'Espèces',
+        soldeApres: data.montant.toString(),
+        methodePaiement: 'CASH',
         observations: 'Dépôt initial - Activation de compte',
         createdBy: data.userId,
       } as any).returning();
-      
-      // 3. Activate Account & Update Balance
+
+      // 3. Activate Account & Update Balance with standardized EN status
       const [updatedCompte] = await tx.update(comptes)
-        .set({ 
-          statut: 'Actif',
+        .set({
+          statut: StatutCompteConst.ACTIVE,
           soldeCourant: data.montant.toString(),
           updatedAt: new Date()
         })
         .where(eq(comptes.id, compteId))
         .returning();
-      
+
       // 4. Update Session Balance
       const nouveauSoldeSession = await updateSessionSolde(
-        tx, 
-        data.sessionCaisseId, 
+        tx,
+        data.sessionCaisseId,
         data.montant
       );
-      
+
       // 5. Create Operation Caisse
-      // const validatedUserId = await validateUserId(tx, data.userId);
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionCaisseId,
         mouvementId: mouvement.id,
-        typeOperation: "Dépôt" as any, 
+        typeOperation: "INITIAL_DEPOSIT",
         montant: data.montant.toString(),
-        methodePaiement: "Espèces",
+        methodePaiement: "CASH",
         reference: `DEP-INIT-${compte.numeroCompte}`,
-        description: `Dépôt initial - Ouverture ${compte.numeroCompte}`,
+        description: `Dépôt initial - Activation compte ${compte.numeroCompte}`,
         clientId: compte.clientId,
         createdBy: data.userId
       }).returning();
@@ -1476,11 +1492,11 @@ export async function payerDepotInitialCompte(
       clientId: result.compte.clientId,
       montant: data.montant.toString(),
       typeCompte: result.compte.typeCompte,
-      modePaiement: 'Espèces',
+      modePaiement: 'CASH',
       transactionId: result.transaction.id,
       agentId: data.userId,
     });
-    
+
     return { ...result, facture };
   });
 }

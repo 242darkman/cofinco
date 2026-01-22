@@ -25,7 +25,7 @@ interface EpargneTransactionFormProps {
   onSuccess: () => void;
 }
 
-type ModePaiement = 'Espèces' | 'Mobile Money' | 'Chèque' | 'Virement';
+type ModePaiement = 'CASH' | 'MOBILE_MONEY' | 'CHECK' | 'TRANSFER';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
@@ -33,10 +33,10 @@ const MOBILE_OPERATORS = [
 ] as const;
 
 const PAYMENT_MODES: { id: ModePaiement; icon: typeof Banknote; label: string }[] = [
-  { id: 'Espèces', icon: Banknote, label: 'Espèces' },
-  { id: 'Mobile Money', icon: Smartphone, label: 'Mobile Money' },
-  { id: 'Chèque', icon: FileCheck, label: 'Chèque' },
-  { id: 'Virement', icon: Building, label: 'Virement' },
+  { id: 'CASH', icon: Banknote, label: 'Espèces' },
+  { id: 'MOBILE_MONEY', icon: Smartphone, label: 'Mobile Money' },
+  { id: 'CHECK', icon: FileCheck, label: 'Chèque' },
+  { id: 'TRANSFER', icon: Building, label: 'Virement' },
 ];
 
 export default function EpargneTransactionForm({ compte, type, onClose, onSuccess }: EpargneTransactionFormProps) {
@@ -49,7 +49,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
     montant: '',
     reference: '',
     description: '',
-    mode_paiement: 'Espèces' as ModePaiement
+    mode_paiement: 'CASH' as ModePaiement
   });
 
   const [selectedOperator, setSelectedOperator] = useState('');
@@ -83,7 +83,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
     }
 
     // Validate operator for mobile money deposits
-    if (formData.mode_paiement === 'Mobile Money' && !selectedOperator && type === 'Dépôt') {
+    if (formData.mode_paiement === 'MOBILE_MONEY' && !selectedOperator && type === 'Dépôt') {
       newErrors.operateur = 'Veuillez sélectionner un opérateur';
     }
 
@@ -101,11 +101,11 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
 
     // Show payment validation modal for deposits with cash or mobile money
     if (type === 'Dépôt' && montantNum > 0) {
-      if (formData.mode_paiement === 'Mobile Money') {
+      if (formData.mode_paiement === 'MOBILE_MONEY') {
         setPaymentModalType('mobile_money');
         setShowPaymentModal(true);
         return;
-      } else if (formData.mode_paiement === 'Espèces') {
+      } else if (formData.mode_paiement === 'CASH') {
         setPaymentModalType('especes');
         setShowPaymentModal(true);
         return;
@@ -160,7 +160,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
   const handleModeChange = useCallback((mode: ModePaiement) => {
     setFormData(prev => ({ ...prev, mode_paiement: mode }));
     // Reset operator when changing mode
-    if (mode !== 'Mobile Money') {
+    if (mode !== 'MOBILE_MONEY') {
       setSelectedOperator('');
     }
   }, []);
@@ -263,7 +263,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
             </fieldset>
 
             {/* Mobile Operator Selection */}
-            {formData.mode_paiement === 'Mobile Money' && type === 'Dépôt' && (
+            {formData.mode_paiement === 'MOBILE_MONEY' && type === 'Dépôt' && (
               <fieldset>
                 <legend className="block text-sm font-semibold text-slate-300 mb-2">
                   <Smartphone size={16} className="inline mr-2" aria-hidden="true" />
@@ -351,7 +351,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
             )}
 
             {/* Reference Field for Check/Transfer */}
-            {(formData.mode_paiement === 'Chèque' || formData.mode_paiement === 'Virement') && (
+            {(formData.mode_paiement === 'CHECK' || formData.mode_paiement === 'TRANSFER') && (
               <div>
                 <label htmlFor="reference" className="block text-sm font-semibold text-slate-300 mb-2">
                   Référence

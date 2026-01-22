@@ -1,10 +1,10 @@
-import type { Client } from '@shared/schema';
+import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState } from 'react';
 import { Download, FileText, FileSpreadsheet, CheckCircle, X } from 'lucide-react';
 import { exportToCSV, exportToJSON } from '../../lib/exportUtils';
 
 interface ClientExportProps {
-  clients: Client[];
+  clients: ClientWithIdentity[];
   onClose: () => void;
 }
 
@@ -41,7 +41,7 @@ export default function ClientExport({ clients, onClose }: ClientExportProps) {
     const data = clients.map(client => {
       const filtered: any = {};
       selectedFields.forEach(field => {
-        filtered[field] = client[field as keyof Client];
+        filtered[field] = client[field as keyof ClientWithIdentity];
       });
       return filtered;
     });
@@ -56,7 +56,7 @@ export default function ClientExport({ clients, onClose }: ClientExportProps) {
     const data = clients.map(client => {
       const filtered: any = {};
       selectedFields.forEach(field => {
-        filtered[field] = client[field as keyof Client];
+        filtered[field] = client[field as keyof ClientWithIdentity];
       });
       return filtered;
     });

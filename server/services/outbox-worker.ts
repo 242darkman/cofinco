@@ -40,11 +40,23 @@ async function processOutboxEvents(): Promise<number> {
 
     for (const event of events) {
       try {
-        // 2. Publish to WebSocket
+        // 2. Mark as published FIRST (ensures DB consistency before broadcast)
+        // This prevents the race condition where we broadcast but fail to mark as published
+        const [updated] = await db.update(evenementsOutbox)
+          .set({ publishedAt: new Date() })
+          .where(eq(evenementsOutbox.id, event.id))
+          .returning();
+
+        if (!updated) {
+          // Event was likely already processed by another worker instance
+          continue;
+        }
+
+        // 3. Then broadcast to WebSocket (after DB confirm)
         if (wsInstance) {
           // Build the channel name: {aggregateType}:{aggregateId}
           const channel = `${event.aggregateType}:${event.aggregateId}`;
-          
+
           wsInstance.broadcast({
             type: "REALTIME_EVENT" as any,
             payload: {
@@ -58,11 +70,6 @@ async function processOutboxEvents(): Promise<number> {
           });
         }
 
-        // 3. Mark as published
-        await db.update(evenementsOutbox)
-          .set({ publishedAt: new Date() })
-          .where(eq(evenementsOutbox.id, event.id));
-        
         publishedCount++;
       } catch (error: any) {
         // Increment retry counter and record error

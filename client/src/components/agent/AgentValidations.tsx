@@ -35,6 +35,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import SecureValidationModal from './SecureValidationModal';
+import { StatutOperationTerrain } from '@shared/enum/status-constants';
 
 // Types for Detail Modal
 import type { OperationTerrainWithRelations, OperationTerrainMetadata } from '@shared/schema';
@@ -110,7 +111,7 @@ export default function AgentValidations() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const opsPromise = caisseAgentApi.listOperations({ statut: 'SUBMITTED' });
+      const opsPromise = caisseAgentApi.listOperations({ statut: StatutOperationTerrain.SUBMITTED });
       const agencesPromise = isAdmin ? agencesApi.getAgences() : Promise.resolve([]);
       
       const [opsResponse, agencesResponse] = await Promise.all([opsPromise, agencesPromise]);

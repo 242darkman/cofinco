@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { formatMoney } from '../../../lib/format';
 import { CreditTimeline } from './CreditTimeline';
+import { DecisionComite, DecisionComiteType, DECISION_COMITE_LABELS, StatutReevaluation, STATUT_REEVALUATION_LABELS } from '@shared/enum/status-constants';
 
 interface Reevaluation {
   id: string;
@@ -151,16 +152,16 @@ const StepDetailModal = ({ step, logs, onClose }: { step: any, logs: AuditLog[],
 
 const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string, onStepClick: (step: any) => void }) => {
   const steps = [
-    { id: 'request', label: 'Demandée', status: ['Demandée', 'Éligibilité en cours'] },
-    { id: 'authorized', label: 'Autorisée', status: ['Autorisée', 'Enquête complémentaire'] },
-    { id: 'committee', label: 'En comité', status: ['En comité'] },
-    { id: 'decision', label: 'Décision', status: ['Approuvée', 'Rejetée définitivement', 'Refusée', 'Annulée'] }
+    { id: 'request', label: 'Demandée', status: [StatutReevaluation.REQUESTED, StatutReevaluation.ELIGIBILITY_CHECK] },
+    { id: 'authorized', label: 'Autorisée', status: [StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION] },
+    { id: 'committee', label: 'En comité', status: [StatutReevaluation.IN_COMMITTEE] },
+    { id: 'decision', label: 'Décision', status: [StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.REFUSED, StatutReevaluation.CANCELLED] }
   ];
 
   const getCurrentStepIndex = () => {
-    if (['Refusée', 'Rejetée définitivement', 'Approuvée', 'Annulée'].includes(currentStatus)) return 3;
-    if (['En comité'].includes(currentStatus)) return 2;
-    if (['Autorisée', 'Enquête complémentaire'].includes(currentStatus)) return 1;
+    if ([StatutReevaluation.REFUSED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.APPROVED, StatutReevaluation.CANCELLED].includes(currentStatus as any)) return 3;
+    if ([StatutReevaluation.IN_COMMITTEE].includes(currentStatus as any)) return 2;
+    if ([StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION].includes(currentStatus as any)) return 1;
     return 0;
   };
   
@@ -606,7 +607,7 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
     }
     
     // Cancel button for non-terminal states
-    if (!['Approuvée', 'Rejetée définitivement', 'Annulée', 'Refusée'].includes(reevaluation.statut)) {
+    if (![StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.CANCELLED, StatutReevaluation.REFUSED].includes(reevaluation.statut as any)) {
       actions.push(
         <button
           key="cancel"
@@ -797,12 +798,12 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       {/* Décision comité si applicable */}
       {reevaluation.decisionComite && (
         <div className={`rounded-xl p-4 border ${
-          reevaluation.decisionComite === 'Approuvée' 
+          reevaluation.decisionComite === DecisionComite.APPROVED 
             ? 'bg-emerald-500/10 border-emerald-500/30' 
             : 'bg-red-500/10 border-red-500/30'
         }`}>
           <h4 className={`text-sm font-medium mb-2 ${
-            reevaluation.decisionComite === 'Approuvée' ? 'text-emerald-400' : 'text-red-400'
+            reevaluation.decisionComite === DecisionComite.APPROVED ? 'text-emerald-400' : 'text-red-400'
           }`}>
             Décision du comité
           </h4>
@@ -903,7 +904,7 @@ function ReevaluationDecisionModalInline({
   onClose: () => void; 
   onSuccess: () => void;
 }) {
-  const [decision, setDecision] = useState<'Approuvée' | 'Rejetée définitivement' | 'Montant réduit'>('Approuvée');
+  const [decision, setDecision] = useState<DecisionComiteType>(DecisionComite.APPROVED);
   const [montantApprouve, setMontantApprouve] = useState<number | undefined>();
   const [commentaire, setCommentaire] = useState('');
   const [conditionsSpeciales, setConditionsSpeciales] = useState('');
@@ -915,7 +916,7 @@ function ReevaluationDecisionModalInline({
       return;
     }
     
-    if (decision === 'Montant réduit' && !montantApprouve) {
+    if (decision === DecisionComite.REDUCED_AMOUNT && !montantApprouve) {
       toast.error('Veuillez spécifier le montant approuvé');
       return;
     }
@@ -928,7 +929,7 @@ function ReevaluationDecisionModalInline({
         credentials: 'include',
         body: JSON.stringify({
           decision,
-          montantApprouve: decision === 'Approuvée' ? undefined : montantApprouve,
+          montantApprouve: decision === DecisionComite.APPROVED ? undefined : montantApprouve,
           commentaire,
           membresPresents: [],
           conditionsSpeciales: conditionsSpeciales || undefined
@@ -940,9 +941,9 @@ function ReevaluationDecisionModalInline({
         throw new Error(data.error?.message || 'Erreur lors de l\'enregistrement');
       }
 
-      if (decision === 'Approuvée') {
+      if (decision === DecisionComite.APPROVED) {
         toast.success('🎉 Réévaluation approuvée ! Le crédit peut être décaissé.');
-      } else if (decision === 'Montant réduit') {
+      } else if (decision === DecisionComite.REDUCED_AMOUNT) {
         toast.success(`✅ Réévaluation approuvée avec montant réduit: ${formatMoney(montantApprouve!)}`);
       } else {
         toast.error('❌ Réévaluation rejetée définitivement.');
@@ -972,9 +973,9 @@ function ReevaluationDecisionModalInline({
             <label className="text-sm text-slate-400 mb-2 block">Décision</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: 'Approuvée', label: 'Approuver', color: 'emerald' },
-                { value: 'Montant réduit', label: 'Réduire', color: 'amber' },
-                { value: 'Rejetée définitivement', label: 'Rejeter', color: 'red' },
+                { value: DecisionComite.APPROVED, label: 'Approuver', color: 'emerald' },
+                { value: DecisionComite.REDUCED_AMOUNT, label: 'Réduire', color: 'amber' },
+                { value: DecisionComite.REJECTED, label: 'Rejeter', color: 'red' },
               ].map(opt => (
                 <button
                   key={opt.value}
@@ -992,7 +993,7 @@ function ReevaluationDecisionModalInline({
           </div>
 
           {/* Montant if reduced */}
-          {decision === 'Montant réduit' && (
+          {decision === DecisionComite.REDUCED_AMOUNT && (
             <div>
               <label className="text-sm text-slate-400 mb-2 block">Montant approuvé</label>
               <input
@@ -1021,7 +1022,7 @@ function ReevaluationDecisionModalInline({
           </div>
 
           {/* Conditions spéciales */}
-          {decision !== 'Rejetée définitivement' && (
+          {decision !== DecisionComite.REJECTED && (
             <div>
               <label className="text-sm text-slate-400 mb-2 block">Conditions spéciales (optionnel)</label>
               <input
@@ -1047,7 +1048,7 @@ function ReevaluationDecisionModalInline({
             onClick={handleSubmit}
             disabled={submitting || commentaire.length < 10}
             className={`flex-1 px-4 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 ${
-              decision === 'Rejetée définitivement'
+              decision === DecisionComite.REJECTED
                 ? 'bg-red-600 hover:bg-red-700 text-white'
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white'
             }`}

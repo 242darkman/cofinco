@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, MessageSquare, UserCheck, RefreshCw, Clock } from 'lucide-react';
+import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, MessageSquare, UserCheck, RefreshCw, Clock, Trash2 } from 'lucide-react';
 import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -10,6 +10,7 @@ import { Badge, ConfirmDialog } from '../../ui';
 import { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
 import { ReevaluationModal } from './ReevaluationModal';
 import { CreditTimeline } from './CreditTimeline';
+import { StatutDemande } from '@shared/enum/status-constants';
 
 interface Demande {
   id: string;
@@ -43,8 +44,10 @@ interface Demande {
     phone: string;
     taux_remboursement?: number;
     credit_total?: number;
+
     photo_url?: string;
   };
+  deleted_at?: string | null;
 }
 
 interface CreditApprovalModalProps {
@@ -259,7 +262,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     try {
       // Prepare approval data to save on the demand
       const updateData: any = {
-        statut: 'Approuvée',
+        statut: 'APPROVED',
         montant_approuve: montantBase,
         commentaire_approbation: sanitizeInput(commentaire),
         decaissement_automatique: scheduledDisbursement,
@@ -288,7 +291,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
     try {
       const payload: any = {
-        statut: 'Rejetée',
+        statut: 'REJECTED',
         motif_rejet: sanitizeInput(commentaire)
       };
 
@@ -373,19 +376,21 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
           {/* ====== FEES STATUS BANNER - Above the Fold ====== */}
           <div className={`mx-6 mt-4 p-4 rounded-xl flex items-center gap-4 ${
-              demande.statut === 'Annulée' || demande.statut === 'Annulé'
+              (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
                 ? 'bg-slate-500/10 border border-slate-500/30'
                 : demande.frais_engagement_payes 
                     ? 'bg-emerald-500/10 border border-emerald-500/30' 
                     : 'bg-amber-500/10 border border-amber-500/30'
           }`}>
               <div className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                  demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                  (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
                     ? 'bg-slate-500/20'
                     : demande.frais_engagement_payes ? 'bg-emerald-500/20' : 'bg-amber-500/20'
               }`}>
-                  {demande.statut === 'Annulée' || demande.statut === 'Annulé' ? (
+                  {demande.statut === StatutDemande.CANCELLED ? (
                       <XCircle className="text-slate-400" size={24} />
+                  ) : !!demande.deleted_at ? (
+                      <Trash2 className="text-slate-400" size={24} />
                   ) : demande.frais_engagement_payes ? (
                       <CheckCircle className="text-emerald-400" size={24} />
                   ) : (
@@ -394,20 +399,24 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
               </div>
               <div className="flex-1">
                   <h4 className={`font-bold text-sm ${
-                      demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                      (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
                         ? 'text-slate-400'
                         : demande.frais_engagement_payes ? 'text-emerald-400' : 'text-amber-400'
                   }`}>
-                      {demande.statut === 'Annulée' || demande.statut === 'Annulé' 
-                        ? 'Demande Annulée' 
-                        : demande.frais_engagement_payes ? 'Frais de Dossier Payés ✅' : 'Frais de Dossier en Attente ⚠️'}
+                      {!!demande.deleted_at 
+                        ? 'Demande Supprimée 🗑️' 
+                        : (demande.statut === StatutDemande.CANCELLED 
+                          ? 'Demande Annulée' 
+                          : demande.frais_engagement_payes ? 'Frais de Dossier Payés ✅' : 'Frais de Dossier en Attente ⚠️')}
                   </h4>
                   <p className={`text-xs ${
-                      demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                      (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
                         ? 'text-slate-400/80'
                         : demande.frais_engagement_payes ? 'text-emerald-300/80' : 'text-amber-300/80'
                   }`}>
-                      {demande.statut === 'Annulée' || demande.statut === 'Annulé'
+                      {!!demande.deleted_at 
+                          ? "Cette demande a été supprimée des archives actives."
+                          : (demande.statut === StatutDemande.CANCELLED
                           ? (demande.frais_engagement_payes 
                               ? `Cette demande a été annulée. Les frais d'engagement de ${formatMoney(demande.montant_frais_engagement || 0)} ont été réglés.`
                               : "Cette demande a été annulée. Aucun frais d'engagement n'a été perçu.")
@@ -415,7 +424,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                               ? `Montant payé : ${formatMoney(demande.montant_frais_engagement || 0)}`
                               : demande.montant_frais_engagement 
                                   ? `Montant dû : ${formatMoney(demande.montant_frais_engagement)}`
-                                  : 'Le client doit régler les frais avant traitement.')
+                                  : 'Le client doit régler les frais avant traitement.'))
                       }
                   </p>
               </div>
@@ -517,7 +526,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
             )}
 
             {/* Reevaluation Section for rejected demands */}
-            {isRejected && !isCancelled && (
+            {isRejected && !isCancelled && !demande.deleted_at && (
               <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4">
                 <h3 className="text-lg font-bold text-blue-400 mb-4 flex items-center gap-2">
                   <RefreshCw size={18} /> Réévaluation de la demande

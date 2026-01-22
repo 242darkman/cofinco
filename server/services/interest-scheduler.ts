@@ -4,6 +4,7 @@ import { comptes, produitsCompte, mouvementsFinanciers, evenementsOutbox, transa
 import { eq, and, gt, sql } from "drizzle-orm";
 import { executeWithLedger, updateCompteSolde } from "./ledger";
 import { log } from "../logger";
+import { StatutCompte } from "@shared/enum/status-constants";
 
 export class InterestSchedulerService {
   private dailyJob: ScheduledTask | null = null;
@@ -43,7 +44,7 @@ export class InterestSchedulerService {
         .leftJoin(produitsCompte, eq(comptes.produitId, produitsCompte.id))
         .where(
             and(
-                eq(comptes.statut, "Actif"),
+                eq(comptes.statut, StatutCompte.ACTIVE),
                 gt(comptes.soldeCourant, "0") // Intérêts uniquement sur solde positif
             )
         );
@@ -114,10 +115,10 @@ export class InterestSchedulerService {
                 "SYSTEME",
                 {
                     montant: montantAcrediter.toString(),
-                    sens: "Crédit",
+                    sens: "CREDIT",
                     clientId: compte.clientId,
                     compteId: compte.id,
-                    methodePaiement: "Virement", // Ou 'Interne'
+                    methodePaiement: "TRANSFER", // Ou 'Interne'
                     typePaiement: "INTERETS", 
                     metadata: {
                         observations: "Capitalisation mensuelle des intérêts"
@@ -142,7 +143,7 @@ export class InterestSchedulerService {
                             typePaiement: "INTERETS" as any, // Cast si enum strict, sinon string
                             montant: montantAcrediter.toString(),
                             soldeApres: nouveauSolde,
-                            methodePaiement: "Virement",
+                            methodePaiement: "TRANSFER",
                             observations: "Capitalisation mensuelle des intérêts",
                             createdBy: null, // System
                         } as any)

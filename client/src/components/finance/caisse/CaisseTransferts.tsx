@@ -11,6 +11,7 @@ import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
 import { TransferHistoryPrintTemplate, TransferHistoryData } from '../../ui/printable/TransferHistoryPrintTemplate';
+import { StatutTransfertCaisse } from '@shared/enum/status-constants';
 
 interface Transfert {
   id: string;
@@ -245,8 +246,8 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
   // Statistiques mémorisées
   // Statistiques calculées
   const stats = useMemo(() => {
-    const validTransferts = transferts.filter(t => t.statut === 'valide' || t.statut === 'Validé');
-    const pendingTransferts = transferts.filter(t => t.statut === 'en_attente' || t.statut === 'En attente');
+    const validTransferts = transferts.filter(t => t.statut === StatutTransfertCaisse.VALIDATED);
+    const pendingTransferts = transferts.filter(t => t.statut === StatutTransfertCaisse.PENDING);
     
     // Si on est Admin (pas de session.agenceId défini ou vue globale), on veut le volume TOTAL échangé
     // Si on est une Agence, on veut seulement CE QUI NOUS CONCERNE
@@ -470,9 +471,9 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                   <Badge
                     value={t.statut}
                     variant={
-                      (t.statut === 'valide' || t.statut === 'Validé') ? 'success' :
-                      (t.statut === 'en_attente' || t.statut === 'En attente') ? 'warning' : 
-                      (t.statut === 'annulé' || t.statut === 'Annulé') ? 'neutral' : 'neutral'
+                      (t.statut === StatutTransfertCaisse.VALIDATED) ? 'success' :
+                      (t.statut === StatutTransfertCaisse.PENDING) ? 'warning' :
+                      (t.statut === StatutTransfertCaisse.CANCELLED) ? 'neutral' : 'neutral'
                     }
                   />
                 </div>
@@ -503,7 +504,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                   </div>
                 </div>
 
-                {(t.statut === 'en_attente' || t.statut === 'En attente') && (
+                {(t.statut === StatutTransfertCaisse.PENDING) && (
                   <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                     {canConfirmTransferts && getDirection(t) === 'IN' && (
                       <Button
@@ -596,13 +597,13 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                       <Badge
                         value={t.statut}
                         variant={
-                          (t.statut === 'valide' || t.statut === 'Validé') ? 'success' :
-                          (t.statut === 'en_attente' || t.statut === 'En attente') ? 'warning' : 'neutral'
+                          (t.statut === StatutTransfertCaisse.VALIDATED) ? 'success' :
+                          (t.statut === StatutTransfertCaisse.PENDING) ? 'warning' : 'neutral'
                         }
                       />
                     </td>
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      {(t.statut === 'en_attente' || t.statut === 'En attente') ? (
+                      {(t.statut === StatutTransfertCaisse.PENDING) ? (
                         <div className="flex items-center justify-end gap-2">
                           {canConfirmTransferts && getDirection(t) === 'IN' && (
                             <Button
@@ -676,8 +677,8 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
               <Badge
                 value={selectedTransfert.statut}
                 variant={
-                  (selectedTransfert.statut === 'valide' || selectedTransfert.statut === 'Validé') ? 'success' :
-                  (selectedTransfert.statut === 'en_attente' || selectedTransfert.statut === 'En attente') ? 'warning' : 'neutral'
+                  (selectedTransfert.statut === StatutTransfertCaisse.VALIDATED) ? 'success' :
+                  (selectedTransfert.statut === StatutTransfertCaisse.PENDING) ? 'warning' : 'neutral'
                 }
                 size="lg"
               />

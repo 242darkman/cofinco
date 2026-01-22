@@ -11,6 +11,7 @@ import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { AgenceProvider } from './contexts/AgenceContext';
 import { PermissionsProvider } from './contexts/PermissionsContext';
+import { LanguageProvider } from './contexts/LanguageContext';
 import { UpdatePrompt } from './components/shared/UpdatePrompt';
 import { useServerHealth } from './contexts/ServerHealthContext';
 import NetworkOverlay from './components/shared/NetworkOverlay';
@@ -267,4 +268,10 @@ function App() {
   );
 }
 
-export default App;
+const AppWrapper = () => (
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
+);
+
+export default AppWrapper;

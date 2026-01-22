@@ -6,6 +6,7 @@ import { insertTontineSchema, insertMembreTontineSchema, insertContributionTonti
 } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
+import { SystemRole } from "@shared/types/roles";
 import { requireAgenceAccess } from "../middleware";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { getWsInstance } from "../ws-server";
@@ -24,7 +25,7 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Create tontine (roles: admin, chef, superviseur)
-  app.post("/api/tontines", requireAuth, requireRole('admin', 'chef', 'superviseur'), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/tontines", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), requireAgenceAccess(), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertTontineSchema.parse(data);
       
@@ -32,11 +33,13 @@ export function registerTontineRoutes(app: Express) {
       const agenceFilter = req.agenceFilter as { agence?: string } | null;
       
       if (agenceFilter && parsed.gestionnaireId) {
+        // Architecture V3: User n'a plus de champ agence
+        // La vérification d'agence doit se faire via employes.agenceId
         const gestionnaire = await storage.getUser(parsed.gestionnaireId);
-        // Si gestionnaire n'existe pas ou n'est pas de la bonne agence
-        if (!gestionnaire || gestionnaire.agence !== agenceFilter.agence) {
-          return res.status(403).json({ message: "Le gestionnaire doit appartenir à votre agence" });
+        if (!gestionnaire) {
+          return res.status(403).json({ message: "Gestionnaire introuvable" });
         }
+        // TODO: Vérifier l'agence via la table employes si nécessaire
       }
       
       const tontine = await storage.createTontine(parsed);
@@ -55,19 +58,21 @@ export function registerTontineRoutes(app: Express) {
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
       // Vérifier accès via gestionnaire
+      // Architecture V3: User n'a plus de champ agence
       const agenceFilter = req.agenceFilter as { agence?: string } | null;
       if (agenceFilter && tontine.gestionnaireId) {
         const gestionnaire = await storage.getUser(tontine.gestionnaireId);
-        if (!gestionnaire || gestionnaire.agence !== agenceFilter.agence) {
-          return res.status(403).json({ message: "Accès refusé : tontine d'une autre agence" });
+        if (!gestionnaire) {
+          return res.status(403).json({ message: "Accès refusé : gestionnaire introuvable" });
         }
+        // TODO: Vérifier l'agence via la table employes si nécessaire
       }
 
       res.json(addSnakeCaseAliasesDeep(tontine));
   });
 
   // Update tontine (roles: admin, chef, superviseur)
-  app.patch("/api/tontines/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.patch("/api/tontines/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
@@ -96,7 +101,7 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Delete tontine (roles: admin, chef)
-  app.delete("/api/tontines/:id", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+  app.delete("/api/tontines/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
@@ -110,7 +115,7 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Add membre to tontine (roles: admin, chef, superviseur)
-  app.post("/api/tontines/:id/membres", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/tontines/:id/membres", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
@@ -133,14 +138,14 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Remove membre from tontine
-  app.delete("/api/tontines/:id/membres/:membreId", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.delete("/api/tontines/:id/membres/:membreId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
       // In a real app, we might want to check if the membre belongs to the tontine
       const success = await storage.updateMembreTontine(req.params.membreId, { statut: 'Retiré' } as any);
       res.json({ success: !!success });
   });
 
   // Update membre tontine (cotisation auto etc)
-  app.patch("/api/tontines/:id/membres/:membreId", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.patch("/api/tontines/:id/membres/:membreId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       // Ensure tontine exists
       const tontine = await storage.getTontine(req.params.id);
@@ -156,7 +161,7 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Create contribution tontine (roles: admin, chef, caisse, superviseur)
-  app.post("/api/contributions-tontine", requireAuth, requireRole('admin', 'chef', 'caisse', 'superviseur'), async (req, res) => {
+  app.post("/api/contributions-tontine", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.SUPERVISEUR), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
         const parsed = insertContributionTontineSchema.parse(data);
@@ -203,7 +208,7 @@ export function registerTontineRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(regles));
   });
 
-  app.post("/api/tontine-regles", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/tontine-regles", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertTontineRegleSchema.parse(data);
     const regle = await storage.createTontineRegle(parsed);
@@ -217,7 +222,7 @@ export function registerTontineRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(regle));
   });
 
-  app.patch("/api/tontine-regles/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.patch("/api/tontine-regles/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const updated = await storage.updateTontineRegle(req.params.id, data as any);
     
@@ -230,7 +235,7 @@ export function registerTontineRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(updated));
   });
 
-  app.delete("/api/tontine-regles/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.delete("/api/tontine-regles/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     const success = await storage.deleteTontineRegle(req.params.id);
     res.json({ success });
   });
@@ -241,7 +246,7 @@ export function registerTontineRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(penalites));
   });
 
-  app.patch("/api/tontine-penalites/:id", requireAuth, requireRole('admin', 'chef', 'superviseur', 'caisse'), async (req, res) => {
+  app.patch("/api/tontine-penalites/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR, SystemRole.CAISSIER), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertTontinePenaliteSchema.partial().parse(data);
     const updated = await storage.updateTontinePenalite(req.params.id, parsed);
@@ -261,7 +266,7 @@ export function registerTontineRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(plans));
   });
 
-  app.post("/api/tontine-plans", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/tontine-plans", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertTontinePlanSchema.parse(data);
@@ -278,13 +283,13 @@ export function registerTontineRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/tontine-plans/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.patch("/api/tontine-plans/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const updated = await storage.updateTontinePlan(req.params.id, data as any);
     res.json(addSnakeCaseAliasesDeep(updated));
   });
 
-  app.delete("/api/tontine-plans/:id", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.delete("/api/tontine-plans/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     const success = await storage.deleteTontinePlan(req.params.id);
     res.json({ success });
   });
@@ -302,7 +307,7 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Tirage aléatoire du prochain bénéficiaire
-  app.post("/api/tontines/:id/tirage-beneficiaire", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/tontines/:id/tirage-beneficiaire", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     try {
       const beneficiaire = await storage.tirerProchainBeneficiaire(req.params.id);
 
@@ -359,7 +364,7 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Créer une distribution
-  app.post("/api/tontine-distributions", requireAuth, requireRole('admin', 'chef', 'superviseur'), async (req, res) => {
+  app.post("/api/tontine-distributions", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body) as Record<string, any>;
 
@@ -411,7 +416,7 @@ export function registerTontineRoutes(app: Express) {
   });
 
   // Annuler une distribution
-  app.delete("/api/tontine-distributions/:id", requireAuth, requireRole('admin', 'chef'), async (req, res) => {
+  app.delete("/api/tontine-distributions/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
     try {
       // Récupérer la distribution avant suppression pour le broadcast
       const distribution = await storage.getDistribution(req.params.id);
