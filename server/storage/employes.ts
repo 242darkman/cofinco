@@ -123,6 +123,9 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
       email: users.email,
       telephone: users.telephone,
       sexe: users.sexe,
+      dateNaissance: users.dateNaissance,
+      adresse: users.adresse,
+      ville: users.ville,
       photoProfile: users.photoProfile,
       statut: users.statut,
     },
@@ -202,6 +205,9 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
       email: users.email,
       telephone: users.telephone,
       sexe: users.sexe,
+      dateNaissance: users.dateNaissance,
+      adresse: users.adresse,
+      ville: users.ville,
       photoProfile: users.photoProfile,
       statut: users.statut,
     },
@@ -259,6 +265,9 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
       email: users.email,
       telephone: users.telephone,
       sexe: users.sexe,
+      dateNaissance: users.dateNaissance,
+      adresse: users.adresse,
+      ville: users.ville,
       photoProfile: users.photoProfile,
       statut: users.statut,
     },
@@ -466,6 +475,9 @@ export async function updateEmployeWithUser(
     email: string;
     telephone: string;
     sexe: string;
+    dateNaissance: string;
+    adresse: string;
+    ville: string;
     photoProfile: string;
     statut: string;
   }>,
@@ -525,6 +537,9 @@ export async function updateEmployeWithUser(
         email: users.email,
         telephone: users.telephone,
         sexe: users.sexe,
+        dateNaissance: users.dateNaissance,
+        adresse: users.adresse,
+        ville: users.ville,
         photoProfile: users.photoProfile,
         statut: users.statut,
       }
