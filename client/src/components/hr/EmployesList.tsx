@@ -3,6 +3,7 @@ import { Edit2, Trash2, Phone, Briefcase } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes'; // Assuming this hook exists and exports Employe
 import { SearchInput, Badge, ResponsiveTable, Button, Card } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { resolveStorageUrl } from '@/lib/format';
 
 interface EmployesListProps {
   employes: Employe[];
@@ -47,7 +48,7 @@ export default function EmployesList({
         <div className="flex items-center gap-3">
           {item.photoProfile ? (
             <img
-              src={item.photoProfile}
+              src={resolveStorageUrl(item.photoProfile)}
               alt={`${item.nom} ${item.prenom}`}
               className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-sm border-2 border-slate-600"
             />

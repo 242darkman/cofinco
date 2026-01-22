@@ -137,7 +137,7 @@ export async function getEmployeWithRoles(id: string): Promise<EmployeWithRoles 
 }
 
 /**
- * Récupérer tous les employés avec leurs données utilisateur
+ * Récupérer tous les employés avec leurs données utilisateur et rôle principal
  */
 export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
   const result = await db.select({
@@ -152,21 +152,26 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
       sexe: users.sexe,
       photoProfile: users.photoProfile,
       statut: users.statut,
-    }
+    },
+    role: userRoles.role,
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(userRoles, eq(users.id, userRoles.userId))
   .where(isNull(users.deletedAt))
   .orderBy(desc(users.createdAt));
 
   return result.map(r => ({
     ...r.employe,
-    user: r.user
+    user: {
+      ...r.user,
+      role: r.role || null,
+    }
   }));
 }
 
 /**
- * Récupérer les employés d'une agence
+ * Récupérer les employés d'une agence avec rôle principal
  */
 export async function getEmployesByAgence(agenceId: string): Promise<EmployeWithUser[]> {
   const result = await db.select({
@@ -181,10 +186,12 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
       sexe: users.sexe,
       photoProfile: users.photoProfile,
       statut: users.statut,
-    }
+    },
+    role: userRoles.role,
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(userRoles, eq(users.id, userRoles.userId))
   .where(and(
     eq(employes.agenceId, agenceId),
     isNull(users.deletedAt)
@@ -193,7 +200,10 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
 
   return result.map(r => ({
     ...r.employe,
-    user: r.user
+    user: {
+      ...r.user,
+      role: r.role || null,
+    }
   }));
 }
 

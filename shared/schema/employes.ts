@@ -60,5 +60,6 @@ export interface EmployeWithUser extends Employe {
     sexe: string | null;
     photoProfile: string | null;
     statut: string;
+    role?: string | null; // Rôle principal depuis userRoles
   };
 }

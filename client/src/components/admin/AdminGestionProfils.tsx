@@ -409,22 +409,20 @@ export default function AdminGestionProfils() {
       const fullName = `${user.nom} ${user.prenom}`.toLowerCase();
       const email = (user.email || '').toLowerCase();
       const phone = (user.telephone || user.phone || '').toLowerCase();
-      const roleSystem = emp.roleSystem || '';
+      // Architecture V3: utiliser user.role depuis userRoles
       const userRole = normalizeRole(user.role);
-      
-      const matchesSearch = fullName.includes(searchQuery.toLowerCase()) || 
+
+      const matchesSearch = fullName.includes(searchQuery.toLowerCase()) ||
                           email.includes(searchQuery.toLowerCase()) ||
                           phone.includes(searchQuery.toLowerCase());
-      
-      const targetSystemRole = roleFilter === 'all' ? 'all' : roleMap[roleFilter];
+
       const matchesRole =
-        targetSystemRole === 'all' ||
-        (targetSystemRole ? roleSystem === targetSystemRole : false) ||
+        roleFilter === 'all' ||
         (userRole ? userRole === roleFilter : false);
-      
+
       return matchesSearch && matchesRole;
     });
-  }, [users, searchQuery, roleFilter, roleMap]);
+  }, [users, searchQuery, roleFilter]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredUsers.length / pageSize);
@@ -568,9 +566,10 @@ export default function AdminGestionProfils() {
                   {
                     key: 'roleSystem',
                     label: 'Rôle',
-                    format: (role, emp) => {
-                      const uiRole = Object.keys(roleMap).find(key => roleMap[key as SystemRole] === role) || role || (emp.user && emp.user.role);
-                      const style = getRoleBadgeStyle(uiRole);
+                    format: (_role, emp) => {
+                      // Utiliser user.role depuis userRoles (Architecture V3)
+                      const userRole = emp.user?.role;
+                      const style = getRoleBadgeStyle(userRole);
                       return (
                         <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap w-[160px] text-center transition-colors ${style.classes}`}>
                           {style.label}

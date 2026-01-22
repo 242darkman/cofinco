@@ -8,6 +8,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { Employe } from '../../hooks/hr/useEmployes';
+import { resolveStorageUrl } from '@/lib/format';
 
 // --- Utility pour les classes ---
 function cn(...inputs: ClassValue[]) {
@@ -70,7 +71,7 @@ const EmployeeCard = ({
           level === 0 ? "border-indigo-500 bg-indigo-600" : "border-slate-600 bg-slate-700"
         )}>
           {node.photoProfile ? (
-            <img src={node.photoProfile} alt={node.nom} className="w-full h-full object-cover" />
+            <img src={resolveStorageUrl(node.photoProfile)} alt={node.nom} className="w-full h-full object-cover" />
           ) : (
             <span>{node.nom.charAt(0)}{node.prenom.charAt(0)}</span>
           )}

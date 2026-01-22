@@ -7,6 +7,7 @@ import { toast } from '../../lib/toast';
 import { useMinIOUpload } from '../../hooks/useMinIOUpload';
 import { StatutUser } from '@shared/enum/status-constants';
 import { agenceApi } from '../../lib/api-client';
+import { resolveStorageUrl } from '@/lib/format';
 
 // Patterns de validation
 const VALIDATION_PATTERNS = {
@@ -523,7 +524,7 @@ export default function EmployeeForm({
               <div className="flex items-center gap-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center overflow-hidden">
                   {selectedUser.photoProfile ? (
-                    <img src={selectedUser.photoProfile} alt="" className="w-full h-full object-cover" />
+                    <img src={resolveStorageUrl(selectedUser.photoProfile)} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <User size={24} className="text-white" />
                   )}
