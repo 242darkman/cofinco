@@ -333,7 +333,29 @@ export function registerAuthRoutes(app: Express) {
        }
     }
 
-    res.json(req.session.user);
+    // Enrichir avec les données employé si disponibles
+    let employeData: Record<string, any> | null = null;
+    try {
+      const employe = await storage.getEmployeByUserId(req.session.user.id);
+      if (employe) {
+        employeData = {
+          matricule: employe.matricule,
+          poste: employe.poste,
+          departement: employe.departement,
+          dateEmbauche: employe.dateEmbauche,
+          typeContrat: employe.typeContrat,
+          salaireBase: employe.salaireBase,
+          hasCaissePin: !!employe.caissePin
+        };
+      }
+    } catch {
+      // Pas de données employé, c'est OK
+    }
+
+    res.json({
+      ...req.session.user,
+      ...employeData
+    });
   });
 
   app.post("/api/auth/verify-pin", requireAuth, async (req, res) => {

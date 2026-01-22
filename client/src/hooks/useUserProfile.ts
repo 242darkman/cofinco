@@ -46,7 +46,7 @@ export function useUserProfile() {
 
   const loadUserProfile = useCallback(async () => {
     try {
-      // Charger le profil utilisateur
+      // Charger le profil utilisateur (inclut les données employé si disponibles)
       const response = await fetch('/api/auth/me', { credentials: 'include' });
       if (!response.ok) {
         if (response.status === 401) {
@@ -57,31 +57,10 @@ export function useUserProfile() {
         throw new Error('Erreur lors du chargement du profil');
       }
       const userData = await response.json();
-
-      // Charger les données employé si disponibles
-      let employeData: Partial<UserData> = {};
-      try {
-        const empResponse = await fetch('/api/employes/me', { credentials: 'include' });
-        if (empResponse.ok) {
-          const empData = await empResponse.json();
-          employeData = {
-            matricule: empData.matricule,
-            poste: empData.poste,
-            departement: empData.departement,
-            dateEmbauche: empData.dateEmbauche,
-            typeContrat: empData.typeContrat,
-            salaireBase: empData.salaireBase,
-            hasCaissePin: !!empData.caissePin
-          };
-        }
-      } catch {
-        // Pas de données employé, c'est OK
-      }
-
       const normalizedRole = normalizeRole(userData.role) || SystemRole.CLIENT;
+
       setUser({
         ...userData,
-        ...employeData,
         role: normalizedRole
       });
     } catch (error) {
