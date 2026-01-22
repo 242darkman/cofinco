@@ -1,13 +1,15 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Users, Shield, Search, CheckCircle,
-  RotateCcw, Filter, Wifi, ArrowLeft, Award
+  RotateCcw, Filter, Wifi, ArrowLeft, Award, Loader2, Sparkles, Ban
 } from 'lucide-react';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { UserPermission } from '../../../hooks/admin/useUserPermissions';
 import { SearchInput, SelectableCard, Button, Badge, Switch } from '../../ui';
 import { usePagination } from '../../../hooks/usePagination';
 import { getRoleBadgeStyle } from '../../../lib/role-utils';
+import { resolveStorageUrl } from '../../../lib/format';
+import { toast } from '../../../lib/toast';
 
 interface UserCustomPermissionsManagerProps {
   users: any[];
@@ -35,6 +37,32 @@ const groupPermissionsByModule = (perms: Permission[]) => {
     groups[module].push(p);
   });
   return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+};
+
+// Helper to get user display name (handles both name and nom/prenom)
+const getUserFullName = (user: any): string => {
+  if (user.name) return user.name;
+  const fullName = `${user.prenom || ''} ${user.nom || ''}`.trim();
+  return fullName || user.username || 'Utilisateur';
+};
+
+// Helper to get user initials
+const getUserInitials = (user: any): string => {
+  if (user.nom || user.prenom) {
+    const firstInitial = (user.prenom || '').charAt(0);
+    const lastInitial = (user.nom || '').charAt(0);
+    return (firstInitial + lastInitial).toUpperCase() || '??';
+  }
+  if (user.name) {
+    return user.name.slice(0, 2).toUpperCase();
+  }
+  return '??';
+};
+
+// Helper to get user photo URL
+const getUserPhotoUrl = (user: any): string => {
+  const photo = user.photoProfile;
+  return photo ? resolveStorageUrl(photo) : '';
 };
 
 // Status dot component
@@ -68,6 +96,45 @@ export default function UserCustomPermissionsManager({
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [isSelectionView, setIsSelectionView] = useState(!preselectedUserId);
 
+  // Loading states for better UX
+  const [loadingPermId, setLoadingPermId] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+  const [recentlyToggled, setRecentlyToggled] = useState<string | null>(null);
+
+  // Enhanced toggle with loading and feedback
+  const handleTogglePermission = useCallback(async (permId: string, permName: string, currentStatus: boolean) => {
+    setLoadingPermId(permId);
+    try {
+      await toggleUserPermission(permId);
+      setRecentlyToggled(permId);
+      setTimeout(() => setRecentlyToggled(null), 1500);
+
+      toast.success(
+        currentStatus
+          ? `Permission "${permName}" désactivée`
+          : `Permission "${permName}" activée`,
+        { duration: 2000 }
+      );
+    } catch (error) {
+      toast.error('Erreur lors de la modification');
+    } finally {
+      setLoadingPermId(null);
+    }
+  }, [toggleUserPermission]);
+
+  // Enhanced reset with loading
+  const handleReset = useCallback(async () => {
+    setIsResetting(true);
+    try {
+      await onResetPermissions();
+      toast.success('Permissions réinitialisées aux valeurs du rôle', { duration: 3000 });
+    } catch (error) {
+      toast.error('Erreur lors de la réinitialisation');
+    } finally {
+      setIsResetting(false);
+    }
+  }, [onResetPermissions]);
+
   useEffect(() => {
     if (preselectedUserId) {
       onUserChange(preselectedUserId);
@@ -80,11 +147,12 @@ export default function UserCustomPermissionsManager({
   // Filter users
   const filteredUsers = useMemo(() => {
     const searchLower = userSearchTerm.toLowerCase();
-    return users.filter(user => 
-      (user.name?.toLowerCase() || '').includes(searchLower) ||
-      (user.username?.toLowerCase() || '').includes(searchLower) ||
-      (user.role?.toLowerCase() || '').includes(searchLower)
-    );
+    return users.filter(user => {
+      const fullName = getUserFullName(user).toLowerCase();
+      return fullName.includes(searchLower) ||
+        (user.username?.toLowerCase() || '').includes(searchLower) ||
+        (user.role?.toLowerCase() || '').includes(searchLower);
+    });
   }, [users, userSearchTerm]);
 
   // Group permissions with stats
@@ -221,16 +289,24 @@ export default function UserCustomPermissionsManager({
               >
                 {/* Avatar */}
                 <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                    {(user.name || '??').slice(0, 2).toUpperCase()}
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform overflow-hidden">
+                    {getUserPhotoUrl(user) ? (
+                      <img
+                        src={getUserPhotoUrl(user)}
+                        alt={getUserFullName(user)}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      getUserInitials(user)
+                    )}
                   </div>
                 </div>
-                
+
                 {/* User Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-white group-hover:text-indigo-300 transition-colors truncate">
-                      {user.name}
+                      {getUserFullName(user)}
                     </span>
                     <span className="text-xs text-slate-500 truncate">@{user.username}</span>
                   </div>
@@ -311,17 +387,25 @@ export default function UserCustomPermissionsManager({
           </button>
           
           <div className="relative">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-base font-bold text-white shadow-lg shadow-indigo-500/20">
-              {(selectedUser.name || '??').slice(0, 2).toUpperCase()}
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-base font-bold text-white shadow-lg shadow-indigo-500/20 overflow-hidden">
+              {getUserPhotoUrl(selectedUser) ? (
+                <img
+                  src={getUserPhotoUrl(selectedUser)}
+                  alt={getUserFullName(selectedUser)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                getUserInitials(selectedUser)
+              )}
             </div>
             <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-900 rounded-full">
               <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
             </span>
           </div>
-          
+
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              {selectedUser.name}
+              {getUserFullName(selectedUser)}
               <span className={`text-xs font-normal px-2 py-0.5 rounded-full border ${getRoleBadgeStyle(selectedUser.role).classes}`}>
                 {getRoleBadgeStyle(selectedUser.role).label}
               </span>
@@ -345,12 +429,17 @@ export default function UserCustomPermissionsManager({
             <div className="text-sm font-bold text-indigo-400">{activePermissionsCount}</div>
           </div>
           
-          <button 
-            onClick={onResetPermissions}
-            className="px-3 py-2 border border-slate-700 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors flex items-center gap-2"
+          <button
+            onClick={handleReset}
+            disabled={isResetting}
+            className="px-3 py-2 border border-slate-700 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RotateCcw size={14} />
-            <span className="hidden sm:inline">Reset</span>
+            {isResetting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RotateCcw size={14} />
+            )}
+            <span className="hidden sm:inline">{isResetting ? 'Reset...' : 'Reset'}</span>
           </button>
         </div>
       </div>
@@ -471,24 +560,34 @@ export default function UserCustomPermissionsManager({
                     }
                   }
                   
+                  const isLoading = loadingPermId === perm.id;
+                  const wasRecentlyToggled = recentlyToggled === perm.id;
+
                   return (
-                    <div 
-                      key={perm.id} 
-                      className={`flex items-center justify-between p-4 hover:bg-slate-800/40 transition-colors group border-l-2 ${borderColor}`}
+                    <div
+                      key={perm.id}
+                      className={`
+                        flex items-center justify-between p-4 hover:bg-slate-800/40 transition-all duration-300 group border-l-2 ${borderColor}
+                        ${wasRecentlyToggled ? 'bg-indigo-500/10 scale-[1.01]' : ''}
+                        ${isLoading ? 'opacity-70' : ''}
+                      `}
                     >
                       <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className={`text-sm font-medium ${status.granted ? 'text-white' : 'text-slate-400'}`}>
+                          <span className={`text-sm font-medium transition-colors ${status.granted ? 'text-white' : 'text-slate-400'}`}>
                             {perm.name}
                           </span>
                           {isCustom && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                              status.granted 
-                                ? 'bg-emerald-500/10 text-emerald-400' 
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium animate-in fade-in duration-300 ${
+                              status.granted
+                                ? 'bg-emerald-500/10 text-emerald-400'
                                 : 'bg-rose-500/10 text-rose-400'
                             }`}>
                               Exception
                             </span>
+                          )}
+                          {wasRecentlyToggled && (
+                            <Sparkles size={14} className="text-indigo-400 animate-pulse" />
                           )}
                         </div>
                         <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
@@ -500,22 +599,28 @@ export default function UserCustomPermissionsManager({
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <span className={`text-xs text-right hidden sm:block font-medium ${statusColor}`}>
+                        <span className={`text-xs text-right hidden sm:block font-medium transition-colors ${statusColor}`}>
                           {statusLabel}
                         </span>
-                        
-                        <Switch 
-                          checked={status.granted}
-                          onChange={() => toggleUserPermission(perm.id)}
-                          className={isCustom 
-                            ? (status.granted ? "bg-amber-500" : "bg-rose-500") 
-                            : (status.granted ? "bg-indigo-600" : "bg-slate-600")
-                          }
-                        />
-                        
-                        {isCustom && (
-                          <button 
-                            onClick={() => toggleUserPermission(perm.id)}
+
+                        {isLoading ? (
+                          <div className="w-11 h-6 flex items-center justify-center">
+                            <Loader2 size={16} className="animate-spin text-indigo-400" />
+                          </div>
+                        ) : (
+                          <Switch
+                            checked={status.granted}
+                            onChange={() => handleTogglePermission(perm.id, perm.name, status.granted)}
+                            className={`transition-all ${isCustom
+                              ? (status.granted ? "bg-amber-500" : "bg-rose-500")
+                              : (status.granted ? "bg-indigo-600" : "bg-slate-600")
+                            }`}
+                          />
+                        )}
+
+                        {isCustom && !isLoading && (
+                          <button
+                            onClick={() => handleTogglePermission(perm.id, perm.name, status.granted)}
                             title="Rétablir au rôle"
                             className="p-1.5 text-slate-600 hover:text-white hover:bg-slate-700 rounded transition-colors"
                           >
