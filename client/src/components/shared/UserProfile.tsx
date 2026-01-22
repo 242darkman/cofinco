@@ -41,54 +41,69 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
     setIsEditing(false);
   };
 
+  // --- MODE ÉDITION (Corrigé) ---
   if (isEditing) {
     return (
-      <div className="flex items-center gap-2 animate-in fade-in duration-200">
-        <div className="flex-1">
-          <label className="text-xs text-indigo-400 ml-1 font-medium">{label}</label>
-          <input
-            type={type}
-            className="w-full bg-slate-950 border border-indigo-500 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-            value={tempValue}
-            onChange={e => setTempValue(e.target.value)}
-            placeholder={placeholder}
-            autoFocus
-          />
+      <div className="animate-in fade-in zoom-in-95 duration-200 bg-slate-900/50 p-2 -m-2 rounded-xl border border-indigo-500/20">
+        {/* 1. Label au-dessus */}
+        <label className="block text-xs font-medium text-indigo-400 mb-1.5 ml-1">
+          {label}
+        </label>
+        
+        {/* 2. Ligne de contrôle (Input + Boutons alignés) */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input 
+              type={type}
+              className="w-full h-10 bg-slate-950 border border-indigo-500 rounded-lg pl-3 pr-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              value={tempValue}
+              onChange={e => setTempValue(e.target.value)}
+              autoFocus
+              placeholder={placeholder || `Entrez ${label.toLowerCase()}...`}
+            />
+          </div>
+          
+          {/* Boutons d'action (Carrés parfaits h-10 w-10) */}
+          <button 
+            onClick={handleSave}
+            disabled={saving}
+            className="h-10 w-10 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg transition-colors shadow-lg shadow-emerald-900/20 disabled:opacity-50"
+            title="Valider"
+          >
+            {saving ? <LoadingSpinner size="sm" /> : <Check size={18} strokeWidth={3} />}
+          </button>
+          
+          <button 
+            onClick={handleCancel}
+            className="h-10 w-10 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg border border-slate-700 transition-colors"
+            title="Annuler"
+          >
+            <X size={18} />
+          </button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
-        >
-          {saving ? <LoadingSpinner size="sm" /> : <Check size={18} />}
-        </button>
-        <button
-          onClick={handleCancel}
-          className="p-2.5 bg-slate-800 text-slate-400 rounded-lg hover:bg-slate-700 transition-colors"
-        >
-          <X size={18} />
-        </button>
       </div>
     );
   }
 
+  // --- MODE LECTURE (Amélioré) ---
   return (
-    <div className="group flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg transition-colors">
-      <div className="flex items-center gap-2">
-        <div className="p-1.5 bg-slate-950 rounded-lg text-slate-500">
-          <Icon size={14} />
+    <div className="group flex items-center justify-between p-3 hover:bg-slate-800/50 rounded-xl transition-colors border border-transparent hover:border-slate-800/50 cursor-default">
+      <div className="flex items-center gap-4 overflow-hidden">
+        <div className="flex-shrink-0 p-2.5 bg-slate-950 rounded-lg text-slate-400 border border-slate-800 group-hover:border-slate-700 group-hover:text-indigo-400 transition-colors">
+          <Icon size={18} />
         </div>
-        <div>
-          <div className="text-[10px] text-slate-500">{label}</div>
-          <div className="text-xs font-medium text-slate-200">{value || <span className="text-slate-600 italic">Non renseigné</span>}</div>
+        <div className="min-w-0">
+          <div className="text-xs text-slate-500 font-medium mb-0.5">{label}</div>
+          <div className="text-sm font-medium text-slate-200 truncate">{value || 'Non renseigné'}</div>
         </div>
       </div>
+      
       {editable && (
-        <button
-          onClick={() => setIsEditing(true)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded transition-all"
+        <button 
+          onClick={() => setIsEditing(true)} 
+          className="opacity-0 group-hover:opacity-100 p-2 text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 rounded-lg transition-all transform scale-90 group-hover:scale-100"
         >
-          <PenLine size={12} />
+          <PenLine size={18} />
         </button>
       )}
     </div>
