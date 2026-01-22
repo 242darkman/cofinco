@@ -137,6 +137,30 @@ export function registerEmployesRoutes(app: Express) {
   });
 
   // ============================================
+  // GET - Données employé de l'utilisateur connecté
+  // ============================================
+  app.get("/api/employes/me", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Non authentifié" });
+      }
+
+      const employe = await storage.getEmployeByUserId(userId);
+      if (!employe) {
+        return res.status(404).json({ message: "Profil employé non trouvé" });
+      }
+
+      // Récupérer avec les données complètes
+      const employeWithUser = await storage.getEmployeWithUser(employe.id);
+      res.json(employeWithUser);
+    } catch (error) {
+      console.error("Error fetching current user employe:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération du profil employé" });
+    }
+  });
+
+  // ============================================
   // GET - Liste des employés avec données utilisateur
   // ============================================
   app.get("/api/employes", requireAuth, async (req, res) => {

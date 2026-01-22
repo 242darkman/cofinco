@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
-  User, Shield, Building2, Key, KeyRound, PenLine, Check, X,
-  Smartphone, Mail, MapPin, Calendar, Briefcase, CreditCard,
+  User, Shield, Building2, Key, PenLine, Check, X,
+  Smartphone, Mail, MapPin, CreditCard,
   Lock, Eye, EyeOff, AlertCircle, Info, UserCircle
 } from 'lucide-react';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -72,22 +72,22 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
   }
 
   return (
-    <div className="group flex items-center justify-between p-3 hover:bg-slate-800/50 rounded-xl transition-colors border border-transparent hover:border-slate-700/50">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-slate-950 rounded-lg text-slate-400">
-          <Icon size={18} />
+    <div className="group flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg transition-colors">
+      <div className="flex items-center gap-2">
+        <div className="p-1.5 bg-slate-950 rounded-lg text-slate-500">
+          <Icon size={14} />
         </div>
         <div>
-          <div className="text-xs text-slate-500">{label}</div>
-          <div className="text-sm font-medium text-slate-200">{value || <span className="text-slate-500 italic">Non renseigné</span>}</div>
+          <div className="text-[10px] text-slate-500">{label}</div>
+          <div className="text-xs font-medium text-slate-200">{value || <span className="text-slate-600 italic">Non renseigné</span>}</div>
         </div>
       </div>
       {editable && (
         <button
           onClick={() => setIsEditing(true)}
-          className="opacity-0 group-hover:opacity-100 p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"
+          className="opacity-0 group-hover:opacity-100 p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded transition-all"
         >
-          <PenLine size={16} />
+          <PenLine size={12} />
         </button>
       )}
     </div>
@@ -97,19 +97,31 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
 // ==================== READONLY FIELD COMPONENT ====================
 interface ReadOnlyFieldProps {
   label: string;
-  value?: string | number;
+  value?: string | number | null;
   highlight?: boolean;
 }
 
 function ReadOnlyField({ label, value, highlight }: ReadOnlyFieldProps) {
   return (
-    <div className="space-y-1">
-      <div className="text-xs text-slate-500 font-medium">{label}</div>
-      <div className={`text-sm font-medium ${highlight ? 'text-emerald-400' : 'text-slate-300'}`}>
-        {value || <span className="text-slate-600 italic">—</span>}
+    <div>
+      <div className="text-[10px] text-slate-500">{label}</div>
+      <div className={`text-xs font-medium ${highlight ? 'text-emerald-400' : 'text-slate-300'}`}>
+        {value || <span className="text-slate-600">—</span>}
       </div>
     </div>
   );
+}
+
+// PIN Form Props Interface
+interface PinFormProps {
+  formData: { currentPassword: string; newPin: string; confirmPin: string };
+  setFormData: (data: any) => void;
+  showPassword: boolean;
+  setShowPassword: (show: boolean) => void;
+  loading: boolean;
+  error: string;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
 }
 
 // ==================== CAISSE PIN MANAGER ====================
@@ -144,36 +156,31 @@ function CaissePinManager({ hasPin, onPinConfigured }: CaissePinManagerProps) {
         currentPassword: formData.currentPassword,
         newPin: formData.newPin
       });
-      toast.success('PIN caisse configuré avec succès');
+      toast.success('PIN configuré');
       setFormData({ currentPassword: '', newPin: '', confirmPin: '' });
       setShowForm(false);
       onPinConfigured();
     } catch (err: any) {
-      setError(handleApiError(err, 'Erreur lors de la configuration du PIN'));
+      setError(handleApiError(err, 'Erreur PIN'));
     } finally {
       setLoading(false);
     }
   }, [formData, onPinConfigured]);
 
-  // PIN non configuré - Alerte
   if (!hasPin) {
     return (
-      <div className="bg-amber-900/10 border border-amber-500/30 rounded-2xl p-5">
-        <h3 className="text-lg font-semibold flex items-center gap-2 mb-3 text-amber-400">
-          <CreditCard size={20} />
-          PIN Caisse
-        </h3>
-
+      <div className={`p-2.5 rounded-lg border ${showForm ? 'bg-slate-950 border-slate-700' : 'bg-amber-900/20 border-amber-500/30'}`}>
         {!showForm ? (
-          <div className="text-center space-y-3">
-            <p className="text-sm text-amber-200/80">
-              Vous n'avez pas encore défini de code PIN. Ce code est indispensable pour autoriser les opérations de caisse.
-            </p>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <CreditCard size={14} className="text-amber-400" />
+              <span className="text-xs text-amber-300">PIN Caisse non configuré</span>
+            </div>
             <button
               onClick={() => setShowForm(true)}
-              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg transition-colors"
+              className="text-[10px] bg-amber-500 hover:bg-amber-400 text-black font-bold px-2 py-1 rounded transition-colors"
             >
-              Configurer maintenant
+              Configurer
             </button>
           </div>
         ) : (
@@ -192,22 +199,17 @@ function CaissePinManager({ hasPin, onPinConfigured }: CaissePinManagerProps) {
     );
   }
 
-  // PIN configuré
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-      <h3 className="text-lg font-semibold flex items-center gap-2 mb-4 text-blue-400">
-        <CreditCard size={20} />
-        PIN Caisse
-      </h3>
-
+    <div className={`p-2.5 rounded-lg border ${showForm ? 'bg-slate-950 border-slate-700' : 'bg-slate-950 border-slate-800'}`}>
       {!showForm ? (
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-            <Check size={16} /> Actif et sécurisé
+          <div className="flex items-center gap-2">
+            <CreditCard size={14} className="text-emerald-400" />
+            <span className="text-xs text-emerald-400">PIN Caisse actif</span>
           </div>
           <button
             onClick={() => setShowForm(true)}
-            className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-700 transition"
+            className="text-[10px] text-slate-400 hover:text-white px-2 py-1 border border-slate-700 rounded hover:bg-slate-800 transition-colors"
           >
             Modifier
           </button>
@@ -228,93 +230,75 @@ function CaissePinManager({ hasPin, onPinConfigured }: CaissePinManagerProps) {
   );
 }
 
-// PIN Form Sub-component
-interface PinFormProps {
-  formData: { currentPassword: string; newPin: string; confirmPin: string };
-  setFormData: (data: any) => void;
-  showPassword: boolean;
-  setShowPassword: (show: boolean) => void;
-  loading: boolean;
-  error: string;
-  onSubmit: (e: React.FormEvent) => void;
-  onCancel: () => void;
-}
-
 function PinForm({ formData, setFormData, showPassword, setShowPassword, loading, error, onSubmit, onCancel }: PinFormProps) {
   return (
-    <form onSubmit={onSubmit} className="space-y-4 mt-4">
+    <form onSubmit={onSubmit} className="space-y-2">
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2.5 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-          <p className="text-xs text-red-400">{error}</p>
+        <div className="bg-red-500/10 border border-red-500/30 rounded p-1.5 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+          <p className="text-[10px] text-red-400">{error}</p>
         </div>
       )}
 
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1.5">Mot de passe actuel</label>
         <div className="relative">
           <input
             type={showPassword ? 'text' : 'password'}
             value={formData.currentPassword}
             onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-            className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-white text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none pr-10"
-            placeholder="••••••••"
+            className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs focus:border-indigo-500 outline-none pr-7"
+            placeholder="Mot de passe de connexion"
             required
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
           >
-            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            {showPassword ? <EyeOff size={12} /> : <Eye size={12} />}
           </button>
         </div>
+        <p className="text-[9px] text-slate-500 mt-0.5 pl-1">Votre mot de passe de session COFIN&CO-M</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nouveau PIN</label>
-          <input
-            type="password"
-            value={formData.newPin}
-            onChange={(e) => setFormData({ ...formData, newPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-            className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-white text-center text-lg font-mono tracking-widest focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-            placeholder="000000"
-            maxLength={6}
-            inputMode="numeric"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">Confirmer PIN</label>
-          <input
-            type="password"
-            value={formData.confirmPin}
-            onChange={(e) => setFormData({ ...formData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-            className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-white text-center text-lg font-mono tracking-widest focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-            placeholder="000000"
-            maxLength={6}
-            inputMode="numeric"
-            required
-          />
-        </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="password"
+          value={formData.newPin}
+          onChange={(e) => setFormData({ ...formData, newPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+          className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none"
+          placeholder="Nouveau"
+          maxLength={6}
+          inputMode="numeric"
+          required
+        />
+        <input
+          type="password"
+          value={formData.confirmPin}
+          onChange={(e) => setFormData({ ...formData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+          className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none"
+          placeholder="Confirmer"
+          maxLength={6}
+          inputMode="numeric"
+          required
+        />
       </div>
 
-      <div className="flex gap-2 pt-2">
+      <div className="flex gap-1.5">
         <button
           type="submit"
           disabled={loading}
-          className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
         >
-          {loading ? <LoadingSpinner size="sm" /> : <Check size={18} />}
-          Enregistrer
+          {loading ? <LoadingSpinner size="sm" /> : <Check size={12} />}
+          OK
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+          className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded transition-colors"
         >
-          Annuler
+          <X size={12} />
         </button>
       </div>
     </form>
@@ -364,46 +348,46 @@ export default function UserProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 md:p-6 pb-24">
-      {/* HEADER : Résumé Rapide */}
-      <div className="flex items-center gap-4 mb-8">
+    <div className="text-white p-4 md:p-6">
+      {/* HEADER COMPACT */}
+      <div className="flex items-center gap-4 mb-6">
         <div className="relative">
           {user.photoProfile ? (
             <img
               src={user.photoProfile}
               alt={getFullName()}
-              className="w-16 h-16 rounded-full border-2 border-indigo-500 object-cover"
+              className="w-14 h-14 rounded-full border-2 border-indigo-500 object-cover"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold border-2 border-indigo-400">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold border-2 border-indigo-400">
               {getInitials()}
             </div>
           )}
-          <button className="absolute bottom-0 right-0 bg-slate-800 p-1.5 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors">
+          <button className="absolute -bottom-0.5 -right-0.5 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors">
             <PenLine size={10} className="text-slate-300" />
           </button>
         </div>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold">{getFullName()}</h1>
-          <div className="flex items-center gap-2 text-sm text-slate-400 flex-wrap">
-            <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20 text-xs font-bold uppercase">
+          <h1 className="text-xl font-bold">{getFullName()}</h1>
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20 text-[10px] font-bold uppercase">
               {getRoleLabel(user.role)}
             </span>
-            {user.agence && <span>• {user.agence}</span>}
+            {user.agence && <span className="text-xs">• {user.agence}</span>}
           </div>
         </div>
       </div>
 
-      {/* BENTO GRID LAYOUT */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 1. CARTE IDENTITÉ (Editable) */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 space-y-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2 pb-3 border-b border-slate-800">
-            <User size={20} className="text-indigo-400" />
+      {/* BENTO GRID - COMPACT */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* 1. CARTE IDENTITÉ */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+          <h3 className="text-sm font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
+            <User size={16} className="text-indigo-400" />
             Informations Personnelles
           </h3>
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <EditableField
               label="Téléphone"
               value={user.telephone}
@@ -429,83 +413,69 @@ export default function UserProfile() {
             />
           </div>
 
-          {/* Username (readonly) */}
-          <div className="pt-3 border-t border-slate-800">
-            <div className="flex items-center gap-3 p-3 bg-slate-950/50 rounded-xl">
-              <div className="p-2 bg-slate-800 rounded-lg text-slate-500">
-                <UserCircle size={18} />
-              </div>
-              <div>
-                <div className="text-xs text-slate-500">Nom d'utilisateur</div>
-                <div className="text-sm font-mono text-slate-300">@{user.username}</div>
-              </div>
-            </div>
+          {/* Username inline */}
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+            <UserCircle size={14} className="text-slate-500" />
+            <span className="text-xs text-slate-500">@{user.username}</span>
           </div>
         </div>
 
-        {/* 2. CARTE RH (Locked par défaut) */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 space-y-4">
-          <div className="flex justify-between items-center pb-3 border-b border-slate-800">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Building2 size={20} className="text-emerald-400" />
+        {/* 2. CARTE RH */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+          <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-300">
+              <Building2 size={16} className="text-emerald-400" />
               Données RH
             </h3>
-            <Lock size={14} className="text-slate-500" />
+            <Lock size={12} className="text-slate-600" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             <ReadOnlyField label="Matricule" value={user.matricule} />
-            <ReadOnlyField label="Date d'embauche" value={formatDate(user.dateEmbauche)} />
-            <ReadOnlyField label="Département" value={user.departement} />
             <ReadOnlyField label="Poste" value={user.poste} />
-            <ReadOnlyField label="Type de contrat" value={user.typeContrat} />
-            <ReadOnlyField label="Membre depuis" value={formatDate(user.createdAt)} />
+            <ReadOnlyField label="Département" value={user.departement} />
+            <ReadOnlyField label="Contrat" value={user.typeContrat} />
+            <ReadOnlyField label="Embauche" value={formatDate(user.dateEmbauche)} />
           </div>
-
-          {/* Section Paie (Visible seulement si permission) */}
-          {canViewSalary() && user.salaireBase !== undefined && (
-            <div className="pt-4 border-t border-slate-800 mt-2">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1">
-                <Lock size={10} /> Données Salariales
-              </p>
-              <ReadOnlyField label="Salaire Base" value={formatMoney(user.salaireBase)} highlight />
-            </div>
-          )}
 
           {/* Info si pas de données RH */}
           {!user.matricule && !user.poste && (
-            <div className="bg-slate-800/30 rounded-xl p-4 flex items-start gap-3">
-              <Info size={16} className="text-slate-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-slate-500">
-                Les données RH ne sont pas encore renseignées pour votre compte. Contactez l'administrateur si nécessaire.
-              </p>
+            <div className="flex items-center gap-2 text-[10px] text-slate-500 pt-2">
+              <Info size={12} className="shrink-0" />
+              <span>Données RH non renseignées.</span>
+            </div>
+          )}
+
+          {/* Section Paie */}
+          {canViewSalary() && user.salaireBase !== undefined && (
+            <div className="pt-2 border-t border-slate-800">
+              <ReadOnlyField label="Salaire Base" value={formatMoney(user.salaireBase)} highlight />
             </div>
           )}
         </div>
 
-        {/* 3. CARTE SÉCURITÉ & PIN */}
-        <div className="space-y-6">
-          {/* Module Mot de Passe */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6">
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-              <Shield size={20} className="text-rose-400" />
-              Sécurité Compte
-            </h3>
-            <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-slate-800">
-              <div>
-                <div className="text-sm font-medium text-white">Mot de passe</div>
-                <div className="text-xs text-slate-500">Protégez votre compte</div>
-              </div>
-              <button
-                onClick={() => setShowPasswordModal(true)}
-                className="text-sm text-indigo-400 hover:text-indigo-300 font-medium px-3 py-1.5 border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
-              >
-                Changer
-              </button>
+        {/* 3. CARTE SÉCURITÉ (Fusionnée) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
+            <Shield size={16} className="text-rose-400" />
+            Sécurité
+          </h3>
+
+          {/* Mot de passe */}
+          <div className="flex justify-between items-center p-2.5 bg-slate-950 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-2">
+              <Key size={14} className="text-slate-500" />
+              <span className="text-xs text-slate-300">Mot de passe</span>
             </div>
+            <button
+              onClick={() => setShowPasswordModal(true)}
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium px-2 py-1 border border-slate-700 rounded hover:bg-slate-800 transition-colors"
+            >
+              Changer
+            </button>
           </div>
 
-          {/* Module PIN Caisse (Intelligent) */}
+          {/* PIN Caisse */}
           {isCashier() && (
             <CaissePinManager
               hasPin={user.hasCaissePin}
@@ -513,15 +483,10 @@ export default function UserProfile() {
             />
           )}
 
-          {/* Info si pas caissier */}
           {!isCashier() && (
-            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5">
-              <div className="flex items-start gap-3">
-                <Info size={16} className="text-slate-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-500">
-                  Le PIN Caisse est réservé aux utilisateurs ayant des permissions de caisse (Caissiers, Superviseurs, Chefs d'Agence).
-                </p>
-              </div>
+            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+              <Info size={12} className="shrink-0" />
+              <span>PIN Caisse réservé aux caissiers.</span>
             </div>
           )}
         </div>
