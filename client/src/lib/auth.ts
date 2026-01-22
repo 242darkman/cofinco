@@ -15,6 +15,7 @@ export interface User {
   agence?: string | null;
   agenceId?: string;
   phone?: string;
+  photoProfile?: string | null;
   mustChangePassword?: boolean;
 }
 
@@ -162,6 +163,7 @@ class AuthService {
       status: authUser.statut || StatutUser.ACTIVE,
       agence: authUser.agence,
       agenceId: authUser.agenceId,
+      photoProfile: authUser.photoProfile,
       mustChangePassword: authUser.mustChangePassword,
     };
   }

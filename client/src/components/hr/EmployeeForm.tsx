@@ -834,7 +834,7 @@ export default function EmployeeForm({
               pattern="[A-Za-z0-9]{6,20}"
               error={validationErrors.numeroCnss}
               placeholder="Ex: CNSS123456"
-              helperText="Numéro de sécurité sociale (optionnel)"
+              helperText="Numéro CNSS (optionnel)"
             />
           </div>
         </div>

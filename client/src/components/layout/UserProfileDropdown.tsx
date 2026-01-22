@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { User, LogOut, ChevronDown, Activity, Building2 } from 'lucide-react';
 import { getRoleLabel } from '@shared/types/roles';
+import { resolveStorageUrl } from '../../lib/format';
 
 interface UserProfileDropdownProps {
   user: {
@@ -9,7 +10,7 @@ interface UserProfileDropdownProps {
     prenom?: string;
     email?: string;
     role?: string;
-    photo_url?: string;
+    photoProfile?: string;
     agence?: string;
   };
   onProfileClick: () => void;
@@ -131,9 +132,9 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
       <div className="p-4 bg-slate-800/50 border-b border-slate-700">
         <div className="flex items-center gap-4">
           {/* Avatar plus grand */}
-          {user?.photo_url ? (
+          {user?.photoProfile ? (
             <img
-              src={user.photo_url}
+              src={resolveStorageUrl(user.photoProfile)}
               alt={fullName}
               className="w-12 h-12 rounded-full object-cover border-2 border-slate-600"
             />
@@ -220,9 +221,9 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
       >
         <div className="relative">
           {/* Avatar */}
-          {user?.photo_url ? (
+          {user?.photoProfile ? (
             <img
-              src={user.photo_url}
+              src={resolveStorageUrl(user.photoProfile)}
               alt={fullName}
               className="w-8 h-8 rounded-full object-cover border-2 border-slate-700"
             />

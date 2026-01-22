@@ -333,6 +333,19 @@ export function registerAuthRoutes(app: Express) {
        }
     }
 
+    // Récupérer les données utilisateur pour les champs non présents en session
+    let userData: { photoProfile?: string | null } = {};
+    try {
+      const user = await storage.getUser(req.session.user.id);
+      if (user) {
+        userData = {
+          photoProfile: user.photoProfile
+        };
+      }
+    } catch {
+      // Erreur lors de la récupération, on continue sans
+    }
+
     // Enrichir avec les données employé si disponibles
     let employeData: Record<string, any> | null = null;
     try {
@@ -354,6 +367,7 @@ export function registerAuthRoutes(app: Express) {
 
     res.json({
       ...req.session.user,
+      ...userData,
       ...employeData
     });
   });

@@ -20,6 +20,8 @@ interface PlatformHeaderProps {
     prenom?: string;
     email?: string;
     role?: string;
+    photoProfile?: string;
+    agence?: string;
   };
 }
 

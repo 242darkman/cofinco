@@ -124,6 +124,19 @@ function App() {
     queryClient.clear();
   };
 
+  // Rafraîchir les données utilisateur (après mise à jour du profil)
+  const refreshCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/me', { credentials: 'include' });
+      if (response.ok) {
+        const userData = await response.json();
+        setCurrentUser(userData);
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <>
@@ -255,7 +268,7 @@ function App() {
                       onLogout={handleLogout}
                     />
                   ) : (
-                    <COFINPlatform currentUser={currentUser} onLogout={handleLogout} />
+                    <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
                   )}
                 </Suspense>
               </ErrorBoundary>

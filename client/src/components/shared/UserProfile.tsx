@@ -1,14 +1,15 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   User, Shield, Building2, Key, PenLine, Check, X,
   Smartphone, Mail, MapPin, CreditCard,
-  Lock, Eye, EyeOff, AlertCircle, Info, UserCircle
+  Lock, Eye, EyeOff, AlertCircle, Info, UserCircle, Camera, Trash2
 } from 'lucide-react';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import PasswordChangeModal from './profile/PasswordChangeModal';
 import { authApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import { resolveStorageUrl } from '../../lib/format';
 
 // ==================== EDITABLE FIELD COMPONENT ====================
 interface EditableFieldProps {
@@ -306,7 +307,11 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
 }
 
 // ==================== MAIN USER PROFILE COMPONENT ====================
-export default function UserProfile() {
+interface UserProfileProps {
+  onUserUpdate?: () => void;
+}
+
+export default function UserProfile({ onUserUpdate }: UserProfileProps) {
   const {
     user, loading,
     showPasswordModal, setShowPasswordModal,
@@ -316,6 +321,81 @@ export default function UserProfile() {
     getFullName, getRoleLabel, getInitials,
     canViewSalary, isCashier, reloadProfile
   } = useUserProfile();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handlePhotoClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validation
+    if (!file.type.startsWith('image/')) {
+      toast.error('Fichier invalide. Sélectionnez une image.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image trop volumineuse (max 2 Mo)');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('path', 'profiles');
+      formData.append('isPublic', 'true');
+
+      const response = await fetch('/api/storage/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Échec upload');
+      }
+
+      const { key } = await response.json();
+
+      // Mettre à jour le profil avec le chemin relatif (pas l'URL complète)
+      const success = await updateField('photoProfile', key);
+      if (success) {
+        toast.success('Photo de profil mise à jour');
+        reloadProfile();
+        onUserUpdate?.(); // Rafraîchir les données dans App.tsx pour sync header
+      }
+    } catch (err: any) {
+      toast.error(handleApiError(err, 'Erreur upload'));
+    } finally {
+      setUploadingPhoto(false);
+      // Reset input pour permettre de re-sélectionner le même fichier
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [updateField, reloadProfile, onUserUpdate]);
+
+  const handleDeletePhoto = useCallback(async () => {
+    if (!confirm('Supprimer votre photo de profil ?')) return;
+
+    setUploadingPhoto(true);
+    try {
+      const success = await updateField('photoProfile', '');
+      if (success) {
+        toast.success('Photo supprimée');
+        reloadProfile();
+        onUserUpdate?.(); // Rafraîchir les données dans App.tsx pour sync header
+      }
+    } catch (err: any) {
+      toast.error(handleApiError(err, 'Erreur suppression'));
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }, [updateField, reloadProfile, onUserUpdate]);
 
   if (loading) {
     return (
@@ -349,12 +429,21 @@ export default function UserProfile() {
 
   return (
     <div className="text-white p-4 md:p-6">
+      {/* Input file caché */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/jpg"
+        className="hidden"
+        onChange={handlePhotoChange}
+      />
+
       {/* HEADER COMPACT */}
       <div className="flex items-center gap-4 mb-6">
-        <div className="relative">
+        <div className="relative group">
           {user.photoProfile ? (
             <img
-              src={user.photoProfile}
+              src={resolveStorageUrl(user.photoProfile)}
               alt={getFullName()}
               className="w-14 h-14 rounded-full border-2 border-indigo-500 object-cover"
             />
@@ -363,9 +452,29 @@ export default function UserProfile() {
               {getInitials()}
             </div>
           )}
-          <button className="absolute -bottom-0.5 -right-0.5 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors">
-            <PenLine size={10} className="text-slate-300" />
+          {/* Bouton changer photo */}
+          <button
+            onClick={handlePhotoClick}
+            disabled={uploadingPhoto}
+            className="absolute -bottom-0.5 -right-0.5 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50"
+            title="Changer la photo"
+          >
+            {uploadingPhoto ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <Camera size={10} className="text-slate-300" />
+            )}
           </button>
+          {/* Bouton supprimer photo (visible au hover si photo existe) */}
+          {user.photoProfile && !uploadingPhoto && (
+            <button
+              onClick={handleDeletePhoto}
+              className="absolute -top-0.5 -right-0.5 bg-rose-600 p-1 rounded-full border border-rose-500 hover:bg-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+              title="Supprimer la photo"
+            >
+              <Trash2 size={10} className="text-white" />
+            </button>
+          )}
         </div>
         <div>
           <h1 className="text-xl font-bold">{getFullName()}</h1>

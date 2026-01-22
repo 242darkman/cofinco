@@ -234,6 +234,7 @@ export interface AuthUser {
   agenceId?: string;
   email?: string;
   statut?: string;
+  photoProfile?: string | null;
   mustChangePassword?: boolean;
 }
 

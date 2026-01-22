@@ -68,9 +68,10 @@ const ModuleLoadingFallback = ({ moduleName }: { moduleName?: string }) => (
 interface COFINPlatformProps {
   currentUser?: any;
   onLogout: () => void;
+  onUserUpdate?: () => void;
 }
 
-export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformProps) {
+export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: COFINPlatformProps) {
   const { language, setLanguage, t } = useLanguage();
   const [isMobile, setIsMobile] = useState(() => 
     typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
@@ -333,7 +334,7 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
       case 'profil':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Profil" />}>
-            <UserProfile />
+            <UserProfile onUserUpdate={onUserUpdate} />
           </Suspense>
         );
       case 'messages':
@@ -406,8 +407,11 @@ export default function COFINPlatform({ currentUser, onLogout }: COFINPlatformPr
             onLogout={onLogout}
             user={{
               nom: currentUser?.nom,
+              prenom: currentUser?.prenom,
               email: currentUser?.email,
-              role: currentUser?.role
+              role: currentUser?.role,
+              photoProfile: currentUser?.photoProfile,
+              agence: currentUser?.agence
             }}
           />
         }
