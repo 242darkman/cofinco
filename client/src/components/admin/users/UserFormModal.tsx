@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Camera, Eye, EyeOff, Key, Upload, X, Users, Shield, User as UserIcon, Mail, Phone, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Camera, Eye, EyeOff, Key, Upload, X, Users, Shield, User as UserIcon, Mail, Phone, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { Button, Modal, FormField, SelectField } from '../../ui';
 import CameraCapture from '../../shared/CameraCapture';
 import { toast } from '../../../lib/toast';
@@ -32,6 +32,12 @@ interface UserFormModalProps {
   onSubmit: (formData: any) => Promise<void>;
   initialData?: User | null;
   loading?: boolean;
+}
+
+interface ValidationState {
+  checking: boolean;
+  available: boolean | null;
+  message?: string;
 }
 
 const roles = getRoleOptions().filter((role) => role.value !== SystemRole.CLIENT);
@@ -155,8 +161,12 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     setErrors({});
   };
 
-  const [usernameChecking, setUsernameChecking] = useState(false);
-  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameValidation, setUsernameValidation] = useState<ValidationState>({
+    checking: false,
+    available: null,
+  });
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const usernameCheckRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const validatePasswordValue = (value: string) => {
     const validationErrors: string[] = [];
@@ -204,23 +214,64 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
   // Generate unique username via backend API
   const generateUniqueUsername = async (fullName: string, fallbackNom: string, fallbackPrenom: string): Promise<string> => {
     try {
-      setUsernameChecking(true);
+      setUsernameValidation(prev => ({ ...prev, checking: true }));
       const response = await fetch(`/api/employes/check-username?fullName=${encodeURIComponent(fullName)}`, {
         credentials: 'include'
       });
       if (response.ok) {
         const data = await response.json();
-        setUsernameAvailable(data.available);
+        setUsernameValidation({
+          checking: false,
+          available: data.available,
+          message: data.available ? undefined : data.message,
+        });
         return data.username;
       }
     } catch (err: any) {
       console.error('Erreur chargement user:', err);
     } finally {
-      setUsernameChecking(false);
+      setUsernameValidation(prev => ({ ...prev, checking: false }));
     }
     // Fallback to local generation
     return generateUsernameLocal(fallbackNom, fallbackPrenom);
   };
+
+  // Check username availability (for manual edits and edit mode)
+  const checkUsernameAvailability = useCallback(async (username: string) => {
+    if (!username || username.length < 2) {
+      setUsernameValidation({ checking: false, available: null });
+      return;
+    }
+
+    // Clear any existing timeout
+    if (usernameCheckRef.current) {
+      clearTimeout(usernameCheckRef.current);
+    }
+
+    setUsernameValidation(prev => ({ ...prev, checking: true }));
+
+    usernameCheckRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/employes/check-username?username=${encodeURIComponent(username)}`, {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // If editing and the username belongs to current user, it's available
+          const isOwnUsername = initialData?.id && !data.available;
+          setUsernameValidation({
+            checking: false,
+            available: data.available || isOwnUsername,
+            message: data.available ? undefined : (isOwnUsername ? undefined : data.message),
+          });
+        } else {
+          setUsernameValidation({ checking: false, available: null });
+        }
+      } catch {
+        setUsernameValidation({ checking: false, available: null });
+      }
+    }, 400);
+  }, [initialData?.id]);
 
   // Auto-generate unique username when name changes (for new users only)
   useEffect(() => {
@@ -238,12 +289,48 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     }
   }, [formData.nom, formData.prenom, initialData]);
 
+  // Cleanup username check timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (usernameCheckRef.current) {
+        clearTimeout(usernameCheckRef.current);
+      }
+    };
+  }, []);
+
   const generatePassword = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const special = '@$!%*?&';
+
+    // Ensure password meets all requirements
+    const minLength = Math.max(passwordRequirements.minLength, 12);
     let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+
+    // Guarantee at least one of each required character type
+    if (passwordRequirements.requireLowercase) {
+      password += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
     }
+    if (passwordRequirements.requireUppercase) {
+      password += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+    }
+    if (passwordRequirements.requireNumbers) {
+      password += numbers.charAt(Math.floor(Math.random() * numbers.length));
+    }
+    if (passwordRequirements.requireSpecialChars) {
+      password += special.charAt(Math.floor(Math.random() * special.length));
+    }
+
+    // Fill the rest with random characters from all pools
+    const allChars = lowercase + uppercase + numbers + special;
+    while (password.length < minLength) {
+      password += allChars.charAt(Math.floor(Math.random() * allChars.length));
+    }
+
+    // Shuffle the password to randomize position of guaranteed characters
+    password = password.split('').sort(() => Math.random() - 0.5).join('');
+
     updateField('password', password);
     setShowPassword(true);
   };
@@ -288,18 +375,42 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
+    // Clear previous submit error
+    setSubmitError(null);
+
     const nextErrors: Record<string, string> = {};
-    if (!formData.nom?.trim()) {
+
+    // Trim and normalize values
+    const trimmedNom = formData.nom?.trim() || '';
+    const trimmedUsername = formData.username?.trim().toLowerCase() || '';
+    const trimmedEmail = formData.email?.trim().toLowerCase() || '';
+    const trimmedTelephone = formData.telephone?.trim().replace(/\s+/g, '') || '';
+    const trimmedPrenom = formData.prenom?.trim() || '';
+
+    if (!trimmedNom) {
       nextErrors.nom = 'Le nom est requis';
     }
-    if (!formData.username?.trim()) {
+    if (!trimmedUsername) {
       nextErrors.username = 'L\'identifiant est requis';
+    } else if (trimmedUsername.length < 3) {
+      nextErrors.username = 'L\'identifiant doit contenir au moins 3 caractères';
+    } else if (!/^[a-z0-9._-]+$/.test(trimmedUsername)) {
+      nextErrors.username = 'L\'identifiant ne peut contenir que des lettres, chiffres, points, tirets et underscores';
     }
-    if (formData.email && !EMAIL_REGEX.test(formData.email)) {
+
+    // Check username availability (only if changed in edit mode or new user)
+    if (usernameValidation.available === false && !usernameValidation.checking) {
+      const isOwnUsername = initialData?.username?.toLowerCase() === trimmedUsername;
+      if (!isOwnUsername) {
+        nextErrors.username = 'Cet identifiant est déjà utilisé';
+      }
+    }
+
+    if (trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)) {
       nextErrors.email = 'Email invalide';
     }
-    if (formData.telephone && !PHONE_REGEX.test(formData.telephone)) {
-      nextErrors.telephone = 'Numero de telephone invalide';
+    if (trimmedTelephone && !PHONE_REGEX.test(trimmedTelephone)) {
+      nextErrors.telephone = 'Numéro de téléphone invalide';
     }
     if (!initialData && !formData.password) {
       nextErrors.password = 'Le mot de passe est requis';
@@ -319,14 +430,14 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     setSaving(true);
     try {
       const payload: any = {
-        username: formData.username.trim(),
-        nom: formData.nom.trim(),
-        prenom: formData.prenom?.trim() || '',
-        email: formData.email?.trim() || '',
-        telephone: formData.telephone?.trim() || '',
+        username: trimmedUsername,
+        nom: trimmedNom,
+        prenom: trimmedPrenom,
+        email: trimmedEmail || null,
+        telephone: trimmedTelephone || null,
         role: formData.role,
         statut: formData.statut,
-        photoProfile: formData.photoProfile || ''
+        photoProfile: formData.photoProfile || null
       };
 
       if (formData.password && formData.password.trim()) {
@@ -335,6 +446,21 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
 
       await onSubmit(payload);
       onClose();
+    } catch (error: any) {
+      // Handle backend errors
+      const message = error?.message || error?.error || 'Une erreur est survenue';
+
+      // Map common backend errors to form fields
+      if (message.toLowerCase().includes('username') || message.toLowerCase().includes('identifiant')) {
+        setErrors(prev => ({ ...prev, username: message }));
+      } else if (message.toLowerCase().includes('email')) {
+        setErrors(prev => ({ ...prev, email: message }));
+      } else if (message.toLowerCase().includes('password') || message.toLowerCase().includes('mot de passe')) {
+        setErrors(prev => ({ ...prev, password: message }));
+      } else {
+        setSubmitError(message);
+        toast.error(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -453,21 +579,31 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                    name="username"
                    value={formData.username}
                    onChange={(e) => {
-                       updateField('username', e.target.value);
-                       setUsernameAvailable(null); // Reset on manual edit
+                       const value = e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                       updateField('username', value);
+                       checkUsernameAvailability(value);
                     }}
                     className="bg-surface-base font-mono"
                     required
                     error={errors.username}
+                    placeholder="ex: p.nom"
                   />
-                   {usernameChecking && (
-                     <div className="absolute right-2 top-8 text-xs text-slate-400">
+                   {usernameValidation.checking && (
+                     <div className="absolute right-2 top-8 text-xs text-slate-400 flex items-center gap-1">
+                       <Loader2 size={12} className="animate-spin" />
                        Vérification...
                      </div>
                    )}
-                   {!usernameChecking && usernameAvailable === true && formData.username && (
-                     <div className="absolute right-2 top-8 text-xs text-green-400">
-                       ✓ Disponible
+                   {!usernameValidation.checking && usernameValidation.available === true && formData.username && (
+                     <div className="absolute right-2 top-8 text-xs text-green-400 flex items-center gap-1">
+                       <CheckCircle2 size={12} />
+                       Disponible
+                     </div>
+                   )}
+                   {!usernameValidation.checking && usernameValidation.available === false && formData.username && (
+                     <div className="absolute right-2 top-8 text-xs text-red-400 flex items-center gap-1">
+                       <XCircle size={12} />
+                       Déjà utilisé
                      </div>
                    )}
                  </div>
@@ -569,10 +705,32 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
              </div>
           </div>
 
+          {/* Global error message */}
+          {submitError && (
+            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <AlertCircle size={16} />
+              <span>{submitError}</span>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={onClose} type="button">Annuler</Button>
-            <Button variant="primary" type="submit" disabled={loading || saving} className="px-6">
-              {loading || saving ? 'Enregistrement...' : (initialData ? 'Enregistrer' : 'Créer Compte')}
+            <Button variant="ghost" onClick={onClose} type="button" disabled={saving}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={loading || saving || isUploading || usernameValidation.checking}
+              className="px-6"
+            >
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" />
+                  Enregistrement...
+                </span>
+              ) : (
+                initialData ? 'Enregistrer' : 'Créer Compte'
+              )}
             </Button>
           </div>
         </form>
