@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SystemRole, getRoleLabel as getSystemRoleLabel, normalizeRole } from '@shared/types/roles';
+import { toast } from '../lib/toast';
 
 export interface UserData {
   id: string;
@@ -8,10 +9,21 @@ export interface UserData {
   prenom: string;
   email?: string;
   telephone?: string;
+  adresse?: string;
   role: SystemRole;
   agence?: string;
+  agenceId?: string;
   actif?: boolean;
   createdAt?: string;
+  photoProfile?: string;
+  // Données employé/RH
+  matricule?: string;
+  poste?: string;
+  departement?: string;
+  dateEmbauche?: string;
+  typeContrat?: string;
+  salaireBase?: number;
+  hasCaissePin?: boolean;
 }
 
 export interface PasswordData {
@@ -23,29 +35,18 @@ export interface PasswordData {
 export function useUserProfile() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [formData, setFormData] = useState({
-    nom: '',
-    prenom: '',
-    email: '',
-    telephone: '',
-    username: ''
-  });
-  const [passwordData, setPasswordData] = useState({
+  const [passwordData, setPasswordData] = useState<PasswordData>({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
   const [passwordError, setPasswordError] = useState('');
 
-  useEffect(() => {
-    loadUserProfile();
-  }, []);
-
-  const loadUserProfile = async () => {
+  const loadUserProfile = useCallback(async () => {
     try {
+      // Charger le profil utilisateur
       const response = await fetch('/api/auth/me', { credentials: 'include' });
       if (!response.ok) {
         if (response.status === 401) {
@@ -55,50 +56,75 @@ export function useUserProfile() {
         }
         throw new Error('Erreur lors du chargement du profil');
       }
-      const data = await response.json();
-      const normalizedRole = normalizeRole(data.role) || SystemRole.CLIENT;
-      setUser({ ...data, role: normalizedRole });
-      setFormData({
-        nom: data.nom || '',
-        prenom: data.prenom || '',
-        email: data.email || '',
-        telephone: data.telephone || '',
-        username: data.username || ''
+      const userData = await response.json();
+
+      // Charger les données employé si disponibles
+      let employeData: Partial<UserData> = {};
+      try {
+        const empResponse = await fetch('/api/employes/me', { credentials: 'include' });
+        if (empResponse.ok) {
+          const empData = await empResponse.json();
+          employeData = {
+            matricule: empData.matricule,
+            poste: empData.poste,
+            departement: empData.departement,
+            dateEmbauche: empData.dateEmbauche,
+            typeContrat: empData.typeContrat,
+            salaireBase: empData.salaireBase,
+            hasCaissePin: !!empData.caissePin
+          };
+        }
+      } catch {
+        // Pas de données employé, c'est OK
+      }
+
+      const normalizedRole = normalizeRole(userData.role) || SystemRole.CLIENT;
+      setUser({
+        ...userData,
+        ...employeData,
+        role: normalizedRole
       });
     } catch (error) {
       console.error(error);
+      toast.error('Erreur lors du chargement du profil');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleSaveProfile = async () => {
-    if (!user) return;
+  useEffect(() => {
+    loadUserProfile();
+  }, [loadUserProfile]);
+
+  const updateField = useCallback(async (field: string, value: string) => {
+    if (!user) return false;
     setSaving(true);
     try {
       const response = await fetch('/api/auth/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ [field]: value })
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erreur lors de la mise à jour');
+        throw new Error(error.error || error.message || 'Erreur lors de la mise à jour');
       }
-      alert('Profil mis à jour avec succès');
-      setEditing(false);
-      loadUserProfile();
+      setUser(prev => prev ? { ...prev, [field]: value } : null);
+      toast.success('Profil mis à jour');
+      return true;
     } catch (err: any) {
-      alert('Erreur: ' + err.message);
+      toast.error(err.message);
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [user]);
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = useCallback(async () => {
     if (!user) return;
     setPasswordError('');
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setPasswordError('Les mots de passe ne correspondent pas');
       return;
@@ -107,6 +133,7 @@ export function useUserProfile() {
       setPasswordError('Le mot de passe doit contenir au moins 8 caractères');
       return;
     }
+
     try {
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
@@ -121,30 +148,59 @@ export function useUserProfile() {
         const error = await response.json();
         throw new Error(error.error || 'Erreur lors du changement de mot de passe');
       }
-      alert('Mot de passe modifié avec succès');
+      toast.success('Mot de passe modifié avec succès');
       setShowPasswordModal(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err: any) {
       setPasswordError(err.message);
     }
-  };
+  }, [user, passwordData]);
 
-  const getFullName = () => {
+  const getFullName = useCallback(() => {
     if (user?.prenom && user?.nom) return `${user.prenom} ${user.nom}`;
     return user?.nom || user?.username || 'Utilisateur';
-  };
+  }, [user]);
 
-  const getRoleLabel = (role: string) => {
+  const getRoleLabel = useCallback((role: string) => {
     return getSystemRoleLabel(role);
-  };
+  }, []);
+
+  const getInitials = useCallback(() => {
+    if (!user) return 'U';
+    const prenom = user.prenom?.charAt(0) || '';
+    const nom = user.nom?.charAt(0) || '';
+    return (prenom + nom).toUpperCase() || user.username?.charAt(0)?.toUpperCase() || 'U';
+  }, [user]);
+
+  // Vérifier si l'utilisateur peut voir les données salariales (admin/RH)
+  const canViewSalary = useCallback(() => {
+    if (!user) return false;
+    return [SystemRole.ADMIN, SystemRole.CHEF_AGENCE].includes(user.role);
+  }, [user]);
+
+  // Vérifier si l'utilisateur est un caissier (peut avoir un PIN)
+  const isCashier = useCallback(() => {
+    if (!user) return false;
+    return [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.SUPERVISEUR].includes(user.role);
+  }, [user]);
 
   return {
-    user, loading, editing, setEditing, saving,
-    showPasswordModal, setShowPasswordModal,
-    formData, setFormData,
-    passwordData, setPasswordData,
-    passwordError, setPasswordError,
-    handleSaveProfile, handleChangePassword,
-    getFullName, getRoleLabel
+    user,
+    loading,
+    saving,
+    showPasswordModal,
+    setShowPasswordModal,
+    passwordData,
+    setPasswordData,
+    passwordError,
+    setPasswordError,
+    updateField,
+    handleChangePassword,
+    getFullName,
+    getRoleLabel,
+    getInitials,
+    canViewSalary,
+    isCashier,
+    reloadProfile: loadUserProfile
   };
 }
