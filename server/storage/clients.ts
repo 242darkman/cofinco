@@ -6,6 +6,7 @@ import { db } from "../db";
 import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { StorageService } from "../services/storage-service";
+import { normalizeNom, normalizePrenom } from "./name-utils";
 
 // ============================================
 // TYPES ET SCHEMAS API
@@ -289,10 +290,10 @@ export async function getClientsPaginated(
  */
 export async function createClient(input: CreateClientApiInput): Promise<Client> {
   return await db.transaction(async (tx) => {
-    // 1. Créer le user avec les données d'identité
+    // 1. Créer le user avec les données d'identité (nom normalisé en MAJUSCULES, prénom capitalisé)
     const [user] = await tx.insert(users).values({
-      nom: input.nom,
-      prenom: input.prenom,
+      nom: normalizeNom(input.nom),
+      prenom: normalizePrenom(input.prenom),
       email: input.email,
       telephone: input.telephone,
       photoProfile: input.photoProfile,
@@ -427,6 +428,14 @@ export async function updateClient(id: string, updateData: Partial<CreateClientA
     } else if (value !== undefined) {
       businessData[key] = value;
     }
+  }
+
+  // Normaliser nom et prénom si présents
+  if (identityData.nom !== undefined) {
+    identityData.nom = normalizeNom(identityData.nom);
+  }
+  if (identityData.prenom !== undefined) {
+    identityData.prenom = normalizePrenom(identityData.prenom);
   }
 
   return await db.transaction(async (tx) => {
@@ -697,10 +706,10 @@ export async function createClientWithUser(
   clientData: Omit<CreateClientApiInput, 'nom' | 'prenom' | 'email' | 'telephone' | 'sexe' | 'photoProfile'>
 ): Promise<{ user: User; client: Client }> {
   return await db.transaction(async (tx) => {
-    // 1. Créer l'utilisateur
+    // 1. Créer l'utilisateur (nom normalisé en MAJUSCULES, prénom capitalisé)
     const [user] = await tx.insert(users).values({
-      nom: userData.nom,
-      prenom: userData.prenom,
+      nom: normalizeNom(userData.nom),
+      prenom: normalizePrenom(userData.prenom),
       email: userData.email,
       telephone: userData.telephone,
       sexe: userData.sexe,
@@ -933,10 +942,10 @@ export async function createClientsBulk(clientsData: CreateClientApiInput[]): Pr
     const results: Client[] = [];
 
     for (const data of clientsData) {
-       // 1. Créer le user avec les données d'identité
+       // 1. Créer le user avec les données d'identité (nom normalisé en MAJUSCULES, prénom capitalisé)
        const [user] = await tx.insert(users).values({
-         nom: data.nom,
-         prenom: data.prenom,
+         nom: normalizeNom(data.nom),
+         prenom: normalizePrenom(data.prenom),
          email: data.email,
          telephone: data.telephone,
          photoProfile: data.photoProfile,

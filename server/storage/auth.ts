@@ -3,6 +3,7 @@ import { type User, type InsertUser, type LoginAttempt, type InsertLoginAttempt,
 import { db } from "../db";
 import { eq, desc, and } from "drizzle-orm";
 import { notDeleted } from "./query-helpers";
+import { normalizeNom, normalizePrenom } from "./name-utils";
 
 export async function getUser(id: string): Promise<User | undefined> {
   const [user] = await db.select().from(users).where(and(eq(users.id, id), notDeleted(users)));
@@ -19,12 +20,32 @@ export async function getAllUsers(): Promise<User[]> {
 }
 
 export async function createUser(insertUser: InsertUser): Promise<User> {
-  const [user] = await db.insert(users).values(insertUser).returning();
+  // Normaliser nom (UPPERCASE) et prénom (Capitalize)
+  const normalizedData = {
+    ...insertUser,
+    nom: normalizeNom(insertUser.nom),
+    prenom: normalizePrenom(insertUser.prenom),
+  };
+
+  const [user] = await db.insert(users).values(normalizedData).returning();
   return user;
 }
 
 export async function updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
-  const [user] = await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+  // Normaliser nom et prénom si présents dans la mise à jour
+  const normalizedData: Partial<InsertUser> & { updatedAt: Date } = {
+    ...data,
+    updatedAt: new Date(),
+  };
+
+  if (data.nom !== undefined) {
+    normalizedData.nom = normalizeNom(data.nom);
+  }
+  if (data.prenom !== undefined) {
+    normalizedData.prenom = normalizePrenom(data.prenom);
+  }
+
+  const [user] = await db.update(users).set(normalizedData).where(eq(users.id, id)).returning();
   return user || undefined;
 }
 // Note: User location tracking has been moved to updateAgentLocation in operations.ts

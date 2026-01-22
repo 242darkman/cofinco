@@ -1,6 +1,6 @@
 import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion } from 'lucide-react';
+import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion, Briefcase, Calendar, DollarSign, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import Modal from '../ui/Modal';
@@ -9,8 +9,8 @@ import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { isAdminRole } from '@shared/types/roles';
-import { agenceApi } from '../../lib/api-client';
+import { isAdminRole, SystemRole } from '@shared/types/roles';
+import { agenceApi, employeApi } from '../../lib/api-client';
 import { useMinIOUpload } from '../../hooks/useMinIOUpload';
 import { resolveStorageUrl } from '../../lib/format';
 import { StatutClient, StatutAgence } from '@shared/enum/status-constants';
@@ -31,6 +31,7 @@ interface ClientFormData {
   prenom?: string | null;
   email?: string | null;
   telephone?: string | null;
+  sexe?: 'M' | 'F' | null;
   photoProfile?: string | null;
 
   // Champs métier client (envoyés à la table clients)
@@ -78,6 +79,20 @@ const ID_TYPE_OPTIONS = [
   { value: 'OTHER', label: 'Autre', icon: FileQuestion },
 ] as const;
 
+// Sexe options
+const SEXE_OPTIONS = [
+  { value: 'M', label: 'Masculin' },
+  { value: 'F', label: 'Féminin' },
+] as const;
+
+// Calcul de l'âge minimum (18 ans)
+const MIN_AGE = 18;
+const getMaxBirthDate = () => {
+  const today = new Date();
+  today.setFullYear(today.getFullYear() - MIN_AGE);
+  return today.toISOString().split('T')[0];
+};
+
 export default function ClientForm({ client, onClose, onSave }: ClientFormProps) {
   // Camera State
   const [isLivenessOpen, setIsLivenessOpen] = useState(false);
@@ -85,6 +100,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
   // User and Agency Data
   const { user } = useUserProfile();
   const [agences, setAgences] = useState<{ id: string; nom: string }[]>([]);
+  const [agentsReferents, setAgentsReferents] = useState<{ id: string; nom: string; prenom: string }[]>([]);
   const isAdmin = isAdminRole(user?.role);
 
   // Form State
@@ -93,9 +109,15 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     prenom: '',
     email: '',
     telephone: '',
+    sexe: null,
     adresse: '',
     adresseDomicile: '',
+    ville: '',
     lieuActivite: '',
+    dateNaissance: '',
+    profession: '',
+    employeur: '',
+    revenuMensuel: '',
     photoUrl: '',
     photoProfile: '',
     statut: StatutClient.ACTIVE,
@@ -110,6 +132,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     numeroPiece: '',
     typeMarcheId: null,
     agenceId: null,
+    agentReferentId: null,
     documents: [],
   });
 
@@ -216,9 +239,15 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         prenom: c.prenom || '',
         email: c.email || '',
         telephone: c.telephone || '',
+        sexe: c.sexe || null,
         adresse: c.adresse || '',
         adresseDomicile: c.adresseDomicile || '',
+        ville: c.ville || '',
         lieuActivite: c.lieuActivite || '',
+        dateNaissance: c.dateNaissance || '',
+        profession: c.profession || '',
+        employeur: c.employeur || '',
+        revenuMensuel: c.revenuMensuel || '',
         photoUrl: c.photoUrl || '',
         photoProfile: c.photoProfile || '',
         statut: c.statut,
@@ -233,6 +262,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         numeroPiece: c.numeroPiece || '',
         typeMarcheId: c.typeMarcheId || null,
         agenceId: c.agenceId || null,
+        agentReferentId: c.agentReferentId || null,
         documents: c.documents || [],
       });
 
@@ -269,6 +299,29 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     }
   }, [isAdmin]);
 
+  // Charger les agents référents (AGENT_TERRAIN ou CHEF_AGENCE)
+  useEffect(() => {
+    const loadAgentsReferents = async () => {
+      try {
+        const data = await employeApi.getAll();
+        // Filtrer pour ne garder que les agents terrain et chefs d'agence
+        const agents = (data || []).filter((emp: any) => {
+          const role = emp.roleSystem || emp.user?.role;
+          return role === 'terrain' || role === 'chef_agence' ||
+                 role === SystemRole.AGENT_TERRAIN || role === SystemRole.CHEF_AGENCE;
+        }).map((emp: any) => ({
+          id: emp.id,
+          nom: emp.user?.nom || emp.nom || '',
+          prenom: emp.user?.prenom || emp.prenom || '',
+        }));
+        setAgentsReferents(agents);
+      } catch (error) {
+        console.error('Erreur chargement agents référents:', error);
+      }
+    };
+    loadAgentsReferents();
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = (): boolean => {
@@ -277,10 +330,28 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     if (!formData.telephone) newErrors.telephone = 'Le téléphone est requis';
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Email invalide';
     if (isAdmin && !formData.agenceId && !client) newErrors.agenceId = "L'agence est requise pour les admins";
-    
+
     // Require ID number for CNI and Passport
     if ((formData.typePiece === 'CNI' || formData.typePiece === 'PASSPORT') && !(formData.numeroPiece || '').trim()) {
       newErrors.numeroPiece = formData.typePiece === 'CNI' ? 'Le N° CNI est requis' : 'Le N° Passeport est requis';
+    }
+
+    // Validation date de naissance (majeur obligatoire)
+    if (formData.dateNaissance) {
+      const birthDate = new Date(formData.dateNaissance);
+      const today = new Date();
+      const age = Math.floor((today.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      if (age < MIN_AGE) {
+        newErrors.dateNaissance = `Le client doit avoir au moins ${MIN_AGE} ans`;
+      }
+    }
+
+    // Validation revenu mensuel (positif)
+    if (formData.revenuMensuel) {
+      const revenu = parseFloat(formData.revenuMensuel);
+      if (isNaN(revenu) || revenu < 0) {
+        newErrors.revenuMensuel = 'Le revenu doit être un nombre positif';
+      }
     }
 
     setErrors(newErrors);
@@ -478,6 +549,39 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
           />
 
+          <SelectField
+            label="Sexe"
+            name="sexe"
+            value={formData.sexe || ''}
+            onChange={(e) => handleChange('sexe', e.target.value as 'M' | 'F' || null)}
+            options={[
+              { value: '', label: 'Sélectionner' },
+              ...SEXE_OPTIONS.map(s => ({ value: s.value, label: s.label }))
+            ]}
+          />
+
+          <FormField
+            label="Date de Naissance"
+            name="dateNaissance"
+            type="date"
+            icon={Calendar}
+            value={formData.dateNaissance || ''}
+            onChange={(e) => handleChange('dateNaissance', e.target.value)}
+            error={errors.dateNaissance}
+            max={getMaxBirthDate()}
+            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+          />
+
+          <FormField
+            label="Ville"
+            name="ville"
+            icon={MapPin}
+            value={formData.ville || ''}
+            onChange={(e) => handleChange('ville', e.target.value)}
+            placeholder="Brazzaville"
+            className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+          />
+
           <FormField
             label="Lieu d'Activité"
             name="lieuActivite"
@@ -523,6 +627,60 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
               { value: 'VIP', label: 'VIP' }
             ]}
           />
+        </div>
+
+        {/* Section Profil & Conformité */}
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2 mb-4">
+            <Briefcase size={18} className="text-cyan-400" />
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Profil Professionnel & Conformité</h4>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <FormField
+              label="Profession"
+              name="profession"
+              icon={Briefcase}
+              value={formData.profession || ''}
+              onChange={(e) => handleChange('profession', e.target.value)}
+              placeholder="Ex: Commerçant, Enseignant..."
+              className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+            />
+
+            <FormField
+              label="Employeur"
+              name="employeur"
+              icon={Briefcase}
+              value={formData.employeur || ''}
+              onChange={(e) => handleChange('employeur', e.target.value)}
+              placeholder="Nom de l'entreprise (si salarié)"
+              className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+            />
+
+            <FormField
+              label="Revenu Mensuel (FCFA)"
+              name="revenuMensuel"
+              type="number"
+              icon={DollarSign}
+              value={formData.revenuMensuel || ''}
+              onChange={(e) => handleChange('revenuMensuel', e.target.value)}
+              error={errors.revenuMensuel}
+              placeholder="150000"
+              min="0"
+              className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+            />
+
+            <SelectField
+              label="Agent Référent"
+              name="agentReferentId"
+              value={formData.agentReferentId || ''}
+              onChange={(e) => handleChange('agentReferentId', e.target.value === '' ? null : e.target.value)}
+              options={[
+                { value: '', label: 'Sélectionner un agent référent' },
+                ...agentsReferents.map(a => ({ value: a.id, label: `${a.prenom} ${a.nom}` }))
+              ]}
+              helperText="Agent terrain ou chef d'agence responsable du client"
+            />
+          </div>
         </div>
 
         {/* Accès Portail Client - Section verrouillée */}

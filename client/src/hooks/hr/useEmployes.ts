@@ -43,6 +43,10 @@ export interface EmployeFormData {
   numeroCnss: string;
   photoProfile?: string;
   managerId?: string | null; // ID du supérieur hiérarchique
+  // Nouveaux champs pour le workflow Admin/RH
+  userId?: string | null; // Liaison avec un User existant
+  agenceId?: string | null; // Agence d'affectation
+  modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY'; // Mode de calcul de paie
 }
 
 export function useEmployes() {

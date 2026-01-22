@@ -242,15 +242,18 @@ export default function AdminGestionUtilisateurs() {
                   <>
                     {canEditUsers && (
                       <>
-                        <IconButton
-                          icon={KeyRound}
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); setPinUser(user); setShowPinModal(true); }}
-                          className="text-warning hover:bg-warning/10"
-                          title="PIN"
-                          aria-label="Définir PIN Caisse"
-                        />
+                        {/* PIN Caisse - uniquement pour les non-clients (employés, caissiers, etc.) */}
+                        {user.role !== SystemRole.CLIENT && user.role !== 'client' && (
+                          <IconButton
+                            icon={KeyRound}
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); setPinUser(user); setShowPinModal(true); }}
+                            className="text-warning hover:bg-warning/10"
+                            title="PIN"
+                            aria-label="Définir PIN Caisse"
+                          />
+                        )}
                         <IconButton
                           icon={Edit2}
                           variant="ghost"

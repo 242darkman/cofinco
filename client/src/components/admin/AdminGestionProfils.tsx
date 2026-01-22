@@ -128,14 +128,7 @@ export default function AdminGestionProfils() {
     role: SystemRole.CAISSIER,
     agenceId: '',
     photoProfile: '',
-    // Agent Terrain specific fields
-    zonesAffectation: [] as string[],
-    objectifMensuel: '100000'
   });
-
-  // Zones for agent terrain assignment
-  const [zones, setZones] = useState<Array<{id: string; nom: string; ville: string}>>([]);
-  const isAgentTerrain = formData.role === SystemRole.AGENT_TERRAIN;
 
   const roleMap: Record<SystemRole, string> = {
     [SystemRole.ADMIN]: 'admin',
@@ -175,19 +168,6 @@ export default function AdminGestionProfils() {
 
   useEffect(() => {
     loadUsers();
-    loadZones();
-  }, []);
-
-  const loadZones = useCallback(async () => {
-    try {
-      const response = await fetch('/api/zones');
-      if (response.ok) {
-        const data = await response.json();
-        setZones(data || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch zones:', error);
-    }
   }, []);
 
   const loadUsers = useCallback(async () => {
@@ -212,30 +192,66 @@ export default function AdminGestionProfils() {
 
     setIsSubmitting(true);
     try {
-      // Mapper le rôle UI vers le rôle système
-      const systemRole = roleMap[formData.role] || 'agent';
+      // Génération d'un username unique basé sur le nom
+      const normalizedNom = formData.nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normalizedPrenom = (formData.prenom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const username = normalizedPrenom ? `${normalizedPrenom.charAt(0)}.${normalizedNom}` : normalizedNom;
 
-      await employeApi.create({
+      // Créer uniquement le User (pas d'employé)
+      // Les données RH seront complétées dans le module RH
+      const createdUser = await userApi.create({
         nom: formData.nom,
         prenom: formData.prenom,
         email: formData.email,
         telephone: formData.phone,
         password: formData.password,
-        username: formData.email, // Par défaut on utilise l'email comme username
-        roleSystem: systemRole as any,
-        agenceId: formData.agenceId || undefined,
+        username: username,
         photoProfile: formData.photoProfile || undefined,
-        // Données employé par défaut
-        typeContrat: 'CDI',
-        modeCalculPaie: 'Mensuel',
-        // Agent Terrain specific data (only used when roleSystem === 'terrain')
-        ...(systemRole === 'terrain' && {
-          zonesAffectation: formData.zonesAffectation.length > 0 ? formData.zonesAffectation : undefined,
-          objectifMensuel: formData.objectifMensuel || '100000'
-        })
-      } as any);
+        typeCompte: 'employe', // Marqué comme employé potentiel
+        canLogin: true,
+        statut: StatutUser.ACTIVE,
+      });
 
-      toast.success(`Profil ${formData.nom} ${formData.prenom} créé avec succès`);
+      // Attribuer le rôle via l'API userRoles si le user a été créé
+      if (createdUser?.id && formData.role) {
+        try {
+          await fetch(`/api/users/${createdUser.id}/roles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              role: formData.role,
+              agenceId: formData.agenceId || null,
+              isPrimary: true,
+            }),
+          });
+        } catch (roleError) {
+          console.error('Erreur attribution rôle:', roleError);
+        }
+      }
+
+      // Affecter à l'agence si spécifiée
+      if (createdUser?.id && formData.agenceId) {
+        try {
+          await fetch(`/api/users/${createdUser.id}/agences`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              agenceId: formData.agenceId,
+              isPrimary: true,
+            }),
+          });
+        } catch (agenceError) {
+          console.error('Erreur affectation agence:', agenceError);
+        }
+      }
+
+      toast.success(
+        `Compte utilisateur ${formData.nom} ${formData.prenom} créé avec succès.\n` +
+        `⚠️ Les informations RH (contrat, salaire, matricule) doivent être complétées dans le module Ressources Humaines.`,
+        { duration: 6000 }
+      );
 
       setFormData({
         nom: '',
@@ -247,8 +263,6 @@ export default function AdminGestionProfils() {
         role: SystemRole.CAISSIER,
         agenceId: '',
         photoProfile: '',
-        zonesAffectation: [],
-        objectifMensuel: '100000'
       });
       setShowCreateForm(false);
       loadUsers();
@@ -456,8 +470,6 @@ export default function AdminGestionProfils() {
                     nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '', role: SystemRole.CAISSIER,
                     agenceId: (contextAgence && contextAgence.id !== 'all') ? contextAgence.id : '',
                     photoProfile: '',
-                    zonesAffectation: [],
-                    objectifMensuel: '100000'
                   });
                   setShowCreateForm(true);
                 }}
@@ -867,69 +879,15 @@ export default function AdminGestionProfils() {
                 <p className="text-[10px] text-content-muted">L'employé sera rattaché à cette agence pour ses opérations.</p>
               </div>
 
-              {/* Agent Terrain Specific Fields - Conditional */}
-              {isAgentTerrain && (
-                <div className="space-y-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 bg-blue-500/20 rounded flex items-center justify-center">
-                      <svg className="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                    <span className="text-xs font-semibold text-blue-400">Configuration Agent Terrain</span>
-                  </div>
-
-                  {/* Zones d'Affectation - Multi-select */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-content-secondary">Zones d'Affectation (optionnel)</label>
-                    <div className="max-h-32 overflow-y-auto bg-surface-base border border-edge rounded-lg p-2 space-y-1">
-                      {zones.length === 0 ? (
-                        <p className="text-xs text-content-muted italic">Aucune zone disponible</p>
-                      ) : (
-                        zones.map((zone) => {
-                          const zoneKey = `${zone.ville}/${zone.nom}`;
-                          const isSelected = formData.zonesAffectation.includes(zoneKey);
-                          return (
-                            <label key={zone.id} className="flex items-center gap-2 cursor-pointer hover:bg-surface-muted p-1 rounded">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  const newZones = e.target.checked
-                                    ? [...formData.zonesAffectation, zoneKey]
-                                    : formData.zonesAffectation.filter(z => z !== zoneKey);
-                                  setFormData({...formData, zonesAffectation: newZones});
-                                }}
-                                className="w-3.5 h-3.5 rounded border-edge text-primary focus:ring-primary"
-                              />
-                              <span className="text-xs text-content-primary">{zone.ville} / {zone.nom}</span>
-                            </label>
-                          );
-                        })
-                      )}
-                    </div>
-                    {formData.zonesAffectation.length > 0 && (
-                      <p className="text-[10px] text-blue-400">{formData.zonesAffectation.length} zone(s) sélectionnée(s)</p>
-                    )}
-                  </div>
-
-                  {/* Objectif Mensuel */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-content-secondary">Objectif Mensuel (FCFA)</label>
-                    <input
-                      type="number"
-                      value={formData.objectifMensuel}
-                      onChange={(e) => setFormData({...formData, objectifMensuel: e.target.value})}
-                      className="w-full px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                      placeholder="100000"
-                      min={0}
-                      step={10000}
-                    />
-                    <p className="text-[10px] text-content-muted">Objectif de collecte mensuel pour cet agent</p>
-                  </div>
-                </div>
-              )}
+              {/* Note: Agent Terrain config et données RH seront gérées dans le module RH */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <p className="text-xs text-amber-400 flex items-center gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>Les données RH (salaire, contrat, matricule) seront à compléter dans le module <strong>Ressources Humaines</strong>.</span>
+                </p>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
