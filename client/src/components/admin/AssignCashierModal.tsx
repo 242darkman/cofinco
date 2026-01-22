@@ -79,8 +79,8 @@ export default function AssignCashierModal({
         {/* HEADER */}
         <div className="p-5 border-b border-slate-800 flex justify-between items-start bg-slate-900/50 rounded-t-2xl">
           <div>
-            <h3 className="text-lg font-bold text-white">Gérer {caisseName}</h3>
-            <p className="text-xs text-slate-400 mt-1">Sélectionnez les agents autorisés sur cette caisse</p>
+            <h3 className="text-lg font-bold text-white">Agents habilités - {caisseName}</h3>
+            <p className="text-xs text-slate-400 mt-1">Ces agents pourront ouvrir une session sur cette caisse</p>
           </div>
           <button
             onClick={onClose}
@@ -108,7 +108,7 @@ export default function AssignCashierModal({
             <div className="mt-3 flex items-center gap-2 text-xs">
               <Users size={14} className="text-indigo-400" />
               <span className="text-slate-400">
-                {selectedUserIds.length} agent{selectedUserIds.length > 1 ? 's' : ''} sélectionné{selectedUserIds.length > 1 ? 's' : ''}
+                {selectedUserIds.length} agent{selectedUserIds.length > 1 ? 's' : ''} habilité{selectedUserIds.length > 1 ? 's' : ''}
               </span>
             </div>
           )}
@@ -176,7 +176,7 @@ export default function AssignCashierModal({
                       <span className="truncate">{fullName}</span>
                       {isCurrent && (
                         <span className="flex-shrink-0 text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                          Actuel
+                          Déjà habilité
                         </span>
                       )}
                     </div>

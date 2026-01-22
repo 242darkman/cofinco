@@ -86,7 +86,7 @@ export default function AdminGestionCaisses() {
           queryClient.invalidateQueries({ queryKey: ['caisses'] });
           setIsAssignModalOpen(false);
           const count = variables.userIds.length;
-          toast.success(count > 0 ? `${count} agent${count > 1 ? 's' : ''} assigné${count > 1 ? 's' : ''}` : 'Caisse libérée');
+          toast.success(count > 0 ? `${count} agent${count > 1 ? 's' : ''} habilité${count > 1 ? 's' : ''}` : 'Habilitations retirées');
           setSelectedCaisseForAssign(null);
           setCurrentAssigneeIds([]);
       },
