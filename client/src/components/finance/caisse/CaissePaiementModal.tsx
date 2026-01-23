@@ -644,17 +644,16 @@ export default function CaissePaiementModal({
                          <div className="text-sm font-bold text-white truncate">
                              {clients.find(c => c.id === formData.client_id)?.nom} {clients.find(c => c.id === formData.client_id)?.prenom}
                          </div>
-                         <div className="flex items-center gap-3 text-xs text-indigo-300 mt-0.5">
-                             <div className="flex items-center gap-1" title={`${clientCredits.length} Crédits actifs`}>
-                                 <CreditCard size={10} /> 
-                                 <span>{clientCredits.length}</span>
+                         <div className="flex items-center gap-4 text-xs text-indigo-300 mt-1">
+                             <div className="flex items-center gap-1.5" title={`${clientCredits.length} Crédit${clientCredits.length > 1 ? 's' : ''} actif${clientCredits.length > 1 ? 's' : ''}`}>
+                                 <CreditCard size={12} className="opacity-70"/> 
+                                 <span className="font-medium">{clientCredits.length} {clientCredits.length > 1 ? 'Crédits' : 'Crédit'}</span>
                              </div>
                              <div className="w-px h-3 bg-indigo-500/30"></div>
-                             <div className="flex items-center gap-1" title={`${activeTontinesCount} Tontines actives`}>
-                                 <Users size={10} /> 
-                                 <span>{activeTontinesCount}</span>
+                             <div className="flex items-center gap-1.5" title={`${activeTontinesCount} Tontine${activeTontinesCount > 1 ? 's' : ''} active${activeTontinesCount > 1 ? 's' : ''}`}>
+                                 <Users size={12} className="opacity-70"/> 
+                                 <span className="font-medium">{activeTontinesCount} {activeTontinesCount > 1 ? 'Tontines' : 'Tontine'}</span>
                              </div>
-                             {/* Placeholder pour Solde Global si disponible dans l'avenir */}
                          </div>
                       </div>
                    </div>
