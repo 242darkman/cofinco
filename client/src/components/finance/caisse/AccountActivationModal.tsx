@@ -143,8 +143,14 @@ export function AccountActivationModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] animate-in fade-in duration-200">
-      <div className="bg-slate-900 rounded-2xl max-w-md w-full mx-4 border border-slate-800 shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] animate-in fade-in duration-200"
+      onClick={() => !loading && onClose()}
+    >
+      <div
+        className="bg-slate-900 rounded-2xl max-w-md w-full mx-4 border border-slate-800 shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
