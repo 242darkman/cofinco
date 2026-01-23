@@ -19,42 +19,44 @@ export function registerMessagesRoutes(app: Express) {
       const userId = req.user.id;
 
       // Complex query to get last message for each conversation partner
+      // Architecture V3: Le rôle est dans user_roles, pas dans users
       const conversations = await db.execute(sql`
         WITH LastMessages AS (
           SELECT DISTINCT ON (
             CASE WHEN sender_id < receiver_id THEN sender_id ELSE receiver_id END,
             CASE WHEN sender_id < receiver_id THEN receiver_id ELSE sender_id END
-          ) 
-            id, 
-            sender_id, 
-            receiver_id, 
-            content, 
+          )
+            id,
+            sender_id,
+            receiver_id,
+            content,
             created_at,
             read,
-            CASE 
-              WHEN sender_id = ${userId} THEN receiver_id 
-              ELSE sender_id 
+            CASE
+              WHEN sender_id = ${userId} THEN receiver_id
+              ELSE sender_id
             END as partner_id
           FROM messages
           WHERE sender_id = ${userId} OR receiver_id = ${userId}
-          ORDER BY 
+          ORDER BY
             CASE WHEN sender_id < receiver_id THEN sender_id ELSE receiver_id END,
             CASE WHEN sender_id < receiver_id THEN receiver_id ELSE sender_id END,
             created_at DESC
         )
-        SELECT 
-          lm.*, 
-          COALESCE(NULLIF(TRIM(u.nom || ' ' || COALESCE(u.prenom, '')), ''), u.username, 'Utilisateur') as partner_name, 
+        SELECT
+          lm.*,
+          COALESCE(NULLIF(TRIM(u.nom || ' ' || COALESCE(u.prenom, '')), ''), u.username, 'Utilisateur') as partner_name,
           u.photo_profile as partner_avatar,
           u.statut as partner_status,
-          u.role as partner_role,
+          ur.role as partner_role,
           a.nom as partner_agence,
-          (SELECT COUNT(*) FROM messages m 
-           WHERE m.receiver_id = ${userId} 
-           AND m.sender_id = lm.partner_id 
+          (SELECT COUNT(*) FROM messages m
+           WHERE m.receiver_id = ${userId}
+           AND m.sender_id = lm.partner_id
            AND m.read = false) as unread_count
         FROM LastMessages lm
         JOIN users u ON u.id = lm.partner_id
+        LEFT JOIN user_roles ur ON ur.user_id = u.id AND ur.is_primary = true
         LEFT JOIN user_agences ua ON ua.user_id = u.id AND ua.is_primary = true AND ua.actif = true
         LEFT JOIN agences a ON a.id = ua.agence_id
         ORDER BY lm.created_at DESC
