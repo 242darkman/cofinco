@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X, User, MapPin, Briefcase, Mail, Phone, CreditCard,
-  MoreVertical, CheckCircle, Ban, Calendar, MessageCircle
+  MoreVertical, CheckCircle, Ban, Calendar, MessageCircle,
+  Loader2, FileText, KeyRound, LogOut, Archive, History, Shield
 } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { resolveStorageUrl } from '@/lib/format';
@@ -14,6 +15,9 @@ interface EmployeeProfileDrawerProps {
 }
 
 export default function EmployeeProfileDrawer({ employee, onClose, onEdit }: EmployeeProfileDrawerProps) {
+  const [isMenuOpen, setMenuOpen] = useState(false);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
+
   // Helper to get initials
   const getInitials = (nom: string, prenom: string) => {
     return `${(nom || '').charAt(0)}${(prenom || '').charAt(0)}`.toUpperCase();
@@ -38,6 +42,19 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit }: Emp
       return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
     } catch {
       return dateString;
+    }
+  };
+
+  // Handle chat opening with window.location
+  const handleOpenChat = async () => {
+    setIsLoadingChat(true);
+    try {
+      // Navigate to messages page with user ID
+      await new Promise(resolve => setTimeout(resolve, 300)); // Small delay for UX
+      window.location.href = `/messages?userId=${employee.id}`;
+    } catch (error) {
+      console.error('Erreur ouverture chat:', error);
+      setIsLoadingChat(false);
     }
   };
 
@@ -85,20 +102,104 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit }: Emp
         <div className="flex-1 overflow-y-auto pt-14 px-8 pb-8 space-y-8">
            
            {/* Actions Rapides Contextuelles */}
-           <div className="flex gap-3">
+           <div className="flex gap-3 relative">
              <button 
                onClick={() => onEdit && onEdit(employee)}
                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-indigo-900/20"
              >
                Modifier Profil
              </button>
-             <button className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm border border-slate-700 flex items-center gap-2">
-               <MessageCircle size={16} />
+             
+             {/* Message Button with Chat Integration */}
+             <button 
+               onClick={handleOpenChat}
+               disabled={isLoadingChat}
+               className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm border border-slate-700 flex items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-wait"
+             >
+               {isLoadingChat ? (
+                 <Loader2 size={18} className="animate-spin text-indigo-400" />
+               ) : (
+                 <MessageCircle size={18} />
+               )}
                <span className="hidden sm:inline">Message</span>
              </button>
-             <button className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl border border-slate-700">
-               <MoreVertical size={18} />
-             </button>
+             
+             {/* Options Menu */}
+             <div className="relative">
+               <button 
+                 onClick={() => setMenuOpen(!isMenuOpen)}
+                 className={`px-3 py-2.5 rounded-xl border transition-colors ${
+                   isMenuOpen 
+                     ? 'bg-slate-700 border-slate-600 text-white' 
+                     : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                 }`}
+               >
+                 <MoreVertical size={20} />
+               </button>
+
+               {/* Enhanced Dropdown Menu */}
+               {isMenuOpen && (
+                 <>
+                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                   <div className="absolute right-0 top-12 z-20 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 animate-in fade-in zoom-in-95 origin-top-right">
+                     
+                     {/* Section Administration */}
+                     <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Administration</div>
+                     <MenuItem 
+                       icon={FileText} 
+                       label="Gérer les documents" 
+                       onClick={() => { console.log('Docs'); setMenuOpen(false); }} 
+                     />
+                     <MenuItem 
+                       icon={History} 
+                       label="Historique d'activité" 
+                       onClick={() => { console.log('History'); setMenuOpen(false); }} 
+                     />
+                     
+                     <div className="my-1 border-t border-slate-800" />
+                     
+                     {/* Section Sécurité */}
+                     <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Sécurité</div>
+                     <MenuItem 
+                       icon={KeyRound} 
+                       label="Réinitialiser le mot de passe" 
+                       onClick={() => { console.log('Reset pwd'); setMenuOpen(false); }} 
+                     />
+                     <MenuItem 
+                       icon={LogOut} 
+                       label="Forcer la déconnexion" 
+                       onClick={() => { console.log('Force logout'); setMenuOpen(false); }} 
+                     />
+
+                     <div className="my-1 border-t border-slate-800" />
+
+                     {/* Section Danger */}
+                     <MenuItem 
+                       icon={Ban} 
+                       label="Suspendre le compte" 
+                       color="text-amber-500 hover:bg-amber-500/10" 
+                       onClick={() => { 
+                         if (confirm('Êtes-vous sûr de vouloir suspendre ce compte ?')) {
+                           console.log('Suspend'); 
+                           setMenuOpen(false);
+                         }
+                       }} 
+                     />
+                     <MenuItem 
+                       icon={Archive} 
+                       label="Archiver (Départ)" 
+                       color="text-red-500 hover:bg-red-500/10" 
+                       onClick={() => { 
+                         if (confirm('Êtes-vous sûr de vouloir archiver cet employé ?')) {
+                           console.log('Archive'); 
+                           setMenuOpen(false);
+                         }
+                       }} 
+                     />
+                   </div>
+                 </>
+               )}
+             </div>
            </div>
 
            {/* Block 1: Info Pro */}
@@ -284,5 +385,26 @@ function AgencyTypeBadge({ type }: { type: 'MAIN' | 'SECONDARY' | 'KIOSK' }) {
     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${typeInfo.colors}`}>
       {typeInfo.label}
     </span>
+  );
+}
+
+function MenuItem({ 
+  icon: Icon, 
+  label, 
+  onClick, 
+  color = "text-slate-300 hover:bg-slate-800 hover:text-white" 
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  color?: string;
+}) {
+  return (
+    <button 
+      onClick={(e) => { e.stopPropagation(); onClick(e); }}
+      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${color}`}
+    >
+      <Icon size={16} /> {label}
+    </button>
   );
 }
