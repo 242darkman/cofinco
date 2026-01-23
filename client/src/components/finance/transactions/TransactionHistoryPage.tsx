@@ -17,6 +17,7 @@ import {
 import { Button, EmptyState } from '../../ui';
 import TransactionsList, { TransactionItem } from './TransactionsList';
 import TransactionDetailDrawer, { TransactionDetails } from './TransactionDetailDrawer';
+import { isIncomingOperation } from '@shared/config/caisse-operations';
 
 // --- Types ---
 
@@ -53,16 +54,25 @@ const QUICK_FILTERS = [
 
 // --- Helper Functions ---
 
-const TYPES_ENTREES = [
-  'Dépôt', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Encaissement',
-  'Cotisation Tontine', 'Approvisionnement coffre', 'FRAIS_ENGAGEMENT', 'Frais Engagement',
-  'DEPOT_ESPECES', 'Dépôt Espèces', 'credit', 'Approvisionnement depuis Coffre-Fort'
+/** French keywords for legacy data compatibility */
+const FR_ENTREE_KEYWORDS = [
+  'dépôt', 'versement', 'remboursement', 'encaissement',
+  'cotisation', 'approvisionnement', 'frais engagement',
+  'activation', 'credit'
 ];
 
+/**
+ * Détermine si une opération est une entrée (crédit pour la caisse)
+ * Utilise la config partagée + fallback sur les labels FR
+ */
 const isEntree = (type: string): boolean => {
-  return TYPES_ENTREES.some(t =>
-    type.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(type.toLowerCase())
-  );
+  // 1. Check shared config (EN operation types)
+  if (isIncomingOperation(type)) {
+    return true;
+  }
+  // 2. Fallback: check French keywords for legacy data
+  const typeLower = type.toLowerCase();
+  return FR_ENTREE_KEYWORDS.some(keyword => typeLower.includes(keyword));
 };
 
 const getToday = () => {
