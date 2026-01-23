@@ -25,6 +25,7 @@ import { eq, and, isNull, inArray, desc } from "drizzle-orm";
 import { StatutTransfertCoffre } from "@shared/enum/status-constants";
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
+import { getWsInstance } from "../../ws-server";
 
 // ============================================================================
 // TYPES
@@ -284,6 +285,38 @@ export class SessionOpeningService {
           userAgent,
         });
 
+        // 11. Notification WebSocket au coffre (demande en attente)
+        try {
+          const ws = getWsInstance();
+          if (ws) {
+            // Notifier le coffre d'une nouvelle demande d'ouverture
+            ws.broadcastToAggregate('coffre', agenceId, {
+              type: 'REALTIME_EVENT',
+              payload: {
+                aggregateType: 'coffre',
+                aggregateId: agenceId,
+                event: 'OPENING_REQUEST_CREATED',
+                transfertId: transfert.id,
+                sessionId: session.id,
+                montant: montantDemande,
+                caisseId,
+              }
+            });
+
+            // Activité en temps réel
+            ws.broadcastToAgency(agenceId, {
+              type: 'LIVE_ACTIVITY',
+              payload: {
+                action: `Demande d'ouverture: ${montantDemande.toLocaleString()} FCFA`,
+                type: 'request',
+                timestamp: new Date().toISOString()
+              }
+            });
+          }
+        } catch (wsError) {
+          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+        }
+
         return {
           success: true,
           session: { ...session, openingTransfertId: transfert.id },
@@ -499,6 +532,50 @@ export class SessionOpeningService {
           userAgent,
         });
 
+        // 7. Notification WebSocket au caissier
+        try {
+          const ws = getWsInstance();
+          if (ws && transfert.agenceId) {
+            if (approved) {
+              // Notifier le caissier que les fonds sont prêts
+              ws.broadcastToAggregate('caisse', transfert.caisseId, {
+                type: 'CAISSE_UPDATE',
+                payload: {
+                  caisseId: transfert.caisseId,
+                  type: 'FUNDS_DISPATCHED',
+                  sessionId: session.id,
+                  montant: Number(transfert.montant),
+                }
+              });
+            } else {
+              // Notifier le caissier du rejet
+              ws.broadcastToAggregate('caisse', transfert.caisseId, {
+                type: 'CAISSE_UPDATE',
+                payload: {
+                  caisseId: transfert.caisseId,
+                  type: 'FUNDS_REJECTED',
+                  sessionId: session.id,
+                  reason: reasonRejection,
+                }
+              });
+            }
+
+            // Activité en temps réel
+            ws.broadcastToAgency(transfert.agenceId, {
+              type: 'LIVE_ACTIVITY',
+              payload: {
+                action: approved
+                  ? `Fonds validés: ${Number(transfert.montant).toLocaleString()} FCFA`
+                  : `Demande rejetée: ${reasonRejection || 'Non spécifié'}`,
+                type: approved ? 'validation' : 'rejection',
+                timestamp: new Date().toISOString()
+              }
+            });
+          }
+        } catch (wsError) {
+          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+        }
+
         return {
           success: true,
           session: updatedSession,
@@ -571,23 +648,45 @@ export class SessionOpeningService {
         const soldeVeille = Number(session.soldeVeille || 0);
         const soldeOuverture = soldeVeille + montantRecu;
 
-        // 4. Exécuter le transfert du coffre
+        // 4. Exécuter le transfert du coffre (si pas déjà exécuté)
         if (session.openingTransfertId) {
-          const execResult = await this.transfertService.executeTransfert({
-            transfertId: session.openingTransfertId,
-            executorId: caissierId,
-            sessionId: sessionId,
-            billetage: billetageReception,
-            ipAddress,
-            userAgent,
-          });
+          // Vérifier le statut actuel du transfert
+          const [currentTransfert] = await tx
+            .select()
+            .from(transfertsCoffreCaisse)
+            .where(eq(transfertsCoffreCaisse.id, session.openingTransfertId));
 
-          if (!execResult.success) {
-            return {
-              success: false,
-              error: `Erreur lors de l'exécution du transfert: ${'error' in execResult ? execResult.error : 'Unknown error'}`,
-              errorCode: 'errorCode' in execResult ? execResult.errorCode : 'EXECUTE_ERROR',
-            };
+          if (currentTransfert) {
+            // Si le transfert est déjà exécuté, on skip l'exécution
+            // (cas où le chef d'agence a validé ET exécuté directement depuis le dashboard coffre)
+            if (currentTransfert.statut === StatutTransfertCoffre.EXECUTED) {
+              console.log("[SessionOpeningService] Transfert déjà exécuté, on continue l'ouverture de session");
+            } else if (currentTransfert.statut === StatutTransfertCoffre.VALIDATED) {
+              // Transfert validé mais pas encore exécuté - on l'exécute
+              const execResult = await this.transfertService.executeTransfert({
+                transfertId: session.openingTransfertId,
+                executorId: caissierId,
+                sessionId: sessionId,
+                billetage: billetageReception,
+                ipAddress,
+                userAgent,
+              });
+
+              if (!execResult.success) {
+                return {
+                  success: false,
+                  error: `Erreur lors de l'exécution du transfert: ${'error' in execResult ? execResult.error : 'Unknown error'}`,
+                  errorCode: 'errorCode' in execResult ? execResult.errorCode : 'EXECUTE_ERROR',
+                };
+              }
+            } else {
+              // Statut inattendu
+              return {
+                success: false,
+                error: `Le transfert est dans un état inattendu: ${currentTransfert.statut}. Il doit être VALIDATED ou EXECUTED.`,
+                errorCode: 'INVALID_TRANSFER_STATUS',
+              };
+            }
           }
         }
 
@@ -651,6 +750,47 @@ export class SessionOpeningService {
           ipAddress,
           userAgent,
         });
+
+        // 10. Notifications WebSocket en temps réel
+        try {
+          const ws = getWsInstance();
+          if (ws && session.agenceId) {
+            // Notifier le dashboard caisse
+            ws.broadcastToAggregate('caisse', session.caisseId, {
+              type: 'CAISSE_UPDATE',
+              payload: {
+                caisseId: session.caisseId,
+                type: 'SESSION_OPENED',
+                sessionId: updatedSession.id,
+                newBalance: soldeOuverture,
+              }
+            });
+
+            // Notifier le coffre que la session est ouverte
+            ws.broadcastToAggregate('coffre', session.agenceId, {
+              type: 'REALTIME_EVENT',
+              payload: {
+                aggregateType: 'coffre',
+                aggregateId: session.agenceId,
+                event: 'SESSION_OPENED',
+                sessionId: updatedSession.id,
+                caisseId: session.caisseId,
+              }
+            });
+
+            // Activité en temps réel pour toute l'agence
+            ws.broadcastToAgency(session.agenceId, {
+              type: 'LIVE_ACTIVITY',
+              payload: {
+                action: `Session caisse ouverte: ${soldeOuverture.toLocaleString()} FCFA`,
+                type: 'session',
+                timestamp: new Date().toISOString()
+              }
+            });
+          }
+        } catch (wsError) {
+          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+        }
 
         return {
           success: true,
@@ -995,6 +1135,36 @@ export class SessionOpeningService {
           ipAddress,
           userAgent,
         });
+
+        // 7. Notification WebSocket en temps réel
+        try {
+          const ws = getWsInstance();
+          if (ws) {
+            // Notifier le dashboard caisse
+            ws.broadcastToAggregate('caisse', caisseId, {
+              type: 'CAISSE_UPDATE',
+              payload: {
+                caisseId,
+                type: 'SESSION_OPENED',
+                sessionId: newSession.id,
+                newBalance: soldeExistant,
+                openingType: 'DIRECT',
+              }
+            });
+
+            // Activité en temps réel
+            ws.broadcastToAgency(agenceId, {
+              type: 'LIVE_ACTIVITY',
+              payload: {
+                action: `Session ouverte (fonds reporté): ${soldeExistant.toLocaleString()} FCFA`,
+                type: 'session',
+                timestamp: new Date().toISOString()
+              }
+            });
+          }
+        } catch (wsError) {
+          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+        }
 
         return {
           success: true,

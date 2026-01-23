@@ -26,12 +26,23 @@ interface SessionForceClosedEvent {
   timestamp: string;
 }
 
+interface CaisseUpdateEvent {
+  caisseId: string;
+  type: 'SESSION_OPENED' | 'FUNDS_DISPATCHED' | 'FUNDS_REJECTED' | 'BALANCE_UPDATED';
+  sessionId?: string;
+  newBalance?: number;
+  montant?: number;
+  reason?: string;
+  openingType?: string;
+}
+
 interface UseCaisseWebSocketOptions {
   caisseId?: string;
   sessionId?: string;
   onCaisseStatusChanged?: (event: CaisseStatusChangedEvent) => void;
   onSessionForceClosed?: (event: SessionForceClosedEvent) => void;
   onSessionUpdated?: (data: any) => void;
+  onCaisseUpdate?: (event: CaisseUpdateEvent) => void;
   enabled?: boolean;
 }
 
@@ -41,6 +52,7 @@ export function useCaisseWebSocket({
   onCaisseStatusChanged,
   onSessionForceClosed,
   onSessionUpdated,
+  onCaisseUpdate,
   enabled = true,
 }: UseCaisseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -49,12 +61,14 @@ export function useCaisseWebSocket({
   const onCaisseStatusChangedRef = useRef(onCaisseStatusChanged);
   const onSessionForceClosedRef = useRef(onSessionForceClosed);
   const onSessionUpdatedRef = useRef(onSessionUpdated);
+  const onCaisseUpdateRef = useRef(onCaisseUpdate);
 
   // Update refs on every render
   useEffect(() => {
     onCaisseStatusChangedRef.current = onCaisseStatusChanged;
     onSessionForceClosedRef.current = onSessionForceClosed;
     onSessionUpdatedRef.current = onSessionUpdated;
+    onCaisseUpdateRef.current = onCaisseUpdate;
   });
 
   const handleMessage = useCallback((event: MessageEvent) => {
@@ -104,6 +118,39 @@ export function useCaisseWebSocket({
             // Trigger refresh
             if (onSessionUpdatedRef.current) {
                 onSessionUpdatedRef.current(data.payload);
+            }
+            break;
+
+        case 'CAISSE_UPDATE':
+            // Handle real-time caisse updates (session opened, funds dispatched, etc.)
+            if (onCaisseUpdateRef.current) {
+                onCaisseUpdateRef.current(data.payload);
+            }
+
+            // Also trigger session update for refresh
+            if (onSessionUpdatedRef.current) {
+                onSessionUpdatedRef.current(data.payload);
+            }
+
+            // Show toast notification based on update type
+            const updateType = data.payload?.type;
+            if (updateType === 'SESSION_OPENED') {
+                toast.success('✓ Session ouverte avec succès', {
+                    duration: 3000,
+                    description: `Solde: ${Number(data.payload.newBalance || 0).toLocaleString()} FCFA`,
+                });
+            } else if (updateType === 'FUNDS_DISPATCHED') {
+                toast.success('💰 Fonds prêts à être récupérés', {
+                    duration: 5000,
+                    description: `Montant: ${Number(data.payload.montant || 0).toLocaleString()} FCFA`,
+                });
+            } else if (updateType === 'FUNDS_REJECTED') {
+                toast.error('❌ Demande de fonds rejetée', {
+                    duration: 5000,
+                    description: data.payload.reason || 'Raison non spécifiée',
+                });
+            } else if (updateType === 'BALANCE_UPDATED') {
+                // Silent update, just refresh
             }
             break;
       }

@@ -203,14 +203,37 @@ export default function CaisseDashboard({
   }, [currentSession?.id]);
 
   // Real-time Updates
+  // Enable WebSocket for both active sessions AND pending opening sessions
+  const wsEnabled = !!currentSession || !!hasPendingOpening;
+  const wsCaisseId = currentSession?.caisse_id || pendingSession?.caisse_id;
+  const wsSessionId = currentSession?.id || pendingSession?.id;
+
   useCaisseWebSocket({
-    caisseId: currentSession?.caisse_id,
-    sessionId: currentSession?.id,
-    enabled: !!currentSession,
+    caisseId: wsCaisseId,
+    sessionId: wsSessionId,
+    enabled: wsEnabled,
     onSessionUpdated: (data) => {
         refetchSession(); // To update balance
         refetchTransactions(); // To show new operation
-        toast.info(data.type === 'MOUVEMENT_CREE' ? 'Nouvelle opération reçue' : 'Session mise à jour');
+        refetchPendingSession(); // To check pending status
+        if (data.type === 'MOUVEMENT_CREE') {
+            toast.info('Nouvelle opération reçue');
+        }
+    },
+    onCaisseUpdate: (data) => {
+        // Handle opening workflow events
+        if (data.type === 'SESSION_OPENED') {
+            refetchSession();
+            refetchPendingSession();
+        } else if (data.type === 'FUNDS_DISPATCHED') {
+            // Funds ready - cashier can now confirm receipt
+            refetchPendingSession();
+        } else if (data.type === 'FUNDS_REJECTED') {
+            // Request rejected - reset to initial state
+            refetchPendingSession();
+        } else if (data.type === 'BALANCE_UPDATED') {
+            refetchSession();
+        }
     },
     onCaisseStatusChanged: (data) => {
         if (data.sessionId === currentSession?.id && data.status === 'CLOSED') {
