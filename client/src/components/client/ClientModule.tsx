@@ -451,7 +451,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                             />
                           ) : (
                             <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600 text-xs font-bold text-slate-500 dark:text-slate-400">
-                              {(item.prenom?.[0] || item.nom?.[0] || '?').toUpperCase()}
+                              {`${item.prenom?.[0] || ''}${item.nom?.[0] || ''}`.toUpperCase() || '?'}
                             </div>
                           )}
                           <span className="font-medium text-slate-900 dark:text-slate-100">
