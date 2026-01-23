@@ -24,6 +24,12 @@ export interface Employe {
   managerId?: string | null; // ID du supérieur hiérarchique
   managerNom?: string | null; // Nom complet du manager (pour affichage)
   agenceId?: string | null; // UUID de l'agence
+  agence?: {
+    id: string;
+    nom: string;
+    typeAgence: 'MAIN' | 'SECONDARY' | 'KIOSK';
+    codeAgence: string;
+  } | null;
   modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY'; // Mode de calcul paie
   jobPositionId?: string | null; // UUID du poste
   jobPosition?: {
@@ -93,6 +99,7 @@ export function useEmployes() {
         managerNom: null, // Sera calculé après
         // Nouveaux champs
         agenceId: item.agenceId || null,
+        agence: item.agence || null, // Include full agence object
         jobPositionId: item.jobPositionId || null,
         jobPosition: item.jobPosition || null,
         modeCalculPaie: item.modeCalculPaie || 'MONTHLY',

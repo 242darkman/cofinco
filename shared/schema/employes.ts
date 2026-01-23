@@ -64,4 +64,10 @@ export interface EmployeWithUser extends Employe {
   };
   jobPosition?: JobPosition | null;
   department?: Department | null;
+  agence?: {
+    id: string;
+    nom: string;
+    typeAgence: 'MAIN' | 'SECONDARY' | 'KIOSK';
+    codeAgence: string;
+  } | null;
 }

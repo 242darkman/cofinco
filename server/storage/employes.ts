@@ -148,11 +148,18 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
       createdAt: departments.createdAt,
       updatedAt: departments.updatedAt,
     },
+    agence: {
+      id: agences.id,
+      nom: agences.nom,
+      typeAgence: agences.typeAgence,
+      codeAgence: agences.codeAgence,
+    },
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
+  .leftJoin(agences, eq(employes.agenceId, agences.id))
   .where(eq(employes.id, id));
 
   if (result.length === 0) return undefined;
@@ -162,6 +169,7 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
     user: result[0].user,
     jobPosition: result[0].jobPosition?.id ? result[0].jobPosition : null,
     department: result[0].department?.id ? result[0].department : null,
+    agence: result[0].agence?.id ? result[0].agence : null,
   };
 }
 
@@ -231,12 +239,19 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
       createdAt: departments.createdAt,
       updatedAt: departments.updatedAt,
     },
+    agence: {
+      id: agences.id,
+      nom: agences.nom,
+      typeAgence: agences.typeAgence,
+      codeAgence: agences.codeAgence,
+    },
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
   .leftJoin(userRoles, eq(users.id, userRoles.userId))
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
+  .leftJoin(agences, eq(employes.agenceId, agences.id))
   .where(isNull(users.deletedAt))
   .orderBy(desc(users.createdAt));
 
@@ -248,6 +263,7 @@ export async function getAllEmployesWithUsers(): Promise<EmployeWithUser[]> {
     },
     jobPosition: r.jobPosition?.id ? r.jobPosition : null,
     department: r.department?.id ? r.department : null,
+    agence: r.agence?.id ? r.agence : null,
   }));
 }
 
@@ -291,12 +307,19 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
       createdAt: departments.createdAt,
       updatedAt: departments.updatedAt,
     },
+    agence: {
+      id: agences.id,
+      nom: agences.nom,
+      typeAgence: agences.typeAgence,
+      codeAgence: agences.codeAgence,
+    },
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
   .leftJoin(userRoles, eq(users.id, userRoles.userId))
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
+  .leftJoin(agences, eq(employes.agenceId, agences.id))
   .where(and(
     eq(employes.agenceId, agenceId),
     isNull(users.deletedAt)
@@ -311,6 +334,7 @@ export async function getEmployesByAgence(agenceId: string): Promise<EmployeWith
     },
     jobPosition: r.jobPosition?.id ? r.jobPosition : null,
     department: r.department?.id ? r.department : null,
+    agence: r.agence?.id ? r.agence : null,
   }));
 }
 

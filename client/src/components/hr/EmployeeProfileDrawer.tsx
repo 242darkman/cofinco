@@ -152,9 +152,24 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit }: Emp
            </Section>
 
            {/* Block 4: Agence (if applicable) */}
-           {employee.agenceId && (
+           {(employee.agenceId || employee.agence) && (
              <Section title="Affectation" icon={MapPin}>
-               <GridItem label="Agence" value="Agence principale" fullWidth />
+               <div className="col-span-2">
+                 <div className="text-xs text-slate-500 font-medium mb-2">Agence</div>
+                 <div className="flex items-center gap-2">
+                   <div className="text-sm text-slate-200 font-medium">
+                     {employee.agence?.nom || 'Agence principale'}
+                   </div>
+                   {employee.agence?.typeAgence && (
+                     <AgencyTypeBadge type={employee.agence.typeAgence} />
+                   )}
+                 </div>
+                 {employee.agence?.codeAgence && (
+                   <div className="text-xs text-slate-500 font-mono mt-1">
+                     Code: {employee.agence.codeAgence}
+                   </div>
+                 )}
+               </div>
              </Section>
            )}
         </div>
@@ -233,6 +248,41 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStyles()}`}>
       {getIcon()}
       {status}
+    </span>
+  );
+}
+
+function AgencyTypeBadge({ type }: { type: 'MAIN' | 'SECONDARY' | 'KIOSK' }) {
+  const getTypeInfo = () => {
+    switch (type) {
+      case 'MAIN':
+        return {
+          label: 'Principale',
+          colors: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+        };
+      case 'SECONDARY':
+        return {
+          label: 'Secondaire',
+          colors: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+        };
+      case 'KIOSK':
+        return {
+          label: 'Kiosque',
+          colors: 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+        };
+      default:
+        return {
+          label: type,
+          colors: 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+        };
+    }
+  };
+
+  const typeInfo = getTypeInfo();
+
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${typeInfo.colors}`}>
+      {typeInfo.label}
     </span>
   );
 }
