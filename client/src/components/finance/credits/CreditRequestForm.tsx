@@ -5,7 +5,7 @@ import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../u
 import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
-import { StatutDemande } from '@shared/enum/status-constants';
+import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS } from '@shared/enum/status-constants';
 import useSmartDuration from '../../../hooks/credits/useSmartDuration';
 import DurationSelector from './DurationSelector';
 
@@ -139,6 +139,15 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     }
   };
 
+  const normalizeTypeCredit = (value: string | undefined): string => {
+    if (!value) return TypeCredit.PERSONAL;
+    const upper = value.toUpperCase();
+    if (upper === TypeCredit.COMMERCIAL || upper === 'ACCOMPAGNEMENT') return TypeCredit.COMMERCIAL;
+    if (upper === TypeCredit.REAL_ESTATE || upper === 'IMMOBILIER') return TypeCredit.REAL_ESTATE;
+    if (upper === TypeCredit.PERSONAL || upper === 'PERSONNEL') return TypeCredit.PERSONAL;
+    return TypeCredit.PERSONAL;
+  };
+
   const handleApplyPlan = (planId: string) => {
     const plan = creditPlans.find(p => p.id === planId);
     if (!plan) return;
@@ -155,7 +164,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     setFormData(prev => ({
       ...prev,
       credit_plan_id: planId,
-      type_credit: plan.typeCredit || plan.type_credit,
+      type_credit: normalizeTypeCredit(plan.typeCredit || plan.type_credit),
       taux_interet: String(plan.tauxInteret || plan.taux_interet),
       duree_valeur: String(plan.dureeValeur || plan.duree_valeur),
       duree_unite: plan.dureeUnite || plan.duree_unite,
@@ -424,11 +433,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
 
 
-  const typeCreditOptions = [
-    { value: 'PERSONAL', label: 'Personnel' },
-    { value: 'REAL_ESTATE', label: 'Immobilier' },
-    { value: 'COMMERCIAL', label: 'Accompagnement (Commercial)' }
-  ];
+  const typeCreditOptions = TYPE_CREDIT_OPTIONS;
 
   const frequenceOptions = [
     { value: '', label: 'Selectionner une frequence...' },

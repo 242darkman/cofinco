@@ -3,6 +3,7 @@ import { FileSpreadsheet, Upload, Download, Plus, Trash2, RefreshCw, Users, Cred
 import { useExcelSheet, ExcelRow } from '../../hooks/useExcelSheet';
 import { TabGroup, Button, Card, Modal, Badge, IconButton, PageHeader, EmptyState } from '../ui';
 import { requestListAll } from '../../lib/api-client';
+import { TypeCredit } from '@shared/enum/status-constants';
 
 const DATA_TYPES = [
   { id: 'clients', label: 'Clients', icon: Users },
@@ -63,6 +64,15 @@ export default function ExcelModule() {
     };
   };
 
+  const normalizeTypeCredit = (value: string | undefined): string => {
+    if (!value) return TypeCredit.PERSONAL;
+    const upper = value.toString().toUpperCase().trim();
+    if (upper === TypeCredit.COMMERCIAL || upper === 'ACCOMPAGNEMENT') return TypeCredit.COMMERCIAL;
+    if (upper === TypeCredit.REAL_ESTATE || upper === 'IMMOBILIER') return TypeCredit.REAL_ESTATE;
+    if (upper === TypeCredit.PERSONAL || upper === 'PERSONNEL') return TypeCredit.PERSONAL;
+    return TypeCredit.PERSONAL;
+  };
+
   const validateCreditRow = (row: ExcelRow, index: number) => {
     const clientId = row.clientId || row.ClientId || row.client_id || '';
     const montant = row.montant || row.Montant || '';
@@ -74,7 +84,7 @@ export default function ExcelModule() {
         clientId: clientId.trim(), montant: String(montant),
         taux: String(row.taux || row.Taux || '12'),
         duree: parseInt(row.duree || row.Duree || '12'),
-        typeCredit: (row.typeCredit || row.TypeCredit || 'Personnel').trim(),
+        typeCredit: normalizeTypeCredit(row.typeCredit || row.TypeCredit),
         objetCredit: (row.objetCredit || row.ObjetCredit || '').trim(),
         statut: (row.statut || row.Statut || 'PENDING').trim(), echeance: 'Mensuel'
       }

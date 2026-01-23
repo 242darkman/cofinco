@@ -5,6 +5,7 @@ import { creditPlanApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { TYPE_CREDIT_OPTIONS } from '@shared/enum/status-constants';
 
 interface CreditPlan {
   id: string;
@@ -326,10 +327,7 @@ export default function AdminCreditPlansGestion({
               name="type_credit"
               value={formData.type_credit}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, type_credit: e.target.value})}
-              options={[
-                { value: 'PERSONAL', label: 'Personnel' },
-                { value: 'COMMERCIAL', label: 'Commercial' }
-              ]}
+              options={TYPE_CREDIT_OPTIONS}
             />
             <TextareaField
               label="Description"

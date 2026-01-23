@@ -94,7 +94,29 @@ export const StatutCredit = {
 
 export type StatutCreditType = (typeof StatutCredit)[keyof typeof StatutCredit];
 
+// ============================================
+// TYPE CREDIT (Catégorie de crédit)
+// ============================================
 
+export const TypeCredit = {
+  PERSONAL: "PERSONAL",
+  REAL_ESTATE: "REAL_ESTATE",
+  COMMERCIAL: "COMMERCIAL",
+} as const;
+
+export type TypeCreditType = (typeof TypeCredit)[keyof typeof TypeCredit];
+
+/** Labels FR pour l'UI des types de crédit */
+export const TYPE_CREDIT_LABELS: Record<TypeCreditType, string> = {
+  [TypeCredit.PERSONAL]: "Personnel",
+  [TypeCredit.REAL_ESTATE]: "Immobilier",
+  [TypeCredit.COMMERCIAL]: "Accompagnement (Commercial)",
+};
+
+/** Options de type crédit pour les selects de l'UI */
+export const TYPE_CREDIT_OPTIONS = Object.entries(TYPE_CREDIT_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
 
 // ============================================
 // STATUT DEMANDE CREDIT (Workflow demande)
