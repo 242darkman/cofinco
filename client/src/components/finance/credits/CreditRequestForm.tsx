@@ -59,10 +59,10 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     duree_unite: 'MONTH' as 'DAY' | 'WEEK' | 'MONTH',
     taux_interet: '',
     frequence_remboursement: '',
-    type_credit: 'Personnel',
+    type_credit: 'PERSONAL',
     objet_credit: '',
     revenus_mensuels: '',
-    type_revenu: 'Mensuel',
+    type_revenu: 'MONTHLY',
     revenu_journalier: '',
     charges_mensuelles: ''
   });
@@ -425,9 +425,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
 
   const typeCreditOptions = [
-    { value: 'Personnel', label: 'Personnel' },
-    { value: 'Immobilier', label: 'Immobilier' },
-    { value: 'Commercial', label: 'Accompagnement (Commercial)' }
+    { value: 'PERSONAL', label: 'Personnel' },
+    { value: 'REAL_ESTATE', label: 'Immobilier' },
+    { value: 'COMMERCIAL', label: 'Accompagnement (Commercial)' }
   ];
 
   const frequenceOptions = [
@@ -756,14 +756,14 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 <div className="flex items-center justify-between">
                   <label className="block text-sm font-semibold text-slate-300">
                     <TrendingUp size={16} className="inline mr-2" />
-                    {formData.type_revenu === 'Journalier' ? 'Revenu Journalier' : 'Revenus Mensuels'} *
+                    {formData.type_revenu === 'DAILY' ? 'Revenu Journalier' : 'Revenus Mensuels'} *
                   </label>
                   <div className="flex bg-slate-700/50 p-0.5 rounded-lg border border-slate-600/50">
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, type_revenu: 'Mensuel' })}
+                      onClick={() => setFormData({ ...formData, type_revenu: 'MONTHLY' })}
                       className={`px-3 py-1 rounded text-xs font-medium transition ${
-                        formData.type_revenu === 'Mensuel'
+                        formData.type_revenu === 'MONTHLY'
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-400 hover:text-white'
                       }`}
@@ -772,9 +772,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, type_revenu: 'Journalier' })}
+                      onClick={() => setFormData({ ...formData, type_revenu: 'DAILY' })}
                       className={`px-3 py-1 rounded text-xs font-medium transition ${
-                        formData.type_revenu === 'Journalier'
+                        formData.type_revenu === 'DAILY'
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-400 hover:text-white'
                       }`}
@@ -783,8 +783,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                     </button>
                   </div>
                 </div>
-
-                {formData.type_revenu === 'Journalier' ? (
+ 
+                {formData.type_revenu === 'DAILY' ? (
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input

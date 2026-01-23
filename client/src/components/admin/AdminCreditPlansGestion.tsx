@@ -50,13 +50,13 @@ export default function AdminCreditPlansGestion({
   const [formData, setFormData] = useState({
     nom: '',
     description: '',
-    type_credit: 'Personnel',
+    type_credit: 'PERSONAL',
     montant_min: '',
     montant_max: '',
     taux_interet: '20',
     duree_valeur: '30',
-    duree_unite: 'Jour',
-    frequence_remboursement: 'Journalier',
+    duree_unite: 'DAY',
+    frequence_remboursement: 'DAILY',
     frais_dossier: '',
     conditions: '',
     actif: true
@@ -90,13 +90,13 @@ export default function AdminCreditPlansGestion({
     setFormData({
       nom: '',
       description: '',
-      type_credit: 'Personnel',
+      type_credit: 'PERSONAL',
       montant_min: '',
       montant_max: '',
       taux_interet: '10',
       duree_valeur: '30',
-      duree_unite: 'Jour',
-      frequence_remboursement: 'Journalier',
+      duree_unite: 'DAY',
+      frequence_remboursement: 'DAILY',
       frais_dossier: '',
       conditions: '',
       actif: true
@@ -327,8 +327,8 @@ export default function AdminCreditPlansGestion({
               value={formData.type_credit}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, type_credit: e.target.value})}
               options={[
-                { value: 'Personnel', label: 'Personnel' },
-                { value: 'Commercial', label: 'Commercial' }
+                { value: 'PERSONAL', label: 'Personnel' },
+                { value: 'COMMERCIAL', label: 'Commercial' }
               ]}
             />
             <TextareaField
@@ -366,9 +366,9 @@ export default function AdminCreditPlansGestion({
                   value={formData.duree_unite}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, duree_unite: e.target.value})}
                   options={[
-                    { value: 'Jour', label: 'Jours' },
-                    { value: 'Semaine', label: 'Semaines' },
-                    { value: 'Mois', label: 'Mois' }
+                    { value: 'DAY', label: 'Jours' },
+                    { value: 'WEEK', label: 'Semaines' },
+                    { value: 'MONTH', label: 'Mois' }
                   ]}
                 />
 
@@ -379,10 +379,10 @@ export default function AdminCreditPlansGestion({
                   value={formData.frequence_remboursement}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, frequence_remboursement: e.target.value})}
                   options={[
-                    { value: 'Journalier', label: 'Journalier' },
-                    { value: 'Hebdomadaire', label: 'Hebdomadaire' },
-                    { value: 'Bimensuel', label: 'Bimensuel' },
-                    { value: 'Mensuel', label: 'Mensuel' }
+                    { value: 'DAILY', label: 'Journalier' },
+                    { value: 'WEEKLY', label: 'Hebdomadaire' },
+                    { value: 'BI_MONTHLY', label: 'Bimensuel' },
+                    { value: 'MONTHLY', label: 'Mensuel' }
                   ]}
                 />
               </div>

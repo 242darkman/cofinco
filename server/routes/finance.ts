@@ -431,7 +431,7 @@ export function registerFinanceRoutes(app: Express) {
                 mapping.commission += c;
             } else if (s === StatutDemande.REEVALUATION_IN_PROGRESS) {
                 mapping.reevaluation += c;
-            } else if ([StatutDemande.REJECTED, StatutDemande.CANCELLED].includes(s as any)) {
+            } else if ([StatutDemande.REJECTED, StatutDemande.CANCELLED, StatutDemande.DEFINITIVELY_REJECTED, StatutDemande.DELETED].includes(s as any)) {
                 mapping.archives += c;
             }
         }
