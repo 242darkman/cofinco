@@ -26,7 +26,7 @@ import crypto from "crypto";
  * Format: EMP-{CODE_AGENCE}-{ANNÉE}-{HEX}
  * Exemple: EMP-BZV-2026-A7F2
  */
-async function generateMatricule(agenceId: string | null | undefined): Promise<string> {
+export async function generateMatricule(agenceId: string | null | undefined): Promise<string> {
   let agenceCode = "XXX"; // Valeur par défaut si pas d'agence
 
   if (agenceId) {

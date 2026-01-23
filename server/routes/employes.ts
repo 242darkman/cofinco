@@ -6,6 +6,7 @@ import { users, employes, agentsTerrain, userRoles } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser } from "@shared/enum/status-constants";
 import { storage } from "../storage";
+import { generateMatricule } from "../storage/employes";
 import { requireAuth, requireRole, hashPassword } from "../auth";
 import { logAudit } from "../audit";
 
@@ -271,6 +272,9 @@ export function registerEmployesRoutes(app: Express) {
         hashedPassword = await hashPassword(data.password);
       }
 
+      // Générer le matricule automatiquement si non fourni
+      const matricule = data.matricule || await generateMatricule(data.agenceId);
+
       // Créer dans une transaction (Architecture V3: user + employe + userRoles)
       const result = await db.transaction(async (tx) => {
         // 1. Créer l'utilisateur
@@ -294,7 +298,7 @@ export function registerEmployesRoutes(app: Express) {
         // 2. Créer l'employé lié (sans roleSystem - géré par userRoles)
         const [employe] = await tx.insert(employes).values({
           userId: user.id,
-          matricule: data.matricule || null,
+          matricule,
           jobPositionId: data.jobPositionId || null,
           dateEmbauche: data.dateEmbauche || null,
           typeContrat: data.typeContrat || 'CDI',
@@ -333,7 +337,7 @@ export function registerEmployesRoutes(app: Express) {
         "CREATE_EMPLOYE",
         "employe",
         result.employe.id,
-        { nom: data.nom, prenom: data.prenom, matricule: data.matricule },
+        { nom: data.nom, prenom: data.prenom, matricule },
         "success",
         "medium"
       );
@@ -501,17 +505,41 @@ export function registerEmployesRoutes(app: Express) {
         return res.status(400).json({ message: "Cet utilisateur a déjà un profil employé" });
       }
 
-      // Valider les données employé
-      const { role: requestedRole, ...employeFields } = req.body;
+      // Séparer les données user des données employé
+      const {
+        role: requestedRole,
+        // Champs user à mettre à jour
+        dateNaissance,
+        adresse,
+        ville,
+        telephone,
+        email,
+        sexe,
+        photoProfile,
+        // Le reste va dans employeFields
+        ...employeFields
+      } = req.body;
+
       const resolvedRole = requestedRole && Object.values(SystemRole).includes(requestedRole)
         ? requestedRole
         : SystemRole.AGENT_TERRAIN;
 
-      // Mettre à jour le type_compte de l'utilisateur
+      // Mettre à jour les informations de l'utilisateur
+      const userUpdateData: Record<string, any> = {
+        typeCompte: user.typeCompte === 'client' ? 'both' : 'employe',
+      };
+
+      // Ajouter les champs user fournis (ne pas écraser si non fournis)
+      if (dateNaissance !== undefined) userUpdateData.dateNaissance = dateNaissance || null;
+      if (adresse !== undefined) userUpdateData.adresse = adresse || null;
+      if (ville !== undefined) userUpdateData.ville = ville || null;
+      if (telephone !== undefined) userUpdateData.telephone = telephone || null;
+      if (email !== undefined) userUpdateData.email = email || null;
+      if (sexe !== undefined) userUpdateData.sexe = sexe || null;
+      if (photoProfile !== undefined) userUpdateData.photoProfile = photoProfile || null;
+
       await db.update(users)
-        .set({
-          typeCompte: user.typeCompte === 'client' ? 'both' : 'employe',
-        })
+        .set(userUpdateData)
         .where(eq(users.id, userId));
 
       // Créer l'employé avec rôle (Architecture V3)

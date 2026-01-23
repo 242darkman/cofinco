@@ -143,16 +143,22 @@ export function useEmployes() {
         .replace(/\s/g, '')
         .replace(/,/g, '.')
         .replace(/[^\d.]/g, '');
-      
+
       // Normaliser phone -> telephone pour le backend
-      const { phone, ...rest } = formData;
+      const { phone, userId, ...rest } = formData;
       const payload = {
         ...rest,
         telephone: phone, // Le backend attend "telephone"
         salaireBase: normalizedSalary || '0'
       };
 
-      const response = await fetch('/api/employes', {
+      // Si userId est fourni, on lie à un utilisateur existant (pas de création d'user)
+      // Sinon, on crée un nouvel utilisateur + employé
+      const url = userId
+        ? `/api/employes/from-user/${userId}`
+        : '/api/employes';
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -161,7 +167,7 @@ export function useEmployes() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erreur');
+        throw new Error(error.message || error.error || 'Erreur');
       }
 
       await fetchEmployes();
