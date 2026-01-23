@@ -43,7 +43,18 @@ const normalizeModuleKey = (module: string): string => module
   .toLowerCase()
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
-  .replace(/\s+/g, '');
+  .replace(/[-_\s]+/g, ''); // Supprime tirets, underscores ET espaces
+
+// Mapping des noms de modules UI vers les préfixes de permissions en BDD
+// Clés normalisées (minuscules, sans tirets/underscores/espaces/accents)
+// Ex: "Coffre-Fort" (UI) → normalisé "coffrefort" → préfixe "coffre" (coffre.view, coffre.transfert.*)
+// Note: Les modules avec tirets/underscores sont automatiquement normalisés (virements_programmes → virementsprogrammes)
+const MODULE_TO_PERMISSION_PREFIX: Record<string, string> = {
+  'coffrefort': 'coffre',              // Coffre-Fort → coffre.view, coffre.transfert.*
+  'agentterrain': 'agent',             // Agent Terrain → agent.view, agent.collect
+  'comptes': 'epargnes',               // Comptes → epargnes.view, epargnes.create
+  'administration': 'admin',           // Administration → admin.users, etc.
+};
 
 const APP_MODULE_MAP: Record<string, AppModule> = APP_MODULES.reduce((map, module) => {
   map[normalizeModuleKey(module)] = module;
@@ -457,10 +468,14 @@ class AuthService {
     if (this.permissionsLoaded && Object.keys(this.permissionsMap).length > 0) {
       const moduleKey = this.normalizeModuleName(module);
 
-      // Chercher dans permissionsMap avec la clé normalisée
-      // ou chercher une clé qui correspond après normalisation
+      // Résoudre le préfixe de permission (ex: "coffrefort" -> "coffre")
+      const permissionPrefix = MODULE_TO_PERMISSION_PREFIX[moduleKey] || moduleKey;
+
+      // Chercher dans permissionsMap avec la clé normalisée ou le préfixe mappé
       for (const [key, actions] of Object.entries(this.permissionsMap)) {
-        if (this.normalizeModuleName(key) === moduleKey && actions.length > 0) {
+        const normalizedKey = this.normalizeModuleName(key);
+        // Vérifie si la clé correspond au moduleKey OU au permissionPrefix
+        if ((normalizedKey === moduleKey || normalizedKey === permissionPrefix || key === permissionPrefix) && actions.length > 0) {
           return true;
         }
       }

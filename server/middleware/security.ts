@@ -17,6 +17,10 @@ import type { Request, Response, NextFunction } from "express";
 // ============================================================================
 
 const isProduction = process.env.NODE_ENV === "production";
+const isDevelopment = !isProduction;
+
+// En développement, désactiver le rate limiting (limites très élevées)
+const DEV_MAX = 10000; // Pratiquement illimité en dev
 
 // ============================================================================
 // RATE LIMITERS
@@ -26,12 +30,13 @@ const isProduction = process.env.NODE_ENV === "production";
  * Limiteur pour les endpoints d'authentification
  * Très strict pour prévenir les attaques par force brute
  *
- * - Max 5 tentatives de login par 15 minutes par IP
+ * - Max 5 tentatives de login par 15 minutes par IP (PROD)
+ * - Désactivé en développement
  * - Ne compte pas les requêtes réussies (skipSuccessfulRequests)
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 tentatives maximum
+  max: isDevelopment ? DEV_MAX : 5, // Désactivé en dev
   message: {
     error: "Trop de tentatives de connexion, réessayez dans 15 minutes",
     retryAfter: 15 * 60, // secondes
@@ -39,6 +44,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skipSuccessfulRequests: true, // Ne pas compter les logins réussis
+  skip: () => isDevelopment, // Skip complètement en dev
   // Default keyGenerator uses req.ip which handles IPv6 properly
   // when trust proxy is set (app.set('trust proxy', 1))
 });
@@ -47,53 +53,59 @@ export const authLimiter = rateLimit({
  * Limiteur standard pour l'API
  * Protège contre le spam sans bloquer les utilisateurs légitimes
  *
- * - Max 200 requêtes par 15 minutes par IP
+ * - Max 200 requêtes par 15 minutes par IP (PROD)
+ * - Désactivé en développement
  * - Suffisant pour les agents actifs en agence
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // 200 requêtes maximum
+  max: isDevelopment ? DEV_MAX : 200, // Désactivé en dev
   message: {
     error: "Trop de requêtes, veuillez réessayer plus tard",
     retryAfter: 15 * 60,
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDevelopment, // Skip complètement en dev
 });
 
 /**
  * Limiteur pour les opérations sensibles
  * Virements, validations de crédits, transactions financières
  *
- * - Max 20 opérations par minute par IP
+ * - Max 20 opérations par minute par IP (PROD)
+ * - Désactivé en développement
  * - Prévient les abus sans bloquer le workflow normal
  */
 export const sensitiveOpsLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 20, // 20 opérations maximum
+  max: isDevelopment ? DEV_MAX : 20, // Désactivé en dev
   message: {
     error: "Opération trop fréquente, veuillez patienter",
     retryAfter: 60,
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDevelopment, // Skip complètement en dev
 });
 
 /**
  * Limiteur pour les uploads de fichiers
  * Prévient l'abus de stockage
  *
- * - Max 30 uploads par minute
+ * - Max 30 uploads par minute (PROD)
+ * - Désactivé en développement
  */
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 uploads maximum
+  max: isDevelopment ? DEV_MAX : 30, // Désactivé en dev
   message: {
     error: "Trop de fichiers uploadés, veuillez patienter",
     retryAfter: 60,
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDevelopment, // Skip complètement en dev
 });
 
 // ============================================================================
