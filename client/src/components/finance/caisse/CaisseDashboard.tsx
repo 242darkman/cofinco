@@ -141,6 +141,24 @@ export default function CaisseDashboard({
     enabled: !sessionActive && !supervisedSession
   });
 
+  // Query for user's assigned caisses with available balance (when no session is active)
+  const {
+    data: myCaisses = [],
+    refetch: refetchMyCaisses
+  } = useQuery({
+    queryKey: ['session-caisse', 'my-caisses'],
+    queryFn: async () => {
+      const data = await sessionCaisseApi.getMyCaisses();
+      return data || [];
+    },
+    // Always fetch to show available funds
+    enabled: true
+  });
+
+  // Get the first non-occupied caisse for displaying available funds
+  const availableCaisse = myCaisses.find((c: any) => !c.is_occupied || !c.isOccupied);
+  const availableBalance = availableCaisse?.available_balance ?? availableCaisse?.availableBalance ?? 0;
+
   // Actual session being used (own or supervised)
   const currentSession = supervisedSession || sessionActive;
 
@@ -445,9 +463,10 @@ export default function CaisseDashboard({
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
   // Use montant_ouverture (the actual DB field) with fallback to solde_initial for backwards compatibility
+  // When no session is active, show available balance from assigned caisse
   const soldeActuel = currentSession
     ? toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial) + totalEntrees - totalSorties
-    : 0;
+    : availableBalance;
 
   const isSessionOpen = !!currentSession;
 
@@ -864,7 +883,7 @@ export default function CaisseDashboard({
              value={soldeActuel}
              icon={Wallet}
              color="primary"
-             subtitle={currentSession ? `Initial: ${formattedMoney(toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial))} F` : "Session Fermée"}
+             subtitle={currentSession ? `Initial: ${formattedMoney(toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial))} F` : (availableBalance > 0 ? "Fonds disponibles" : "Session Fermée")}
              trend={currentSession ? `${transactions.length} Ops` : "Inactif"}
              trendUp={!!currentSession}
              className="col-span-2 shadow-xl shadow-cyan-950/20"
@@ -1089,9 +1108,9 @@ export default function CaisseDashboard({
                 <div>
                     <div className="flex items-center gap-2">
                         <h1 className="text-xl font-bold text-white leading-none mb-0.5">Caisse</h1>
-                        {currentSession?.caisse_nom && (
+                        {(currentSession?.caisse_nom || availableCaisse?.nom) && (
                             <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-bold uppercase tracking-wider border border-cyan-500/20">
-                                {currentSession.caisse_nom}
+                                {currentSession?.caisse_nom || availableCaisse?.nom}
                             </span>
                         )}
                          {hasPendingOpening && (

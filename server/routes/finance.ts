@@ -1325,11 +1325,26 @@ export function registerFinanceRoutes(app: Express) {
             const lastClosedSession = await storage.getLastClosedSession(c.id);
             if (lastClosedSession) {
                // Priority: montantReporte (funds kept for next day) > caisse.solde > declared amount
-               currentSolde = lastClosedSession.montantReporte
-                  || c.solde
-                  || lastClosedSession.montantFermetureDeclare
-                  || lastClosedSession.montantFermetureTheorique
-                  || "0";
+               // IMPORTANT: Use Number() to check actual value, not string truthiness ("0" is truthy!)
+               const montantReporte = Number(lastClosedSession.montantReporte || 0);
+               const soldeCaisse = Number(c.solde || 0);
+               const montantDeclare = Number(lastClosedSession.montantFermetureDeclare || 0);
+               const montantTheorique = Number(lastClosedSession.montantFermetureTheorique || 0);
+
+               if (montantReporte > 0) {
+                  currentSolde = montantReporte.toString();
+               } else if (soldeCaisse > 0) {
+                  currentSolde = soldeCaisse.toString();
+               } else if (montantDeclare > 0) {
+                  currentSolde = montantDeclare.toString();
+               } else if (montantTheorique > 0) {
+                  currentSolde = montantTheorique.toString();
+               } else {
+                  currentSolde = "0";
+               }
+            } else {
+               // No closed session, use caisse.solde directly
+               currentSolde = c.solde || "0";
             }
          }
 
@@ -1405,6 +1420,18 @@ export function registerFinanceRoutes(app: Express) {
       const user = req.session.user!;
       const session = await storage.getActiveSessionForUser(user.id);
       res.json(addSnakeCaseAliasesDeep(session || null));
+  });
+
+  /**
+   * GET /api/sessions-caisse/my-caisses
+   * Récupère les caisses assignées à l'utilisateur avec leur solde disponible
+   * Utilisé par le dashboard pour afficher le solde quand aucune session n'est active
+   * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
+   */
+  app.get("/api/sessions-caisse/my-caisses", requireAuth, async (req, res) => {
+    const user = req.session.user!;
+    const caisses = await storage.getUserAssignedCaissesWithBalance(user.id);
+    res.json(addSnakeCaseAliasesDeep(caisses));
   });
 
   app.get("/api/sessions-caisse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), requireAgenceIdAccess(), async (req, res) => {

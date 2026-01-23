@@ -1178,6 +1178,79 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       return db.select().from(caisseAssignations).where(eq(caisseAssignations.userId, userId));
   }
 
+  /**
+   * Get user's assigned caisses with available balance
+   * Balance = montantReporte from last closed session OR caisse.solde
+   */
+  export async function getUserAssignedCaissesWithBalance(userId: string): Promise<any[]> {
+    // 1. Get user's assignments
+    const assignments = await db.select().from(caisseAssignations).where(eq(caisseAssignations.userId, userId));
+
+    if (assignments.length === 0) return [];
+
+    // 2. Get caisse details for each assignment
+    const caisseIds = assignments.map(a => a.caisseId);
+    const caissesData = await db.select().from(caisses).where(inArray(caisses.id, caisseIds));
+
+    // 3. For each caisse, get last closed session to determine available balance
+    const result = await Promise.all(caissesData.map(async (caisse) => {
+      // Check if there's an active session on this caisse
+      const [activeSession] = await db.select()
+        .from(sessionsCaisse)
+        .where(and(
+          eq(sessionsCaisse.caisseId, caisse.id),
+          isNull(sessionsCaisse.closedAt)
+        ));
+
+      // Get last closed session for balance info
+      const [lastClosedSession] = await db.select()
+        .from(sessionsCaisse)
+        .where(and(
+          eq(sessionsCaisse.caisseId, caisse.id),
+          sql`${sessionsCaisse.closedAt} IS NOT NULL`
+        ))
+        .orderBy(desc(sessionsCaisse.closedAt))
+        .limit(1);
+
+      // Calculate available balance (using Number() for proper comparison)
+      let availableBalance = 0;
+      let balanceSource = 'none';
+
+      if (lastClosedSession) {
+        const montantReporte = Number(lastClosedSession.montantReporte || 0);
+        const soldeCaisse = Number(caisse.solde || 0);
+        const montantDeclare = Number(lastClosedSession.montantFermetureDeclare || 0);
+
+        if (montantReporte > 0) {
+          availableBalance = montantReporte;
+          balanceSource = 'montantReporte';
+        } else if (soldeCaisse > 0) {
+          availableBalance = soldeCaisse;
+          balanceSource = 'caisse.solde';
+        } else if (montantDeclare > 0) {
+          availableBalance = montantDeclare;
+          balanceSource = 'montantDeclare';
+        }
+      } else {
+        // No closed session, use caisse.solde directly
+        availableBalance = Number(caisse.solde || 0);
+        balanceSource = 'caisse.solde';
+      }
+
+      return {
+        ...caisse,
+        availableBalance,
+        balanceSource,
+        isOccupied: !!activeSession,
+        occupiedBy: activeSession?.caissierId || null,
+        activeSessionId: activeSession?.id || null,
+        lastClosedAt: lastClosedSession?.closedAt || null,
+      };
+    }));
+
+    return result;
+  }
+
   export async function setCaisseAssignments(caisseId: string, userIds: string[], assignedBy: string): Promise<void> {
       // Transaction to replace assignments
       await db.transaction(async (tx) => {

@@ -776,6 +776,8 @@ export const sessionCaisseApi = {
   get: (id: string) => request<any>(`/sessions-caisse/${id}`),
   getByCaissier: (caissierId: string) => requestListAll<any>(`/sessions-caisse/caissier/${caissierId}`),
   getActive: () => request<any>('/sessions-caisse/active'),
+  // Récupérer les caisses assignées à l'utilisateur avec leur solde disponible
+  getMyCaisses: () => request<any[]>('/sessions-caisse/my-caisses'),
   create: (data: any) => request<any>('/sessions-caisse', {
     method: 'POST',
     body: JSON.stringify(data),

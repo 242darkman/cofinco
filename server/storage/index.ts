@@ -448,6 +448,7 @@ export interface IStorage {
     updateCaisse(id: string, caisse: Partial<InsertCaisse>): Promise<Caisse | undefined>;
     getCaisseAssignments(caisseId: string): Promise<CaisseAssignation[]>;
     getUserCaisseAssignments(userId: string): Promise<CaisseAssignation[]>;
+    getUserAssignedCaissesWithBalance(userId: string): Promise<any[]>;
     setCaisseAssignments(caisseId: string, userIds: string[], assignedBy: string): Promise<void>;
     getCaissesWithStatus(agenceId?: string): Promise<any[]>;
 
