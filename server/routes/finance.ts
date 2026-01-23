@@ -57,6 +57,7 @@ import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import * as sessionService from "../services/caisse/session-service";
 import { sessionOpeningService } from "../services/caisse/session-opening-service";
 import { sessionClosingService } from "../services/caisse/session-closing-service";
+import { accessControlService } from "../services/caisse/access-control-service";
 import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_OPERATIONS } from "@shared/config/caisse-operations";
 
 export function registerFinanceRoutes(app: Express) {
@@ -3157,6 +3158,327 @@ export function registerFinanceRoutes(app: Express) {
     );
 
     res.json(addSnakeCaseAliasesDeep(result.session));
+  });
+
+  // ============================================================================
+  // CAISSE ACCESS CONTROL API
+  // ============================================================================
+
+  /**
+   * GET /api/access/status/caisse
+   * Vérifie si la caisse est accessible selon les horaires d'ouverture
+   */
+  app.get("/api/access/status/caisse", requireAuth, async (req, res) => {
+    try {
+      const caisseId = req.query.caisseId as string | undefined;
+      const agenceId = req.query.agenceId as string | undefined;
+
+      const status = await accessControlService.checkCaisseAccess(caisseId, agenceId);
+      res.json(addSnakeCaseAliasesDeep(status));
+    } catch (error: any) {
+      console.error("Error checking caisse access:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * GET /api/caisse/authorization-status
+   * Vérifie si l'utilisateur a une autorisation valide pour accéder à la caisse
+   */
+  app.get("/api/caisse/authorization-status", requireAuth, async (req, res) => {
+    try {
+      const user = req.session.user!;
+      const caisseId = req.query.caisseId as string | undefined;
+      const agenceId = (req.query.agenceId as string | undefined) || user.agenceId;
+
+      const status = await accessControlService.checkUserAuthorization(user.id, caisseId, agenceId);
+      res.json(addSnakeCaseAliasesDeep(status));
+    } catch (error: any) {
+      console.error("Error checking authorization:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * POST /api/caisse/access-codes/validate
+   * Valide un code de sécurité et crée une autorisation temporaire
+   */
+  app.post("/api/caisse/access-codes/validate", requireAuth, async (req, res) => {
+    try {
+      const user = req.session.user!;
+      const data = normalizeKeysDeep(req.body) as any;
+
+      if (!data.code) {
+        return res.status(400).json({ error: "Le code de sécurité est requis" });
+      }
+
+      const result = await accessControlService.validateSecurityCode({
+        userId: user.id,
+        code: data.code,
+        caisseId: data.caisseId,
+        agenceId: data.agenceId || user.agenceId,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+
+      if (!result.success) {
+        return res.status(401).json({ success: false, error: result.error });
+      }
+
+      await logAudit(
+        req,
+        "ACCESS_CODE_VALIDATED",
+        "caisse_access",
+        result.authorization?.id || '',
+        { caisseId: data.caisseId },
+        "success",
+        "medium"
+      );
+
+      res.json(addSnakeCaseAliasesDeep({
+        success: true,
+        authorization: result.authorization,
+      }));
+    } catch (error: any) {
+      console.error("Error validating access code:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/caisse/access-codes/generate
+   * Génère un nouveau code de sécurité (admin/chef d'agence seulement)
+   */
+  app.post("/api/caisse/access-codes/generate", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+    try {
+      const user = req.session.user!;
+      const data = normalizeKeysDeep(req.body) as any;
+
+      const agenceId = data.agenceId || user.agenceId;
+      if (!agenceId) {
+        return res.status(400).json({ error: "L'agence est requise" });
+      }
+
+      // Calculate expiry date
+      let expiresAt: Date | undefined;
+      if (data.expiresInHours) {
+        expiresAt = new Date(Date.now() + data.expiresInHours * 60 * 60 * 1000);
+      } else if (data.expiresAt) {
+        expiresAt = new Date(data.expiresAt);
+      }
+
+      const result = await accessControlService.generateSecurityCodeForCaisse({
+        createdBy: user.id,
+        agenceId,
+        caisseId: data.caisseId,
+        codeType: data.codeType || 'EMERGENCY',
+        maxUsages: data.maxUsages ?? 1,
+        authorizationDurationHours: data.authorizationDurationHours ?? 4,
+        expiresAt,
+        description: data.description,
+      });
+
+      if (!result.success) {
+        return res.status(500).json({ error: result.error });
+      }
+
+      await logAudit(
+        req,
+        "ACCESS_CODE_GENERATED",
+        "caisse_security_code",
+        result.codeId || '',
+        {
+          agenceId,
+          caisseId: data.caisseId,
+          codeType: data.codeType,
+          maxUsages: data.maxUsages,
+        },
+        "success",
+        "high"
+      );
+
+      res.json(addSnakeCaseAliasesDeep({
+        success: true,
+        code: result.code, // Returned only at creation time
+        codeId: result.codeId,
+        expiresAt,
+      }));
+    } catch (error: any) {
+      console.error("Error generating access code:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/caisse/access-codes
+   * Liste les codes de sécurité actifs pour une agence
+   */
+  app.get("/api/caisse/access-codes", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+    try {
+      const user = req.session.user!;
+      const agenceId = (req.query.agenceId as string) || user.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ error: "L'agence est requise" });
+      }
+
+      const codes = await accessControlService.getActiveCodesForAgence(agenceId);
+      res.json(addSnakeCaseAliasesDeep(codes));
+    } catch (error: any) {
+      console.error("Error fetching access codes:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * DELETE /api/caisse/access-codes/:id
+   * Désactive un code de sécurité
+   */
+  app.delete("/api/caisse/access-codes/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+    try {
+      await accessControlService.deactivateSecurityCode(req.params.id);
+
+      await logAudit(
+        req,
+        "ACCESS_CODE_DEACTIVATED",
+        "caisse_security_code",
+        req.params.id,
+        {},
+        "success",
+        "medium"
+      );
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deactivating access code:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * GET /api/caisse/authorizations
+   * Liste les autorisations actives pour une agence
+   */
+  app.get("/api/caisse/authorizations", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+    try {
+      const user = req.session.user!;
+      const agenceId = (req.query.agenceId as string) || user.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ error: "L'agence est requise" });
+      }
+
+      const authorizations = await accessControlService.getActiveAuthorizationsForAgence(agenceId);
+      res.json(addSnakeCaseAliasesDeep(authorizations));
+    } catch (error: any) {
+      console.error("Error fetching authorizations:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/caisse/authorizations/:id/revoke
+   * Révoque une autorisation active
+   */
+  app.post("/api/caisse/authorizations/:id/revoke", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+    try {
+      const user = req.session.user!;
+      const data = normalizeKeysDeep(req.body) as any;
+
+      await accessControlService.revokeAuthorization(
+        req.params.id,
+        user.id,
+        data.reason
+      );
+
+      await logAudit(
+        req,
+        "AUTHORIZATION_REVOKED",
+        "caisse_user_authorization",
+        req.params.id,
+        { reason: data.reason },
+        "success",
+        "high"
+      );
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error revoking authorization:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  /**
+   * PATCH /api/caisses/:id/operating-hours
+   * Met à jour les horaires d'ouverture d'une caisse (admin/chef d'agence)
+   */
+  app.patch("/api/caisses/:id/operating-hours", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.session.user!;
+      const data = normalizeKeysDeep(req.body) as any;
+
+      // Validate operating days if provided
+      if (data.operatingDays) {
+        if (!Array.isArray(data.operatingDays)) {
+          return res.status(400).json({ error: "Les jours d'ouverture doivent être un tableau" });
+        }
+        const validDays = data.operatingDays.every((d: any) => typeof d === 'number' && d >= 0 && d <= 6);
+        if (!validDays) {
+          return res.status(400).json({ error: "Les jours doivent être des nombres entre 0 (Dimanche) et 6 (Samedi)" });
+        }
+      }
+
+      // Validate time format if provided
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      if (data.operatingHoursStart && !timeRegex.test(data.operatingHoursStart)) {
+        return res.status(400).json({ error: "Format d'heure de début invalide (HH:MM attendu)" });
+      }
+      if (data.operatingHoursEnd && !timeRegex.test(data.operatingHoursEnd)) {
+        return res.status(400).json({ error: "Format d'heure de fin invalide (HH:MM attendu)" });
+      }
+
+      const caisse = await storage.getCaisse(id);
+      if (!caisse) {
+        return res.status(404).json({ error: "Caisse non trouvée" });
+      }
+
+      // Check agency access
+      if (!isAdminRole(user.role) && caisse.agenceId !== user.agenceId) {
+        return res.status(403).json({ error: "Accès refusé à cette agence" });
+      }
+
+      const updateData: any = {};
+      if (typeof data.operatingHoursEnabled === 'boolean') {
+        updateData.operatingHoursEnabled = data.operatingHoursEnabled;
+      }
+      if (data.operatingHoursStart) {
+        updateData.operatingHoursStart = data.operatingHoursStart;
+      }
+      if (data.operatingHoursEnd) {
+        updateData.operatingHoursEnd = data.operatingHoursEnd;
+      }
+      if (data.operatingDays) {
+        updateData.operatingDays = data.operatingDays;
+      }
+
+      const updated = await storage.updateCaisse(id, updateData);
+
+      await logAudit(
+        req,
+        "CAISSE_OPERATING_HOURS_UPDATED",
+        "caisse",
+        id,
+        updateData,
+        "success",
+        "medium"
+      );
+
+      res.json(addSnakeCaseAliasesDeep(updated));
+    } catch (error: any) {
+      console.error("Error updating operating hours:", error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
 }

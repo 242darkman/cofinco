@@ -372,6 +372,18 @@ export const caisseApi = {
    */
   getHistoriqueSummary: (caisseId: string) =>
     request<CaisseHistoriqueSummary>(`/caisses/${caisseId}/historique/summary`),
+  /**
+   * Mettre à jour les horaires d'ouverture d'une caisse
+   */
+  updateOperatingHours: (caisseId: string, data: {
+    operatingHoursEnabled?: boolean;
+    operatingHoursStart?: string;
+    operatingHoursEnd?: string;
+    operatingDays?: number[];
+  }) => request<any>(`/caisses/${caisseId}/operating-hours`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
 };
 
 // Client Stats Response Type
@@ -1507,18 +1519,93 @@ export const passwordResetApi = {
 
 // Caisse Access Codes API
 export const caisseAccessCodeApi = {
-  getAll: () => request<any[]>('/caisse/access-codes'),
-  create: (data: any) => request<any>('/caisse/access-codes', {
+  getAll: (agenceId?: string) => request<any[]>(`/caisse/access-codes${agenceId ? `?agenceId=${agenceId}` : ''}`),
+  generate: (data: {
+    agenceId?: string;
+    caisseId?: string;
+    codeType?: 'EMERGENCY' | 'DAILY' | 'PERMANENT';
+    maxUsages?: number;
+    authorizationDurationHours?: number;
+    expiresInHours?: number;
+    description?: string;
+  }) => request<{ success: boolean; code: string; codeId: string; expiresAt: string }>('/caisse/access-codes/generate', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  revoke: (codeId: string) => request<any>(`/caisse/access-codes/${codeId}/revoke`, { method: 'POST' }),
+  deactivate: (codeId: string) => request<{ success: boolean }>(`/caisse/access-codes/${codeId}`, { method: 'DELETE' }),
+  // Legacy methods (to be deprecated)
+  create: (data: any) => request<any>('/caisse/access-codes/generate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  revoke: (codeId: string) => request<any>(`/caisse/access-codes/${codeId}`, { method: 'DELETE' }),
   getPermissions: () => request<any[]>('/caisse/code-permissions'),
   createPermission: (data: any) => request<any>('/caisse/code-permissions', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
   revokePermission: (permId: string) => request<any>(`/caisse/code-permissions/${permId}/revoke`, { method: 'POST' }),
+};
+
+// Caisse Access Control API (Operating Hours + Authorizations)
+export const caisseAccessControlApi = {
+  /**
+   * Vérifie si la caisse est accessible selon les horaires d'ouverture
+   */
+  checkAccess: (caisseId?: string, agenceId?: string) => {
+    const params = new URLSearchParams();
+    if (caisseId) params.append('caisseId', caisseId);
+    if (agenceId) params.append('agenceId', agenceId);
+    const query = params.toString();
+    return request<{
+      accessible: boolean;
+      reason: 'WITHIN_HOURS' | 'OUTSIDE_HOURS' | 'DISABLED' | 'AUTHORIZED';
+      message: string;
+      operatingHours?: { open: string; close: string };
+      nextOpening?: { day: string; time: string };
+      closingTime?: string;
+    }>(`/access/status/caisse${query ? `?${query}` : ''}`);
+  },
+  /**
+   * Vérifie si l'utilisateur a une autorisation valide
+   */
+  checkAuthorization: (caisseId?: string, agenceId?: string) => {
+    const params = new URLSearchParams();
+    if (caisseId) params.append('caisseId', caisseId);
+    if (agenceId) params.append('agenceId', agenceId);
+    const query = params.toString();
+    return request<{
+      authorized: boolean;
+      reason: 'VALID_AUTHORIZATION' | 'NO_AUTHORIZATION' | 'EXPIRED' | 'REVOKED';
+      expiresAt?: string;
+      grantedAt?: string;
+    }>(`/caisse/authorization-status${query ? `?${query}` : ''}`);
+  },
+  /**
+   * Valide un code de sécurité et obtient une autorisation temporaire
+   */
+  validateCode: (code: string, caisseId?: string, agenceId?: string) =>
+    request<{
+      success: boolean;
+      error?: string;
+      authorization?: { id: string; expiresAt: string };
+    }>('/caisse/access-codes/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code, caisseId, agenceId }),
+    }),
+  /**
+   * Liste les autorisations actives pour une agence
+   */
+  getAuthorizations: (agenceId?: string) =>
+    request<any[]>(`/caisse/authorizations${agenceId ? `?agenceId=${agenceId}` : ''}`),
+  /**
+   * Révoque une autorisation active
+   */
+  revokeAuthorization: (authorizationId: string, reason?: string) =>
+    request<{ success: boolean }>(`/caisse/authorizations/${authorizationId}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
 };
 
 // Import Logs API

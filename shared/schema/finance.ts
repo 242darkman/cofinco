@@ -826,7 +826,13 @@ export const caisses = pgTable("caisses", {
   type: text("type").notNull().default("PHYSICAL"), // 'PHYSICAL'
   solde: numeric("solde").notNull().default("0"),
   statut: statutCaisseMainEnum("statut").notNull().default("CLOSED"),
-  // Optional: link to a specific device or location?
+
+  // Operating hours configuration
+  operatingHoursEnabled: boolean("operating_hours_enabled").default(false),
+  operatingHoursStart: text("operating_hours_start").default("08:00"), // HH:MM format
+  operatingHoursEnd: text("operating_hours_end").default("17:00"),     // HH:MM format
+  operatingDays: jsonb("operating_days").default([1, 2, 3, 4, 5]),     // 0=Sun, 1=Mon, etc.
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete

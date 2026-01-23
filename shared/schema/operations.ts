@@ -287,8 +287,20 @@ export const caisseSecurityCodes = pgTable("caisse_security_codes", {
   active: boolean("active").default(true),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
+
+  // Enhanced fields for access control
+  caisseId: uuid("caisse_id").references(() => caisses.id, { onDelete: 'cascade' }),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: 'cascade' }),
+  codeType: text("code_type").default("EMERGENCY"), // EMERGENCY, DAILY, PERMANENT
+  maxUsages: integer("max_usages"), // NULL = unlimited
+  usageCount: integer("usage_count").default(0),
+  authorizationDurationHours: integer("authorization_duration_hours").default(4),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: 'set null' }),
+  description: text("description"),
 });
 export type CaisseSecurityCode = typeof caisseSecurityCodes.$inferSelect;
+export const insertCaisseSecurityCodeSchema = createInsertSchema(caisseSecurityCodes).omit({ id: true, createdAt: true, usageCount: true });
+export type InsertCaisseSecurityCode = z.infer<typeof insertCaisseSecurityCodeSchema>;
 
 // Caisse Assignations (Many-to-Many)
 export const caisseAssignations = pgTable("caisse_assignations", {
@@ -308,8 +320,43 @@ export const caisseCodeUsages = pgTable("caisse_code_usages", {
   codeId: uuid("code_id").references(() => caisseSecurityCodes.id),
   usedAt: timestamp("used_at").defaultNow(),
   success: boolean("success").default(false),
+
+  // Enhanced fields for tracking
+  userId: uuid("user_id").references(() => users.id, { onDelete: 'set null' }),
+  authorizationId: uuid("authorization_id"), // Will be linked to caisseUserAuthorizations
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  failureReason: text("failure_reason"),
 });
 export type CaisseCodeUsage = typeof caisseCodeUsages.$inferSelect;
+
+// Caisse User Authorizations - Tracks users who validated a security code
+export const caisseUserAuthorizations = pgTable("caisse_user_authorizations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  caisseId: uuid("caisse_id").references(() => caisses.id, { onDelete: 'cascade' }),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: 'cascade' }),
+  codeId: uuid("code_id").references(() => caisseSecurityCodes.id, { onDelete: 'set null' }),
+  reason: text("reason"),
+
+  // Validity period
+  grantedAt: timestamp("granted_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+
+  // Revocation tracking
+  revokedAt: timestamp("revoked_at"),
+  revokedBy: uuid("revoked_by").references(() => users.id, { onDelete: 'set null' }),
+  revokeReason: text("revoke_reason"),
+
+  // Connection metadata
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type CaisseUserAuthorization = typeof caisseUserAuthorizations.$inferSelect;
+export const insertCaisseUserAuthorizationSchema = createInsertSchema(caisseUserAuthorizations).omit({ id: true, createdAt: true, grantedAt: true });
+export type InsertCaisseUserAuthorization = z.infer<typeof insertCaisseUserAuthorizationSchema>;
 
 // Code Generation Permissions
 export const codeGenerationPermissions = pgTable("code_generation_permissions", {

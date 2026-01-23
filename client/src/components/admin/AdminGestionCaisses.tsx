@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Monitor, Lock, MoreVertical, User, XCircle, Trash2 } from 'lucide-react';
+import { Plus, Search, Monitor, Lock, MoreVertical, User, XCircle, Trash2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, FormField, SelectField, Modal, ConfirmDialog } from '../ui';
 import { authService } from '../../lib/auth';
@@ -8,6 +8,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
 import { ForceCloseModal } from './ForceCloseModal';
 import AssignCashierModal from './AssignCashierModal';
+import CaisseOperatingHoursModal from './CaisseOperatingHoursModal';
 import { isAdminRole, normalizeRole } from '@shared/types/roles';
 import { StatutClient, StatutCaisseAgent, StatutCaisse, StatutCaisseType } from '@shared/enum/status-constants';
 
@@ -20,6 +21,11 @@ interface Caisse {
   isOccupied?: boolean;
   occupiedBy?: string;
   agenceId: string;
+  // Operating hours
+  operatingHoursEnabled?: boolean;
+  operatingHoursStart?: string;
+  operatingHoursEnd?: string;
+  operatingDays?: number[];
 }
 
 export default function AdminGestionCaisses() {
@@ -55,6 +61,10 @@ export default function AdminGestionCaisses() {
   const [isForceCloseModalOpen, setIsForceCloseModalOpen] = useState(false);
   const [selectedCaisseForClose, setSelectedCaisseForClose] = useState<Caisse | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
+
+  // Operating Hours Modal State
+  const [isOperatingHoursModalOpen, setIsOperatingHoursModalOpen] = useState(false);
+  const [selectedCaisseForHours, setSelectedCaisseForHours] = useState<Caisse | null>(null);
   
   // Utiliser l'agenceId de la caisse sélectionnée pour récupérer les employés de cette agence
   const targetAgenceId = selectedCaisseForAssign?.agenceId || user?.agenceId;
@@ -359,6 +369,17 @@ export default function AdminGestionCaisses() {
                               Assigner
                             </button>
                             <button
+                              onClick={() => {
+                                setSelectedCaisseForHours(caisse);
+                                setIsOperatingHoursModalOpen(true);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-700/50 flex items-center gap-2"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              Horaires d'accès
+                            </button>
+                            <button
                               onClick={() => handleDelete(caisse)}
                               className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-slate-700/50 flex items-center gap-2 border-t border-slate-700"
                             >
@@ -479,6 +500,15 @@ export default function AdminGestionCaisses() {
           }
         }}
         onClose={() => setIsForceCloseModalOpen(false)}
+      />
+
+      <CaisseOperatingHoursModal
+        isOpen={isOperatingHoursModalOpen}
+        caisse={selectedCaisseForHours}
+        onClose={() => {
+          setIsOperatingHoursModalOpen(false);
+          setSelectedCaisseForHours(null);
+        }}
       />
 
       <ConfirmDialog
