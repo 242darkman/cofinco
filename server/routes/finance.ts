@@ -1252,11 +1252,26 @@ export function registerFinanceRoutes(app: Express) {
             if (lastClosedSession) {
                // Priority: montantReporte (funds kept for next day) > caisse.solde > declared amount
                // montantReporte is set during the closing workflow when cashier decides to keep funds
-               currentSolde = lastClosedSession.montantReporte
-                  || c.solde
-                  || lastClosedSession.montantFermetureDeclare
-                  || lastClosedSession.montantFermetureTheorique
-                  || "0";
+               // IMPORTANT: Use Number() to check actual value, not string truthiness ("0" is truthy!)
+               const montantReporte = Number(lastClosedSession.montantReporte || 0);
+               const soldeCaisse = Number(c.solde || 0);
+               const montantDeclare = Number(lastClosedSession.montantFermetureDeclare || 0);
+               const montantTheorique = Number(lastClosedSession.montantFermetureTheorique || 0);
+
+               if (montantReporte > 0) {
+                  currentSolde = montantReporte.toString();
+               } else if (soldeCaisse > 0) {
+                  currentSolde = soldeCaisse.toString();
+               } else if (montantDeclare > 0) {
+                  currentSolde = montantDeclare.toString();
+               } else if (montantTheorique > 0) {
+                  currentSolde = montantTheorique.toString();
+               } else {
+                  currentSolde = "0";
+               }
+            } else {
+               // No closed session, use caisse.solde directly
+               currentSolde = c.solde || "0";
             }
          }
 
