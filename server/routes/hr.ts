@@ -8,7 +8,8 @@ import {
   candidatures,
   bulletinsPaie,
   horairesTravail,
-  presences
+  presences,
+  employes
 } from "@shared/schema";
 import { normalizeRole, SystemRole } from "@shared/types/roles";
 import { StatutCandidature, StatutConge, StatutUser, StatutVisiteTerrain, StatutArchive } from "@shared/enum/status-constants";
@@ -61,8 +62,14 @@ hrRouter.get("/conges", getAuthUser, async (req, res) => {
     const restrictedRoles = ['agent', 'employe', 'stagiaire'];
 
     if (roleIn(userRole, restrictedRoles)) {
-        // Force filter to own ID
-        conditions.push(eq(demandesConges.employeId, req.user!.id));
+        // Résoudre l'employeId à partir du userId
+        const employe = await storage.getEmployeByUserId(req.user!.id);
+        if (employe) {
+            conditions.push(eq(demandesConges.employeId, employe.id));
+        } else {
+            // Si pas d'employé trouvé, on force une condition impossible pour ne rien retourner
+            conditions.push(eq(demandesConges.employeId, '00000000-0000-0000-0000-000000000000'));
+        }
     }
 
     if (dateDebut) conditions.push(gte(demandesConges.dateDebut, dateDebut as string));
@@ -608,7 +615,13 @@ hrRouter.get("/paie/my", getAuthUser, async (req, res) => {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
 
-        const bulletins = await storage.getBulletins(userId);
+        // Résoudre l'employeId à partir du userId
+        const employe = await storage.getEmployeByUserId(userId);
+        if (!employe) {
+            return res.status(404).json({ error: "Profil employé non trouvé" });
+        }
+
+        const bulletins = await storage.getBulletins(employe.id);
         res.json(bulletins);
     } catch (error) {
         console.error("Erreur récupération mes bulletins:", error);
@@ -787,10 +800,16 @@ hrRouter.get("/presence/today", getAuthUser, async (req, res) => {
 // POST /api/hr/presence/checkin - Pointage Arrivée
 hrRouter.post("/presence/checkin", getAuthUser, async (req, res) => {
     try {
-        const employeId = req.user?.id; // PRODUCTION: Use authenticated user only
-        if (!employeId) return res.status(401).json({ error: "Non authentifié" });
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: "Non authentifié" });
         
-        const result = await storage.checkIn(employeId);
+        // Résoudre l'employeId à partir du userId
+        const employe = await storage.getEmployeByUserId(userId);
+        if (!employe) {
+            return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
+        }
+        
+        const result = await storage.checkIn(employe.id);
         res.json(result);
     } catch (error) {
         console.error("Erreur pointage:", error);
@@ -801,16 +820,22 @@ hrRouter.post("/presence/checkin", getAuthUser, async (req, res) => {
 // POST /api/hr/presence/checkout - Pointage Départ
 hrRouter.post("/presence/checkout", getAuthUser, async (req, res) => {
     try {
-        const employeId = req.user?.id; // PRODUCTION: Use authenticated user only
-        if (!employeId) return res.status(401).json({ error: "Non authentifié" });
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: "Non authentifié" });
+
+        // Résoudre l'employeId à partir du userId
+        const employe = await storage.getEmployeByUserId(userId);
+        if (!employe) {
+            return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
+        }
         
-        const result = await storage.checkOut(employeId);
+        const result = await storage.checkOut(employe.id);
         if (!result) return res.status(404).json({ error: "Aucun pointage d'arrivée trouvé pour aujourd'hui" });
         
         // WebSocket: Notify presence update
         const wsInstance = getWsInstance();
         if (wsInstance) {
-            wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId } });
+            wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId: employe.id } });
         }
         
         res.json(result);
@@ -823,16 +848,22 @@ hrRouter.post("/presence/checkout", getAuthUser, async (req, res) => {
 // POST /api/hr/presence/start-break - Début pause
 hrRouter.post("/presence/start-break", getAuthUser, async (req, res) => {
     try {
-        const employeId = req.user?.id;
-        if (!employeId) return res.status(401).json({ error: "Non authentifié" });
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: "Non authentifié" });
+
+        // Résoudre l'employeId à partir du userId
+        const employe = await storage.getEmployeByUserId(userId);
+        if (!employe) {
+            return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
+        }
         
-        const result = await storage.startBreak(employeId);
+        const result = await storage.startBreak(employe.id);
         if (!result) return res.status(404).json({ error: "Aucun pointage d'arrivée trouvé" });
         
         // WebSocket: Notify presence update
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
-            wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId } });
+            wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId: employe.id } });
         }
         
         res.json(result);
@@ -845,16 +876,22 @@ hrRouter.post("/presence/start-break", getAuthUser, async (req, res) => {
 // POST /api/hr/presence/end-break - Fin pause
 hrRouter.post("/presence/end-break", getAuthUser, async (req, res) => {
     try {
-        const employeId = req.user?.id;
-        if (!employeId) return res.status(401).json({ error: "Non authentifié" });
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: "Non authentifié" });
+
+        // Résoudre l'employeId à partir du userId
+        const employe = await storage.getEmployeByUserId(userId);
+        if (!employe) {
+            return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
+        }
         
-        const result = await storage.endBreak(employeId);
+        const result = await storage.endBreak(employe.id);
         if (!result) return res.status(404).json({ error: "Aucune pause en cours" });
         
         // WebSocket: Notify presence update
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance) {
-            wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId } });
+            wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId: employe.id } });
         }
         
         res.json(result);
@@ -872,17 +909,18 @@ hrRouter.get("/presence/by-status/:status", getAuthUser, async (req, res) => {
         
         const presencesList = await db.select({
             presence: presences,
-            employe: users
+            user: users
         })
         .from(presences)
-        .innerJoin(users, eq(presences.employeId, users.id))
+        .innerJoin(employes, eq(presences.employeId, employes.id))
+        .innerJoin(users, eq(employes.userId, users.id))
         .where(and(
             eq(presences.date, today),
             eq(presences.statut, status)
         ));
         
         res.json(presencesList.map(p => ({
-            ...p.employe,
+            ...p.user,
             heureArrivee: p.presence.heureArrivee,
             heureDepart: p.presence.heureDepart,
             heuresTravaillees: p.presence.heuresTravaillees
