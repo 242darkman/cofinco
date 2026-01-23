@@ -845,7 +845,7 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   montantFermetureTheorique: numeric("montant_fermeture_theorique").notNull().default("0"),
   montantFermetureDeclare: numeric("montant_fermeture_declare"),
   ecart: numeric("ecart"),
-  statut: statutSessionCaisseEnum("statut").notNull().default("OPEN"),
+  statut: statutSessionCaisseEnum("statut").notNull().default("REQUESTING_FUNDS"),
   observations: text("observations"),
   billetageOuverture: json("billetage_ouverture"),
   billetageFermeture: json("billetage_fermeture"),
@@ -856,15 +856,62 @@ export const sessionsCaisse = pgTable("sessions_caisse", {
   lastActivity: timestamp("last_activity").defaultNow(), // Heartbeat - dernière activité
   timeoutAt: timestamp("timeout_at"), // Date d'expiration prévue
   forcedCloseReason: text("forced_close_reason"),
-  
+
   // Force close fields (admin override)
   forceClosedBy: uuid("force_closed_by").references(() => users.id, { onDelete: "set null" }),
   forceClosedAt: timestamp("force_closed_at"),
-  
+
   // Flexible closure options
   fundsKeptInCaisse: boolean("funds_kept_in_caisse").default(false),
   transferToCoffreId: uuid("transfer_to_coffre_id").references(() => coffresForts.id, { onDelete: "set null" }),
-  
+
+  // ========== WORKFLOW OUVERTURE SECURISEE (Coffre → Caisse) ==========
+  // Lien vers le transfert d'ouverture (FK gérée au niveau migration SQL pour éviter dépendance circulaire)
+  openingTransfertId: uuid("opening_transfert_id"), // Référence vers transferts_coffre_caisse.id
+
+  // Montants du workflow d'ouverture
+  montantDemande: numeric("montant_demande"),           // Montant demandé par le caissier au coffre
+  soldeVeille: numeric("solde_veille").default("0"),    // Solde résiduel de la veille (si fundsKeptInCaisse)
+
+  // Timestamps du workflow d'ouverture
+  fundsRequestedAt: timestamp("funds_requested_at"),    // Phase A: Demande soumise
+  fundsDispatchedAt: timestamp("funds_dispatched_at"),  // Phase B: Coffre a validé
+  fundsReceivedAt: timestamp("funds_received_at"),      // Phase C: Caissier a confirmé réception
+
+  // Billetage à la réception (pour détection d'écart avec montant demandé)
+  billetageReception: json("billetage_reception"),
+
+  // Expiration automatique de la demande
+  requestExpiresAt: timestamp("request_expires_at"),
+  // ========== FIN WORKFLOW OUVERTURE ==========
+
+  // ========== WORKFLOW FERMETURE SECURISEE (Caisse → Coffre) ==========
+  // Règle d'Or: L'argent compté physiquement doit correspondre à:
+  // MontantVersCoffre + MontantReporte = TotalPhysique
+
+  // Timestamps du workflow de fermeture
+  closingInitiatedAt: timestamp("closing_initiated_at"),    // Début du gel (CLOSING_COUNT)
+  countSubmittedAt: timestamp("count_submitted_at"),        // Comptage soumis (CLOSING_VALIDATION)
+  closingFinalizedAt: timestamp("closing_finalized_at"),    // Clôture définitive (CLOSED)
+
+  // Comptage physique et écart
+  montantPhysique: numeric("montant_physique"),             // Montant compté physiquement
+  ecartJustification: text("ecart_justification"),          // Obligatoire si écart != 0
+
+  // Décision de transfert vers coffre
+  montantVersCoffre: numeric("montant_vers_coffre"),        // Montant à transférer au coffre
+  montantReporte: numeric("montant_reporte"),               // Montant gardé pour J+1 (fonds de roulement)
+  closingTransfertId: uuid("closing_transfert_id"),         // Référence vers transferts_coffre_caisse.id
+
+  // Validation par responsable coffre (si transfert)
+  coffreValidationStatus: text("coffre_validation_status", { enum: ["PENDING", "APPROVED", "REJECTED"] }),
+  coffreValidatedBy: uuid("coffre_validated_by").references(() => users.id, { onDelete: "set null" }),
+  coffreValidatedAt: timestamp("coffre_validated_at"),
+
+  // Bordereau de clôture
+  closingBordereauUrl: text("closing_bordereau_url"),       // URL du PDF généré
+  // ========== FIN WORKFLOW FERMETURE ==========
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete

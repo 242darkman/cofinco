@@ -18,6 +18,7 @@ import {
   StatutTransaction,
   TypeOperationCaisse,
   MethodePaiement,
+  MethodePaiementType,
   METHODE_PAIEMENT_LABELS,
   isOperationCaisseEntree,
   isActiveStatus
@@ -49,6 +50,20 @@ interface CaissePaiementModalProps {
   preFilledAmount?: number;
   /** ID du client pré-sélectionné (pour activation depuis PendingActivationDrawer) */
   preSelectedClientId?: string;
+}
+
+interface FormData {
+  client_id: string;
+  montant: string;
+  mode_paiement: MethodePaiementType;
+  type_operation: string;
+  numero_telephone: string;
+  numero_transaction: string;
+  reference: string;
+  description: string;
+  banque_origine: string;
+  numero_compte_origine: string;
+  reference_virement: string;
 }
 
 export default function CaissePaiementModal({
@@ -83,7 +98,7 @@ export default function CaissePaiementModal({
   const [activeTontinesCount, setActiveTontinesCount] = useState(0);
   const [activeCreditsAmount, setActiveCreditsAmount] = useState(0);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     client_id: preSelectedClientId || '',
     montant: preFilledAmount ? preFilledAmount.toString() : '',
     mode_paiement: MethodePaiement.CASH,

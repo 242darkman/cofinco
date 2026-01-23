@@ -5,7 +5,7 @@
 
 import webPush from "web-push";
 import { db } from "../db";
-import { pushSubscriptions, pushNotificationLogs, users } from "@shared/schema";
+import { pushSubscriptions, pushNotificationLogs, users, userRoles } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 // VAPID keys - should be set in environment variables
@@ -271,9 +271,9 @@ export async function sendPushToRole(
   payload: PushPayload
 ): Promise<{ sent: number; failed: number }> {
   const usersWithRole = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.role, role));
+    .select({ id: userRoles.userId })
+    .from(userRoles)
+    .where(eq(userRoles.role, role as any));
 
   const userIds = usersWithRole.map((u) => u.id);
   return sendPushToUsers(userIds, payload);

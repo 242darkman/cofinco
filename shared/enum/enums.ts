@@ -422,8 +422,14 @@ export const statutCaisseMainEnum = pgEnum("statut_caisse_main_enum", [
 // ============================================
 
 export const statutSessionCaisseEnum = pgEnum("statut_session_caisse_enum", [
-  "OPEN",
-  "CLOSED",
+  // === WORKFLOW D'OUVERTURE ===
+  "REQUESTING_FUNDS", // Caissier a demandé des fonds (Phase A)
+  "FUNDS_DISPATCHED", // Responsable coffre a validé, fonds envoyés (Phase B)
+  "OPEN",             // Session opérationnelle
+  // === WORKFLOW DE FERMETURE ===
+  "CLOSING_COUNT",      // Session gelée, caissier compte ses billets (blind count)
+  "CLOSING_VALIDATION", // Comptage fait, décision de transfert vers coffre
+  "CLOSED",             // Session définitivement fermée
 ]);
 
 // ============================================

@@ -811,6 +811,77 @@ export const sessionCaisseApi = {
     method: 'POST',
     body: JSON.stringify({ reason }),
   }),
+  // ========== WORKFLOW SECURISE D'OUVERTURE (Coffre → Caisse) ==========
+  // Phase A: Demande d'ouverture
+  requestOpening: (data: { caisseId: string; montantDemande: number; agenceId?: string; observations?: string }) =>
+    request<{ session: any; transfert: any }>('/sessions-caisse/request-opening', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  // Récupérer la session en attente (REQUESTING_FUNDS ou FUNDS_DISPATCHED)
+  getPending: () => request<any>('/sessions-caisse/pending'),
+  // Phase C: Confirmer la réception des fonds et ouvrir la session
+  receiveFunds: (id: string, data: { billetageReception: Record<string, number>; observations?: string }) =>
+    request<any>(`/sessions-caisse/${id}/receive-funds`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  // Annuler une demande d'ouverture (uniquement si REQUESTING_FUNDS)
+  cancelRequest: (id: string, reason?: string) =>
+    request<{ success: boolean }>(`/sessions-caisse/${id}/cancel-request`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  // Ouverture directe avec fonds reporté existant (sans passer par le coffre)
+  openDirect: (data: { caisseId: string; agenceId?: string; observations?: string }) =>
+    request<{ session: any }>('/sessions-caisse/open-direct', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // ========== WORKFLOW SECURISE DE FERMETURE (Caisse → Coffre) ==========
+  // Phase A: Initier la fermeture (gèle la session)
+  initiateClose: (id: string) =>
+    request<{ session: any }>(`/sessions-caisse/${id}/initiate-close`, {
+      method: 'POST',
+    }),
+
+  // Phase B: Soumettre le comptage physique (blind count)
+  submitCount: (id: string, data: {
+    billetage: Record<string, number>;
+    ecartJustification?: string;
+  }) =>
+    request<{ session: any; ecart: number }>(`/sessions-caisse/${id}/submit-count`, {
+      method: 'POST',
+      body: JSON.stringify({
+        billetageFermeture: data.billetage,
+        ecartJustification: data.ecartJustification,
+      }),
+    }),
+
+  // Phase C: Finaliser la clôture (décision transfert coffre + report)
+  finalizeClose: (id: string, data: {
+    montantVersCoffre: number;
+    montantReporte: number;
+    observations?: string;
+  }) =>
+    request<{ session: any; transfert?: any }>(`/sessions-caisse/${id}/finalize-close`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Annuler la fermeture (uniquement si CLOSING_COUNT)
+  cancelClose: (id: string, reason?: string) =>
+    request<{ success: boolean }>(`/sessions-caisse/${id}/cancel-close`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  // Récupérer les sessions en cours de fermeture (pour supervision)
+  getClosingSessions: (agenceId?: string) => {
+    const query = agenceId ? `?agenceId=${agenceId}` : '';
+    return request<any[]>(`/sessions-caisse/closing${query}`);
+  },
 };
 
 // Operations Caisse API
@@ -1154,6 +1225,16 @@ export const coffreApi = {
     if (params.limit) queryParams.append('limit', String(params.limit));
     return request<any>(`/coffre/mouvements?${queryParams.toString()}`);
   },
+  // ========== WORKFLOW SECURISE D'OUVERTURE (Coffre → Caisse) ==========
+  // Récupérer les demandes d'ouverture en attente
+  getPendingOpeningRequests: (agenceId: string) =>
+    request<any[]>(`/coffre/pending-opening-requests?agenceId=${agenceId}`),
+  // Phase B: Valider ou rejeter une demande d'ouverture
+  validateOpeningTransfer: (id: string, data: { approved: boolean; reasonRejection?: string; billetage?: Record<string, number> }) =>
+    request<{ success: boolean; session: any; transfert: any }>(`/coffre/transferts/${id}/validate-opening`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // Incidents Caisse API

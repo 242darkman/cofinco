@@ -149,11 +149,15 @@ export default function AdminGestionProfils() {
       length: pwd.length >= 8,
       uppercase: /[A-Z]/.test(pwd),
       number: /[0-9]/.test(pwd),
+      special: /[@$!%*?&]/.test(pwd),
       match: pwd === formData.confirmPassword && pwd !== ''
     };
   }, [formData.password, formData.confirmPassword]);
 
-  const isPasswordSecure = passwordValidation.length && passwordValidation.uppercase && passwordValidation.number;
+  const isPasswordSecure = passwordValidation.length && 
+                          passwordValidation.uppercase && 
+                          passwordValidation.number && 
+                          passwordValidation.special;
   const isFormValid = isPasswordSecure && passwordValidation.match && formData.nom && formData.email;
 
   const modules = [
@@ -934,6 +938,10 @@ export default function AdminGestionProfils() {
                   <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.number ? 'text-success' : 'text-content-muted'}`}>
                     {passwordValidation.number ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
                     <span>Un chiffre</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.special ? 'text-success' : 'text-content-muted'}`}>
+                    {passwordValidation.special ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
+                    <span>Caractère spécial (@$!%*?&)</span>
                   </div>
                 </div>
               </div>

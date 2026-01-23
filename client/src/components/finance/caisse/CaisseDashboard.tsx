@@ -4,7 +4,7 @@ import {
   Activity, RefreshCw, ArrowRightLeft, Users, Smartphone, Wallet,
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
   PiggyBank, ArrowUpRight, ArrowDownRight, Shield, Timer, AlertCircle,
-  LockKeyhole, KeyRound
+  LockKeyhole, KeyRound, Package, Check, UserCheck, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
@@ -35,41 +35,7 @@ import CaisseHistoriqueGlobal from './CaisseHistoriqueGlobal';
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
 import { PendingActivationDrawer } from './PendingActivationDrawer';
-import { UserCheck, History } from 'lucide-react';
-
-interface SessionCaisse {
-  id: string;
-  caissier_id: string;
-  openedAt?: string;
-  opened_at?: string;
-  closedAt?: string;
-  closed_at?: string;
-  solde_initial: number;
-  solde_theorique: number;
-  solde_reel?: number;
-  ecart?: number;
-  computedStatus?: string;
-  observations: string;
-  caissier_nom?: string;
-  caisse_nom?: string;
-  caisse_id?: string;
-  agence_id?: string;
-  timeoutAt?: string;
-}
-
-interface Transaction {
-  id: string;
-  session_id: string;
-  type_operation: string;
-  montant: number;
-  mode_paiement: string;
-  reference: string;
-  description: string;
-  created_at: string;
-  client_nom?: string; // Optional extended data
-  client_prenom?: string;
-  client_telephone?: string;
-}
+import { SessionCaisse, CaisseTransaction as Transaction } from '../../../types/finance';
 
 interface CaisseProps {
   userRole?: string;
@@ -140,27 +106,47 @@ export default function CaisseDashboard({
   const [isTxDrawerOpen, setIsTxDrawerOpen] = useState(false);
 
   // React Query for Real-time Data
-  const { 
-    data: sessionActive, 
+  const {
+    data: sessionActive,
     isLoading: loadingSession,
-    refetch: refetchSession 
+    refetch: refetchSession
   } = useQuery({
     queryKey: ['session-caisse', 'active'],
     queryFn: async () => {
       // If supervised, use that
       if (supervisedSession) return supervisedSession;
-      
+
       const data = await sessionCaisseApi.getActive();
       const status = data ? (data.computedStatus || computeSessionStatus(data)) : null;
-      if (data && status === 'OPEN') {
+      // Consider OPEN, CLOSING_COUNT, and CLOSING_VALIDATION as active sessions
+      if (data && (status === 'OPEN' || status === 'CLOSING_COUNT' || status === 'CLOSING_VALIDATION')) {
         return data as SessionCaisse;
       }
       return null;
     }
   });
 
+  // Query for pending sessions (REQUESTING_FUNDS or FUNDS_DISPATCHED)
+  const {
+    data: pendingSession,
+    isLoading: loadingPendingSession,
+    refetch: refetchPendingSession
+  } = useQuery({
+    queryKey: ['session-caisse', 'pending'],
+    queryFn: async () => {
+      const data = await sessionCaisseApi.getPending();
+      return data as SessionCaisse | null;
+    },
+    // Only check for pending if we don't have an active session
+    enabled: !sessionActive && !supervisedSession
+  });
+
   // Actual session being used (own or supervised)
   const currentSession = supervisedSession || sessionActive;
+
+  // Determine if we have a pending opening workflow
+  const hasPendingOpening = !currentSession && pendingSession &&
+    (pendingSession.statut === 'REQUESTING_FUNDS' || pendingSession.statut === 'FUNDS_DISPATCHED');
 
   // Pending activations - sync with PendingActivationDrawer
   const { data: pendingActivations = [] } = useQuery({
@@ -234,7 +220,7 @@ export default function CaisseDashboard({
     }
   });
 
-  const loading = loadingSession || loadingTransactions;
+  const loading = loadingSession || loadingTransactions || loadingPendingSession;
 
   // Manual refresh logic replaced by React Query's automatic background refetching
   // But we keep manual refetch capability for specific actions
@@ -353,6 +339,7 @@ export default function CaisseDashboard({
 
   const handleOuvertureCaisse = async () => {
     await loadSessionActive();
+    await refetchPendingSession();
     await loadCaissesSeparees();
     setSupervisedSession(null); // Clear supervision if we open our own
     setSupervisionInfo(null);
@@ -434,8 +421,9 @@ export default function CaisseDashboard({
     .filter(t => isOutgoingOperation(t.type_operation))
     .reduce((sum, t) => sum + toNumber(t.montant), 0);
 
+  // Use montant_ouverture (the actual DB field) with fallback to solde_initial for backwards compatibility
   const soldeActuel = currentSession
-    ? toNumber(currentSession.solde_initial) + totalEntrees - totalSorties
+    ? toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial) + totalEntrees - totalSorties
     : 0;
 
   const isSessionOpen = !!currentSession;
@@ -450,14 +438,17 @@ export default function CaisseDashboard({
     }
   }, [isSessionOpen, activeTab]);
 
+  // Check if session is in closing workflow (frozen - no new transactions allowed)
+  const isClosingWorkflow = currentSession?.statut === 'CLOSING_COUNT' || currentSession?.statut === 'CLOSING_VALIDATION';
+
   const tabs = [
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
     { key: 'infos-client', label: 'Info Client', icon: Users, disabled: !isSessionOpen },
-    { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen },
-    { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !mobileMoneyEnabled || !isSessionOpen },
+    { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen || isClosingWorkflow },
+    { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !mobileMoneyEnabled || !isSessionOpen || isClosingWorkflow },
     { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
     { key: 'rapprochement', label: 'Clôture', icon: RefreshCw, disabled: !isSessionOpen },
-    { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen },
+    { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'etats', label: 'États', icon: FileText, disabled: !isSessionOpen },
     { key: 'supervision', label: 'Supervision', icon: Shield, disabled: false },
   ];
@@ -585,7 +576,7 @@ export default function CaisseDashboard({
         );
       case 'rapprochement':
         return currentSession ? (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseRapprochement session={currentSession} onClose={() => { setActiveTab('dashboard'); loadSessionActive(); loadTransactionsJour(); }} /></div>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseRapprochement session={currentSession} onClose={() => { setActiveTab('dashboard'); loadSessionActive(); loadTransactionsJour(); }} soldeTheoriqueCalcule={soldeActuel} /></div>
         ) : null;
       case 'transferts':
         return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => setActiveTab('dashboard')} /></div>;
@@ -606,6 +597,193 @@ export default function CaisseDashboard({
             </div>
         );
       default:
+        // Handle pending opening workflow states
+        if (hasPendingOpening && pendingSession) {
+          return (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              {pendingSession.statut === 'REQUESTING_FUNDS' ? (
+                <>
+                  <div className="p-8 rounded-[2rem] bg-amber-500/5 ring-1 ring-amber-500/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <Clock className="w-16 h-16 text-amber-500 relative z-10 animate-pulse" />
+                  </div>
+                  <div className="space-y-3">
+                    <h2 className="text-3xl font-black text-white tracking-tight">Vérification Coffre</h2>
+                    <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
+                      Votre demande de <span className="text-amber-500 font-bold">{new Intl.NumberFormat('fr-FR').format(pendingSession.montant_demande || 0)} FCFA</span> est en cours d'examen par la supervision.
+                    </p>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 rounded-full border border-amber-500/20 text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                       <Timer size={12} className="animate-spin" style={{ animationDuration: '3s' }} />
+                       Statut: Transmission Sécurisée
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 items-center w-full max-w-xs">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={() => setShowOuverture(true)}
+                      className="w-full border-white/10 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl font-bold"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Gérer la Demande
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-8 rounded-[2rem] bg-emerald-500/5 ring-1 ring-emerald-500/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <Package className="w-16 h-16 text-emerald-500 relative z-10" />
+                  </div>
+                  <div className="space-y-3">
+                    <h2 className="text-3xl font-black text-white tracking-tight">Dotation Prête</h2>
+                    <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
+                      Le coffre a débloqué <span className="text-emerald-500 font-bold">{new Intl.NumberFormat('fr-FR').format(pendingSession.montant_demande || 0)} FCFA</span>. Vous devez confirmer le comptage pour activer votre session.
+                    </p>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                       <Check size={12} />
+                       Validation Coffre: Reçue
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 items-center w-full max-w-xs">
+                    <Button
+                      size="lg"
+                      onClick={() => setShowOuverture(true)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 rounded-2xl font-black py-6 text-lg"
+                    >
+                      <KeyRound className="w-5 h-5 mr-2" />
+                      Ouvrir le Terminal
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {isAdminRole(userRole) && (
+                <button
+                  onClick={() => setActiveTab('supervision')}
+                  className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
+                >
+                  Accéder aux outils de supervision
+                </button>
+              )}
+            </div>
+          );
+        }
+
+        // Handle closing workflow states - session is frozen
+        if (currentSession && (currentSession.statut === 'CLOSING_COUNT' || currentSession.statut === 'CLOSING_VALIDATION')) {
+          const isCountPhase = currentSession.statut === 'CLOSING_COUNT';
+          const isValidationPhase = currentSession.statut === 'CLOSING_VALIDATION';
+          const isPendingCoffreValidation = isValidationPhase && currentSession.coffre_validation_status === 'PENDING';
+
+          return (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              {isCountPhase ? (
+                // Phase 1: Counting in progress
+                <>
+                  <div className="p-6 rounded-full bg-blue-500/10 ring-1 ring-blue-500/30 shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-blue-500/10 to-blue-400/5" />
+                    <RefreshCw className="w-16 h-16 text-blue-400 relative z-10 animate-spin" style={{ animationDuration: '3s' }} />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold text-white">Session en Fermeture</h2>
+                    <p className="text-slate-400 max-w-md mx-auto">
+                      La session est <span className="text-blue-400 font-bold">gelée</span>. Veuillez compter vos billets et soumettre le comptage physique.
+                    </p>
+                    {currentSession.closing_initiated_at && (
+                      <p className="text-xs text-slate-500">
+                        Fermeture initiée le {new Date(currentSession.closing_initiated_at).toLocaleString('fr-FR')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-3 items-center w-full max-w-sm">
+                    <Button
+                      size="lg"
+                      onClick={() => setActiveTab('rapprochement')}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)] font-bold py-6 text-lg"
+                    >
+                      <RefreshCw className="w-5 h-5 mr-2" />
+                      Soumettre le Comptage
+                    </Button>
+                  </div>
+                </>
+              ) : isPendingCoffreValidation ? (
+                // Phase 2: Waiting for coffre validation
+                <>
+                  <div className="p-6 rounded-full bg-amber-500/10 ring-1 ring-amber-500/30 shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-amber-500/10 to-amber-400/5" />
+                    <Clock className="w-16 h-16 text-amber-400 relative z-10 animate-pulse" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold text-white">Transfert en Attente</h2>
+                    <p className="text-slate-400 max-w-md mx-auto">
+                      Le transfert de <span className="text-amber-400 font-bold">{new Intl.NumberFormat('fr-FR').format(currentSession.montant_vers_coffre || 0)} FCFA</span> vers le coffre est en attente de validation.
+                    </p>
+                    {currentSession.montant_reporte && Number(currentSession.montant_reporte) > 0 && (
+                      <p className="text-xs text-emerald-400">
+                        Fonds reportés: {new Intl.NumberFormat('fr-FR').format(currentSession.montant_reporte)} FCFA
+                      </p>
+                    )}
+                    {currentSession.count_submitted_at && (
+                      <p className="text-xs text-slate-500">
+                        Comptage soumis le {new Date(currentSession.count_submitted_at).toLocaleString('fr-FR')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-3 items-center w-full max-w-sm">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={() => setActiveTab('rapprochement')}
+                      className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                    >
+                      <Clock className="w-5 h-5 mr-2" />
+                      Voir le Détail
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                // Phase 2: Ready to finalize
+                <>
+                  <div className="p-8 rounded-[2rem] bg-emerald-500/5 ring-1 ring-emerald-500/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <Lock className="w-16 h-16 text-emerald-500 relative z-10" />
+                  </div>
+                  <div className="space-y-3">
+                    <h2 className="text-3xl font-black text-white tracking-tight">Vault Compté</h2>
+                    <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
+                      Le rapprochement physique a été enregistré avec succès. La session est prête pour l'archivage final.
+                    </p>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                       <Shield size={12} />
+                       Comptage Physique: {new Intl.NumberFormat('fr-FR').format(currentSession.montant_physique || 0)} F
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 items-center w-full max-w-xs">
+                    <Button
+                      size="lg"
+                      onClick={() => setActiveTab('rapprochement')}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 rounded-2xl font-black py-6 text-lg"
+                    >
+                      <Check className="w-5 h-5 mr-2" />
+                      Finaliser le Protocole
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {isAdminRole(userRole) && (
+                <button
+                  onClick={() => setActiveTab('supervision')}
+                  className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
+                >
+                  Accéder aux outils de supervision
+                </button>
+              )}
+            </div>
+          );
+        }
+
         if (!isSessionOpen) {
            return (
              <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -621,8 +799,8 @@ export default function CaisseDashboard({
                 </div>
                 <div className="flex flex-col gap-3 items-center w-full max-w-sm">
                   {canOpenCaisse && (
-                    <Button 
-                      size="lg" 
+                    <Button
+                      size="lg"
                       onClick={() => setShowOuverture(true)}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.2)] font-bold py-6 text-lg"
                     >
@@ -630,10 +808,10 @@ export default function CaisseDashboard({
                       Ouvrir ma Session
                     </Button>
                   )}
-                  
+
                   {isAdminRole(userRole) && (
-                    <button 
-                      onClick={() => setActiveTab('supervision')} 
+                    <button
+                      onClick={() => setActiveTab('supervision')}
                       className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
                     >
                       Accéder aux outils de supervision sans ouvrir
@@ -659,14 +837,14 @@ export default function CaisseDashboard({
       {/* Top Session Stats - Mobile First Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
-             title="Solde Session" 
+             title="Solde de Session" 
              value={soldeActuel}
              icon={Wallet}
              color="primary"
-             subtitle={currentSession ? "Session Ouverte" : "Session Fermée"}
-             trend={currentSession ? "Ouverte" : "Fermée"}
+             subtitle={currentSession ? `Initial: ${formattedMoney(toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial))} F` : "Session Fermée"}
+             trend={currentSession ? `${transactions.length} Ops` : "Inactif"}
              trendUp={!!currentSession}
-             className="col-span-2"
+             className="col-span-2 shadow-xl shadow-cyan-950/20"
           />
           <StatCard
              title="Entrées" 
@@ -893,6 +1071,26 @@ export default function CaisseDashboard({
                                 {currentSession.caisse_nom}
                             </span>
                         )}
+                         {hasPendingOpening && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest border border-amber-500/20">
+                                Ouverture en cours
+                            </span>
+                         )}
+                         {currentSession?.statut === 'OPEN' && (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
+                                Session Active
+                            </span>
+                         )}
+                         {currentSession?.statut === 'CLOSING_COUNT' && (
+                            <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-500/20 animate-pulse">
+                                Phase: Comptage
+                            </span>
+                         )}
+                         {currentSession?.statut === 'CLOSING_VALIDATION' && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-black uppercase tracking-widest border border-amber-500/20 animate-pulse">
+                                Phase: Validation Coffre
+                            </span>
+                         )}
                     </div>
                     <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Gestion Financière</p>
                 </div>
@@ -911,10 +1109,15 @@ export default function CaisseDashboard({
                  )}
 
                  {canCreatePayments && (
-                   <button 
+                   <button
                       onClick={() => currentSession ? setShowPaiement(true) : alert('Caisse fermée')}
-                      disabled={!currentSession}
-                      className="w-9 h-9 rounded-full bg-[#1e293b] border border-[#334155] text-cyan-400 hover:bg-[#334155] hover:text-white flex items-center justify-center transition-all"
+                      disabled={!currentSession || currentSession.statut === 'CLOSING_COUNT' || currentSession.statut === 'CLOSING_VALIDATION'}
+                      className={`w-9 h-9 rounded-full bg-[#1e293b] border border-[#334155] text-cyan-400 hover:bg-[#334155] hover:text-white flex items-center justify-center transition-all ${
+                        currentSession?.statut === 'CLOSING_COUNT' || currentSession?.statut === 'CLOSING_VALIDATION'
+                          ? 'opacity-50 cursor-not-allowed'
+                          : ''
+                      }`}
+                      title={currentSession?.statut === 'CLOSING_COUNT' || currentSession?.statut === 'CLOSING_VALIDATION' ? 'Session gelée - Finalisez la clôture' : undefined}
                    >
                        <CreditCard size={18} />
                    </button>
@@ -925,6 +1128,17 @@ export default function CaisseDashboard({
                           Ouvrir
                       </Button>
                     )
+                 ) : currentSession.statut === 'CLOSING_COUNT' || currentSession.statut === 'CLOSING_VALIDATION' ? (
+                    // Show "Continue Closing" button when in closing workflow
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setActiveTab('rapprochement')}
+                      className="rounded-full shadow-lg shadow-blue-500/20"
+                    >
+                        <RefreshCw size={14} className="mr-1.5" />
+                        Continuer
+                    </Button>
                  ) : (
                     canCloseCaisse && (
                       <Button variant="danger" size="sm" onClick={handleFermetureCaisse} className="rounded-full shadow-lg shadow-red-500/20">
@@ -1030,6 +1244,7 @@ export default function CaisseDashboard({
         <CaisseOuverture
           onClose={() => setShowOuverture(false)}
           onSuccess={handleOuvertureCaisse}
+          pendingSession={pendingSession || undefined}
         />
       )}
 

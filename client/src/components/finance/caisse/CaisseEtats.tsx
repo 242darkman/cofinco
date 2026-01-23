@@ -5,21 +5,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { computeSessionStatus, getSessionStatusLabel } from '../../../lib/format';
+import { SessionCaisse } from '../../../types/finance';
 
-interface SessionCaisse {
-  id: string;
-  openedAt?: string;
-  opened_at?: string;
-  closedAt?: string;
-  closed_at?: string;
-  timeoutAt?: string;
-  timeout_at?: string;
-  solde_initial: number;
-  solde_theorique: number;
-  solde_reel?: number;
-  ecart?: number;
-  computedStatus?: string;
-}
 
 export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   const [sessions, setSessions] = useState<SessionCaisse[]>([]);

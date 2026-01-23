@@ -357,7 +357,6 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return results.map(({ demande, client, user, agence }) => ({
       ...demande,
       numeroDemande: demande.numeroDemande,
-      montantDemande: Number(demande.montantDemande),
       clients: client ? {
         nom: user?.nom,
         prenom: user?.prenom,
@@ -366,7 +365,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         agence: agence?.nom,
         agenceId: client.agenceId
       } : undefined
-    }));
+    })) as DemandeCredit[];
   }
   
   export async function createDemandeCredit(insertDemande: InsertDemandeCredit): Promise<DemandeCredit> {
@@ -482,14 +481,13 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     
     return results.map(({ enquete, client, user }) => ({
       ...enquete,
-      montantDemande: Number(enquete.montantDemande),
       clients: client ? {
         nom: user?.nom,
         prenom: user?.prenom,
         telephone: user?.telephone,
         photoProfile: user?.photoProfile
       } : undefined
-    }));
+    })) as EnqueteCredit[];
   }
   
   export async function createEnqueteCredit(insertEnquete: InsertEnqueteCredit): Promise<EnqueteCredit> {

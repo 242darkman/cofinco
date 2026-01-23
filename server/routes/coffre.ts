@@ -585,3 +585,104 @@ coffreRouter.put("/config", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ============================================================================
+// WORKFLOW SECURISE D'OUVERTURE DE CAISSE (Coffre → Caisse)
+// Routes pour le responsable coffre
+// ============================================================================
+
+// Importer le service d'ouverture
+import { sessionOpeningService } from "../services/caisse/session-opening-service";
+
+/**
+ * GET /coffre/pending-opening-requests
+ * Liste les demandes d'ouverture de caisse en attente pour une agence
+ */
+coffreRouter.get(
+  "/pending-opening-requests",
+  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const agenceId = (req.query.agenceId as string) || user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ error: "agenceId requis" });
+      }
+
+      const requests = await sessionOpeningService.getPendingOpeningRequests(agenceId);
+      res.json(requests);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  }
+);
+
+/**
+ * POST /coffre/transferts/:id/validate-opening
+ * Phase B: Le responsable coffre valide ou rejette une demande d'ouverture
+ */
+coffreRouter.post(
+  "/transferts/:id/validate-opening",
+  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = (req as any).user;
+
+      if (!user?.id) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const validationSchema = z.object({
+        approved: z.boolean(),
+        reasonRejection: z.string().optional(),
+        billetage: z.record(z.string(), z.number()).optional(),
+      });
+
+      const body = validationSchema.parse(req.body);
+
+      // Validation: si rejet, raison obligatoire
+      if (!body.approved && !body.reasonRejection) {
+        return res.status(400).json({ error: "La raison du rejet est obligatoire" });
+      }
+
+      const result = await sessionOpeningService.validateOpeningTransfer({
+        transfertId: id,
+        validatorId: user.id,
+        approved: body.approved,
+        reasonRejection: body.reasonRejection,
+        billetage: body.billetage,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      });
+
+      if (!result.success) {
+        const statusMap: Record<string, number> = {
+          TRANSFERT_NOT_FOUND: 404,
+          NOT_OPENING_FUND: 400,
+          INVALID_TRANSITION: 409,
+          SAME_USER_FORBIDDEN: 403,
+          SESSION_NOT_FOUND: 404,
+          DB_ERROR: 500,
+        };
+        const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+        return res.status(status).json({
+          error: result.error,
+          errorCode: result.errorCode
+        });
+      }
+
+      res.json({
+        success: true,
+        session: result.session,
+        transfert: result.transfert,
+      });
+    } catch (e: any) {
+      if (e.name === 'ZodError') {
+        return res.status(400).json({ error: "Données invalides", details: e.errors });
+      }
+      res.status(500).json({ error: e.message });
+    }
+  }
+);

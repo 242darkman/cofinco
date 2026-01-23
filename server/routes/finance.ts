@@ -55,6 +55,8 @@ import { getWsInstance } from "../ws-server";
 import { eq, desc, and, sql, count } from "drizzle-orm";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import * as sessionService from "../services/caisse/session-service";
+import { sessionOpeningService } from "../services/caisse/session-opening-service";
+import { sessionClosingService } from "../services/caisse/session-closing-service";
 import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_OPERATIONS } from "@shared/config/caisse-operations";
 
 export function registerFinanceRoutes(app: Express) {
@@ -1248,7 +1250,13 @@ export function registerFinanceRoutes(app: Express) {
             // Get balance from last closed session
             const lastClosedSession = await storage.getLastClosedSession(c.id);
             if (lastClosedSession) {
-               currentSolde = lastClosedSession.montantFermetureDeclare || lastClosedSession.montantFermetureTheorique || "0";
+               // Priority: montantReporte (funds kept for next day) > caisse.solde > declared amount
+               // montantReporte is set during the closing workflow when cashier decides to keep funds
+               currentSolde = lastClosedSession.montantReporte
+                  || c.solde
+                  || lastClosedSession.montantFermetureDeclare
+                  || lastClosedSession.montantFermetureTheorique
+                  || "0";
             }
          }
 
@@ -1301,7 +1309,12 @@ export function registerFinanceRoutes(app: Express) {
             // Get balance from last closed session
             const lastClosedSession = await storage.getLastClosedSession(c.id);
             if (lastClosedSession) {
-               currentSolde = lastClosedSession.montantFermetureDeclare || lastClosedSession.montantFermetureTheorique || "0";
+               // Priority: montantReporte (funds kept for next day) > caisse.solde > declared amount
+               currentSolde = lastClosedSession.montantReporte
+                  || c.solde
+                  || lastClosedSession.montantFermetureDeclare
+                  || lastClosedSession.montantFermetureTheorique
+                  || "0";
             }
          }
 
@@ -1391,6 +1404,95 @@ export function registerFinanceRoutes(app: Express) {
       
       const sessions = await storage.getAllSessionsCaisse(filter);
       res.json(addSnakeCaseAliasesDeep(sessions));
+  });
+
+  /**
+   * GET /api/sessions-caisse/closing
+   * Récupère les sessions en cours de fermeture pour l'agence (supervision)
+   * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
+   */
+  app.get("/api/sessions-caisse/closing", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
+    const user = req.session.user!;
+    const agenceId = (req.query.agenceId as string) || user.agenceId;
+
+    if (!agenceId) {
+      return res.status(400).json({ message: "L'agence est requise" });
+    }
+
+    const sessions = await sessionClosingService.getClosingSessionsForAgence(agenceId);
+    res.json(addSnakeCaseAliasesDeep(sessions));
+  });
+
+  /**
+   * GET /api/sessions-caisse/pending
+   * Récupère la session en attente (REQUESTING_FUNDS ou FUNDS_DISPATCHED) de l'utilisateur
+   * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
+   */
+  app.get("/api/sessions-caisse/pending", requireAuth, async (req, res) => {
+    const user = req.session.user!;
+    const session = await sessionOpeningService.getPendingSession(user.id);
+    res.json(addSnakeCaseAliasesDeep(session || null));
+  });
+
+  /**
+   * Sessions à risque (inactives depuis trop longtemps)
+   * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
+   */
+  app.get("/api/sessions-caisse/risky", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+      try {
+          const riskySessions = await sessionService.getRiskySessions();
+          res.json(addSnakeCaseAliasesDeep(riskySessions));
+      } catch (error: any) {
+          console.error("Erreur récupération sessions à risque:", error);
+          res.status(500).json({ message: error.message });
+      }
+  });
+
+  /**
+   * Sessions avec écarts significatifs (monitoring)
+   * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
+   */
+  app.get("/api/sessions-caisse/ecarts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+      try {
+          const threshold = req.query.threshold ? Number(req.query.threshold) : undefined;
+          const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
+          res.json(addSnakeCaseAliasesDeep(sessionsWithEcarts));
+      } catch (error: any) {
+          console.error("Erreur récupération écarts:", error);
+          res.status(500).json({ message: error.message });
+      }
+  });
+
+  /**
+   * Fermer les sessions expirées (route admin pour déclencher manuellement ou via cron)
+   * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
+   */
+  app.post("/api/sessions-caisse/close-expired", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+      try {
+          const timeoutHours = req.body.timeoutHours ? Number(req.body.timeoutHours) : 12;
+          const closedSessions = await sessionService.closeExpiredSessions(timeoutHours);
+
+          // Notifier via WebSocket
+          const wsInstance = getWsInstance();
+          if (wsInstance && closedSessions.length > 0) {
+              closedSessions.forEach(s => {
+                  wsInstance.broadcast({
+                      type: "SESSION_TIMEOUT",
+                      payload: { sessionId: s.sessionId, caisseId: s.caisseId }
+                  });
+              });
+              wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+          }
+
+          res.json({
+              success: true,
+              closedCount: closedSessions.length,
+              closedSessions
+          });
+      } catch (error: any) {
+          console.error("Erreur fermeture sessions expirées:", error);
+          res.status(500).json({ message: error.message });
+      }
   });
 
   app.get("/api/sessions-caisse/:id", requireAuth, async (req, res) => {
@@ -1587,58 +1689,6 @@ export function registerFinanceRoutes(app: Express) {
           res.json({ success: true, timestamp: new Date().toISOString() });
       } else {
           res.status(400).json({ success: false, message: "Session non active" });
-      }
-  });
-
-  // Sessions à risque (inactives depuis trop longtemps)
-  app.get("/api/sessions-caisse/risky", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
-      try {
-          const riskySessions = await sessionService.getRiskySessions();
-          res.json(addSnakeCaseAliasesDeep(riskySessions));
-      } catch (error: any) {
-          console.error("Erreur récupération sessions à risque:", error);
-          res.status(500).json({ message: error.message });
-      }
-  });
-
-  // Sessions avec écarts significatifs (monitoring)
-  app.get("/api/sessions-caisse/ecarts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
-      try {
-          const threshold = req.query.threshold ? Number(req.query.threshold) : undefined;
-          const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
-          res.json(addSnakeCaseAliasesDeep(sessionsWithEcarts));
-      } catch (error: any) {
-          console.error("Erreur récupération écarts:", error);
-          res.status(500).json({ message: error.message });
-      }
-  });
-
-  // Fermer les sessions expirées (route admin pour déclencher manuellement ou via cron)
-  app.post("/api/sessions-caisse/close-expired", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
-      try {
-          const timeoutHours = req.body.timeoutHours ? Number(req.body.timeoutHours) : 12;
-          const closedSessions = await sessionService.closeExpiredSessions(timeoutHours);
-
-          // Notifier via WebSocket
-          const wsInstance = getWsInstance();
-          if (wsInstance && closedSessions.length > 0) {
-              closedSessions.forEach(s => {
-                  wsInstance.broadcast({
-                      type: "SESSION_TIMEOUT",
-                      payload: { sessionId: s.sessionId, caisseId: s.caisseId }
-                  });
-              });
-              wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
-          }
-
-          res.json({
-              success: true,
-              closedCount: closedSessions.length,
-              closedSessions
-          });
-      } catch (error: any) {
-          console.error("Erreur fermeture sessions expirées:", error);
-          res.status(500).json({ message: error.message });
       }
   });
 
@@ -2577,6 +2627,494 @@ export function registerFinanceRoutes(app: Express) {
       console.error("Erreur liquidation:", e);
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // ============================================================================
+  // WORKFLOW SECURISE D'OUVERTURE DE CAISSE (Coffre → Caisse)
+  // ============================================================================
+  // Règle d'Or: L'argent ne doit jamais apparaître "magiquement".
+  // Le solde d'ouverture = solde veille + transfert coffre (tous deux auditables)
+  // ============================================================================
+
+  /**
+   * POST /api/sessions-caisse/request-opening
+   * Phase A: Le caissier demande l'ouverture de sa caisse avec un montant souhaité
+   */
+  app.post("/api/sessions-caisse/request-opening", requireAuth, async (req, res) => {
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    // Validation basique
+    if (!data.caisseId) {
+      return res.status(400).json({ message: "Vous devez sélectionner une caisse physique." });
+    }
+    if (!data.montantDemande || Number(data.montantDemande) <= 0) {
+      return res.status(400).json({ message: "Le montant demandé doit être positif." });
+    }
+
+    // Vérifier l'assignation si pas manager
+    const normalizedRole = normalizeRole(user.role);
+    const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+
+    if (!isManager) {
+      const assignments = await storage.getCaisseAssignments(data.caisseId);
+      const isAssigned = assignments.some(a => a.userId === user.id);
+      if (!isAssigned) {
+        return res.status(403).json({ message: "Accès refusé. Vous n'êtes pas assigné à cette caisse." });
+      }
+    }
+
+    const result = await sessionOpeningService.requestSessionOpening({
+      caissierId: user.id,
+      caisseId: data.caisseId,
+      agenceId: data.agenceId || user.agenceId,
+      montantDemande: Number(data.montantDemande),
+      observations: data.observations,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        CAISSE_OCCUPIED: 409,
+        USER_HAS_SESSION: 409,
+        INVALID_AMOUNT: 400,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode
+      });
+    }
+
+    // Notifier via WebSocket
+    const wsInstance = getWsInstance();
+    if (wsInstance) {
+      wsInstance.broadcast({ type: "OPENING_REQUEST_CREATED", payload: { agenceId: data.agenceId || user.agenceId } });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_OPENING_REQUESTED",
+      "session_caisse",
+      result.session.id,
+      { caisseId: data.caisseId, montantDemande: data.montantDemande },
+      "success",
+      "low"
+    );
+
+    res.status(201).json(addSnakeCaseAliasesDeep({
+      session: result.session,
+      transfert: result.transfert,
+    }));
+  });
+
+  /**
+   * POST /api/sessions-caisse/open-direct
+   * Ouverture directe avec le fonds reporté existant (sans passer par le coffre)
+   * Cas d'usage: Le caissier a laissé un fonds de roulement lors de la fermeture
+   * et souhaite reprendre son travail sans approvisionnement supplémentaire.
+   */
+  app.post("/api/sessions-caisse/open-direct", requireAuth, async (req, res) => {
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    // Validation basique
+    if (!data.caisseId) {
+      return res.status(400).json({ message: "Vous devez sélectionner une caisse physique." });
+    }
+
+    // Vérifier l'assignation si pas manager
+    const normalizedRole = normalizeRole(user.role);
+    const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+
+    if (!isManager) {
+      const assignments = await storage.getCaisseAssignments(data.caisseId);
+      const isAssigned = assignments.some(a => a.userId === user.id);
+      if (!isAssigned) {
+        return res.status(403).json({ message: "Accès refusé. Vous n'êtes pas assigné à cette caisse." });
+      }
+    }
+
+    const result = await sessionOpeningService.openDirectWithExistingFunds({
+      caissierId: user.id,
+      caisseId: data.caisseId,
+      agenceId: data.agenceId || user.agenceId,
+      observations: data.observations,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        CAISSE_NOT_FOUND: 404,
+        NO_EXISTING_FUNDS: 400,
+        CAISSE_OCCUPIED: 409,
+        USER_HAS_SESSION: 409,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode
+      });
+    }
+
+    // Notifier via WebSocket
+    const wsInstance = getWsInstance();
+    if (wsInstance) {
+      wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { agenceId: data.agenceId || user.agenceId } });
+      wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_DIRECT_OPEN",
+      "session_caisse",
+      result.session.id,
+      { caisseId: data.caisseId, type: "FONDS_REPORTE" },
+      "success",
+      "low"
+    );
+
+    res.status(201).json(addSnakeCaseAliasesDeep({
+      session: result.session,
+    }));
+  });
+
+  /**
+   * POST /api/sessions-caisse/:id/receive-funds
+   * Phase C: Le caissier confirme la réception des fonds et ouvre la session
+   */
+  app.post("/api/sessions-caisse/:id/receive-funds", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    if (!data.billetageReception || Object.keys(data.billetageReception).length === 0) {
+      return res.status(400).json({ message: "Le billetage de réception est obligatoire." });
+    }
+
+    const result = await sessionOpeningService.receiveFundsAndOpen({
+      sessionId: id,
+      caissierId: user.id,
+      billetageReception: data.billetageReception,
+      observations: data.observations,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        SESSION_NOT_FOUND: 404,
+        INVALID_STATE: 409,
+        PERMISSION_DENIED: 403,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode
+      });
+    }
+
+    // Notifier via WebSocket
+    const wsInstance = getWsInstance();
+    if (wsInstance) {
+      wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: result.session.caisseId } });
+      wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_OPENED_WITH_FUNDS",
+      "session_caisse",
+      id,
+      { soldeOuverture: result.session.montantOuverture },
+      "success",
+      "low"
+    );
+
+    res.json(addSnakeCaseAliasesDeep(result.session));
+  });
+
+  /**
+   * POST /api/sessions-caisse/:id/cancel-request
+   * Annule une demande d'ouverture (uniquement si REQUESTING_FUNDS)
+   */
+  app.post("/api/sessions-caisse/:id/cancel-request", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    const result = await sessionOpeningService.cancelOpeningRequest({
+      sessionId: id,
+      userId: user.id,
+      reason: data.reason,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        SESSION_NOT_FOUND: 404,
+        INVALID_STATE: 409,
+        PERMISSION_DENIED: 403,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode
+      });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_OPENING_CANCELLED",
+      "session_caisse",
+      id,
+      { reason: data.reason },
+      "success",
+      "low"
+    );
+
+    res.json({ success: true });
+  });
+
+  // ============================================================================
+  // WORKFLOW SECURISE DE FERMETURE DE CAISSE (Caisse → Coffre)
+  // ============================================================================
+  // Règle d'Or: L'argent compté physiquement doit correspondre à:
+  // MontantVersCoffre + MontantReporte = TotalPhysique
+  // ============================================================================
+
+  /**
+   * POST /api/sessions-caisse/:id/initiate-close
+   * Phase A: Gel de la session - Le caissier initie la fermeture
+   */
+  app.post("/api/sessions-caisse/:id/initiate-close", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+
+    const result = await sessionClosingService.initiateClose({
+      sessionId: id,
+      caissierId: user.id,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        SESSION_NOT_FOUND: 404,
+        NOT_YOUR_SESSION: 403,
+        INVALID_STATUS: 409,
+        PENDING_TRANSACTIONS: 409,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode
+      });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_CLOSING_INITIATED",
+      "session_caisse",
+      id,
+      { statut: "CLOSING_COUNT" },
+      "success",
+      "medium"
+    );
+
+    res.json(addSnakeCaseAliasesDeep(result.session));
+  });
+
+  /**
+   * POST /api/sessions-caisse/:id/submit-count
+   * Phase B: Soumission du comptage à l'aveugle (blind count)
+   */
+  app.post("/api/sessions-caisse/:id/submit-count", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    // Validation basique
+    if (!data.billetageFermeture || typeof data.billetageFermeture !== 'object') {
+      return res.status(400).json({ message: "Le billetage est obligatoire" });
+    }
+
+    const result = await sessionClosingService.submitCount({
+      sessionId: id,
+      caissierId: user.id,
+      billetageFermeture: data.billetageFermeture,
+      ecartJustification: data.ecartJustification,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        SESSION_NOT_FOUND: 404,
+        NOT_YOUR_SESSION: 403,
+        INVALID_STATUS: 409,
+        MISSING_JUSTIFICATION: 400,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode,
+        soldeTheorique: result.soldeTheorique,
+        montantPhysique: result.montantPhysique,
+        ecart: result.ecart,
+      });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_COUNT_SUBMITTED",
+      "session_caisse",
+      id,
+      {
+        soldeTheorique: result.soldeTheorique,
+        montantPhysique: result.montantPhysique,
+        ecart: result.ecart,
+      },
+      "success",
+      "medium"
+    );
+
+    res.json(addSnakeCaseAliasesDeep({
+      session: result.session,
+      soldeTheorique: result.soldeTheorique,
+      montantPhysique: result.montantPhysique,
+      ecart: result.ecart,
+    }));
+  });
+
+  /**
+   * POST /api/sessions-caisse/:id/finalize-close
+   * Phase C: Finalisation - Décision de trésorerie et clôture définitive
+   */
+  app.post("/api/sessions-caisse/:id/finalize-close", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    // Validation basique
+    if (typeof data.montantVersCoffre !== 'number' || typeof data.montantReporte !== 'number') {
+      return res.status(400).json({ message: "Les montants de transfert et report sont obligatoires" });
+    }
+
+    if (data.montantVersCoffre < 0 || data.montantReporte < 0) {
+      return res.status(400).json({ message: "Les montants ne peuvent pas être négatifs" });
+    }
+
+    const result = await sessionClosingService.finalizeClose({
+      sessionId: id,
+      caissierId: user.id,
+      montantVersCoffre: data.montantVersCoffre,
+      montantReporte: data.montantReporte,
+      observations: data.observations,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        SESSION_NOT_FOUND: 404,
+        NOT_YOUR_SESSION: 403,
+        INVALID_STATUS: 409,
+        AMOUNT_MISMATCH: 400,
+        COFFRE_NOT_FOUND: 500,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode
+      });
+    }
+
+    // Notifier via WebSocket
+    const wsInstance = getWsInstance();
+    if (wsInstance) {
+      wsInstance.broadcast({
+        type: "CAISSE_UPDATE",
+        payload: {
+          sessionId: id,
+          statut: "CLOSED",
+          hasPendingTransfer: !!result.transfert,
+        }
+      });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_CLOSED",
+      "session_caisse",
+      id,
+      {
+        montantVersCoffre: data.montantVersCoffre,
+        montantReporte: data.montantReporte,
+        closingTransfertId: result.transfert?.id,
+      },
+      "success",
+      "high"
+    );
+
+    res.json(addSnakeCaseAliasesDeep({
+      session: result.session,
+      transfert: result.transfert,
+    }));
+  });
+
+  /**
+   * POST /api/sessions-caisse/:id/cancel-close
+   * Annule le processus de fermeture (uniquement en phase CLOSING_COUNT)
+   */
+  app.post("/api/sessions-caisse/:id/cancel-close", requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const user = req.session.user!;
+    const data = normalizeKeysDeep(req.body) as any;
+
+    const result = await sessionClosingService.cancelClose({
+      sessionId: id,
+      caissierId: user.id,
+      reason: data.reason,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+
+    if (!result.success) {
+      const statusMap: Record<string, number> = {
+        SESSION_NOT_FOUND: 404,
+        NOT_YOUR_SESSION: 403,
+        INVALID_STATUS: 409,
+        DB_ERROR: 500,
+      };
+      const status = statusMap[result.errorCode || 'DB_ERROR'] || 500;
+      return res.status(status).json({
+        message: result.error,
+        errorCode: result.errorCode
+      });
+    }
+
+    await logAudit(
+      req,
+      "SESSION_CLOSING_CANCELLED",
+      "session_caisse",
+      id,
+      { reason: data.reason },
+      "success",
+      "medium"
+    );
+
+    res.json(addSnakeCaseAliasesDeep(result.session));
   });
 
 }

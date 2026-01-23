@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2 } from 'lucide-react';
+import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2, Loader2, Send, Package, ArrowRight, Ban, Banknote, Plus } from 'lucide-react';
 import { Card, Button, IconButton, LoadingSpinner, Badge } from '../../ui';
 import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { authService } from '../../../lib/auth';
 import { api } from '../../../lib/api';
+import { sessionCaisseApi } from '../../../lib/api-client';
 import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface CaisseOuvertureProps {
   onClose: () => void;
   onSuccess: () => void;
+  pendingSession?: any; // Session en attente (REQUESTING_FUNDS ou FUNDS_DISPATCHED)
 }
 
 interface Caisse {
@@ -35,52 +38,77 @@ interface Agence {
   nom: string;
 }
 
-export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureProps) {
-  // RBAC permissions
+type WorkflowStep = 'auth' | 'choice' | 'waiting' | 'confirm';
+type OpeningMode = 'request' | 'direct'; // request = demander au coffre, direct = avec fonds existants
+
+/**
+ * Workflow Sécurisé d'Ouverture de Caisse (Coffre → Caisse)
+ *
+ * Nouveau flux avec fonds reporté:
+ * - Si la caisse a un solde > 0: proposer le choix (direct ou avec complément)
+ * - Ouverture directe: PIN → Session ouverte immédiatement
+ * - Avec complément: Phase A → Phase B → Phase C (workflow coffre)
+ */
+export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: CaisseOuvertureProps) {
+  const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
-  const hasGlobalPermission = hasPermission('caisse', 'create') || hasPermission('caisse', 'manage');
   const currentUser = authService.getCurrentUser();
   const isAdmin = isAdminRole(currentUser?.role);
-  
-  // Allow ANY logged in user to attempt self-auth via PIN if they have permissions
-  const canSelfAuthorize = true; 
 
+  // Déterminer l'étape initiale basée sur la session en attente
+  const getInitialStep = (): WorkflowStep => {
+    if (pendingSession) {
+      if (pendingSession.statut === 'REQUESTING_FUNDS') return 'waiting';
+      if (pendingSession.statut === 'FUNDS_DISPATCHED') return 'confirm';
+    }
+    return 'auth';
+  };
 
-  const [step, setStep] = useState<'auth' | 'billetage'>('auth');
+  const [step, setStep] = useState<WorkflowStep>(getInitialStep());
   const [loading, setLoading] = useState(false);
   const [loadingCaisses, setLoadingCaisses] = useState(true);
-  
+
   const [caisses, setCaisses] = useState<Caisse[]>([]);
   const [selectedCaisseId, setSelectedCaisseId] = useState<string>('');
-  
+
   const [agences, setAgences] = useState<Agence[]>([]);
   const [selectedAgenceId, setSelectedAgenceId] = useState<string>(currentUser?.agenceId || '');
 
-  const [superviseur, setSuperviseur] = useState<any>(null);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const [authData, setAuthData] = useState({ username: '', password: '', pin: '' });
-  const [formData, setFormData] = useState({ caissier_id: '', observations: '' });
+  const [authData, setAuthData] = useState({ pin: '' });
+  const [montantDemande, setMontantDemande] = useState<number>(500000); // Montant par défaut
+  const [observations, setObservations] = useState('');
 
+  // Suggestions de montant pour aller vite (POS Friendly)
+  const quickAmounts = [50000, 100000, 250000, 500000];
+
+  // Session créée après Phase A
+  const [session, setSession] = useState<any>(pendingSession || null);
+
+  // Billetage pour Phase C
   const [billetage, setBilletage] = useState({
-    billets_10000: 0, billets_5000: 0, billets_1000: 0, billets_500: 0,
+    billets_10000: 0, billets_5000: 0, billets_2000: 0, billets_1000: 0, billets_500: 0,
     billets_200: 0, billets_100: 0, billets_50: 0,
-    pieces_20: 0, pieces_10: 0, pieces_5: 0,
+    pieces_500: 0, pieces_200: 0, pieces_100: 0, pieces_50: 0,
+    pieces_25: 0, pieces_20: 0, pieces_10: 0, pieces_5: 0, pieces_1: 0,
   });
 
-  // Load Agencies for Admin
+  // Mode d'ouverture sélectionné (pour caisse avec fonds reporté)
+  const [openingMode, setOpeningMode] = useState<OpeningMode>('request');
+
+  // Charger les agences pour Admin
   useEffect(() => {
     if (isAdmin) {
       const fetchAgences = async () => {
         try {
           const res = await api.get<Agence[]>('/agences');
           if (res.data) {
-             setAgences(res.data);
-             // Ensure selectedAgenceId is valid or default to first
-             if (!selectedAgenceId && res.data.length > 0) {
-                 setSelectedAgenceId(res.data[0].id);
-             }
+            setAgences(res.data);
+            if (!selectedAgenceId && res.data.length > 0) {
+              setSelectedAgenceId(res.data[0].id);
+            }
           }
         } catch (e) {
           console.error("Erreur chargement agences", e);
@@ -88,644 +116,734 @@ export default function CaisseOuverture({ onClose, onSuccess }: CaisseOuvertureP
       };
       fetchAgences();
     }
-  }, [isAdmin]);
+  }, [isAdmin, selectedAgenceId]);
 
-  // Fetch Caisses when Agence changes
+  // Charger les caisses quand l'agence change
   useEffect(() => {
     const fetchCaisses = async () => {
-        if (!selectedAgenceId) {
-             if (!isAdmin) { // Admin allows selection, so wait. Non-admin MUST have ID.
-                console.warn("Agence ID manquante pour l'utilisateur", currentUser);
-                setError("Impossible de charger les caisses : Agence non identifiée.");
-             }
-             setLoadingCaisses(false);
-             return;
+      if (!selectedAgenceId) {
+        if (!isAdmin) {
+          setError("Impossible de charger les caisses : Agence non identifiée.");
         }
-        setLoadingCaisses(true);
-        try {
-            const res = await api.get<Caisse[]>(`/agences/${selectedAgenceId}/caisses`);
-            if (res.data) {
-                let availableCaisses = res.data;
+        setLoadingCaisses(false);
+        return;
+      }
+      setLoadingCaisses(true);
+      try {
+        const res = await api.get<Caisse[]>(`/agences/${selectedAgenceId}/caisses`);
+        if (res.data) {
+          let availableCaisses = res.data;
 
-                // Filter for Cashiers (Non-Admin & Non-Manager)
-                const normalizedRole = normalizeRole(currentUser?.role);
-                const isManager = normalizedRole === SystemRole.CHEF_AGENCE || normalizedRole === SystemRole.ADMIN;
-                
-                if (!isManager && currentUser?.id) {
-                    availableCaisses = res.data.filter(c => 
-                        c.assignments && c.assignments.includes(currentUser.id)
-                    );
-                }
+          const normalizedRole = normalizeRole(currentUser?.role);
+          const isManager = normalizedRole === SystemRole.CHEF_AGENCE || normalizedRole === SystemRole.ADMIN;
 
-                setCaisses(availableCaisses);
-                
-                // Auto-select if only one option (especially for cashiers)
-                if (availableCaisses.length === 1) {
-                    setSelectedCaisseId(availableCaisses[0].id);
-                } else {
-                    setSelectedCaisseId('');
-                }
-                
-                // Pre-select first available if any
-                const firstAvailable = res.data.find(c => !c.isOccupied && c.statut !== 'CLOSED');
-                if (firstAvailable) setSelectedCaisseId(firstAvailable.id);
-            }
-        } catch (e) {
-            console.error("Erreur chargement caisses", e);
-            setError("Impossible de charger la liste des caisses.");
-        } finally {
-            setLoadingCaisses(false);
+          if (!isManager && currentUser?.id) {
+            availableCaisses = res.data.filter(c =>
+              c.assignments && c.assignments.includes(currentUser.id)
+            );
+          }
+
+          setCaisses(availableCaisses);
+
+          if (availableCaisses.length === 1) {
+            setSelectedCaisseId(availableCaisses[0].id);
+          } else {
+            setSelectedCaisseId('');
+          }
+
+          const firstAvailable = availableCaisses.find(c => !c.isOccupied && c.statut !== 'CLOSED');
+          if (firstAvailable) setSelectedCaisseId(firstAvailable.id);
         }
+      } catch (e) {
+        console.error("Erreur chargement caisses", e);
+        setError("Impossible de charger la liste des caisses.");
+      } finally {
+        setLoadingCaisses(false);
+      }
     };
-    fetchCaisses();
-  }, [selectedAgenceId, isAdmin]);
+
+    if (step === 'auth') {
+      fetchCaisses();
+    }
+  }, [selectedAgenceId, isAdmin, step, currentUser?.id, currentUser?.role]);
 
   const calculerTotal = () => {
-    return billetage.billets_10000 * 10000 + billetage.billets_5000 * 5000 +
-      billetage.billets_1000 * 1000 + billetage.billets_500 * 500 +
-      billetage.billets_200 * 200 + billetage.billets_100 * 100 +
-      billetage.billets_50 * 50 + billetage.pieces_20 * 20 +
-      billetage.pieces_10 * 10 + billetage.pieces_5 * 5;
+    return (
+      billetage.billets_10000 * 10000 + billetage.billets_5000 * 5000 +
+      billetage.billets_2000 * 2000 + billetage.billets_1000 * 1000 +
+      billetage.billets_500 * 500 + billetage.billets_200 * 200 +
+      billetage.pieces_500 * 500 + billetage.pieces_200 * 200 +
+      billetage.pieces_100 * 100 + billetage.pieces_50 * 50 +
+      billetage.pieces_25 * 25 + billetage.pieces_20 * 20 +
+      billetage.pieces_10 * 10 + billetage.pieces_5 * 5 +
+      billetage.pieces_1 * 1
+    );
   };
 
-  const handleAuthentication = async (e: React.FormEvent) => {
+  // ========== PHASE A: Authentification + Demande de fonds ==========
+  const handleRequestOpening = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     if (!selectedCaisseId) {
-        setError("Veuillez sélectionner une caisse physique.");
-        setLoading(false);
-        return;
+      setError("Veuillez sélectionner une caisse physique.");
+      setLoading(false);
+      return;
+    }
+
+    if (!authData.pin || authData.pin.length < 4) {
+      setError("Veuillez entrer votre PIN à 6 chiffres.");
+      setLoading(false);
+      return;
+    }
+
+    if (montantDemande <= 0) {
+      setError("Le montant demandé doit être positif.");
+      setLoading(false);
+      return;
     }
 
     try {
-      let data;
-      
-      if (canSelfAuthorize) {
-          // Simplified Auth (PIN Only)
-           if (!authData.pin) {
-            setError('Veuillez entrer votre PIN à 6 chiffres.');
-            setLoading(false);
-            return;
-          }
-          
-          const res = await fetch('/api/auth/verify-pin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ pin: authData.pin })
-          });
-          
-          data = await res.json();
-           if (!res.ok) {
-            if (data && data.requirePinSetup) {
-              setError('Aucun PIN configuré. Définissez votre PIN dans Paramètres > Sécurité.');
-            } else {
-              setError(data?.error || 'PIN incorrect. Vérifiez votre saisie.');
-            }
-            setLoading(false);
-            return;
-          }
+      // 1. Vérifier le PIN
+      const pinRes = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ pin: authData.pin })
+      });
 
-      } else {
-          // Full Supervisor Auth
-          const res = await fetch('/api/auth/verify-supervisor', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              username: authData.username,
-              password: authData.password,
-              pin: authData.pin || undefined
-            })
-          });
-          
-          data = await res.json();
-           if (!res.ok) {
-             // ... Error handling same as before
-            if (data && data.requirePinSetup) {
-              setError('Aucun PIN configuré. Définissez votre PIN dans Paramètres > Sécurité.');
-            } else {
-              setError(data?.error || 'Erreur d\'authentification. Vérifiez vos identifiants.');
-            }
-            setLoading(false);
-            return;
-           }
+      const pinData = await pinRes.json();
+      if (!pinRes.ok) {
+        if (pinData?.requirePinSetup) {
+          setError('Aucun PIN configuré. Définissez votre PIN dans Paramètres > Sécurité.');
+        } else {
+          setError(pinData?.error || 'PIN incorrect.');
+        }
+        setLoading(false);
+        return;
       }
 
+      // 2. Soumettre la demande d'ouverture
+      const result = await sessionCaisseApi.requestOpening({
+        caisseId: selectedCaisseId,
+        montantDemande,
+        agenceId: selectedAgenceId || currentUser?.agenceId,
+        observations,
+      });
 
-      // Common checks
-      if (!data.hasPinConfigured && !canSelfAuthorize) { // verification might differ
-         // verify-pin endpoint ensures pin is configured. verify-supervisor checks it too.
-         setError('Veuillez d\'abord configurer le PIN caisse.');
-         setLoading(false);
-         return;
-      }
+      setSession(result.session);
+      setSuccessMessage('Demande soumise ! En attente de validation par le coffre.');
 
+      // Passer à l'étape d'attente
+      setTimeout(() => {
+        setStep('waiting');
+        setSuccessMessage('');
+      }, 1500);
 
-      setSuperviseur(data);
-      // If Admin is opening for themselves, they are the caissier.
-      // If Caissier opens with Supervisor auth, the Caissier (currentUser) is the caissier, Supervisor is authorizer.
-      // Wait. formData.caissier_id was getting set to `data.id` (the Supervisor's ID) in previous code?
-      // Step 134: `setFormData({ ...formData, caissier_id: data.id });`
-      // That implies the person 'Logging In' in the modal BECOMES the caissier.
-      // YES. "Ouverture de Caisse" -> Who is taking this caisse?
-      // If I am a Caissier, I am already logged in. But this modal asks for "Authentification Superviseur".
-      // Line 159 payload uses `caissier_id: formData.caissier_id`.
-      // Line 166 uses `autorise_par: superviseur?.id`.
-      // If `handleAuthentication` sets `caissier_id` to `data.id` (Supervisor ID), then the Supervisor becomes the Caissier?
-      // That seems WRONG if a Caissier is just asking for validation.
-      // BUT currently, the app seems to treat this step as "Who is opening the session?".
-      // If I am logged in as 'Alice' (Caissier), and 'Bob' (Supervisor) auths...
-      // Should 'Alice' be the caissier? Yes.
-      // So `caissier_id` should probably be `currentUser.id`.
-      // Let's check `api/sessions-caisse` logic roughly (not visible).
-      // Assuming `currentUser` is the one opening the session.
-      // The previous code SET `caissier_id` to `data.id` (Line 137).
-      // If `data` came from `verify-supervisor`, `data` IS the supervisor.
-      // So previous code made the Supervisor the owner of the session!
-      // Maybe that's intended for "High Security" where Supervisor takes responsibility?
-      // OR it was a bug/misunderstanding.
-      // User said: "sachant que l'utilisateur est déjà authentifié pas besoin de demandé encore (login + mdp)".
-      // This implies the user wants to use *their own* identity.
-      // So `caissier_id` should be `currentUser.id`.
-      // And `autorise_par` should be `data.id` (User who authenticated/authorized).
-      // If CanSelfAuth, `caissier_id` = `currentUser.id`, `autorise_par` = `currentUser.id`.
-      // If Caissier needs Supervisor, `caissier_id` = `currentUser.id`, `autorise_par` = `Supervisor.id`.
-      
-      // I will fix this logic: `caissier_id` = `currentUser.id`.
-      setFormData({ ...formData, caissier_id: currentUser?.id || '' });
-
-      setSuccessMessage('Authentification réussie !');
-      setTimeout(() => { setStep('billetage'); setSuccessMessage(''); }, 1000);
     } catch (err: any) {
-      setError('Erreur: ' + (err.message || err.error || "Erreur inconnue"));
+      setError(err.message || "Erreur lors de la soumission de la demande.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // ========== PHASE B: En attente (polling ou WebSocket pour transition) ==========
+  useEffect(() => {
+    if (step !== 'waiting') return;
+
+    const checkStatus = async () => {
+      try {
+        const pending = await sessionCaisseApi.getPending();
+        if (pending) {
+          setSession(pending);
+          if (pending.statut === 'FUNDS_DISPATCHED') {
+            setStep('confirm');
+          }
+        } else {
+          // Session annulée ou rejetée
+          setError("La demande a été annulée ou rejetée. Veuillez réessayer.");
+          setStep('auth');
+        }
+      } catch (e) {
+        console.error("Erreur vérification statut:", e);
+      }
+    };
+
+    // Polling toutes les 5 secondes
+    const interval = setInterval(checkStatus, 5000);
+    checkStatus(); // Vérifier immédiatement
+
+    return () => clearInterval(interval);
+  }, [step]);
+
+  // ========== PHASE C: Confirmation de réception ==========
+  const handleConfirmReception = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     const totalCalcule = calculerTotal();
 
-    try {
-      const payload = {
-        caisseId: selectedCaisseId,
-        caissierId: currentUser?.id,
-        dateOuverture: new Date().toISOString(),
-        soldeInitial: totalCalcule.toString(),
-        soldeTheorique: totalCalcule.toString(),
-        statut: 'OPEN',
-        observations: formData.observations,
-        billetageOuverture: billetage,
-        // Removed non-schema fields to avoid validation errors
-      };
+    if (totalCalcule <= 0) {
+      setError("Veuillez saisir le billetage des fonds reçus.");
+      setLoading(false);
+      return;
+    }
 
-      const res = await fetch('/api/sessions-caisse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
+    try {
+      const result = await sessionCaisseApi.receiveFunds(session.id, {
+        billetageReception: billetage,
+        observations,
       });
 
-      if (!res.ok) {
-        const result = await res.json();
-        throw new Error(result.error || 'Erreur lors de la création');
-      }
+      setSuccessMessage('Session ouverte avec succès !');
+      queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
 
-      setSuccessMessage('Caisse ouverte avec succès !');
-      setTimeout(onSuccess, 1500);
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+
     } catch (err: any) {
-      setError('Erreur: ' + err.message);
+      setError(err.message || "Erreur lors de la confirmation.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ========== Annulation de la demande ==========
+  const handleCancelRequest = async () => {
+    if (!session?.id) return;
 
-  
-  const BILLETS = [
-    { name: 'billets_10000', label: '10 000', value: 10000 },
-    { name: 'billets_5000', label: '5 000', value: 5000 },
-    { name: 'billets_1000', label: '1 000', value: 1000 },
-    { name: 'billets_500', label: '500', value: 500 },
-  ];
+    setLoading(true);
+    setError('');
 
-  const PIECES = [
-    { name: 'billets_200', label: '200', value: 200 }, // Often handled as coin in practice or small note
-    { name: 'billets_100', label: '100', value: 100 },
-    { name: 'billets_50', label: '50', value: 50 },
-    { name: 'pieces_20', label: '20', value: 20 },
-    { name: 'pieces_10', label: '10', value: 10 },
-    { name: 'pieces_5', label: '5', value: 5 },
-  ];
-
-  // Format money helper
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR').format(amount);
-  };
-
-  // Format relative time
-  const formatLastClosure = (dateStr?: string) => {
-    if (!dateStr) return null;
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays === 0) {
-      if (diffHours < 1) return "Il y a moins d'une heure";
-      return `Il y a ${diffHours}h`;
-    } else if (diffDays === 1) {
-      return `Hier à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-    } else if (diffDays < 7) {
-      return `Il y a ${diffDays} jours`;
-    } else {
-      return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+    try {
+      await sessionCaisseApi.cancelRequest(session.id, "Annulé par le caissier");
+      setSuccessMessage('Demande annulée.');
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de l'annulation.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Selected caisse info
-  const selectedCaisseInfo = useMemo(() => {
-    return caisses.find(c => c.id === selectedCaisseId);
-  }, [caisses, selectedCaisseId]);
+  // Obtenir les détails de la caisse sélectionnée
+  const selectedCaisse = useMemo(() =>
+    caisses.find(c => c.id === selectedCaisseId),
+    [caisses, selectedCaisseId]
+  );
+
+  // Calculer le solde existant de la caisse (fonds reporté)
+  const soldeExistant = useMemo(() => {
+    if (!selectedCaisse) return 0;
+    return Number(selectedCaisse.solde || 0);
+  }, [selectedCaisse]);
+
+  // La caisse a-t-elle des fonds reportés ?
+  const hasFondsReporte = soldeExistant > 0;
+
+  // ========== OUVERTURE DIRECTE (avec fonds existants) ==========
+  const handleDirectOpening = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    if (!selectedCaisseId) {
+      setError("Veuillez sélectionner une caisse physique.");
+      setLoading(false);
+      return;
+    }
+
+    if (!authData.pin || authData.pin.length < 4) {
+      setError("Veuillez entrer votre PIN à 6 chiffres.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Vérifier le PIN
+      const pinRes = await fetch('/api/auth/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ pin: authData.pin })
+      });
+
+      const pinData = await pinRes.json();
+      if (!pinRes.ok) {
+        if (pinData?.requirePinSetup) {
+          setError('Aucun PIN configuré. Définissez votre PIN dans Paramètres > Sécurité.');
+        } else {
+          setError(pinData?.error || 'PIN incorrect.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 2. Ouverture directe avec fonds existants
+      const result = await sessionCaisseApi.openDirect({
+        caisseId: selectedCaisseId,
+        agenceId: selectedAgenceId || currentUser?.agenceId,
+        observations,
+      });
+
+      setSession(result.session);
+      setSuccessMessage('Session ouverte avec succès !');
+      queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
+
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de l'ouverture directe.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Formater les montants
+  const formatMoney = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount) + ' FCFA';
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-3">
-      <Card variant="elevated" className="w-full max-w-lg max-h-[95vh] flex flex-col bg-surface-base" padding="none">
-        {/* Header */}
-        <div className="px-3 py-3 sm:px-4 flex items-center gap-3 border-b border-edge bg-success/10">
-          <div className="p-2 rounded-xl bg-success/20">
-            <Unlock className="w-5 h-5 text-success" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-content-primary">Ouverture de Caisse</h3>
-            <p className="text-[10px] sm:text-xs text-content-muted">
-              {step === 'auth' ? 'Étape 1/2 : Authentification' : 'Étape 2/2 : Décompte initial'}
-            </p>
-          </div>
-          <IconButton icon={X} variant="ghost" size="sm" onClick={onClose} aria-label="Fermer" />
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      
+      {/* Container Modale "Zero Scroll" */}
+      <div className="w-full max-w-4xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px]">
+        
+        {/* COLONNE GAUCHE : CONTEXTE & INFO (Visuel) */}
+        <div className="md:w-1/3 bg-slate-900 p-6 flex flex-col border-r border-slate-800 relative">
+           
+           {/* Header Context */}
+           <div className="mb-8">
+             <div className="flex items-center gap-2 text-emerald-400 font-bold mb-2">
+               <Shield className="h-6 w-6" />
+               <span>Ouverture Sécurisée</span>
+             </div>
+             <p className="text-xs text-slate-400 leading-relaxed">
+               Vous initiez une demande de fonds pour votre session. Cette demande devra être validée par le Responsable Coffre.
+             </p>
+           </div>
 
-        {/* Progress */}
-        <div className="px-4 py-3 flex items-center justify-center gap-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step === 'auth' ? 'bg-primary text-white' : 'bg-success text-white'}`}>
-            {step === 'billetage' ? <Check size={14} /> : '1'}
-          </div>
-          <div className={`w-12 h-1 rounded ${step === 'billetage' ? 'bg-success' : 'bg-edge'}`} />
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${step === 'billetage' ? 'bg-primary text-white' : 'bg-surface-muted text-content-muted'}`}>
-            2
-          </div>
-        </div>
+           {/* Stepper Vertical */}
+           <div className="flex-1 space-y-6">
+             <StepItem 
+               number="1" 
+               label="Configuration" 
+               active={step === 'auth'} 
+               completed={step === 'waiting' || step === 'confirm'} 
+             />
+             <StepItem 
+               number="2" 
+               label="Validation Coffre" 
+               active={step === 'waiting'} 
+               completed={step === 'confirm'} 
+             />
+             <StepItem 
+               number="3" 
+               label="Réception & Confirmation" 
+               active={step === 'confirm'} 
+               completed={false} 
+             />
+           </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
-          {error && (
-            <div className="bg-danger/10 border border-danger/30 rounded-xl p-3 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
-              <p className="text-xs text-danger">{error}</p>
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="bg-success/10 border border-success/30 rounded-xl p-3 flex items-center gap-2">
-              <Check className="w-4 h-4 text-success" />
-              <p className="text-xs text-success font-semibold">{successMessage}</p>
-            </div>
-          )}
-
-          {step === 'auth' && (
-            <form onSubmit={handleAuthentication} className="space-y-4">
-              
-              {/* ADMIN: Agency Selector */}
-              {isAdmin && (
-                  <SelectField
-                    label="Agence"
-                    name="agence"
-                    value={selectedAgenceId}
-                    onChange={(e) => setSelectedAgenceId(e.target.value)}
-                    options={agences.map(a => ({ value: a.id, label: a.nom }))}
-                    className="mb-4"
-                  />
-              )}
-
-              {/* Caisse Selector */}
-                <div className="space-y-3">
-                    <label className="text-xs font-semibold text-content-secondary">Choisir la Caisse</label>
-                    {loadingCaisses ? (
-                        <div className="flex justify-center py-4"><LoadingSpinner size="sm" /></div>
-                    ) : caisses.length === 0 ? (
-                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center">
-                          <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
-                          <p className="text-sm text-amber-400 font-medium">Aucune caisse disponible</p>
-                          <p className="text-xs text-amber-300/70 mt-1">
-                            Contactez votre superviseur pour être assigné à une caisse.
-                          </p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-2">
-                            {caisses.map(caisse => {
-                                const isSelected = selectedCaisseId === caisse.id;
-                                const hasLastSession = caisse.lastSession?.closedAt || caisse.lastSession?.closed_at;
-
-                                return (
-                                    <button
-                                        key={caisse.id}
-                                        type="button"
-                                        disabled={caisse.isOccupied}
-                                        onClick={() => setSelectedCaisseId(caisse.id)}
-                                        className={`
-                                            relative p-3 rounded-xl border text-left transition-all
-                                            ${isSelected
-                                                ? 'border-primary bg-primary/5 ring-2 ring-primary/50'
-                                                : 'border-edge bg-surface-muted hover:border-primary/50'
-                                            }
-                                            ${caisse.isOccupied ? 'opacity-60 cursor-not-allowed' : ''}
-                                        `}
-                                    >
-                                        {/* Selection indicator */}
-                                        {isSelected && (
-                                          <div className="absolute -top-1.5 -right-1.5">
-                                            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                                              <CheckCircle2 size={12} className="text-white" />
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                {/* Caisse name and type */}
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className={`p-1.5 rounded-lg ${
-                                                      caisse.type === 'Coffre-Fort'
-                                                        ? 'bg-amber-500/10 text-amber-500'
-                                                        : 'bg-cyan-500/10 text-cyan-500'
-                                                    }`}>
-                                                      {caisse.type === 'Coffre-Fort' ? <Lock size={14} /> : <Monitor size={14} />}
-                                                    </div>
-                                                    <div>
-                                                      <span className="text-sm font-bold text-content-primary block">{caisse.nom}</span>
-                                                      <span className="text-[10px] text-content-muted">{caisse.type}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Status and last session info */}
-                                                {caisse.isOccupied ? (
-                                                    <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                                                      <User size={12} className="text-amber-500" />
-                                                      <span className="text-xs text-amber-400">
-                                                        Occupée par <strong>{caisse.occupiedByName || 'un autre caissier'}</strong>
-                                                      </span>
-                                                    </div>
-                                                ) : hasLastSession ? (
-                                                    <div className="flex items-center gap-3 p-2 rounded-lg bg-surface-base/50 border border-edge/50">
-                                                      <div className="flex-1">
-                                                        <div className="flex items-center gap-1.5 text-[10px] text-content-muted mb-0.5">
-                                                          <Clock size={10} />
-                                                          <span>Dernière fermeture: {formatLastClosure(caisse.lastSession?.closedAt || caisse.lastSession?.closed_at)}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5">
-                                                          <Wallet size={10} className="text-emerald-500" />
-                                                          <span className="text-xs font-semibold text-emerald-400 font-mono">
-                                                            {formatMoney(caisse.lastSession?.solde_reel || 0)} F
-                                                          </span>
-                                                          <span className="text-[10px] text-content-muted">solde final</span>
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                                      <CheckCircle2 size={12} className="text-emerald-500" />
-                                                      <span className="text-xs text-emerald-400">Disponible - Première ouverture</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-
-              <div className="bg-primary/10 border border-primary/30 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <Shield className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-semibold text-content-primary">
-                      {canSelfAuthorize ? "Validation d'identité" : "Authentification Superviseur"}
-                  </span>
-                </div>
-                {canSelfAuthorize ? (
-                     <p className="text-[10px] text-content-muted pl-6">
-                        Confirmez votre identité avec votre PIN pour ouvrir cette session.
-                     </p>
-                ) : (
-                    <p className="text-[10px] text-content-muted pl-6">
-                      Seul un Administrateur ou Chef d'Agence peut autoriser l'ouverture
-                    </p>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                {!canSelfAuthorize && (
-                    <>
-                        <div>
-                        <label className="block text-xs font-semibold text-content-secondary mb-1.5">Identifiant</label>
-                        <input
-                            type="text"
-                            value={authData.username}
-                            onChange={(e) => setAuthData({ ...authData, username: e.target.value })}
-                            className="w-full px-3 py-2.5 bg-surface-muted border border-edge rounded-xl text-content-primary text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                            placeholder="Nom d'utilisateur"
-                            required
-                        />
-                        </div>
-                        <div>
-                        <label className="block text-xs font-semibold text-content-secondary mb-1.5">Mot de passe</label>
-                        <input
-                            type="password"
-                            value={authData.password}
-                            onChange={(e) => setAuthData({ ...authData, password: e.target.value })}
-                            className="w-full px-3 py-2.5 bg-surface-muted border border-edge rounded-xl text-content-primary text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                            placeholder="••••••••"
-                            required
-                        />
-                        </div>
-                    </>
-                )}
-                
+           {/* Agence Info */}
+           <div className="mt-auto pt-6 border-t border-slate-800">
+             <div className="flex items-center gap-3 opacity-70">
+                <Monitor className="text-slate-500 h-5 w-5" />
                 <div>
-                  <label className="block text-xs font-semibold text-content-secondary mb-1.5 flex items-center gap-1.5">
-                    <KeyRound size={12} /> PIN Caisse (6 chiffres)
-                  </label>
-                  <input
-                    type="password"
-                    value={authData.pin}
-                    onChange={(e) => setAuthData({ ...authData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                    className="w-full px-3 py-2.5 bg-surface-muted border border-edge rounded-xl text-content-primary text-center text-lg font-mono tracking-widest focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                    placeholder="000000"
-                    maxLength={6}
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" isLoading={loading} variant="primary" icon={Lock} className="flex-1" size="sm">
-                  Continuer
-                </Button>
-                <Button type="button" variant="ghost" onClick={onClose} size="sm">Annuler</Button>
-              </div>
-            </form>
-          )}
-
-          {step === 'billetage' && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="bg-surface-base border border-edge rounded-xl shadow-sm overflow-hidden mb-4">
-                <div className="bg-surface-muted/50 p-4 border-b border-edge flex flex-col items-center justify-center text-center">
-                   <span className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Total en Caisse</span>
-                   <div className="text-3xl font-bold text-primary tabular-nums tracking-tight">
-                      {calculerTotal().toLocaleString()} <span className="text-sm font-medium text-content-muted">FCFA</span>
+                   <div className="text-xs text-slate-500 uppercase">Agence</div>
+                   <div className="text-sm font-bold text-white">
+                     {agences.find(a => a.id === selectedAgenceId)?.nom || 'Siège Principal'}
                    </div>
                 </div>
-                <div className="grid grid-cols-2 divide-x divide-edge border-b border-edge bg-surface-base/50">
-                    <div className="p-3 text-center">
-                        <span className="block text-[10px] text-content-muted uppercase">Autorisé par</span>
-                        <span className="text-xs font-semibold text-content-primary truncate block">{superviseur?.name}</span>
-                    </div>
-                    <div className="p-3 text-center">
-                        <span className="block text-[10px] text-content-muted uppercase">Caisse</span>
-                        <span className="text-xs font-semibold text-content-primary truncate block">{caisses.find(c => c.id === selectedCaisseId)?.nom}</span>
-                    </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                 {/* Billets Section */}
-                 <div>
-                    <h4 className="flex items-center gap-2 text-sm font-bold text-content-primary mb-3 px-1">
-                        <Wallet size={16} className="text-primary" /> Billets
-                    </h4>
-                    <div className="space-y-2">
-                        {BILLETS.map((d) => {
-                            const count = billetage[d.name as keyof typeof billetage];
-                            const subtotal = count * d.value;
-                            return (
-                                <div key={d.name} className="flex items-center justify-between p-3 bg-surface-muted/40 rounded-xl border border-edge/50">
-                                    <div className="flex flex-col">
-                                        <span className="font-bold text-content-primary">{d.label}</span>
-                                        <span className="text-[10px] text-content-muted font-medium">
-                                            {subtotal > 0 ? `${subtotal.toLocaleString()} F` : '-'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-3 bg-surface-base rounded-lg p-1 border border-edge shadow-sm">
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setBilletage({ ...billetage, [d.name]: Math.max(0, count - 1) })} 
-                                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-danger/10 text-content-secondary hover:text-danger transition-colors"
-                                        >
-                                            <span className="text-lg leading-none mb-0.5">-</span>
-                                        </button>
-                                        <input
-                                            type="number"
-                                            value={count || ''}
-                                            onChange={(e) => setBilletage({ ...billetage, [d.name]: Math.max(0, Number(e.target.value)) })}
-                                            className="w-12 text-center bg-transparent font-bold text-content-primary outline-none"
-                                            placeholder="0"
-                                            min="0"
-                                        />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setBilletage({ ...billetage, [d.name]: count + 1 })} 
-                                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-success/10 text-content-secondary hover:text-success transition-colors"
-                                        >
-                                            <span className="text-lg leading-none mb-0.5">+</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                 </div>
-
-                 {/* Pièces Section */}
-                 <div>
-                    <h4 className="flex items-center gap-2 text-sm font-bold text-content-primary mb-3 px-1">
-                        <DollarSign size={16} className="text-secondary" /> Pièces & Petite Monnaie
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {PIECES.map((d) => {
-                            const count = billetage[d.name as keyof typeof billetage];
-                            return (
-                                <div key={d.name} className="flex items-center justify-between p-2 pl-3 bg-surface-muted/40 rounded-xl border border-edge/50">
-                                     <span className="font-bold text-content-primary text-sm">{d.label}</span>
-                                     <div className="flex items-center gap-1">
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setBilletage({ ...billetage, [d.name]: Math.max(0, count - 1) })} 
-                                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-danger/10 text-content-secondary hover:text-danger transition-colors text-lg font-medium"
-                                        >-</button>
-                                        <input
-                                            type="number"
-                                            value={count || ''}
-                                            onChange={(e) => setBilletage({ ...billetage, [d.name]: Math.max(0, Number(e.target.value)) })}
-                                            className="w-10 text-center bg-transparent font-semibold text-content-primary outline-none text-sm"
-                                            placeholder="0"
-                                            min="0"
-                                        />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setBilletage({ ...billetage, [d.name]: count + 1 })} 
-                                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-success/10 text-content-secondary hover:text-success transition-colors text-lg font-medium"
-                                        >+</button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-content-secondary mb-1.5">Observations</label>
-                <textarea
-                  value={formData.observations}
-                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                  className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-xl text-content-primary text-xs resize-none focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
-                  rows={2}
-                  placeholder="Notes optionnelles..."
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                {(() => {
-                    // Check availability
-                    const selectedCaisse = caisses.find(c => c.id === selectedCaisseId);
-                    const isAssigned = selectedCaisse?.assignments?.includes(currentUser?.id || '');
-                    const canOpen = hasGlobalPermission || isAssigned;
-
-                    return canOpen ? (
-                        <Button type="submit" isLoading={loading} disabled={calculerTotal() === 0} variant="primary" icon={Unlock} className="flex-1" size="sm">
-                            Ouvrir la Caisse
-                        </Button>
-                    ) : (
-                        <div className="flex-1 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-center text-sm">
-                            Vous n'êtes pas assigné à cette caisse
-                        </div>
-                    );
-                })()}
-                <Button type="button" variant="ghost" onClick={() => setStep('auth')} size="sm">Retour</Button>
-              </div>
-            </form>
-          )}
+             </div>
+           </div>
         </div>
-      </Card>
+
+        {/* COLONNE DROITE : ACTION (Interactive) */}
+        <div className="flex-1 p-6 md:p-8 flex flex-col bg-slate-950 overflow-y-auto">
+           
+           <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white">
+                  {step === 'auth' && 'Initialisation Caisse'}
+                  {step === 'waiting' && 'Vérification en cours...'}
+                  {step === 'confirm' && 'Confirmation des fonds'}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {step === 'auth' && 'Précisez votre caisse et le montant souhaité.'}
+                  {step === 'waiting' && 'En attente de l\'approbation du responsable.'}
+                  {step === 'confirm' && 'Veuillez confirmer le billetage reçu.'}
+                </p>
+              </div>
+              <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+                <X size={24}/>
+              </button>
+           </div>
+
+           {/* Messages d'erreur/succès */}
+           {error && (
+             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-xl flex items-center gap-3 text-red-200 text-sm animate-in slide-in-from-top-2">
+               <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-400" />
+               <span>{error}</span>
+             </div>
+           )}
+
+           {successMessage && (
+             <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/50 rounded-xl flex items-center gap-3 text-emerald-200 text-sm animate-in slide-in-from-top-2">
+               <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-400" />
+               <span>{successMessage}</span>
+             </div>
+           )}
+
+           <div className="flex-1">
+              {/* PHASE A: Demande de fonds */}
+              {step === 'auth' && (
+                <div className="space-y-6">
+                  {/* 1. SÉLECTION AGENCE & CAISSE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {isAdmin && (
+                      <div className="space-y-2">
+                         <label className="text-xs font-bold text-slate-500 uppercase ml-1">Agence</label>
+                         <div className="relative">
+                            <Monitor className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                            <select 
+                              value={selectedAgenceId}
+                              onChange={(e) => setSelectedAgenceId(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-10 py-3 text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
+                            >
+                              {agences.map(a => <option key={a.id} value={a.id}>{a.nom}</option>)}
+                            </select>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                              <span className="text-slate-500">▼</span>
+                            </div>
+                         </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                       <label className="text-xs font-bold text-slate-500 uppercase ml-1">Sélectionner votre caisse</label>
+                       <div className="relative">
+                          <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                          {loadingCaisses ? (
+                            <div className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-slate-400 flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Chargement...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <select 
+                                value={selectedCaisseId}
+                                onChange={(e) => setSelectedCaisseId(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-10 py-3 text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
+                              >
+                                <option value="">Choisir une caisse</option>
+                                {caisses.map(c => (
+                                  <option key={c.id} value={c.id} disabled={c.isOccupied}>
+                                    {c.nom} {c.isOccupied ? '(Occupée)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <span className="text-slate-500">▼</span>
+                              </div>
+                            </>
+                          )}
+                       </div>
+                    </div>
+                  </div>
+
+                  {/* FONDS REPORTÉ - Choix d'ouverture */}
+                  {hasFondsReporte && selectedCaisseId && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-4 animate-in slide-in-from-top-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <Banknote className="h-5 w-5 text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-amber-200">Fonds reporté disponible</p>
+                          <p className="text-xs text-amber-300/70">
+                            Cette caisse contient <span className="font-bold text-amber-200">{formatMoney(soldeExistant)}</span> de la session précédente.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setOpeningMode('direct')}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            openingMode === 'direct'
+                              ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500'
+                              : 'bg-slate-900/50 border-slate-700 hover:border-slate-500'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Unlock className={`h-4 w-4 ${openingMode === 'direct' ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            <span className={`text-sm font-semibold ${openingMode === 'direct' ? 'text-emerald-300' : 'text-slate-300'}`}>
+                              Ouverture rapide
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400">
+                            Ouvrir avec le fonds existant ({formatMoney(soldeExistant)})
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setOpeningMode('request')}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            openingMode === 'request'
+                              ? 'bg-cyan-500/20 border-cyan-500 ring-1 ring-cyan-500'
+                              : 'bg-slate-900/50 border-slate-700 hover:border-slate-500'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Plus className={`h-4 w-4 ${openingMode === 'request' ? 'text-cyan-400' : 'text-slate-400'}`} />
+                            <span className={`text-sm font-semibold ${openingMode === 'request' ? 'text-cyan-300' : 'text-slate-300'}`}>
+                              Avec complément
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400">
+                            Demander des fonds supplémentaires au coffre
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. MONTANT DOTATION - uniquement si mode "request" ou pas de fonds reporté */}
+                  {(openingMode === 'request' || !hasFondsReporte) && (
+                  <div className="space-y-3">
+                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Dotation souhaitée (FCFA)</label>
+                     
+                     {/* Input Géant */}
+                     <div className="relative group">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xl group-focus-within:text-emerald-400">F</span>
+                        <input 
+                          type="number" 
+                          value={montantDemande}
+                          onChange={(e) => setMontantDemande(Number(e.target.value))}
+                          placeholder="0"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-5 text-3xl font-bold text-white placeholder-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+                        />
+                     </div>
+
+                     {/* Chips Rapides */}
+                     <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                        {quickAmounts.map(amt => (
+                          <button 
+                            key={amt}
+                            type="button"
+                            onClick={() => setMontantDemande(amt)}
+                            className={`px-4 py-2 bg-slate-900 border rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                              montantDemande === amt 
+                                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' 
+                                : 'border-slate-700 text-slate-400 hover:border-slate-500 hover:text-white'
+                            }`}
+                          >
+                            {new Intl.NumberFormat('fr-FR').format(amt)}
+                          </button>
+                        ))}
+                     </div>
+                  </div>
+                  )}
+
+                  {/* 3. PIN SÉCURITÉ */}
+                  <div className="space-y-2">
+                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Code PIN Agent</label>
+                     <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <input 
+                          type="password" 
+                          placeholder="••••••"
+                          maxLength={6}
+                          value={authData.pin}
+                          onChange={(e) => setAuthData({ ...authData, pin: e.target.value })}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-white tracking-[1em] font-mono text-xl focus:border-emerald-500 outline-none transition-all placeholder-slate-800"
+                        />
+                        {authData.pin.length === 6 && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                            <CheckCircle2 size={24} />
+                          </div>
+                        )}
+                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PHASE B: En attente */}
+              {step === 'waiting' && (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95">
+                  <div className="relative w-24 h-24">
+                    <div className="absolute inset-0 border-4 border-emerald-500/20 rounded-full animate-ping" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/10 border-2 border-emerald-500/30 rounded-full">
+                      <Clock className="h-10 w-10 text-emerald-400" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 max-w-sm">
+                    <h3 className="text-lg font-bold text-white">Transmission au coffre...</h3>
+                    <p className="text-sm text-slate-400">
+                      Veuillez patienter pendant que le responsable valide votre dotation de 
+                      <span className="text-white font-bold mx-1">
+                        {Number(session?.montantDemande || montantDemande).toLocaleString('fr-FR')} FCFA
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="w-full max-w-xs bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-left space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                       <span className="text-slate-500">Caisse</span>
+                       <span className="text-white font-medium">{session?.caisse?.nom || selectedCaisse?.nom}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                       <span className="text-slate-500">Statut</span>
+                       <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-full text-[10px] uppercase font-bold tracking-wider">
+                         Validation en cours
+                       </span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleCancelRequest}
+                    disabled={loading}
+                    className="text-slate-500 hover:text-red-400 text-xs font-bold transition-colors flex items-center gap-2"
+                  >
+                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban size={14} />}
+                    Annuler la demande
+                  </button>
+                </div>
+              )}
+
+              {/* PHASE C: Confirmation de réception */}
+              {step === 'confirm' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-emerald-500/20 border-2 border-emerald-500/30 rounded-xl flex items-center justify-center">
+                      <Package className="h-6 w-6 text-emerald-400" />
+                    </div>
+                    <div>
+                       <div className="text-xs font-bold text-emerald-500/70 uppercase">Fonds Prêts</div>
+                       <div className="text-xl font-black text-white">
+                         {Number(session?.montantDemande || montantDemande).toLocaleString('fr-FR')} <span className="text-xs font-bold text-slate-500">FCFA</span>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Billetage de réception</h4>
+                      <div className="text-xs font-bold text-emerald-400">
+                        Total compté: {calculerTotal().toLocaleString()} F
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {[10000, 5000, 2000, 1000, 500, 200, 100, 50, 25, 10, 5].map((value) => {
+                        const isBillet = value >= 500;
+                        const key = (isBillet ? `billets_${value}` : `pieces_${value}`) as keyof typeof billetage;
+                        // Special case for 500 which can be both, but we use billets_500 in state
+                        const stateKey = value === 500 ? 'billets_500' : key;
+                        
+                        return (
+                          <div key={value} className="bg-slate-900 border border-slate-800 rounded-xl p-2 focus-within:border-emerald-500/50 transition-all">
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">{value} F</label>
+                            <input 
+                              type="number" 
+                              value={billetage[stateKey as keyof typeof billetage] || ''}
+                              onChange={(e) => setBilletage({ ...billetage, [stateKey]: Number(e.target.value) || 0 })}
+                              className="w-full bg-transparent text-white font-bold text-sm outline-none px-1"
+                              placeholder="0"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Alerte écart */}
+                    {Math.abs(calculerTotal() - Number(session?.montantDemande || montantDemande)) > 0 && calculerTotal() > 0 && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 text-amber-200 text-xs">
+                        <AlertCircle className="h-4 w-4 text-amber-400" />
+                        <span>Écart de {Math.abs(calculerTotal() - Number(session?.montantDemande || montantDemande)).toLocaleString()} F.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+           </div>
+
+           {/* FOOTER ACTION */}
+           <div className="mt-auto pt-6 border-t border-slate-800">
+              {step === 'auth' && (
+                <button
+                  onClick={hasFondsReporte && openingMode === 'direct' ? handleDirectOpening : handleRequestOpening}
+                  disabled={loading || !selectedCaisseId || authData.pin.length < 4}
+                  className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:bg-slate-800 disabled:text-slate-500 ${
+                    hasFondsReporte && openingMode === 'direct'
+                      ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20 text-white'
+                      : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20 text-white'
+                  }`}
+                >
+                   {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+                     <>
+                       <span>
+                         {hasFondsReporte && openingMode === 'direct'
+                           ? 'Ouvrir la session'
+                           : 'Envoyer la demande'}
+                       </span>
+                       {hasFondsReporte && openingMode === 'direct'
+                         ? <Unlock size={20} />
+                         : <ArrowRight size={20} />}
+                     </>
+                   )}
+                </button>
+              )}
+
+              {step === 'confirm' && (
+                <button 
+                  onClick={handleConfirmReception}
+                  disabled={loading || calculerTotal() <= 0}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all"
+                >
+                   {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+                     <>
+                       <span>Confirmer & Ouvrir</span>
+                       <Check size={20} />
+                     </>
+                   )}
+                </button>
+              )}
+           </div>
+
+        </div>
+      </div>
     </div>
   );
+}
+
+// Composant Visuel Stepper
+function StepItem({ number, label, active, completed }: { number: string; label: string; active: boolean; completed: boolean }) {
+  return (
+    <div className={`flex items-center gap-4 transition-all duration-300 ${active || completed ? 'opacity-100' : 'opacity-30'}`}>
+       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm border-2 transition-all ${
+         completed 
+           ? 'bg-emerald-500 border-emerald-500 text-white' 
+           : active 
+             ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+             : 'bg-transparent border-slate-700 text-slate-500'
+       }`}>
+         {completed ? <Check size={18} /> : number}
+       </div>
+       <div className="flex flex-col">
+         <span className={`text-[10px] uppercase font-bold tracking-wider ${active ? 'text-emerald-500' : 'text-slate-500'}`}>Étape {number}</span>
+         <span className={`text-sm font-bold ${active || completed ? 'text-white' : 'text-slate-500'}`}>{label}</span>
+       </div>
+    </div>
+  )
 }

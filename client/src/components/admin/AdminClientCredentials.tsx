@@ -379,6 +379,7 @@ export default function AdminClientCredentials() {
                                 variant="ghost"
                                 onClick={() => copyToClipboard(result.username || '')}
                                 className="h-6 w-6"
+                                aria-label="Copier le nom d'utilisateur"
                               />
                             </div>
                             <div className="flex items-center gap-2">
@@ -392,6 +393,7 @@ export default function AdminClientCredentials() {
                                 variant="ghost"
                                 onClick={() => togglePasswordVisibility(result.clientId)}
                                 className="h-6 w-6"
+                                aria-label={visiblePasswords.has(result.clientId) ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                               />
                               <IconButton
                                 icon={Copy}
@@ -399,6 +401,7 @@ export default function AdminClientCredentials() {
                                 variant="ghost"
                                 onClick={() => copyToClipboard(result.password || '')}
                                 className="h-6 w-6"
+                                aria-label="Copier le mot de passe"
                               />
                             </div>
                           </div>

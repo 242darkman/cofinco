@@ -71,13 +71,21 @@ export const transfertsCoffreCaisse = pgTable(
     
     // Billetage optionnel
     billetage: json("billetage"),
-    
+
     // Métadonnées
     metadata: json("metadata"),
-    
+
     // Verrouillage après exécution
     verrouille: boolean("verrouille").notNull().default(false),
-    
+
+    // ========== WORKFLOW OUVERTURE SECURISEE (Coffre → Caisse) ==========
+    // Lien vers la session d'ouverture (si ce transfert est pour ouvrir une caisse)
+    sessionOuvertureId: uuid("session_ouverture_id").references(() => sessionsCaisse.id, { onDelete: "set null" }),
+
+    // Flag indiquant que ce transfert est pour l'ouverture d'une session caisse
+    isOpeningFund: boolean("is_opening_fund").notNull().default(false),
+    // ========== FIN WORKFLOW OUVERTURE ==========
+
     // Audit timestamps
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -91,6 +99,8 @@ export const transfertsCoffreCaisse = pgTable(
     idxCaisse: index("idx_transferts_coffre_caisse").on(t.caisseId),
     idxStatutDate: index("idx_transferts_coffre_statut_date").on(t.statut, t.createdAt),
     idxRequestedBy: index("idx_transferts_coffre_requested_by").on(t.requestedBy),
+    idxSessionOuverture: index("idx_transferts_coffre_session_ouverture").on(t.sessionOuvertureId),
+    idxOpeningFund: index("idx_transferts_coffre_opening_fund").on(t.isOpeningFund),
     chkMontantPos: sql`CONSTRAINT chk_transferts_coffre_montant_pos CHECK (${t.montant} > 0)`,
   }),
 );

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -19,7 +19,9 @@ import {
   Play,
   Ban,
   Eye,
-  Vault
+  Vault,
+  User,
+  KeyRound
 } from "lucide-react";
 import { toast } from 'sonner';
 
@@ -40,7 +42,7 @@ interface CoffreFortDashboardProps {
 
 // Types pour le dialogue de confirmation
 interface ConfirmAction {
-  type: 'validate' | 'reject' | 'execute';
+  type: 'validate' | 'reject' | 'execute' | 'validate-opening' | 'reject-opening';
   transfert: any;
 }
 
@@ -61,6 +63,16 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     queryKey: ["coffre-stats", agenceId],
     queryFn: () => coffreApi.getStats(agenceId),
   });
+
+  // Query for pending opening requests (new secure workflow)
+  const { data: pendingOpeningRequests = [], isLoading: isLoadingOpeningRequests, refetch: refetchOpeningRequests } = useQuery({
+    queryKey: ['coffre', 'pending-opening-requests', agenceId],
+    queryFn: () => coffreApi.getPendingOpeningRequests(agenceId),
+    enabled: !!agenceId,
+    refetchInterval: 15000, // Poll more frequently for opening requests
+  });
+
+  const queryClient = useQueryClient();
 
   const { hasPermission } = usePermissions();
   const canValidate = hasPermission('coffre', 'transfert.validate');
@@ -147,6 +159,41 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     }
   };
 
+  // Handler for validating/rejecting opening requests (new secure workflow)
+  const handleValidateOpeningRequest = async (transfertId: string, approved: boolean, reasonRejection?: string) => {
+    setActionLoading(transfertId);
+    try {
+      await coffreApi.validateOpeningTransfer(transfertId, {
+        approved,
+        reasonRejection: approved ? undefined : (reasonRejection || 'Demande rejetée par le responsable coffre')
+      });
+      toast.success(approved ? "Demande d'ouverture validée" : "Demande d'ouverture rejetée", {
+        description: approved
+          ? "Le caissier peut maintenant confirmer la réception des fonds."
+          : "Le caissier a été notifié du rejet."
+      });
+      refetchOpeningRequests();
+      refetch(); // Refresh transferts list
+      refetchStats(); // Refresh coffre balance
+      // Invalidate session queries to update cashier view
+      queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
+    } catch (e: any) {
+      const errorMessage = e.message || "";
+      let userMessage = errorMessage;
+      if (errorMessage.includes("propre demande") || errorMessage.includes("same user")) {
+        userMessage = "Vous ne pouvez pas valider votre propre demande d'ouverture.";
+      } else if (errorMessage.toLowerCase().includes("insuffisant")) {
+        userMessage = "Solde coffre insuffisant pour cette dotation.";
+      }
+      toast.error("Action impossible", {
+        description: userMessage || "Une erreur est survenue."
+      });
+    } finally {
+      setActionLoading(null);
+      setConfirmAction(null);
+    }
+  };
+
   const handleConfirmAction = () => {
     if (!confirmAction) return;
 
@@ -157,6 +204,10 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       handleValidate(transfert.id, false);
     } else if (type === 'execute') {
       handleExecute(transfert.id);
+    } else if (type === 'validate-opening') {
+      handleValidateOpeningRequest(transfert.id, true);
+    } else if (type === 'reject-opening') {
+      handleValidateOpeningRequest(transfert.id, false);
     }
   };
 
@@ -250,6 +301,64 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           ),
           variant: 'info' as const,
           confirmText: 'Exécuter maintenant'
+        };
+      case 'validate-opening':
+        return {
+          title: "Valider la demande d'ouverture",
+          message: (
+            <>
+              <span className="block mb-3">Vous êtes sur le point de <strong className="text-emerald-400">valider</strong> cette demande d'ouverture de caisse :</span>
+              <span className="block bg-slate-800/50 rounded-lg p-3 space-y-2 mb-3">
+                <span className="flex justify-between">
+                  <span className="text-slate-400">Montant demandé</span>
+                  <span className="font-bold text-white">{montantFormatted} FCFA</span>
+                </span>
+                <span className="flex justify-between">
+                  <span className="text-slate-400">Caisse</span>
+                  <span className="text-white">{transfert.caisseDestinationNom || caisse}</span>
+                </span>
+                <span className="flex justify-between">
+                  <span className="text-slate-400">Caissier</span>
+                  <span className="text-white">{transfert.caissierNom || transfert.requestedByNom}</span>
+                </span>
+              </span>
+              <span className="text-emerald-400 text-sm flex items-center gap-2">
+                <KeyRound size={14} />
+                Le caissier pourra alors confirmer la réception et ouvrir sa session.
+              </span>
+            </>
+          ),
+          variant: 'success' as const,
+          confirmText: 'Valider et envoyer les fonds'
+        };
+      case 'reject-opening':
+        return {
+          title: "Rejeter la demande d'ouverture",
+          message: (
+            <>
+              <span className="block mb-3">Vous êtes sur le point de <strong className="text-red-400">rejeter</strong> cette demande d'ouverture :</span>
+              <span className="block bg-slate-800/50 rounded-lg p-3 space-y-2 mb-3">
+                <span className="flex justify-between">
+                  <span className="text-slate-400">Montant demandé</span>
+                  <span className="font-bold text-white">{montantFormatted} FCFA</span>
+                </span>
+                <span className="flex justify-between">
+                  <span className="text-slate-400">Caisse</span>
+                  <span className="text-white">{transfert.caisseDestinationNom || caisse}</span>
+                </span>
+                <span className="flex justify-between">
+                  <span className="text-slate-400">Caissier</span>
+                  <span className="text-white">{transfert.caissierNom || transfert.requestedByNom}</span>
+                </span>
+              </span>
+              <span className="text-amber-400 text-sm flex items-center gap-2">
+                <AlertTriangle size={14} />
+                Le caissier sera notifié et devra soumettre une nouvelle demande.
+              </span>
+            </>
+          ),
+          variant: 'danger' as const,
+          confirmText: 'Rejeter la demande'
         };
       default:
         return { title: '', message: '', variant: 'info' as const, confirmText: '' };
@@ -511,27 +620,173 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         <>
         {/* Header Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard 
+        <StatCard
             title="Solde Coffre"
             value={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}
             icon={Wallet}
             color="primary"
         />
-        <StatCard 
+        <StatCard
             title="En Attente"
-            value={pendingCount}
+            value={pendingCount + (pendingOpeningRequests?.length || 0)}
             variant="default"
             color="warning"
             icon={Clock}
         />
-        <StatCard 
+        <StatCard
             title="Mouvements J"
             value={todayVolume}
             variant="default"
-            color="primary" // Changed from info to primary
+            color="primary"
             icon={ArrowRightLeft}
         />
       </div>
+
+      {/* Pending Opening Requests Section - New Secure Workflow */}
+      {(pendingOpeningRequests?.length > 0 || isLoadingOpeningRequests) && (
+        <Card className="overflow-hidden bg-gradient-to-br from-amber-500/5 to-orange-500/5 border-amber-500/30">
+          <div className="p-4 border-b border-amber-500/20 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/20">
+                <KeyRound className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-lg flex items-center gap-2">
+                  Demandes d'Ouverture de Caisse
+                  {pendingOpeningRequests?.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-bold animate-pulse">
+                      {pendingOpeningRequests.length}
+                    </span>
+                  )}
+                </h3>
+                <p className="text-slate-400 text-sm">Caissiers en attente de dotation pour ouvrir leur session</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchOpeningRequests()}
+              disabled={isLoadingOpeningRequests}
+              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+            >
+              <Loader2
+                size={14}
+                className={`mr-2 ${isLoadingOpeningRequests ? 'animate-spin' : ''}`}
+              />
+              Actualiser
+            </Button>
+          </div>
+
+          {isLoadingOpeningRequests ? (
+            <div className="p-8 text-center">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-400 mx-auto" />
+              <p className="text-slate-400 mt-2">Chargement des demandes...</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-amber-500/10">
+              {pendingOpeningRequests.map((request: any) => (
+                <div
+                  key={request.transfert?.id || request.session?.id}
+                  className="p-4 hover:bg-amber-500/5 transition-colors"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    {/* Request Info */}
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-xl bg-slate-800 border border-slate-700">
+                        <User className="w-6 h-6 text-slate-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-white">
+                            {request.caissierNom || request.transfert?.requestedByNom || 'Caissier'}
+                          </span>
+                          <span className="text-slate-500">•</span>
+                          <span className="text-sm text-slate-400">
+                            {request.caisseNom || request.transfert?.caisseDestinationNom || 'Caisse'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-amber-400 font-bold">
+                            {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} FCFA
+                          </span>
+                          {request.soldeVeille > 0 && (
+                            <span className="text-slate-500">
+                              (+ {Number(request.soldeVeille).toLocaleString()} FCFA solde veille)
+                            </span>
+                          )}
+                        </div>
+                        {request.fundsRequestedAt && (
+                          <span className="text-xs text-slate-500 mt-1 block">
+                            Demandé le {format(new Date(request.fundsRequestedAt), "dd/MM/yyyy à HH:mm", { locale: fr })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 ml-auto">
+                      {canValidate && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-9 px-4 text-xs font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                            onClick={() => setConfirmAction({
+                              type: 'validate-opening',
+                              transfert: {
+                                id: request.transfert?.id,
+                                montant: request.montantDemande || request.transfert?.montant,
+                                caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                requestedByNom: request.transfert?.requestedByNom
+                              }
+                            })}
+                            disabled={actionLoading === request.transfert?.id}
+                          >
+                            {actionLoading === request.transfert?.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle2 size={14} className="mr-1.5" />
+                                Valider
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-9 px-4 text-xs font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                            onClick={() => setConfirmAction({
+                              type: 'reject-opening',
+                              transfert: {
+                                id: request.transfert?.id,
+                                montant: request.montantDemande || request.transfert?.montant,
+                                caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                requestedByNom: request.transfert?.requestedByNom
+                              }
+                            })}
+                            disabled={actionLoading === request.transfert?.id}
+                          >
+                            <XCircle size={14} className="mr-1.5" />
+                            Rejeter
+                          </Button>
+                        </>
+                      )}
+                      {!canValidate && (
+                        <span className="text-xs text-slate-500 italic flex items-center gap-1.5">
+                          <Clock size={12} />
+                          En attente de validation
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
         <div className="p-4 border-b border-slate-800 flex justify-between items-center">

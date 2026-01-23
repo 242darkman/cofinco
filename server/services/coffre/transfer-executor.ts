@@ -94,12 +94,13 @@ export async function executeTransfertCoffre(
 
     // Déterminer source et destination
     const isCoffreSource = transfert.typeTransfert === "COFFRE_VERS_CAISSE";
-    
-    // Vérifier solde source
+
+    // Vérifier solde source (sauf pour les transferts de clôture qui ont déjà été validés)
     const montant = parseFloat(transfert.montant);
     const soldeSource = parseFloat((isCoffreSource ? coffre.solde : caisse.solde) || "0");
+    const isClosingTransfer = transfert.motif?.includes("Remise de clôture");
 
-    if (soldeSource < montant) {
+    if (soldeSource < montant && !isClosingTransfer) {
       throw new Error(`INSUFFICIENT_FUNDS: Solde insuffisant (disponible: ${soldeSource}, requis: ${montant})`);
     }
 
@@ -214,7 +215,12 @@ export async function executeTransfertCoffre(
         await updateBalance(tx, 'coffre', coffre.id, -montant); // Coffre Debit
         await updateBalance(tx, 'caisse', caisse.id, montant);  // Caisse Credit
     } else {
-        await updateBalance(tx, 'caisse', caisse.id, -montant); // Caisse Debit
+        // Pour les transferts de clôture (CAISSE_VERS_COFFRE), le solde de la caisse
+        // a déjà été mis à jour dans finalizeClose (= montantReporte).
+        // On ne doit PAS débiter la caisse à nouveau, seulement créditer le coffre.
+        if (!isClosingTransfer) {
+            await updateBalance(tx, 'caisse', caisse.id, -montant); // Caisse Debit (sauf clôture)
+        }
         await updateBalance(tx, 'coffre', coffre.id, montant);  // Coffre Credit
     }
 
@@ -272,14 +278,17 @@ export async function executeTransfertCoffre(
              });
 
              // Notify Caisse (Balance Updates)
+             // Pour les transferts de clôture, le solde de la caisse est déjà le montantReporte
+             const newCaisseBalance = isCoffreSource
+                 ? (Number(caisse.solde) + Number(montant))
+                 : (isClosingTransfer ? Number(caisse.solde) : (Number(caisse.solde) - Number(montant)));
+
              ws.broadcastToAggregate('caisse', caisse.id, {
                 type: 'CAISSE_UPDATE',
                 payload: {
                     caisseId: caisse.id,
                     type: 'BALANCE_UPDATED',
-                    newBalance: isCoffreSource 
-                        ? (Number(caisse.solde) + Number(montant)) 
-                        : (Number(caisse.solde) - Number(montant))
+                    newBalance: newCaisseBalance
                 }
              });
         }
