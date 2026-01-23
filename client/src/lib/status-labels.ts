@@ -525,6 +525,22 @@ export const AGENCY_STATUS_COLORS: Record<StatutAgenceType, string> = {
   CLOSED: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
+// ============================================
+// TYPE COMPTE (Labels FR pour types de compte)
+// ============================================
+
+export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  CURRENT: "Courant",
+  SAVINGS: "Épargne",
+  BLOCKED: "Bloqué",
+};
+
+export const ACCOUNT_TYPE_COLORS: Record<string, string> = {
+  CURRENT: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  SAVINGS: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  BLOCKED: "bg-red-500/15 text-red-300 border-red-500/30",
+};
+
 
 // ============================================
 // HELPERS

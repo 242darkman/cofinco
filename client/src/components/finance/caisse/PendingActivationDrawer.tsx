@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { api } from '../../../lib/api-client';
 import { resolveClientPhotoUrl } from '@/lib/format';
+import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '@/lib/status-labels';
 
 interface PendingActivationDrawerProps {
   open: boolean;
@@ -125,10 +126,10 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                                {account.client.nom} {account.client.prenom}
                             </h4>
                             <div className="flex items-center gap-2 text-xs text-slate-500">
-                               <Badge 
-                                  variant="outline" 
+                               <Badge
+                                  variant="outline"
                                   className="text-[10px] px-1 py-0 h-4 border-slate-700 text-slate-400"
-                                  value={account.typeCompte}
+                                  value={getStatusLabel(account.typeCompte, ACCOUNT_TYPE_LABELS)}
                                />
                                <span className="flex items-center gap-1">
                                   <Clock size={10} />
