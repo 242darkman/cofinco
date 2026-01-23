@@ -239,7 +239,48 @@ export const StatutCoffre = {
 
 export type StatutCoffreType = (typeof StatutCoffre)[keyof typeof StatutCoffre];
 
+// ============================================
+// TYPE MOUVEMENT COFFRE (Opérations sur coffre-fort)
+// ============================================
 
+export const TypeMouvementCoffre = {
+  SORTIE_COFFRE: "SORTIE_COFFRE",
+  ENTREE_COFFRE: "ENTREE_COFFRE",
+  SORTIE_CAISSE: "SORTIE_CAISSE",
+  ENTREE_CAISSE: "ENTREE_CAISSE",
+  SORTIE_COFFRE_TRANSIT: "SORTIE_COFFRE_TRANSIT",
+  ENTREE_COFFRE_RECEPTION: "ENTREE_COFFRE_RECEPTION",
+  SAFE_SUPPLY: "SAFE_SUPPLY",
+  SAFE_DEPOSIT: "SAFE_DEPOSIT",
+  CREDIT_DISBURSEMENT: "CREDIT_DISBURSEMENT",
+  TRANSFER_OUT: "TRANSFER_OUT",
+  TRANSFER_IN: "TRANSFER_IN",
+} as const;
+
+export type TypeMouvementCoffreType = (typeof TypeMouvementCoffre)[keyof typeof TypeMouvementCoffre];
+
+/** Labels FR pour l'UI des types de mouvement coffre */
+export const TYPE_MOUVEMENT_COFFRE_LABELS: Record<string, string> = {
+  [TypeMouvementCoffre.SORTIE_COFFRE]: "Sortie Coffre",
+  [TypeMouvementCoffre.ENTREE_COFFRE]: "Entrée Coffre",
+  [TypeMouvementCoffre.SORTIE_CAISSE]: "Sortie Caisse",
+  [TypeMouvementCoffre.ENTREE_CAISSE]: "Entrée Caisse",
+  [TypeMouvementCoffre.SORTIE_COFFRE_TRANSIT]: "Transit Sortant",
+  [TypeMouvementCoffre.ENTREE_COFFRE_RECEPTION]: "Réception Transit",
+  [TypeMouvementCoffre.SAFE_SUPPLY]: "Approvisionnement Coffre",
+  [TypeMouvementCoffre.SAFE_DEPOSIT]: "Dépôt Coffre",
+  [TypeMouvementCoffre.CREDIT_DISBURSEMENT]: "Décaissement Crédit",
+  [TypeMouvementCoffre.TRANSFER_OUT]: "Transfert Sortant",
+  [TypeMouvementCoffre.TRANSFER_IN]: "Transfert Entrant",
+};
+
+/**
+ * Obtient le label FR pour un type de mouvement coffre
+ */
+export function getMouvementCoffreLabel(type: string | null | undefined): string {
+  if (!type) return "Opération";
+  return TYPE_MOUVEMENT_COFFRE_LABELS[type] || type;
+}
 
 // ============================================
 // STATUT CAISSE (Caisses principales)

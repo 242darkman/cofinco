@@ -25,7 +25,7 @@ import { toast } from 'sonner';
 
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
 import { coffreApi, sessionCaisseApi } from "@/lib/api-client";
-import { StatutTransfertCoffre } from "@shared/enum/status-constants";
+import { StatutTransfertCoffre, getMouvementCoffreLabel } from "@shared/enum/status-constants";
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { CoffreAdminPanel } from './CoffreAdminPanel';
 import { ProvisionCoffreModal } from './ProvisionCoffreModal';
@@ -623,7 +623,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
                             value={isCredit ? 'Entrée' : 'Sortie'}
                         />
                         <span className="text-sm text-slate-300">
-                            {row.typePaiement || row.metadata?.type || row.sourceModule}
+                            {getMouvementCoffreLabel(row.typePaiement || row.metadata?.type || row.sourceModule)}
                         </span>
                     </div>
                 );
