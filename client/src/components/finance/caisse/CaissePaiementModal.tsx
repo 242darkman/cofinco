@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
+import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, CreditCard, ArrowDownLeft, ArrowUpRight, Loader2, Banknote, CheckCircle } from 'lucide-react';
+import mtnMomoLogo from '../../../assets/logos/momo_mtna.png';
+import airtelMoneyLogo from '../../../assets/logos/airtel-money.png';
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -584,619 +586,382 @@ export default function CaissePaiementModal({
   }, [formData.montant]);
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="paiement-modal-title"
-    >
-      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <header className="sticky top-0 bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
-          <h2 id="paiement-modal-title" className="text-2xl font-bold text-white">
-            Fiche de Paiement
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white transition"
-            data-testid="button-close-payment"
-            aria-label="Fermer la fiche de paiement"
-          >
-            <X size={24} aria-hidden="true" />
-          </button>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
+      <div className="bg-slate-950 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-800 flex flex-col max-h-[90vh]">
+        
+        {/* HEADER: Titre + Close */}
+        <header className="px-6 py-4 bg-slate-900/50 border-b border-slate-800 flex justify-between items-center">
+           <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${isOperationEntree(formData.type_operation) ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                 {isOperationEntree(formData.type_operation) ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}
+              </div>
+              <div>
+                  <h2 id="paiement-modal-title" className="text-xl font-bold text-white">Nouvelle Transaction</h2>
+                  <p className="text-xs text-slate-400">Effectuez une opération rapide et sécurisée</p>
+              </div>
+           </div>
+           <button 
+             onClick={onClose} 
+             className="p-2 hover:bg-slate-800 rounded-full transition-colors"
+             aria-label="Fermer"
+           >
+             <X size={20} className="text-slate-400" />
+           </button>
         </header>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {errors.submit && (
-            <div
-              className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg"
-              role="alert"
-            >
-              {errors.submit}
-            </div>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <SearchableSelect
-                label="Client"
-                name="client_id"
-                value={formData.client_id}
-                onChange={(value: string | number) => setFormData({ ...formData, client_id: String(value) })}
-                options={clients.map(c => ({
-                  value: c.id,
-                  label: `${c.nom || ''} ${c.prenom || ''}`.trim() || 'Sans Nom',
-                  subLabel: [c.telephone, c.email].filter(Boolean).join(' • '),
-                  image: c.photoProfile || c.photo_profile || c.photo
-                }))}
-                placeholder="Rechercher un client..."
-                error={errors.client_id}
-                required
-              />
-            </div>
-            
-            {/* Client Summary */}
-            {formData.client_id && (
-                <div className="col-span-1 md:col-span-2 bg-slate-700/30 rounded-lg p-3 flex flex-wrap gap-4 items-center mb-2">
-                    <div className="flex items-center gap-2">
-                        <User className="text-blue-400" size={18} />
-                        <span className="text-slate-300 text-sm">Client: <strong className="text-white">{clients.find(c => c.id === formData.client_id)?.nom} {clients.find(c => c.id === formData.client_id)?.prenom}</strong></span>
-                    </div>
-                    
-                    <div className="h-4 w-px bg-slate-600 hidden sm:block"></div>
-                    
-                    <div className="flex items-center gap-2" title="Crédits en cours">
-                        <CreditCard className={clientCredits.length > 0 ? "text-amber-400" : "text-slate-500"} size={18} />
-                        <span className="text-sm">
-                            <span className="text-slate-400">Crédits:</span> 
-                            <strong className={`ml-1 ${clientCredits.length > 0 ? "text-amber-400" : "text-slate-500"}`}>
-                                {clientCredits.length} 
-                                {clientCredits.length > 0 && ` (${formatMoney(activeCreditsAmount)})`}
-                            </strong>
-                        </span>
-                    </div>
-
-                    <div className="h-4 w-px bg-slate-600 hidden sm:block"></div>
-
-                    <div className="flex items-center gap-2" title="Tontines actives">
-                        <Users className={activeTontinesCount > 0 ? "text-emerald-400" : "text-slate-500"} size={18} />
-                        <span className="text-sm">
-                            <span className="text-slate-400">Tontines:</span>
-                            <strong className={`ml-1 ${activeTontinesCount > 0 ? "text-emerald-400" : "text-slate-500"}`}>
-                                {activeTontinesCount}
-                            </strong>
-                        </span>
-                    </div>
-                </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="type-operation-select"
-                className="block text-sm font-semibold text-slate-300 mb-2"
-              >
-                Type d'Opération *
-              </label>
-              <select
-                id="type-operation-select"
-                value={formData.type_operation}
-                onChange={(e) => setFormData({ ...formData, type_operation: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
-                data-testid="select-operation-type"
-                aria-required="true"
-              >
-                <optgroup label="Tontines">
-                  <option value={TypeOperationCaisse.TONTINE_CONTRIBUTION}>Cotisation Tontine</option>
-                  <option value={TypeOperationCaisse.TONTINE_WITHDRAWAL}>Retrait Tontine</option>
-                </optgroup>
-                <optgroup label="Crédits / Prêts">
-                  <option value={TypeOperationCaisse.LOAN_REPAYMENT}>Remboursement Prêt</option>
-                  <option value={TypeOperationCaisse.CREDIT_DISBURSEMENT}>Décaissement Prêt</option>
-                </optgroup>
-                <optgroup label="Compte Épargne">
-                  <option value={TypeOperationCaisse.DEPOSIT_SAVINGS}>Versement Compte Épargne</option>
-                  <option value={TypeOperationCaisse.WITHDRAWAL_SAVINGS}>Retrait Compte Épargne</option>
-                </optgroup>
-                <optgroup label="Compte Courant">
-                  <option value={TypeOperationCaisse.DEPOSIT_CURRENT}>Versement Compte Courant</option>
-                  <option value={TypeOperationCaisse.WITHDRAWAL_CURRENT}>Retrait Compte Courant</option>
-                </optgroup>
-                <optgroup label="Compte Bloqué">
-                  <option value={TypeOperationCaisse.DEPOSIT_BLOCKED}>Versement Compte Bloqué</option>
-                  <option value={TypeOperationCaisse.WITHDRAWAL_BLOCKED}>Retrait Compte Bloqué</option>
-                </optgroup>
-                <optgroup label="Autres">
-                  <option value={TypeOperationCaisse.MISC_COLLECTION}>Encaissement Divers</option>
-                  <option value={TypeOperationCaisse.MISC_DISBURSEMENT}>Décaissement Divers</option>
-                  <option value={TypeOperationCaisse.BANK_FEE}>Frais Bancaires</option>
-                </optgroup>
-              </select>
-            </div>
-          </div>
-
-          {/* Account Selection for Account Operations */}
-          {isAccountOperation && formData.client_id && (
-             <div className="bg-slate-700/30 rounded-lg p-4 border border-slate-600">
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Compte Cible *</label>
-                {clientAccounts.length === 0 ? (
-                   <p className="text-amber-400 text-sm flex items-center gap-2"><AlertCircle size={14} /> Aucun compte trouvé pour ce client.</p>
-                ) : (
-                   <div className="grid gap-2">
-                       {clientAccounts.map(acc => (
-                           <div
-                              key={acc.id}
-                              onClick={() => {
-                                 setSelectedAccountId(acc.id);
-                                 setSelectedAccount(acc);
-                              }}
-                              className={`p-3 rounded border cursor-pointer flex items-center justify-between transition ${
-                                selectedAccountId === acc.id
-                                ? 'bg-cyan-500/20 border-cyan-500'
-                                : 'bg-slate-800 border-slate-700 hover:border-slate-500'
-                              }`}
-                           >
-                               <div>
-                                   <div className="flex items-center gap-2">
-                                       <span className="font-mono font-bold text-white">{acc.numero_compte || acc.numeroCompte}</span>
-                                       <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold ${
-                                           acc.statut === StatutCompte.ACTIVE ? 'bg-emerald-500/20 text-emerald-400' :
-                                           acc.statut === StatutCompte.PENDING_ACTIVATION ? 'bg-orange-500/20 text-orange-400' :
-                                           'bg-slate-500/20 text-slate-400'
-                                       }`}>
-                                           {getStatusLabel(acc.statut, ACCOUNT_STATUS_LABELS)}
-                                       </span>
-                                   </div>
-                                   <div className="text-xs text-slate-400">
-                                       {getStatusLabel(acc.type_compte || acc.typeCompte, ACCOUNT_TYPE_LABELS)}
-                                   </div>
-                               </div>
-                               {selectedAccountId === acc.id && <CheckCircle2 className="text-cyan-400" size={20} />}
-                           </div>
-                       ))}
+  
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          
+          {/* SECTION 1: QUI & QUOI (Grid 2 cols) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             {/* Col Gauche: Client */}
+             <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center gap-2">
+                    <User size={12}/> Client / Membre
+                </label>
+                <SearchableSelect
+                  label=""
+                  name="client_id"
+                  value={formData.client_id}
+                  onChange={(value: string | number) => setFormData({ ...formData, client_id: String(value) })}
+                  options={clients.map(c => ({
+                    value: c.id,
+                    label: `${c.nom || ''} ${c.prenom || ''}`.trim() || 'Sans Nom',
+                    subLabel: [c.telephone, c.email].filter(Boolean).join(' • '),
+                    image: c.photoProfile || c.photo_profile || c.photo
+                  }))}
+                  placeholder="Rechercher un client..."
+                  error={errors.client_id}
+                  required
+                />
+                
+                {/* Rich Summary Card (Si client sélectionné) */}
+                {formData.client_id && (
+                   <div className="mt-2 p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl flex items-center gap-3 animate-in slide-in-from-top-2">
+                      <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-white shrink-0">
+                         {clients.find(c => c.id === formData.client_id)?.nom?.charAt(0) || 'C'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <div className="text-sm font-bold text-white truncate">
+                             {clients.find(c => c.id === formData.client_id)?.nom} {clients.find(c => c.id === formData.client_id)?.prenom}
+                         </div>
+                         <div className="flex items-center gap-3 text-xs text-indigo-300 mt-0.5">
+                             <div className="flex items-center gap-1" title={`${clientCredits.length} Crédits actifs`}>
+                                 <CreditCard size={10} /> 
+                                 <span>{clientCredits.length}</span>
+                             </div>
+                             <div className="w-px h-3 bg-indigo-500/30"></div>
+                             <div className="flex items-center gap-1" title={`${activeTontinesCount} Tontines actives`}>
+                                 <Users size={10} /> 
+                                 <span>{activeTontinesCount}</span>
+                             </div>
+                             {/* Placeholder pour Solde Global si disponible dans l'avenir */}
+                         </div>
+                      </div>
                    </div>
                 )}
-                 {errors.account && (
-                    <p className="text-red-500 text-sm mt-2" role="alert">{errors.account}</p>
-                 )}
              </div>
-          )}
-
-          {/* Section Tontines */}
-          {isTontineOperation && formData.client_id && (
-            <section
-              className="bg-blue-900/30 border border-blue-600/50 rounded-lg p-4"
-              aria-labelledby="tontines-title"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Users className="text-blue-400" size={20} aria-hidden="true" />
-                <h4 id="tontines-title" className="font-semibold text-white">
-                  Tontines du client
-                </h4>
-              </div>
-
-              {loadingTontines ? (
-                <div className="flex items-center justify-center py-4" role="status" aria-label="Chargement des tontines">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500" />
-                </div>
-              ) : clientTontines.length === 0 ? (
-                <div className="flex items-center gap-2 text-amber-400 py-2" role="status">
-                  <AlertCircle size={18} aria-hidden="true" />
-                  <span>Ce client n'est inscrit à aucune tontine active</span>
-                </div>
-              ) : (
-                <div className="space-y-2" role="listbox" aria-label="Liste des tontines">
-                  {clientTontines.map((ct) => (
-                    <button
-                      key={ct.id}
-                      type="button"
-                      onClick={() => selectTontine(ct)}
-                      className={`w-full p-4 rounded-lg border-2 transition text-left flex items-center justify-between ${
-                        selectedTontine?.id === ct.id
-                          ? 'border-green-500 bg-green-500/20'
-                          : 'border-slate-600 bg-slate-700/50 hover:border-blue-500'
-                      }`}
-                      data-testid={`tontine-option-${ct.id}`}
-                      role="option"
-                      aria-selected={selectedTontine?.id === ct.id}
+  
+             {/* Col Droite: Type Opération */}
+             <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center gap-2">
+                    <FileText size={12}/> Nature Opération
+                </label>
+                <div className="relative">
+                    <select 
+                       value={formData.type_operation}
+                       onChange={(e) => setFormData({ ...formData, type_operation: e.target.value })}
+                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-indigo-500 outline-none appearance-none"
                     >
-                      <div>
-                        <p className="font-semibold text-white">{escapeHtml(ct.tontine.nom)}</p>
-                        <p className="text-sm text-slate-400">
-                          Cotisation: <span className="text-green-400 font-bold">{formatMoney(parseFloat(ct.tontine.montantCotisation))}</span>
-                          {' '}{escapeHtml(ct.tontine.frequence)}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Total versé: {formatMoney(parseFloat(ct.totalCotisations || '0'))}
-                        </p>
-                      </div>
-                      {selectedTontine?.id === ct.id && (
-                        <CheckCircle2 className="text-green-400" size={24} aria-hidden="true" />
+                       <optgroup label="Tontines">
+                         <option value={TypeOperationCaisse.TONTINE_CONTRIBUTION}>Cotisation Tontine</option>
+                         <option value={TypeOperationCaisse.TONTINE_WITHDRAWAL}>Retrait Tontine</option>
+                       </optgroup>
+                       <optgroup label="Crédits / Prêts">
+                         <option value={TypeOperationCaisse.LOAN_REPAYMENT}>Remboursement Prêt</option>
+                         <option value={TypeOperationCaisse.CREDIT_DISBURSEMENT}>Décaissement Prêt</option>
+                       </optgroup>
+                       <optgroup label="Compte Épargne">
+                         <option value={TypeOperationCaisse.DEPOSIT_SAVINGS}>Versement Compte Épargne</option>
+                         <option value={TypeOperationCaisse.WITHDRAWAL_SAVINGS}>Retrait Compte Épargne</option>
+                       </optgroup>
+                       <optgroup label="Compte Courant">
+                         <option value={TypeOperationCaisse.DEPOSIT_CURRENT}>Versement Compte Courant</option>
+                         <option value={TypeOperationCaisse.WITHDRAWAL_CURRENT}>Retrait Compte Courant</option>
+                       </optgroup>
+                       <optgroup label="Compte Bloqué">
+                         <option value={TypeOperationCaisse.DEPOSIT_BLOCKED}>Versement Compte Bloqué</option>
+                         <option value={TypeOperationCaisse.WITHDRAWAL_BLOCKED}>Retrait Compte Bloqué</option>
+                       </optgroup>
+                       <optgroup label="Autres">
+                         <option value={TypeOperationCaisse.MISC_COLLECTION}>Encaissement Divers</option>
+                         <option value={TypeOperationCaisse.MISC_DISBURSEMENT}>Décaissement Divers</option>
+                         <option value={TypeOperationCaisse.BANK_FEE}>Frais Bancaires</option>
+                       </optgroup>
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                        <ArrowDownLeft size={16} className="rotate-[-45deg]" />
+                    </div>
+                </div>
+                
+                {/* Selecteurs Conditionnels (Tontine / Compte) intégrés ici */}
+                {isTontineOperation && formData.client_id && (
+                   <div className="pt-2 animate-in fade-in slide-in-from-top-1">
+                      {loadingTontines ? (
+                         <div className="flex items-center justify-center p-2"><div className="animate-spin h-4 w-4 border-2 border-indigo-500 rounded-full border-t-transparent"></div></div>
+                      ) : clientTontines.length === 0 ? (
+                         <div className="text-amber-500 text-xs p-2 bg-amber-500/10 rounded border border-amber-500/20">Aucune tontine active</div>
+                      ) : (
+                          <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Tontine Cible</label>
+                              <select 
+                                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                                  value={selectedTontine?.id || ''}
+                                  onChange={(e) => {
+                                      const t = clientTontines.find(ct => ct.id === e.target.value);
+                                      if (t) selectTontine(t);
+                                  }}
+                              >
+                                  <option value="">Sélectionner une tontine...</option>
+                                  {clientTontines.map(ct => (
+                                      <option key={ct.id} value={ct.id}>
+                                          {ct.tontine.nom} - {formatMoney(parseFloat(ct.tontine.montantCotisation))}
+                                      </option>
+                                  ))}
+                              </select>
+                              {errors.tontine && <p className="text-red-500 text-xs">{errors.tontine}</p>}
+                          </div>
                       )}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {errors.tontine && (
-                <p className="text-red-500 text-sm mt-2" role="alert">{errors.tontine}</p>
-              )}
-            </section>
-          )}
-
-          {/* Montant */}
-          <div>
-            <label
-              htmlFor="montant-input"
-              className="block text-sm font-semibold text-slate-300 mb-2"
-            >
-              <DollarSign size={16} className="inline mr-1" aria-hidden="true" />
-              Montant (FCFA) *
-            </label>
-            <input
-              id="montant-input"
-              type="number"
-              value={formData.montant}
-              onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
-              className={`w-full px-4 py-3 bg-slate-700 border ${
-                errors.montant ? 'border-red-500' : 'border-slate-600'
-              } rounded-lg text-white text-lg font-bold focus:ring-2 focus:ring-blue-500`}
-              placeholder="50000"
-              min="0"
-              step="100"
-              data-testid="input-montant"
-              aria-required="true"
-              aria-invalid={!!errors.montant}
-              aria-describedby={errors.montant ? 'montant-error' : selectedTontine ? 'montant-hint' : undefined}
-            />
-            {errors.montant && (
-              <p id="montant-error" className="text-red-500 text-sm mt-1" role="alert">
-                {errors.montant}
-              </p>
-            )}
-            {selectedTontine && !errors.montant && (
-              <p id="montant-hint" className="text-sm text-green-400 mt-1">
-                Montant de cotisation prérempli depuis la tontine "{escapeHtml(selectedTontine.tontine.nom)}"
-              </p>
-            )}
+                   </div>
+                )}
+  
+                {isAccountOperation && formData.client_id && (
+                   <div className="pt-2 animate-in fade-in slide-in-from-top-1">
+                        {clientAccounts.length === 0 ? (
+                           <div className="text-amber-500 text-xs p-2 bg-amber-500/10 rounded border border-amber-500/20">Aucun compte trouvé</div>
+                        ) : (
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Compte Cible</label>
+                                <select 
+                                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                                    value={selectedAccountId}
+                                    onChange={(e) => {
+                                        setSelectedAccountId(e.target.value);
+                                        const acc = clientAccounts.find(a => a.id === e.target.value);
+                                        if (acc) setSelectedAccount(acc);
+                                    }}
+                                >
+                                    <option value="">Sélectionner un compte...</option>
+                                    {clientAccounts.map(acc => (
+                                        <option key={acc.id} value={acc.id}>
+                                            {acc.numero_compte || acc.numeroCompte} - {getStatusLabel(acc.type_compte || acc.typeCompte, ACCOUNT_TYPE_LABELS)}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.account && <p className="text-red-500 text-xs">{errors.account}</p>}
+                            </div>
+                        )}
+                   </div>
+                )}
+             </div>
           </div>
-
-          {/* Mode de Paiement */}
-          <fieldset>
-            <legend className="block text-sm font-semibold text-slate-300 mb-3">
-              Mode de Paiement *
-            </legend>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3" role="radiogroup">
-              {[
-                { mode: MethodePaiement.CASH, label: METHODE_PAIEMENT_LABELS[MethodePaiement.CASH], icon: Wallet, color: 'green', disabled: false },
-                { mode: MethodePaiement.TRANSFER, label: METHODE_PAIEMENT_LABELS[MethodePaiement.TRANSFER], icon: Building2, color: 'emerald', disabled: false },
-                { mode: MethodePaiement.MOBILE_MONEY, label: METHODE_PAIEMENT_LABELS[MethodePaiement.MOBILE_MONEY], icon: Smartphone, color: 'amber', disabled: true }
-              ].map(({ mode, label, icon: Icon, color, disabled }) => (
-                <button
-                  key={mode}
+  
+          {/* SECTION 2: MÉTHODE DE PAIEMENT (Tuiles) */}
+          <div className="space-y-2">
+             <label className="text-xs font-bold text-slate-500 uppercase ml-1 block">Règlement</label>
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* Tuile CASH */}
+                <button 
                   type="button"
-                  disabled={disabled}
-                  onClick={() => {
-                    if (disabled) return;
-                    const needsPhone = mode === MethodePaiement.MOBILE_MONEY;
-                    setFormData({
-                      ...formData,
-                      mode_paiement: mode,
-                      numero_telephone: needsPhone ? formData.numero_telephone : '',
-                      numero_transaction: needsPhone ? formData.numero_transaction : ''
-                    });
-                  }}
-                  className={`p-4 rounded-lg border-2 transition relative ${
-                    disabled
-                      ? 'border-slate-800 bg-slate-800/50 opacity-50 cursor-not-allowed grayscale'
-                      : formData.mode_paiement === mode
-                        ? `border-${color}-500 bg-${color}-500/20`
-                        : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
-                  }`}
-                  role="radio"
-                  aria-checked={formData.mode_paiement === mode}
-                  aria-disabled={disabled}
-                  data-testid={`payment-${mode.toLowerCase().replace(/\s+/g, '-')}`}
+                  onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.CASH})}
+                  className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-emerald-500 ${formData.mode_paiement === MethodePaiement.CASH ? 'border-emerald-500 bg-emerald-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-60 hover:opacity-100 hover:border-slate-600'}`}
                 >
-                  {Icon && (
-                    <Icon
-                      size={32}
-                      className={`mx-auto mb-2 ${
-                        disabled ? 'text-slate-600' :
-                        formData.mode_paiement === mode ? `text-${color}-400` : 'text-slate-400'
-                      }`}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <div
-                    className={`text-sm font-semibold ${
-                      disabled ? 'text-slate-500' :
-                      formData.mode_paiement === mode ? `text-${color}-400` : 'text-slate-300'
-                    }`}
-                  >
-                    {label}
-                  </div>
-                  {disabled && (
-                     <span className="absolute top-2 right-2 flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-500"></span>
-                     </span>
-                  )}
+                   <Banknote size={24} className={formData.mode_paiement === MethodePaiement.CASH ? 'text-emerald-500' : 'text-slate-400'} />
+                   <span className={`text-[10px] font-bold uppercase ${formData.mode_paiement === MethodePaiement.CASH ? 'text-emerald-400' : 'text-slate-400'}`}>Espèces</span>
                 </button>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Informations Mobile Money */}
-          {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
-            <section
-              className="p-4 bg-slate-700/30 border border-slate-600 rounded-lg space-y-4"
-              aria-labelledby="mobile-money-title"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Smartphone className="text-cyan-400" size={20} aria-hidden="true" />
-                <h4 id="mobile-money-title" className="font-semibold text-white">
-                  Informations Mobile Money
-                </h4>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    htmlFor="phone-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    Numéro de Téléphone *
-                  </label>
-                  <input
-                    id="phone-input"
-                    type="tel"
-                    value={formData.numero_telephone}
-                    onChange={(e) => setFormData({ ...formData, numero_telephone: e.target.value })}
-                    className={`w-full px-4 py-3 bg-slate-700 border ${
-                      errors.numero_telephone ? 'border-red-500' : 'border-slate-600'
-                    } rounded-lg text-white`}
-                    placeholder="+242 06 XXX XXXX"
-                    data-testid="input-phone"
-                    aria-required="true"
-                    aria-invalid={!!errors.numero_telephone}
-                    aria-describedby={errors.numero_telephone ? 'phone-error' : undefined}
-                  />
-                  {errors.numero_telephone && (
-                    <p id="phone-error" className="text-red-500 text-sm mt-1" role="alert">
-                      {errors.numero_telephone}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="transaction-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    Numéro de Transaction *
-                  </label>
-                  <input
-                    id="transaction-input"
-                    type="text"
-                    value={formData.numero_transaction}
-                    onChange={(e) => setFormData({ ...formData, numero_transaction: e.target.value })}
-                    className={`w-full px-4 py-3 bg-slate-700 border ${
-                      errors.numero_transaction ? 'border-red-500' : 'border-slate-600'
-                    } rounded-lg text-white font-mono`}
-                    placeholder="TRX123456789"
-                    data-testid="input-transaction"
-                    aria-required="true"
-                    aria-invalid={!!errors.numero_transaction}
-                    aria-describedby={errors.numero_transaction ? 'transaction-error' : undefined}
-                  />
-                  {errors.numero_transaction && (
-                    <p id="transaction-error" className="text-red-500 text-sm mt-1" role="alert">
-                      {errors.numero_transaction}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Informations Virement */}
-          {formData.mode_paiement === MethodePaiement.TRANSFER && (
-            <section
-              className="p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-lg space-y-4"
-              aria-labelledby="transfer-info-title"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Building2 className="text-emerald-400" size={20} aria-hidden="true" />
-                <h4 id="transfer-info-title" className="font-semibold text-white">
-                  Informations du Virement
-                </h4>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label
-                    htmlFor="origin-bank-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    Banque d'Origine *
-                  </label>
-                  <input
-                    id="origin-bank-input"
-                    type="text"
-                    value={formData.banque_origine}
-                    onChange={(e) => setFormData({ ...formData, banque_origine: e.target.value })}
-                    className={`w-full px-4 py-3 bg-slate-700 border ${
-                      errors.banque_origine ? 'border-red-500' : 'border-slate-600'
-                    } rounded-lg text-white`}
-                    placeholder="Ex: BGFI, UBA, Ecobank..."
-                    aria-required="true"
-                    aria-invalid={!!errors.banque_origine}
-                  />
-                  {errors.banque_origine && (
-                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.banque_origine}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="origin-account-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    N° Compte Origine
-                  </label>
-                  <input
-                    id="origin-account-input"
-                    type="text"
-                    value={formData.numero_compte_origine}
-                    onChange={(e) => setFormData({ ...formData, numero_compte_origine: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono"
-                    placeholder="XXXX-XXXX-XXXX"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="transfer-ref-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    Référence Virement *
-                  </label>
-                  <input
-                    id="transfer-ref-input"
-                    type="text"
-                    value={formData.reference_virement}
-                    onChange={(e) => setFormData({ ...formData, reference_virement: e.target.value })}
-                    className={`w-full px-4 py-3 bg-slate-700 border ${
-                      errors.reference_virement ? 'border-red-500' : 'border-slate-600'
-                    } rounded-lg text-white font-mono`}
-                    placeholder="VIR-2024-XXXXX"
-                    aria-required="true"
-                    aria-invalid={!!errors.reference_virement}
-                  />
-                  {errors.reference_virement && (
-                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.reference_virement}</p>
-                  )}
-                </div>
-              </div>
-
-              <p className="text-xs text-emerald-300/70 flex items-center gap-1">
-                <AlertCircle size={12} />
-                Veuillez confirmer la réception du virement sur le compte de l'institution
-              </p>
-            </section>
-          )}
-
-          {/* Référence */}
-          <div>
-            <label
-              htmlFor="reference-input"
-              className="block text-sm font-semibold text-slate-300 mb-2"
-            >
-              Référence (optionnel)
-            </label>
-            <input
-              id="reference-input"
-              type="text"
-              value={formData.reference}
-              onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono"
-              placeholder="Généré automatiquement"
-              data-testid="input-reference"
-            />
+                
+                {/* Tuile MTN */}
+                <button 
+                   type="button"
+                   disabled={true /* Disabled for now as per original code */}
+                   onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.MOBILE_MONEY})}
+                   className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none relative overflow-hidden ${formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'border-yellow-500 bg-yellow-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-40 grayscale cursor-not-allowed'}`}
+                >
+                   <img src={mtnMomoLogo} alt="MTN MoMo" className="h-8 object-contain" />
+                   {/* <span className="text-[10px] font-bold uppercase text-slate-400">MTN MoMo</span> */}
+                   <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full">Bientôt</span>
+                   </div>
+                </button>
+  
+                {/* Tuile Airtel */}
+                <button 
+                   type="button"
+                   disabled={true /* Disabled for now as per original code */}
+                   onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.MOBILE_MONEY})}
+                   className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none relative overflow-hidden ${formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'border-red-500 bg-red-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-40 grayscale cursor-not-allowed'}`}
+                >
+                   <img src={airtelMoneyLogo} alt="Airtel Money" className="h-8 object-contain" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full">Bientôt</span>
+                   </div>
+                </button>
+  
+                {/* Tuile Virement */}
+                <button 
+                   type="button"
+                   onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.TRANSFER})}
+                   className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500 ${formData.mode_paiement === MethodePaiement.TRANSFER ? 'border-blue-500 bg-blue-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-60 hover:opacity-100 hover:border-slate-600'}`}
+                >
+                   <Building2 size={24} className={formData.mode_paiement === MethodePaiement.TRANSFER ? 'text-blue-500' : 'text-slate-400'} />
+                   <span className={`text-[10px] font-bold uppercase ${formData.mode_paiement === MethodePaiement.TRANSFER ? 'text-blue-400' : 'text-slate-400'}`}>Virement</span>
+                </button>
+             </div>
           </div>
-
-          {/* Description */}
-          <div>
-            <label
-              htmlFor="description-input"
-              className="block text-sm font-semibold text-slate-300 mb-2"
-            >
-              <FileText size={16} className="inline mr-1" aria-hidden="true" />
-              Description *
-            </label>
-            <textarea
-              id="description-input"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className={`w-full px-4 py-3 bg-slate-700 border ${
-                errors.description ? 'border-red-500' : 'border-slate-600'
-              } rounded-lg text-white`}
-              rows={3}
-              placeholder="Détails du paiement..."
-              data-testid="input-description"
-              aria-required="true"
-              aria-invalid={!!errors.description}
-              aria-describedby={errors.description ? 'description-error' : undefined}
-            />
-            {errors.description && (
-              <p id="description-error" className="text-red-500 text-sm mt-1" role="alert">
-                {errors.description}
-              </p>
-            )}
-          </div>
-
-          {/* Résumé du montant */}
-          {formattedMontant && (
-            <div
-              className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4"
-              role="status"
-              aria-label="Résumé du paiement"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-400 mb-1">Montant du paiement</p>
-                  <p
-                    className={`text-3xl font-bold ${
-                      isOperationEntree(formData.type_operation) ? 'text-green-400' : 'text-red-400'
-                    }`}
-                  >
-                    {isOperationEntree(formData.type_operation) ? '+' : '-'}
-                    {formattedMontant}
-                  </p>
-                  <p className="text-sm text-slate-300 mt-1">via {METHODE_PAIEMENT_LABELS[formData.mode_paiement as keyof typeof METHODE_PAIEMENT_LABELS] || formData.mode_paiement}</p>
+  
+          {/* SECTION 3: MONTANT (Hero Input) */}
+          <div className="space-y-6">
+             {/* Champs conditionnels Virement qui glissent ici si sélectionnés - Logic adapted from original */}
+             {formData.mode_paiement === MethodePaiement.TRANSFER && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-4 p-4 bg-slate-900/50 rounded-xl border border-blue-900/30">
+                   <div className="md:col-span-1">
+                       <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Banque Origine</label>
+                       <input 
+                          value={formData.banque_origine}
+                          onChange={(e) => setFormData({...formData, banque_origine: e.target.value})}
+                          placeholder="Ex: BGFI" 
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500" 
+                        />
+                         {errors.banque_origine && <p className="text-red-500 text-xs mt-1">{errors.banque_origine}</p>}
+                   </div>
+                   <div className="md:col-span-2">
+                       <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Réf. Virement</label>
+                       <input 
+                          value={formData.reference_virement}
+                          onChange={(e) => setFormData({...formData, reference_virement: e.target.value})}
+                          placeholder="Réf: VIR-xxx" 
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500" 
+                        />
+                        {errors.reference_virement && <p className="text-red-500 text-xs mt-1">{errors.reference_virement}</p>}
+                   </div>
                 </div>
-                <DollarSign
-                  size={48}
-                  className={isOperationEntree(formData.type_operation) ? 'text-green-400' : 'text-red-400'}
-                  aria-hidden="true"
+             )}
+  
+             {/* Champs conditionnels Mobile Money (Phone/Ref) - Adapté pour le futur si activé */}
+              {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
+                <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                   <div>
+                       <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Téléphone</label>
+                       <input 
+                           value={formData.numero_telephone}
+                           onChange={(e) => setFormData({...formData, numero_telephone: e.target.value})}
+                           placeholder="+242..." 
+                           className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500" 
+                       />
+                   </div>
+                   <div>
+                       <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">ID Transaction</label>
+                       <input 
+                           value={formData.numero_transaction}
+                           onChange={(e) => setFormData({...formData, numero_transaction: e.target.value})}
+                           placeholder="Trans ID" 
+                           className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500" 
+                       />
+                   </div>
+                </div>
+             )}
+  
+             <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                     <span className={`text-4xl font-bold ${isOperationEntree(formData.type_operation) ? 'text-emerald-500' : 'text-rose-500'}`}>
+                         {isOperationEntree(formData.type_operation) ? '+' : '-'}
+                     </span>
+                </div>
+                <input 
+                   type="number"
+                   value={formData.montant}
+                   onChange={(e) => setFormData({...formData, montant: e.target.value})}
+                   className={`w-full bg-slate-900/50 border-2 rounded-2xl pl-12 pr-16 py-8 text-5xl font-bold text-white placeholder-slate-700 outline-none transition-all text-center tracking-tight ${errors.montant ? 'border-red-500 focus:border-red-400' : 'border-slate-800 focus:border-indigo-500'}`}
+                   placeholder="0"
                 />
-              </div>
-            </div>
-          )}
-
-          {/* Boutons d'action */}
-          <div className="flex gap-3">
-            {canCreatePayments ? (
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold flex items-center justify-center gap-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                data-testid="button-validate-payment"
-              >
-                <Check size={20} aria-hidden="true" />
-                {loading ? 'Enregistrement...' : 'Valider le Paiement'}
-              </button>
-            ) : (
-              <div
-                className="flex-1 px-6 py-3 bg-amber-500/20 text-amber-400 rounded-lg text-center font-semibold flex items-center justify-center gap-2"
-                role="alert"
-              >
-                <AlertCircle size={20} aria-hidden="true" />
-                Vous n'avez pas la permission d'effectuer des paiements
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold focus:ring-2 focus:ring-slate-500 focus:outline-none"
-              data-testid="button-cancel-payment"
-            >
-              Annuler
-            </button>
+                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-600 font-bold text-lg">FCFA</span>
+             </div>
+             {errors.montant && (
+                 <div className="text-center">
+                     <span className="px-3 py-1 rounded-full bg-red-500/10 text-red-400 text-sm border border-red-500/20 inline-flex items-center gap-2">
+                         <AlertCircle size={14}/> {errors.montant}
+                     </span>
+                 </div>
+             )}
+              {selectedTontine && !errors.montant && (
+               <div className="text-center -mt-2">
+                 <span className="text-emerald-400 text-xs bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                   Cotisation suggérée: {formatMoney(parseFloat(selectedTontine.tontine.montantCotisation))}
+                 </span>
+               </div>
+             )}
           </div>
-        </form>
+  
+          {/* SECTION 4: MÉTADONNÉES (Discret) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-slate-800/50">
+             <div className="md:col-span-2 space-y-1">
+                <label className="text-[10px] uppercase font-bold text-slate-500 block">Note / Description</label>
+                <input 
+                   value={formData.description}
+                   onChange={(e) => setFormData({...formData, description: e.target.value})}
+                   placeholder="Ajouter une note ou description..." 
+                   className={`w-full bg-transparent border-b ${errors.description ? 'border-red-500' : 'border-slate-800 focus:border-indigo-500'} px-0 py-2 text-sm text-white placeholder-slate-600 outline-none transition-colors`}
+                />
+                {errors.description && <p className="text-red-500 text-xs">{errors.description}</p>}
+             </div>
+             <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-slate-500 block text-right">Référence</label>
+                <input 
+                   disabled 
+                   value={formData.reference || "Auto-généré"} 
+                   className="w-full bg-transparent border-b border-slate-800 px-0 py-2 text-sm text-slate-600 font-mono text-right" 
+                />
+             </div>
+          </div>
+  
+          {/* Global Error Banner if any unexpected error */}
+          {errors.submit && (
+              <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center gap-3">
+                  <AlertCircle size={20} />
+                  <span className="text-sm font-medium">{errors.submit}</span>
+              </div>
+          )}
+  
+        </div>
+  
+        {/* FOOTER: Action */}
+        <div className="p-6 bg-slate-900 border-t border-slate-800">
+           <button 
+              onClick={handleSubmit}
+              disabled={loading}
+              className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-[0.99] ${loading ? 'bg-indigo-600/50 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/20 text-white'}`}
+           >
+              {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={24}/>
+                    <span>Traitement en cours...</span>
+                  </>
+              ) : (
+                  <>
+                    <CheckCircle size={24} />
+                    <span>Valider la Transaction</span>
+                  </>
+              )}
+           </button>
+           <div className="mt-4 text-center">
+              <button onClick={onClose} className="text-slate-500 hover:text-white text-sm transition-colors">
+                  Annuler l'opération
+              </button>
+           </div>
+        </div>
+  
       </div>
-
-      {/* Universal Success Modal */}
+      
+      {/* Universal Success Modal - Preservé */}
       <UniversalPaymentSuccessModal
         isOpen={showReceipt}
         onClose={() => {
