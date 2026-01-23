@@ -1440,10 +1440,9 @@ export async function payerDepotInitialCompte(
           throw new Error("Ce compte n'est pas en attente de paiement initial");
       }
 
-      // 2. Validate payment amount matches expected initial deposit
-      const expectedAmount = parseFloat(compte.soldeCourant || '0');
-      if (expectedAmount > 0 && data.montant !== expectedAmount) {
-          throw new Error(`Le montant doit correspondre au dépôt initial demandé: ${expectedAmount} FCFA`);
+      // 2. Validate payment amount (flexible: client can deposit more or less than initially promised)
+      if (data.montant <= 0) {
+        throw new Error("Le montant du dépôt initial doit être supérieur à 0");
       }
 
       // 3. Create Transaction for account history

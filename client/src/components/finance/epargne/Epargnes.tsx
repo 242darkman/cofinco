@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Plus, Search, Users, DollarSign, Filter, Activity } from 'lucide-react';
-import { compteEpargneApi } from '../../../lib/api-client';
+import { toast } from 'sonner';
+import { compteEpargneApi, sessionCaisseApi } from '../../../lib/api-client';
 import EpargneAccountForm from './EpargneAccountForm';
 import EpargneTransactionForm from './EpargneTransactionForm';
 import AccountDetailSlideOver from './AccountDetailSlideOver';
@@ -13,7 +15,9 @@ import StatCard from '../../ui/StatCard';
 import TabGroup from '../../ui/TabGroup';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
 import { getAccountBalance } from '../../../lib/account-config';
-import { TypeCompte, type TypeCompteType } from '@shared/enum/status-constants';
+import { computeSessionStatus } from '../../../lib/format';
+import { TypeCompte, type TypeCompteType, StatutCompte } from '@shared/enum/status-constants';
+import { AccountActivationModal } from '../caisse/AccountActivationModal';
 
 
 interface Compte {
@@ -58,6 +62,25 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   const [interestCompte, setInterestCompte] = useState<Compte | null>(null);
   const [goalsCompte, setGoalsCompte] = useState<Compte | null>(null);
   const [activeTab, setActiveTab] = useState<TypeCompteType>(TypeCompte.CURRENT);
+  // État pour le modal d'activation de compte
+  const [activationAccount, setActivationAccount] = useState<{
+    id: string;
+    numeroCompte: string;
+    typeCompte: string;
+    montantInitial: number;
+    client: { id: string; nom: string; prenom: string; photoUrl?: string };
+  } | null>(null);
+
+  // Query for active caisse session (needed for account activation)
+  const { data: sessionActive } = useQuery({
+    queryKey: ['session-caisse', 'active'],
+    queryFn: async () => {
+      const data = await sessionCaisseApi.getActive();
+      const status = data ? computeSessionStatus(data) : null;
+      if (data && status === 'OPEN') return data;
+      return null;
+    },
+  });
 
   // Pagination & Search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -201,6 +224,28 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       console.error('Cannot process transaction: compte has no associated client');
       return;
     }
+
+    // Handle pending activation accounts specially
+    if (compte.statut === StatutCompte.PENDING_ACTIVATION && type === 'Dépôt') {
+      if (!sessionActive) {
+        toast.warning('Pour activer un compte, veuillez d\'abord ouvrir une session de caisse');
+        return;
+      }
+      // Open the dedicated activation modal
+      setActivationAccount({
+        id: compte.id,
+        numeroCompte: compte.numero_compte || compte.numeroCompte || '',
+        typeCompte: compte.type_compte || compte.typeCompte || '',
+        montantInitial: getAccountBalance(compte),
+        client: {
+          id: compte.clients.id,
+          nom: compte.clients.nom,
+          prenom: compte.clients.prenom || '',
+        }
+      });
+      return;
+    }
+
     setSelectedCompte(compte);
     setTransactionType(type);
   };
@@ -364,6 +409,19 @@ export default function Epargnes({ activeView }: EpargnesProps) {
             setTransactionType(null);
           }}
           onSuccess={handleTransactionSuccess}
+        />
+      )}
+
+      {/* Modal d'activation de compte (pour comptes PENDING_ACTIVATION) */}
+      {activationAccount && sessionActive && (
+        <AccountActivationModal
+          account={activationAccount}
+          sessionId={sessionActive.id}
+          onClose={() => setActivationAccount(null)}
+          onSuccess={() => {
+            setActivationAccount(null);
+            loadComptes();
+          }}
         />
       )}
 

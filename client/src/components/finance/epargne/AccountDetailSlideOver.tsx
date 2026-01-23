@@ -1,25 +1,29 @@
 
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   X, User, TrendingUp, TrendingDown, Calendar,
   DollarSign, Percent, Lock, Download, Copy,
   CreditCard, ExternalLink, ArrowUpRight, ArrowDownLeft,
   AlertTriangle, Banknote
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '../../ui/sheet';
 import TabGroup from '../../ui/TabGroup';
 import Badge from '../../ui/Badge';
 import { Button, IconButton } from '../../ui';
-import { compteEpargneApi, transactionEpargneApi, clientApi } from '../../../lib/api-client';
+import { compteEpargneApi, transactionEpargneApi, clientApi, sessionCaisseApi } from '../../../lib/api-client';
 import { TransactionRowActions } from '../shared/TransactionRowActions';
 import { ReceiptViewer } from '../shared/ReceiptViewer';
 import { useReceiptActions } from '../../../hooks/finance/useReceiptActions';
 import { getAccountBalance, getAccountUiConfig, getMonthlyInterestEstimate, getRealBalance, getPendingDepositAmount } from '../../../lib/account-config';
 import { getStatusLabel, ALL_STATUS_LABELS } from '../../../lib/status-labels';
+import { computeSessionStatus } from '../../../lib/format';
 import { isDepositType, isWithdrawalType } from '@shared/enum/status-constants';
 import StatementExportModal from './StatementExportModal';
 import { formatClientName } from '../../../lib/format';
 import { useLocation } from 'wouter';
+import { AccountActivationModal } from '../caisse/AccountActivationModal';
 
 // Mapping EN -> FR pour les types de compte
 const TYPE_COMPTE_LABELS: Record<string, string> = {
@@ -45,10 +49,23 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('transactions');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showActivationModal, setShowActivationModal] = useState(false);
   const [stats, setStats] = useState({
     totalDepots: 0,
     totalRetraits: 0,
     nombreTransactions: 0
+  });
+
+  // Query for active caisse session (needed for account activation)
+  const { data: sessionActive } = useQuery({
+    queryKey: ['session-caisse', 'active'],
+    queryFn: async () => {
+      const data = await sessionCaisseApi.getActive();
+      const status = data ? computeSessionStatus(data) : null;
+      if (data && status === 'OPEN') return data;
+      return null;
+    },
+    enabled: isOpen,
   });
 
   // Receipt actions hook
@@ -259,11 +276,14 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
                            </p>
                          </div>
 
-                         {/* Primary Action: Go to cash register */}
+                         {/* Primary Action: Open activation modal */}
                          <button
                            onClick={() => {
-                             onClose();
-                             navigate(`/caisse?ref=${compte.numero_compte}&amount=${pendingAmount}`);
+                             if (!sessionActive) {
+                               toast.warning('Pour activer un compte, veuillez d\'abord ouvrir une session de caisse');
+                               return;
+                             }
+                             setShowActivationModal(true);
                            }}
                            className="flex items-center gap-3 px-6 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.02]"
                          >
@@ -473,6 +493,29 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
         factureId={viewingFactureId || ''}
         format="a4"
       />
+
+      {/* Account Activation Modal */}
+      {showActivationModal && compte && sessionActive && (
+        <AccountActivationModal
+          account={{
+            id: compte.id,
+            numeroCompte: compte.numero_compte || compte.numeroCompte || '',
+            typeCompte: compte.type_compte || compte.typeCompte || '',
+            montantInitial: getPendingDepositAmount(compte),
+            client: {
+              id: compte.clients?.id || compte.client_id,
+              nom: compte.clients?.nom || '',
+              prenom: compte.clients?.prenom || '',
+            }
+          }}
+          sessionId={sessionActive.id}
+          onClose={() => setShowActivationModal(false)}
+          onSuccess={() => {
+            setShowActivationModal(false);
+            loadCompteDetails(); // Refresh account details
+          }}
+        />
+      )}
     </>
   );
 }

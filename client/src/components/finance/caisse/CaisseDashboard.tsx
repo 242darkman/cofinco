@@ -35,6 +35,7 @@ import CaisseHistoriqueGlobal from './CaisseHistoriqueGlobal';
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
 import { PendingActivationDrawer } from './PendingActivationDrawer';
+import { AccountActivationModal } from './AccountActivationModal';
 import { SessionCaisse, CaisseTransaction as Transaction } from '../../../types/finance';
 
 interface CaisseProps {
@@ -79,6 +80,14 @@ export default function CaisseDashboard({
   const [preSelectedAccountId, setPreSelectedAccountId] = useState<string | undefined>(undefined);
   const [preFilledAmount, setPreFilledAmount] = useState<number | undefined>(undefined);
   const [preSelectedClientId, setPreSelectedClientId] = useState<string | undefined>(undefined);
+  // État pour le modal d'activation de compte dédié
+  const [activationAccount, setActivationAccount] = useState<{
+    id: string;
+    numeroCompte: string;
+    typeCompte: string;
+    montantInitial: number;
+    client: { id: string; nom: string; prenom: string; photoUrl?: string };
+  } | null>(null);
   const [caissesSeparees, setCaissesSeparees] = useState<any[]>([]);
   
   // Super-User mode: Admin can supervise a specific active session
@@ -993,16 +1002,26 @@ export default function CaisseDashboard({
       <PendingActivationDrawer
         open={showActivationDrawer}
         onClose={() => setShowActivationDrawer(false)}
-        onActivate={(compteId, montant, clientId) => {
+        onActivate={(account) => {
            setShowActivationDrawer(false);
-           // Ouvrir le modal de paiement avec les valeurs pré-remplies
-           setInitialPaymentType('DEPOSIT_SAVINGS'); // Valeur EN pour activation
-           setPreSelectedAccountId(compteId);
-           setPreFilledAmount(montant);
-           setPreSelectedClientId(clientId);
-           setShowPaiement(true);
+           // Ouvrir le modal d'activation dédié avec le compte complet
+           setActivationAccount(account);
         }}
       />
+
+      {/* Modal d'activation de compte dédié */}
+      {activationAccount && currentSession && (
+        <AccountActivationModal
+          account={activationAccount}
+          sessionId={currentSession.id}
+          onClose={() => setActivationAccount(null)}
+          onSuccess={() => {
+            setActivationAccount(null);
+            refetchSession();
+            refetchTransactions();
+          }}
+        />
+      )}
 
       {/* Recent Transactions - Using new TransactionsList component */}
       <TransactionsList

@@ -10,14 +10,7 @@ import { api } from '../../../lib/api-client';
 import { resolveClientPhotoUrl } from '@/lib/format';
 import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '@/lib/status-labels';
 
-interface PendingActivationDrawerProps {
-  open: boolean;
-  onClose: () => void;
-  /** Callback avec compteId, montant ET clientId pour pré-remplir le modal de paiement */
-  onActivate: (compteId: string, montant: number, clientId: string) => void;
-}
-
-interface PendingAccount {
+export interface PendingAccount {
   id: string;
   numeroCompte: string;
   typeCompte: string;
@@ -29,6 +22,13 @@ interface PendingAccount {
     prenom: string;
     photoUrl?: string;
   };
+}
+
+interface PendingActivationDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  /** Callback avec le compte complet pour le modal d'activation dédié */
+  onActivate: (account: PendingAccount) => void;
 }
 
 export function PendingActivationDrawer({ open, onClose, onActivate }: PendingActivationDrawerProps) {
@@ -148,7 +148,7 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                    
                    <Button
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-11 font-medium shadow-lg shadow-emerald-500/10 active:scale-[0.98] transition-all"
-                      onClick={() => onActivate(account.id, account.montantInitial, account.client.id)}
+                      onClick={() => onActivate(account)}
                    >
                       Encaisser maintenant
                    </Button>
