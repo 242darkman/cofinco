@@ -417,6 +417,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         <AccountActivationModal
           account={activationAccount}
           sessionId={sessionActive.id}
+          caisseName={sessionActive.caisse_nom}
           onClose={() => setActivationAccount(null)}
           onSuccess={() => {
             setActivationAccount(null);

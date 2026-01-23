@@ -509,6 +509,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
             }
           }}
           sessionId={sessionActive.id}
+          caisseName={sessionActive.caisse_nom}
           onClose={() => setShowActivationModal(false)}
           onSuccess={() => {
             setShowActivationModal(false);

@@ -26,6 +26,7 @@ interface AccountInfo {
 interface AccountActivationModalProps {
   account: AccountInfo;
   sessionId: string;
+  caisseName?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -33,6 +34,7 @@ interface AccountActivationModalProps {
 export function AccountActivationModal({
   account,
   sessionId,
+  caisseName,
   onClose,
   onSuccess
 }: AccountActivationModalProps) {
@@ -243,6 +245,12 @@ export function AccountActivationModal({
               <span className="text-slate-400">Compte</span>
               <span className="text-white font-mono">{account.numeroCompte}</span>
             </div>
+            {caisseName && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Caisse de réception</span>
+                <span className="text-cyan-400 font-medium">{caisseName}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2">
               <span className="text-slate-400">Total à encaisser</span>
               <span className="text-emerald-400 font-bold text-lg">

@@ -1014,6 +1014,7 @@ export default function CaisseDashboard({
         <AccountActivationModal
           account={activationAccount}
           sessionId={currentSession.id}
+          caisseName={currentSession.caisse_nom}
           onClose={() => setActivationAccount(null)}
           onSuccess={() => {
             setActivationAccount(null);
