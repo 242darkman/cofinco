@@ -23,6 +23,7 @@ import {
   isOperationCaisseEntree,
   isActiveStatus
 } from '@shared/enum/status-constants';
+import { getStatusLabel, ACCOUNT_STATUS_LABELS, ACCOUNT_TYPE_LABELS } from '../../../lib/status-labels';
 
 interface ClientTontine {
   id: string;
@@ -721,15 +722,15 @@ export default function CaissePaiementModal({
                 ) : (
                    <div className="grid gap-2">
                        {clientAccounts.map(acc => (
-                           <div 
+                           <div
                               key={acc.id}
                               onClick={() => {
                                  setSelectedAccountId(acc.id);
                                  setSelectedAccount(acc);
                               }}
                               className={`p-3 rounded border cursor-pointer flex items-center justify-between transition ${
-                                selectedAccountId === acc.id 
-                                ? 'bg-cyan-500/20 border-cyan-500' 
+                                selectedAccountId === acc.id
+                                ? 'bg-cyan-500/20 border-cyan-500'
                                 : 'bg-slate-800 border-slate-700 hover:border-slate-500'
                               }`}
                            >
@@ -741,10 +742,12 @@ export default function CaissePaiementModal({
                                            acc.statut === StatutCompte.PENDING_ACTIVATION ? 'bg-orange-500/20 text-orange-400' :
                                            'bg-slate-500/20 text-slate-400'
                                        }`}>
-                                           {acc.statut === StatutCompte.PENDING_ACTIVATION ? 'Activation Requise' : acc.statut}
+                                           {getStatusLabel(acc.statut, ACCOUNT_STATUS_LABELS)}
                                        </span>
                                    </div>
-                                   <div className="text-xs text-slate-400">{acc.type_compte || acc.typeCompte}</div>
+                                   <div className="text-xs text-slate-400">
+                                       {getStatusLabel(acc.type_compte || acc.typeCompte, ACCOUNT_TYPE_LABELS)}
+                                   </div>
                                </div>
                                {selectedAccountId === acc.id && <CheckCircle2 className="text-cyan-400" size={20} />}
                            </div>
