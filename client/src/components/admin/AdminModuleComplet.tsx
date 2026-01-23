@@ -36,6 +36,7 @@ import RolesPermissionsManager from './permissions/RolesPermissionsManager';
 import ModulePermissionsView from './permissions/ModulePermissionsView';
 import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
 import RegularizationDashboard from './RegularizationDashboard';
+import AdminClientCredentials from './AdminClientCredentials';
 
 interface AdminModuleCompletProps {
   activeView?: string;
@@ -273,6 +274,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
             {activeTab === 'sms' && <AdminSmsSettings />}
             {activeTab === 'updates' && <AdminVersionInfo />}
             {activeTab === 'regularisation' && <RegularizationDashboard />}
+            {activeTab === 'client-credentials' && <AdminClientCredentials />}
 
             {activeTab === 'roles' && (
               <div className="space-y-4">

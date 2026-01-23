@@ -49,7 +49,8 @@ export const ADMIN_TABS = [
   { id: 'sms', label: 'SMS', icon: 'MessageSquare', disabled: true, permission: 'admin.settings' },
   { id: 'updates', label: 'Version', icon: 'Package', permission: 'admin.settings' },
   { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound', permission: 'caisse.manage' },
-  { id: 'regularisation', label: 'Régularisation', icon: 'AlertTriangle', permission: 'admin.manage' }
+  { id: 'regularisation', label: 'Régularisation', icon: 'AlertTriangle', permission: 'admin.manage' },
+  { id: 'client-credentials', label: 'Accès Clients', icon: 'Key', permission: 'admin.manage' }
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];

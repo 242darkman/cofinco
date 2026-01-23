@@ -1261,6 +1261,187 @@ export function registerClientRoutes(app: Express) {
   });
 
   // ============================================
+  // GENERATE PORTAL CREDENTIALS FOR CLIENTS
+  // ============================================
+
+  /**
+   * POST /api/clients/generate-credentials
+   * Génère username + password pour les clients sans accès portail
+   *
+   * Body: { clientIds?: string[] } - Si vide, traite tous les clients sans credentials
+   * Returns: { generated: number, results: { clientId, username, password, error? }[] }
+   */
+  app.post("/api/clients/generate-credentials", requireRole(SystemRole.ADMIN), async (req, res) => {
+    try {
+      const { clientIds } = req.body as { clientIds?: string[] };
+      const crypto = await import("crypto");
+
+      // Récupérer les clients à traiter
+      let clientsToProcess: any[] = [];
+
+      if (clientIds && clientIds.length > 0) {
+        // Clients spécifiques
+        for (const id of clientIds) {
+          const client = await getClientWithUser(id);
+          if (client && client.user && !client.user.username) {
+            clientsToProcess.push(client);
+          }
+        }
+      } else {
+        // Tous les clients sans credentials
+        const allClients = await storage.getAllClients({});
+        for (const client of allClients) {
+          if (client.userId) {
+            const clientWithUser = await getClientWithUser(client.id);
+            if (clientWithUser && clientWithUser.user && !clientWithUser.user.username) {
+              clientsToProcess.push(clientWithUser);
+            }
+          }
+        }
+      }
+
+      const results: { clientId: string; nom: string; username?: string; password?: string; error?: string }[] = [];
+      let generatedCount = 0;
+
+      for (const client of clientsToProcess) {
+        try {
+          const user = client.user;
+          if (!user) {
+            results.push({ clientId: client.id, nom: 'N/A', error: "Utilisateur non trouvé" });
+            continue;
+          }
+
+          // Générer username au format p.nom
+          const fullName = `${user.prenom || ''} ${user.nom || ''}`.trim();
+          const normalized = fullName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const parts = normalized.trim().split(/\s+/).filter(Boolean);
+
+          let baseUsername: string;
+          if (parts.length < 2) {
+            baseUsername = parts[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'client';
+          } else {
+            const prenom = parts[0];
+            const nom = parts[parts.length - 1];
+            baseUsername = `${prenom.charAt(0).toLowerCase()}.${nom.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+          }
+
+          // Vérifier l'unicité et incrémenter si nécessaire
+          let finalUsername = baseUsername;
+          let counter = 0;
+          while (await storage.getUserByUsername(finalUsername)) {
+            counter++;
+            finalUsername = `${baseUsername}${counter}`;
+          }
+
+          // Générer un mot de passe aléatoire sécurisé (12 caractères)
+          const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+          const passwordLength = 12;
+          const randomBytes = crypto.randomBytes(passwordLength);
+          let plainPassword = '';
+          for (let i = 0; i < passwordLength; i++) {
+            plainPassword += charset[randomBytes[i] % charset.length];
+          }
+
+          // S'assurer que le mot de passe respecte les règles (au moins 1 majuscule, 1 chiffre)
+          // Forcer si nécessaire
+          if (!/[A-Z]/.test(plainPassword)) {
+            plainPassword = 'A' + plainPassword.slice(1);
+          }
+          if (!/[0-9]/.test(plainPassword)) {
+            plainPassword = plainPassword.slice(0, -1) + '7';
+          }
+
+          // Hasher le mot de passe
+          const hashedPassword = await hashPassword(plainPassword);
+
+          // Mettre à jour l'utilisateur
+          await db.update(users)
+            .set({
+              username: finalUsername,
+              password: hashedPassword,
+              canLogin: true,
+              mustChangePassword: true, // Forcer le changement au premier login
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, user.id));
+
+          results.push({
+            clientId: client.id,
+            nom: `${user.nom} ${user.prenom || ''}`.trim(),
+            username: finalUsername,
+            password: plainPassword, // Retourner en clair pour l'admin
+          });
+          generatedCount++;
+
+          // Audit log
+          await logAudit(
+            req,
+            "GENERATE_CLIENT_CREDENTIALS",
+            "user",
+            user.id,
+            { clientId: client.id, username: finalUsername },
+            "success",
+            "high"
+          );
+
+        } catch (clientError: any) {
+          results.push({
+            clientId: client.id,
+            nom: client.user?.nom || 'N/A',
+            error: clientError.message || "Erreur inconnue"
+          });
+        }
+      }
+
+      res.json({
+        generated: generatedCount,
+        total: clientsToProcess.length,
+        results,
+      });
+
+    } catch (error) {
+      console.error("Error generating client credentials:", error);
+      res.status(500).json({ message: "Erreur lors de la génération des identifiants" });
+    }
+  });
+
+  /**
+   * GET /api/clients/without-credentials
+   * Liste les clients sans accès portail (sans username)
+   */
+  app.get("/api/clients/without-credentials", requireRole(SystemRole.ADMIN), async (req, res) => {
+    try {
+      const allClients = await storage.getAllClients({});
+      const clientsWithoutCredentials: any[] = [];
+
+      for (const client of allClients) {
+        if (client.userId) {
+          const clientWithUser = await getClientWithUser(client.id);
+          if (clientWithUser && clientWithUser.user && !clientWithUser.user.username) {
+            clientsWithoutCredentials.push({
+              id: client.id,
+              nom: clientWithUser.user.nom,
+              prenom: clientWithUser.user.prenom,
+              email: clientWithUser.user.email,
+              telephone: clientWithUser.user.telephone,
+              createdAt: client.createdAt,
+            });
+          }
+        }
+      }
+
+      res.json({
+        count: clientsWithoutCredentials.length,
+        clients: clientsWithoutCredentials,
+      });
+
+    } catch (error) {
+      console.error("Error fetching clients without credentials:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des clients" });
+    }
+  });
+
+  // ============================================
   // GLOBAL HISTORY ENDPOINT
   // ============================================
   app.get("/api/clients/:id/global-history", requireAuth, requireAgenceIdAccess(), async (req, res) => {
