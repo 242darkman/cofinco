@@ -695,7 +695,20 @@ async function seedDemoSimple() {
     });
     console.log(`   -> Admin linked to Agency: ${siegeId} (Siège)`);
 
-    // C. Assign Admin to Caisse
+    // C. Create Employee record for Admin (required for caisse operations)
+    const [adminEmploye] = await db.insert(employes).values({
+      userId: adminUser.id,
+      matricule: 'EMP-SIEGE-2026-0D4Q',
+      agenceId: siegeId,
+      dateEmbauche: '2018-01-01',
+      typeContrat: 'CDI',
+      statut: StatutUser.ACTIVE,
+      salaireBase: 1450364,
+      modeCalculPaie: 'MONTHLY',
+    }).returning();
+    console.log(`   -> Admin employee record created (ID: ${adminEmploye.id})`);
+
+    // D. Assign Admin to Caisse
     if (siegeCaisseIds['Siège']) {
         await db.insert(caisseAssignations).values({
             caisseId: siegeCaisseIds['Siège'],
@@ -703,7 +716,7 @@ async function seedDemoSimple() {
             assignedBy: adminUser.id,
         });
 
-        // D. Create a closed session for history (solde 0 - pas d'opérations)
+        // E. Create a closed session for history (solde 0 - pas d'opérations)
         await db.insert(sessionsCaisse).values({
             caissierId: adminUser.id,
             caisseId: siegeCaisseIds['Siège'],

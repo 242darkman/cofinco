@@ -46,6 +46,7 @@ import {
   // HR tables
   departments,
   jobPositions,
+  employes,
 } from '@shared/schema';
 import {
   agencyMigrations,
@@ -259,6 +260,7 @@ async function seedProd() {
     await db.delete(agences);
     await db.delete(zones);
     // Users are tricky, we definitely need an admin.
+    await db.delete(employes); // Must delete before users (FK constraint)
     await db.delete(userRoles); // Auth V3: Clear roles before users
     await db.delete(users);
     // HR tables
@@ -720,6 +722,19 @@ async function seedProd() {
         dateAffectation: new Date().toISOString().split('T')[0],
       });
     }
+
+    // 6d. Créer l'employé pour l'admin (requis pour les opérations caisse)
+    await db.insert(employes).values({
+      userId: adminUser.id,
+      matricule: 'EMP-SIEGE-2026-0D4Q',
+      agenceId: siegeAgenceId,
+      dateEmbauche: '2018-01-01',
+      typeContrat: 'CDI',
+      statut: StatutUser.ACTIVE,
+      salaireBase: 0,
+      modeCalculPaie: 'MONTHLY',
+    });
+    console.log('   -> Admin employee record created');
 
 
     // SEED DUREES SUGGEREES (Credit)
