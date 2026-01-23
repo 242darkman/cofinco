@@ -1,5 +1,44 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronDown, Search, X, Check } from 'lucide-react';
+import { resolveStorageUrl } from '../../lib/format';
+
+/** Génère les initiales à partir d'un label (ex: "MALONGA Herve" -> "MH") */
+function getInitials(label: string): string {
+  const words = label.trim().split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].charAt(0).toUpperCase();
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+}
+
+/** Composant Avatar avec fallback initiales */
+function OptionAvatar({ image, label, disabled }: { image?: string; label: string; disabled?: boolean }) {
+  const [hasError, setHasError] = useState(false);
+  const resolvedUrl = image ? resolveStorageUrl(image) : null;
+
+  // Reset error state when image changes
+  useEffect(() => {
+    setHasError(false);
+  }, [image]);
+
+  const showImage = resolvedUrl && !hasError;
+
+  return (
+    <div className={`relative ${disabled ? 'grayscale opacity-70' : ''}`}>
+      {showImage ? (
+        <img
+          src={resolvedUrl}
+          alt=""
+          className="w-8 h-8 rounded-full object-cover border border-slate-600"
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-xs font-bold text-white border border-slate-600 flex-shrink-0">
+          {getInitials(label)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface SearchableSelectOption {
   value: string | number;
@@ -205,15 +244,7 @@ export default function SearchableSelect({
                   `}
                 >
                   {/* Optional Image/Avatar */}
-                  <div className={`relative ${option.disabled ? 'grayscale opacity-70' : ''}`}>
-                    {option.image ? (
-                      <img src={option.image} alt="" className="w-8 h-8 rounded-full object-cover border border-slate-600" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600 flex-shrink-0">
-                          {option.label.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
+                  <OptionAvatar image={option.image} label={option.label} disabled={option.disabled} />
 
                   <div className="flex-1 min-w-0">
                     <div className={`font-medium truncate flex items-center gap-2 ${option.disabled ? 'text-slate-500' : ''}`}>

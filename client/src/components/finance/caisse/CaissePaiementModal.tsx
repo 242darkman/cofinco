@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, Printer, Eye, CreditCard, TrendingUp, PiggyBank, Receipt } from 'lucide-react';
+import { X, DollarSign, Wallet, Smartphone, Building2, User, FileText, Check, Users, CheckCircle2, AlertCircle, CreditCard } from 'lucide-react';
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -16,24 +16,12 @@ import {
   StatutCompte,
   StatutParticipationTontine,
   StatutTransaction,
-  TYPES_OPERATIONS_CAISSE,
   TypeOperationCaisse,
+  MethodePaiement,
+  METHODE_PAIEMENT_LABELS,
   isOperationCaisseEntree,
-  getOperationCaisseLabel,
   isActiveStatus
 } from '@shared/enum/status-constants';
-
-const AirtelLogo = ({ className = '' }: { className?: string }) => (
-  <div className={`flex items-center justify-center font-bold text-red-500 bg-red-100 rounded-lg p-2 ${className}`}>
-    <span>Airtel</span>
-  </div>
-);
-
-const MTNLogo = ({ className = '' }: { className?: string }) => (
-  <div className={`flex items-center justify-center font-bold text-yellow-500 bg-yellow-100 rounded-lg p-2 ${className}`}>
-    <span>MTN</span>
-  </div>
-);
 
 interface ClientTontine {
   id: string;
@@ -62,10 +50,6 @@ interface CaissePaiementModalProps {
   /** ID du client pré-sélectionné (pour activation depuis PendingActivationDrawer) */
   preSelectedClientId?: string;
 }
-
-// TYPES_OPERATIONS désormais importé depuis @shared/enum/status-constants
-// Alias local pour compatibilité avec le code existant
-const TYPES_OPERATIONS = TYPES_OPERATIONS_CAISSE;
 
 export default function CaissePaiementModal({
   sessionId,
@@ -100,20 +84,14 @@ export default function CaissePaiementModal({
   const [activeCreditsAmount, setActiveCreditsAmount] = useState(0);
 
   const [formData, setFormData] = useState({
-    // Pré-remplir le client si fourni (activation de compte)
     client_id: preSelectedClientId || '',
-    // Pré-remplir le montant si fourni (activation de compte)
     montant: preFilledAmount ? preFilledAmount.toString() : '',
-    mode_paiement: 'CASH',
+    mode_paiement: MethodePaiement.CASH,
     type_operation: initialType || TypeOperationCaisse.TONTINE_CONTRIBUTION,
     numero_telephone: '',
     numero_transaction: '',
     reference: '',
     description: '',
-    // Champs pour chèques
-    numero_cheque: '',
-    banque_emettrice: '',
-    date_emission_cheque: '',
     // Champs pour virements
     banque_origine: '',
     numero_compte_origine: '',
@@ -168,7 +146,8 @@ export default function CaissePaiementModal({
   const loadClients = useCallback(async () => {
     try {
       const data = await clientApi.getAllList();
-      setClients(data.filter((c: any) => isActiveStatus(c.status)));
+      // Le serveur retourne 'statut' (FR), on vérifie les deux pour compatibilité
+      setClients(data.filter((c: any) => isActiveStatus(c.statut) || isActiveStatus(c.status)));
     } catch (error) {
       console.error('Error loading clients:', error);
       setClients([]);
@@ -297,12 +276,10 @@ export default function CaissePaiementModal({
     }
 
     // Validation Mobile Money
-    const isMobileMoney = formData.mode_paiement === 'MOBILE_MONEY';
-    if (isMobileMoney) {
+    if (formData.mode_paiement === MethodePaiement.MOBILE_MONEY) {
       if (!formData.numero_telephone) {
         newErrors.numero_telephone = 'Numéro requis';
       } else {
-        // Format téléphone Congo: +242 XX XXX XXXX ou 0X XXX XXXX
         const phoneClean = formData.numero_telephone.replace(/\s/g, '');
         const phoneRegex = /^(\+242|00242|0)?[0-9]{9}$/;
         if (!phoneRegex.test(phoneClean)) {
@@ -314,21 +291,8 @@ export default function CaissePaiementModal({
       }
     }
 
-    // Validation Chèque
-    if (formData.mode_paiement === 'CHECK') {
-      if (!formData.numero_cheque?.trim()) {
-        newErrors.numero_cheque = 'Numéro de chèque requis';
-      }
-      if (!formData.banque_emettrice?.trim()) {
-        newErrors.banque_emettrice = 'Banque émettrice requise';
-      }
-      if (!formData.date_emission_cheque) {
-        newErrors.date_emission_cheque = "Date d'émission requise";
-      }
-    }
-
     // Validation Virement
-    if (formData.mode_paiement === 'TRANSFER') {
+    if (formData.mode_paiement === MethodePaiement.TRANSFER) {
       if (!formData.banque_origine?.trim()) {
         newErrors.banque_origine = "Banque d'origine requise";
       }
@@ -367,7 +331,7 @@ export default function CaissePaiementModal({
       const montant = parseFloat(formData.montant);
       const reference = formData.reference || genererReference();
 
-      const isMobileMoney = formData.mode_paiement === 'Airtel Money' || formData.mode_paiement === 'MTN Mobile Money';
+      const isMobileMoney = formData.mode_paiement === MethodePaiement.MOBILE_MONEY;
 
       const operationData = {
         session_id: sessionId,
@@ -638,7 +602,7 @@ export default function CaissePaiementModal({
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <SearchableSelect
-                label="Client *"
+                label="Client"
                 name="client_id"
                 value={formData.client_id}
                 onChange={(value: string | number) => setFormData({ ...formData, client_id: String(value) })}
@@ -646,7 +610,7 @@ export default function CaissePaiementModal({
                   value: c.id,
                   label: `${c.nom || ''} ${c.prenom || ''}`.trim() || 'Sans Nom',
                   subLabel: [c.telephone, c.email].filter(Boolean).join(' • '),
-                  image: c.photo 
+                  image: c.photoProfile || c.photo_profile || c.photo
                 }))}
                 placeholder="Rechercher un client..."
                 error={errors.client_id}
@@ -881,20 +845,19 @@ export default function CaissePaiementModal({
             <legend className="block text-sm font-semibold text-slate-300 mb-3">
               Mode de Paiement *
             </legend>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3" role="radiogroup">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3" role="radiogroup">
               {[
-                { mode: 'CASH', label: 'Espèces', icon: Wallet, color: 'green', disabled: false },
-                { mode: 'CHECK', label: 'Chèque', icon: Receipt, color: 'blue', disabled: false },
-                { mode: 'TRANSFER', label: 'Virement', icon: Building2, color: 'emerald', disabled: false },
-                { mode: 'MOBILE_MONEY', label: 'Mobile Money', icon: Smartphone, color: 'amber', disabled: true }
+                { mode: MethodePaiement.CASH, label: METHODE_PAIEMENT_LABELS[MethodePaiement.CASH], icon: Wallet, color: 'green', disabled: false },
+                { mode: MethodePaiement.TRANSFER, label: METHODE_PAIEMENT_LABELS[MethodePaiement.TRANSFER], icon: Building2, color: 'emerald', disabled: false },
+                { mode: MethodePaiement.MOBILE_MONEY, label: METHODE_PAIEMENT_LABELS[MethodePaiement.MOBILE_MONEY], icon: Smartphone, color: 'amber', disabled: true }
               ].map(({ mode, label, icon: Icon, color, disabled }) => (
                 <button
-                  key={label}
+                  key={mode}
                   type="button"
                   disabled={disabled}
                   onClick={() => {
                     if (disabled) return;
-                    const needsPhone = mode === 'MOBILE_MONEY';
+                    const needsPhone = mode === MethodePaiement.MOBILE_MONEY;
                     setFormData({
                       ...formData,
                       mode_paiement: mode,
@@ -930,7 +893,7 @@ export default function CaissePaiementModal({
                       formData.mode_paiement === mode ? `text-${color}-400` : 'text-slate-300'
                     }`}
                   >
-                    {mode.replace(' Money', '').replace(' Mobile', '')}
+                    {label}
                   </div>
                   {disabled && (
                      <span className="absolute top-2 right-2 flex h-2 w-2">
@@ -944,7 +907,7 @@ export default function CaissePaiementModal({
           </fieldset>
 
           {/* Informations Mobile Money */}
-          {formData.mode_paiement === 'MOBILE_MONEY' && (
+          {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
             <section
               className="p-4 bg-slate-700/30 border border-slate-600 rounded-lg space-y-4"
               aria-labelledby="mobile-money-title"
@@ -1016,101 +979,8 @@ export default function CaissePaiementModal({
             </section>
           )}
 
-          {/* Informations Chèque */}
-          {formData.mode_paiement === 'CHECK' && (
-            <section
-              className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg space-y-4"
-              aria-labelledby="check-info-title"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Receipt className="text-blue-400" size={20} aria-hidden="true" />
-                <h4 id="check-info-title" className="font-semibold text-white">
-                  Informations du Chèque
-                </h4>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label
-                    htmlFor="check-number-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    Numéro du Chèque *
-                  </label>
-                  <input
-                    id="check-number-input"
-                    type="text"
-                    value={formData.numero_cheque}
-                    onChange={(e) => setFormData({ ...formData, numero_cheque: e.target.value })}
-                    className={`w-full px-4 py-3 bg-slate-700 border ${
-                      errors.numero_cheque ? 'border-red-500' : 'border-slate-600'
-                    } rounded-lg text-white font-mono`}
-                    placeholder="CHQ-0001234"
-                    aria-required="true"
-                    aria-invalid={!!errors.numero_cheque}
-                  />
-                  {errors.numero_cheque && (
-                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.numero_cheque}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="bank-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    Banque Émettrice *
-                  </label>
-                  <input
-                    id="bank-input"
-                    type="text"
-                    value={formData.banque_emettrice}
-                    onChange={(e) => setFormData({ ...formData, banque_emettrice: e.target.value })}
-                    className={`w-full px-4 py-3 bg-slate-700 border ${
-                      errors.banque_emettrice ? 'border-red-500' : 'border-slate-600'
-                    } rounded-lg text-white`}
-                    placeholder="Ex: BGFI, UBA, Ecobank..."
-                    aria-required="true"
-                    aria-invalid={!!errors.banque_emettrice}
-                  />
-                  {errors.banque_emettrice && (
-                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.banque_emettrice}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="check-date-input"
-                    className="block text-sm font-semibold text-slate-300 mb-2"
-                  >
-                    Date d'Émission *
-                  </label>
-                  <input
-                    id="check-date-input"
-                    type="date"
-                    value={formData.date_emission_cheque}
-                    onChange={(e) => setFormData({ ...formData, date_emission_cheque: e.target.value })}
-                    className={`w-full px-4 py-3 bg-slate-700 border ${
-                      errors.date_emission_cheque ? 'border-red-500' : 'border-slate-600'
-                    } rounded-lg text-white`}
-                    aria-required="true"
-                    aria-invalid={!!errors.date_emission_cheque}
-                  />
-                  {errors.date_emission_cheque && (
-                    <p className="text-red-500 text-sm mt-1" role="alert">{errors.date_emission_cheque}</p>
-                  )}
-                </div>
-              </div>
-
-              <p className="text-xs text-blue-300/70 flex items-center gap-1">
-                <AlertCircle size={12} />
-                Le chèque sera vérifié avant validation de l'opération
-              </p>
-            </section>
-          )}
-
           {/* Informations Virement */}
-          {formData.mode_paiement === 'TRANSFER' && (
+          {formData.mode_paiement === MethodePaiement.TRANSFER && (
             <section
               className="p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-lg space-y-4"
               aria-labelledby="transfer-info-title"
@@ -1263,7 +1133,7 @@ export default function CaissePaiementModal({
                     {isOperationEntree(formData.type_operation) ? '+' : '-'}
                     {formattedMontant}
                   </p>
-                  <p className="text-sm text-slate-300 mt-1">via {formData.mode_paiement}</p>
+                  <p className="text-sm text-slate-300 mt-1">via {METHODE_PAIEMENT_LABELS[formData.mode_paiement as keyof typeof METHODE_PAIEMENT_LABELS] || formData.mode_paiement}</p>
                 </div>
                 <DollarSign
                   size={48}
