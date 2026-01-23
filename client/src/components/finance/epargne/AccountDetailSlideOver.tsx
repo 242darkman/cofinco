@@ -36,13 +36,27 @@ const getTypeCompteLabel = (type: string): string => {
   return TYPE_COMPTE_LABELS[type] || type;
 };
 
+interface ActivationAccountData {
+  id: string;
+  numeroCompte: string;
+  typeCompte: string;
+  montantInitial: number;
+  client: {
+    id: string;
+    nom: string;
+    prenom: string;
+  };
+}
+
 interface AccountDetailSlideOverProps {
   compteId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  /** Optional callback to handle activation externally (closes slideover and opens modal in parent) */
+  onRequestActivation?: (account: ActivationAccountData) => void;
 }
 
-export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: AccountDetailSlideOverProps) {
+export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRequestActivation }: AccountDetailSlideOverProps) {
   const [, navigate] = useLocation();
   const [compte, setCompte] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -186,8 +200,9 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
 
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col bg-slate-900 border-l border-slate-800">
+      {/* Disable modal behavior (focus trap) and hide overlay when activation modal is open */}
+      <Sheet open={isOpen} onOpenChange={onClose} modal={!showActivationModal}>
+        <SheetContent side="right" hideOverlay={showActivationModal} className="w-full sm:max-w-xl p-0 flex flex-col bg-slate-900 border-l border-slate-800">
           
           {/* 1. Sticky Header */}
           <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/95 backdrop-blur z-10 sticky top-0">
@@ -283,6 +298,26 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose }: Ac
                                toast.warning('Pour activer un compte, veuillez d\'abord ouvrir une session de caisse');
                                return;
                              }
+
+                             const accountData: ActivationAccountData = {
+                               id: compte.id,
+                               numeroCompte: compte.numero_compte || compte.numeroCompte || '',
+                               typeCompte: compte.type_compte || compte.typeCompte || '',
+                               montantInitial: getPendingDepositAmount(compte),
+                               client: {
+                                 id: compte.clients?.id || compte.client_id,
+                                 nom: compte.clients?.nom || '',
+                                 prenom: compte.clients?.prenom || '',
+                               }
+                             };
+
+                             // If parent provided a callback, use it (recommended approach)
+                             if (onRequestActivation) {
+                               onRequestActivation(accountData);
+                               return;
+                             }
+
+                             // Fallback: use internal modal
                              setShowActivationModal(true);
                            }}
                            className="flex items-center gap-3 px-6 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.02]"

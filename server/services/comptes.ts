@@ -1449,7 +1449,7 @@ export async function payerDepotInitialCompte(
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId,
         mouvementId: mouvement.id,
-        typePaiement: 'DEPOSIT',
+        typePaiement: 'INITIAL_DEPOSIT',
         montant: data.montant.toString(),
         soldeApres: data.montant.toString(),
         methodePaiement: 'CASH',

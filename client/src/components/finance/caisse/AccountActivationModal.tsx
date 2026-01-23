@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { X, Wallet, AlertTriangle, Loader2, UserCheck, Banknote } from 'lucide-react';
-import { Button } from '../../ui';
 import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -64,9 +64,28 @@ export function AccountActivationModal({
     onClose();
   }, [onSuccess, onClose]);
 
-  // Handle form submission
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  // Handle backdrop click - only close if clicking directly on backdrop
+  const handleBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && !loading) {
+      onClose();
+    }
+  }, [loading, onClose]);
+
+  // Handle close button click
+  const handleCloseClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (!loading) {
+      onClose();
+    }
+  }, [loading, onClose]);
+
+  // Handle form submission
+  const handleSubmit = useCallback(async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
 
     if (!isValidAmount) {
       setError('Le montant doit être supérieur à 0');
@@ -142,10 +161,13 @@ export function AccountActivationModal({
     );
   }
 
-  return (
+  // Use Portal to render modal at document body level (avoids z-index stacking issues)
+  return createPortal(
     <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] animate-in fade-in duration-200"
-      onClick={() => !loading && onClose()}
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         className="bg-slate-900 rounded-2xl max-w-md w-full mx-4 border border-slate-800 shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300"
@@ -163,9 +185,10 @@ export function AccountActivationModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={handleCloseClick}
             disabled={loading}
-            className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -267,20 +290,27 @@ export function AccountActivationModal({
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              onClick={onClose}
+              onClick={handleCloseClick}
               disabled={loading}
-              className="flex-1"
+              className="flex-1 px-4 py-2.5 text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
               Annuler
-            </Button>
-            <Button
-              type="submit"
-              variant="success"
+            </button>
+            <button
+              type="button"
               disabled={loading || !isValidAmount}
-              className="flex-1 shadow-lg shadow-emerald-500/20"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSubmit(e);
+              }}
+              className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shadow-lg shadow-emerald-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
                 <>
@@ -293,10 +323,11 @@ export function AccountActivationModal({
                   Encaisser & Activer
                 </>
               )}
-            </Button>
+            </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -431,6 +431,11 @@ export default function Epargnes({ activeView }: EpargnesProps) {
           compteId={detailCompteId}
           isOpen={!!detailCompteId}
           onClose={() => setDetailCompteId(null)}
+          onRequestActivation={(account) => {
+            // Close the slideover and open the activation modal
+            setDetailCompteId(null);
+            setActivationAccount(account);
+          }}
         />
       )}
 

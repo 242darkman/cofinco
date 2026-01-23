@@ -1077,7 +1077,7 @@ export function registerComptesRoutes(app: Express) {
         );
 
         // Broadcast temps réel (outbox worker gère le reste)
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance && user?.agence) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "LIVE_ACTIVITY",
@@ -1154,7 +1154,7 @@ export function registerComptesRoutes(app: Express) {
             await logAudit(req, "DEPOT_INITIAL", "compte", req.params.id, { montant: data.montant }, "success", "high");
              
              // Broadcast temps réel
-            const wsInstance = require("../ws-server").getWsInstance();
+            const wsInstance = getWsInstance();
             if (wsInstance && req.session.user?.agence) {
               wsInstance.broadcastToAgency(req.session.user.agence, {
                 type: "LIVE_ACTIVITY",
@@ -1234,7 +1234,7 @@ export function registerComptesRoutes(app: Express) {
         );
 
         // Broadcast temps réel
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance && user?.agence) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "NOTIFICATION",
@@ -1377,7 +1377,7 @@ export function registerComptesRoutes(app: Express) {
         );
 
         // Notification explicite (en plus de l'outbox)
-        const wsInstance = require("../ws-server").getWsInstance();
+        const wsInstance = getWsInstance();
         if (wsInstance && user?.agence) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "NOTIFICATION",

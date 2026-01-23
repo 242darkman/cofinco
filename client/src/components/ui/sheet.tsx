@@ -3,7 +3,18 @@ import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
 
-const Sheet = SheetPrimitive.Root;
+interface SheetProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Root> {
+  /** When false, disables focus trap and outside click handling. Useful when rendering modals on top. */
+  modal?: boolean;
+}
+
+const Sheet = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Root>,
+  SheetProps
+>(({ modal = true, ...props }, ref) => (
+  <SheetPrimitive.Root modal={modal} {...props} />
+));
+Sheet.displayName = "Sheet";
 const SheetTrigger = SheetPrimitive.Trigger;
 const SheetClose = SheetPrimitive.Close;
 const SheetPortal = SheetPrimitive.Portal;
@@ -23,12 +34,18 @@ const SheetOverlay = React.forwardRef<
 ));
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
+interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content> {
+  side?: "top" | "bottom" | "left" | "right";
+  /** When true, hides the overlay and disables its pointer events. Useful when rendering modals on top. */
+  hideOverlay?: boolean;
+}
+
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content> & { side?: "top" | "bottom" | "left" | "right" }
->(({ side = "right", className, children, ...props }, ref) => (
+  SheetContentProps
+>(({ side = "right", className, children, hideOverlay = false, ...props }, ref) => (
   <SheetPortal>
-    <SheetOverlay />
+    <SheetOverlay className={hideOverlay ? "pointer-events-none opacity-0" : undefined} />
     <SheetPrimitive.Content
       ref={ref}
       className={cn(
