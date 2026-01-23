@@ -27,6 +27,9 @@ export interface ClientWithUser extends Client {
     sexe: string | null;
     photoProfile: string | null;
     statut?: string;
+    username?: string | null;
+    canLogin?: boolean | null;
+    mustChangePassword?: boolean | null;
   } | null;
 }
 
@@ -674,6 +677,9 @@ export async function getClientWithUser(id: string): Promise<ClientWithUser | un
       telephone: users.telephone,
       sexe: users.sexe,
       photoProfile: users.photoProfile,
+      username: users.username,
+      canLogin: users.canLogin,
+      mustChangePassword: users.mustChangePassword,
     }
   })
   .from(clients)
