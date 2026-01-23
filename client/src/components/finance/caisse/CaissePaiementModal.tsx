@@ -159,6 +159,14 @@ export default function CaissePaiementModal({
     ].includes(formData.type_operation as any);
   }, [formData.type_operation]);
 
+  // Vérifier si c'est une opération de crédit
+  const isLoanOperation = useMemo(() => {
+    return [
+      TypeOperationCaisse.LOAN_REPAYMENT,
+      TypeOperationCaisse.CREDIT_DISBURSEMENT
+    ].includes(formData.type_operation as any);
+  }, [formData.type_operation]);
+
   // Charger les clients via api-client
   // Utilise isActiveStatus pour gérer les données legacy FR et EN
   const loadClients = useCallback(async () => {
@@ -270,8 +278,40 @@ export default function CaissePaiementModal({
 
 
 
+  // Filtrer les comptes en fonction du type d'opération
+  const filteredAccounts = useMemo(() => {
+     if (!clientAccounts) return [];
+     const op = formData.type_operation;
+     
+     if ([TypeOperationCaisse.DEPOSIT_SAVINGS, TypeOperationCaisse.WITHDRAWAL_SAVINGS].includes(op as any)) {
+         return clientAccounts.filter(a => (a.type_compte || a.typeCompte) === 'SAVINGS');
+     } else if ([TypeOperationCaisse.DEPOSIT_CURRENT, TypeOperationCaisse.WITHDRAWAL_CURRENT].includes(op as any)) {
+         return clientAccounts.filter(a => (a.type_compte || a.typeCompte) === 'CURRENT');
+     } else if ([TypeOperationCaisse.DEPOSIT_BLOCKED, TypeOperationCaisse.WITHDRAWAL_BLOCKED].includes(op as any)) {
+         return clientAccounts.filter(a => (a.type_compte || a.typeCompte) === 'BLOCKED');
+     }
+     return [];
+  }, [clientAccounts, formData.type_operation]);
+
+  // Auto-select account if only one match exists after filtering
+  useEffect(() => {
+     if (isAccountOperation && filteredAccounts.length === 1) {
+         const acc = filteredAccounts[0];
+         setSelectedAccountId(acc.id);
+         setSelectedAccount(acc);
+     } else if (isAccountOperation && selectedAccountId) {
+         // Verify if selected account is still valid for the new operation type
+         const isValid = filteredAccounts.find(a => a.id === selectedAccountId);
+         if (!isValid) {
+             setSelectedAccountId('');
+             setSelectedAccount(null);
+         }
+     }
+  }, [isAccountOperation, filteredAccounts, selectedAccountId]);
+
   // Générer une référence
   const genererReference = useCallback(() => {
+
     const date = new Date();
     return `PAY-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   }, []);
@@ -702,7 +742,9 @@ export default function CaissePaiementModal({
                     </div>
                 </div>
                 
-                {/* Selecteurs Conditionnels (Tontine / Compte) intégrés ici */}
+                {/* Selecteurs Conditionnels (Tontine / Compte / Prêt) */}
+                
+                {/* 1. TONTINES */}
                 {isTontineOperation && formData.client_id && (
                    <div className="pt-2 animate-in fade-in slide-in-from-top-1">
                       {loadingTontines ? (
@@ -712,31 +754,33 @@ export default function CaissePaiementModal({
                       ) : (
                           <div className="space-y-1">
                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Tontine Cible</label>
-                              <select 
-                                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none"
-                                  value={selectedTontine?.id || ''}
-                                  onChange={(e) => {
-                                      const t = clientTontines.find(ct => ct.id === e.target.value);
-                                      if (t) selectTontine(t);
-                                  }}
-                              >
-                                  <option value="">Sélectionner une tontine...</option>
-                                  {clientTontines.map(ct => (
-                                      <option key={ct.id} value={ct.id}>
-                                          {ct.tontine.nom} - {formatMoney(parseFloat(ct.tontine.montantCotisation))}
-                                      </option>
-                                  ))}
-                              </select>
-                              {errors.tontine && <p className="text-red-500 text-xs">{errors.tontine}</p>}
+                              <SearchableSelect
+                                label=""
+                                name="tontine_id"
+                                value={selectedTontine?.id || ''}
+                                onChange={(val: string | number) => {
+                                    const t = clientTontines.find(ct => ct.id === val);
+                                    if (t) selectTontine(t);
+                                }}
+                                options={clientTontines.map(ct => ({
+                                    value: ct.id,
+                                    label: `${ct.tontine.nom} (${formatMoney(parseFloat(ct.tontine.montantCotisation))})`,
+                                    subLabel: ct.tontine.frequence
+                                }))}
+                                placeholder="Sélectionner une tontine..."
+                                error={errors.tontine}
+                                className="bg-slate-800 border-slate-600"
+                              />
                           </div>
                       )}
                    </div>
                 )}
-  
+                
+                {/* 2. COMPTES (Filtrés par type) */}
                 {isAccountOperation && formData.client_id && (
                    <div className="pt-2 animate-in fade-in slide-in-from-top-1">
-                        {clientAccounts.length === 0 ? (
-                           <div className="text-amber-500 text-xs p-2 bg-amber-500/10 rounded border border-amber-500/20">Aucun compte trouvé</div>
+                        {filteredAccounts.length === 0 ? (
+                           <div className="text-amber-500 text-xs p-2 bg-amber-500/10 rounded border border-amber-500/20">Aucun compte correspondant trouvé</div>
                         ) : (
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Compte Cible</label>
@@ -745,20 +789,53 @@ export default function CaissePaiementModal({
                                     value={selectedAccountId}
                                     onChange={(e) => {
                                         setSelectedAccountId(e.target.value);
-                                        const acc = clientAccounts.find(a => a.id === e.target.value);
+                                        const acc = filteredAccounts.find(a => a.id === e.target.value);
                                         if (acc) setSelectedAccount(acc);
                                     }}
                                 >
                                     <option value="">Sélectionner un compte...</option>
-                                    {clientAccounts.map(acc => (
+                                    {filteredAccounts.map(acc => (
                                         <option key={acc.id} value={acc.id}>
-                                            {acc.numero_compte || acc.numeroCompte} - {getStatusLabel(acc.type_compte || acc.typeCompte, ACCOUNT_TYPE_LABELS)}
+                                            {acc.numero_compte || acc.numeroCompte} - {getStatusLabel(acc.type_compte || acc.typeCompte, ACCOUNT_TYPE_LABELS)} ({formatMoney(acc.solde || 0)})
                                         </option>
                                     ))}
                                 </select>
                                 {errors.account && <p className="text-red-500 text-xs">{errors.account}</p>}
                             </div>
                         )}
+                   </div>
+                )}
+                
+                {/* 3. CRÉDITS (Nouveau) */}
+                {isLoanOperation && formData.client_id && (
+                   <div className="pt-2 animate-in fade-in slide-in-from-top-1">
+                       {clientCredits.length === 0 ? (
+                           <div className="text-amber-500 text-xs p-2 bg-amber-500/10 rounded border border-amber-500/20">Aucun crédit actif trouvé</div>
+                       ) : (
+                           <div className="space-y-1">
+                               <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Crédit Cible</label>
+                               <select 
+                                   className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                                   // Note: Assuming we might need a selectedCredit state in future, but for now we might use description to store info or add state
+                                   onChange={(e) => {
+                                       const credit = clientCredits.find(c => c.id === e.target.value);
+                                       if (credit) {
+                                           setFormData(prev => ({
+                                               ...prev,
+                                               description: `${prev.description ? prev.description + ' - ' : ''}Crédit #${credit.reference_dossier || credit.id}`
+                                           }));
+                                       }
+                                   }}
+                               >
+                                   <option value="">Sélectionner un crédit...</option>
+                                   {clientCredits.map(c => (
+                                       <option key={c.id} value={c.id}>
+                                           {c.reference_dossier || 'Dossier'} - Restant: {formatMoney(c.restant_du)}
+                                       </option>
+                                   ))}
+                               </select>
+                           </div>
+                       )}
                    </div>
                 )}
              </div>
