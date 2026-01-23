@@ -222,7 +222,7 @@ export class StorageService {
       Body: file.buffer,
       ContentType: file.mimetype,
       Metadata: {
-        originalName: file.originalname,
+        originalName: this.sanitizeMetadataValue(file.originalname),
         uploadedAt: new Date().toISOString(),
       }
     }));
@@ -383,6 +383,18 @@ export class StorageService {
       console.error(`❌ Error deleting file ${cleanKey}:`, error?.message);
       throw error;
     }
+  }
+
+  /**
+   * Sanitize value for S3 Metadata (US-ASCII only)
+   * This prevents 'SignatureDoesNotMatch' errors when filenames contain accents
+   */
+  private static sanitizeMetadataValue(value: string): string {
+    if (!value) return '';
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^\x00-\x7F]/g, '?');  // Replace any other non-ASCII with ?
   }
 
   /**
