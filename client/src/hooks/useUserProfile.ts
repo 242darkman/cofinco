@@ -59,9 +59,13 @@ export function useUserProfile() {
       const userData = await response.json();
       const normalizedRole = normalizeRole(userData.role) || SystemRole.CLIENT;
 
+      // Mapper les données imbriquées pour l'affichage
       setUser({
         ...userData,
-        role: normalizedRole
+        role: normalizedRole,
+        // Extraire les noms depuis les objets imbriqués (jobPosition, department)
+        poste: userData.poste || userData.jobPosition?.name || null,
+        departement: userData.departement || userData.department?.name || null,
       });
     } catch (error) {
       console.error(error);

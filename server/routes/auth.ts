@@ -334,12 +334,14 @@ export function registerAuthRoutes(app: Express) {
     }
 
     // Récupérer les données utilisateur pour les champs non présents en session
-    let userData: { photoProfile?: string | null } = {};
+    let userData: { photoProfile?: string | null; telephone?: string | null; adresse?: string | null } = {};
     try {
       const user = await storage.getUser(req.session.user.id);
       if (user) {
         userData = {
-          photoProfile: user.photoProfile
+          photoProfile: user.photoProfile,
+          telephone: user.telephone,
+          adresse: user.adresse,
         };
       }
     } catch {
