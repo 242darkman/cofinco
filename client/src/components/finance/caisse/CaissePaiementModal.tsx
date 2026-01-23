@@ -23,6 +23,7 @@ import {
   MethodePaiementType,
   METHODE_PAIEMENT_LABELS,
   isOperationCaisseEntree,
+  normalizeOperationType,
   isActiveStatus
 } from '@shared/enum/status-constants';
 import { getStatusLabel, ACCOUNT_STATUS_LABELS, ACCOUNT_TYPE_LABELS } from '../../../lib/status-labels';
@@ -105,7 +106,7 @@ export default function CaissePaiementModal({
     client_id: preSelectedClientId || '',
     montant: preFilledAmount ? preFilledAmount.toString() : '',
     mode_paiement: MethodePaiement.CASH,
-    type_operation: initialType || TypeOperationCaisse.TONTINE_CONTRIBUTION,
+    type_operation: normalizeOperationType(initialType),
     numero_telephone: '',
     numero_transaction: '',
     reference: '',
@@ -131,6 +132,17 @@ export default function CaissePaiementModal({
       }));
     }
   }, [preSelectedAccountId, preFilledAmount]);
+  
+  // Synchroniser le type d'opération si initialType change (retro-compatibilité labels FR)
+  useEffect(() => {
+    if (initialType) {
+      const normalized = normalizeOperationType(initialType);
+      setFormData(prev => ({
+        ...prev,
+        type_operation: normalized
+      }));
+    }
+  }, [initialType]);
 
   // Idempotency Key - useMemo garantit une seule génération à la création du composant
   // Ceci est la solution correcte au bug #8 de l'audit : évite les doublons lors des re-renders
@@ -142,30 +154,27 @@ export default function CaissePaiementModal({
   }, []);
 
   // Vérifier si c'est une opération tontine - utilise les constantes EN
-  const isTontineOperation = useMemo(() => {
-    return formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION ||
-           formData.type_operation === TypeOperationCaisse.TONTINE_WITHDRAWAL;
-  }, [formData.type_operation]);
+  // Note: Calcul direct (pas useMemo) pour garantir la réactivité immédiate
+  const isTontineOperation =
+    formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION ||
+    formData.type_operation === TypeOperationCaisse.TONTINE_WITHDRAWAL;
 
   // Vérifier si c'est une opération sur compte - utilise les constantes EN
-  const isAccountOperation = useMemo(() => {
-    return [
-      TypeOperationCaisse.DEPOSIT_SAVINGS,
-      TypeOperationCaisse.WITHDRAWAL_SAVINGS,
-      TypeOperationCaisse.DEPOSIT_CURRENT,
-      TypeOperationCaisse.WITHDRAWAL_CURRENT,
-      TypeOperationCaisse.DEPOSIT_BLOCKED,
-      TypeOperationCaisse.WITHDRAWAL_BLOCKED
-    ].includes(formData.type_operation as any);
-  }, [formData.type_operation]);
+  // Note: Calcul direct pour garantir la réactivité
+  const isAccountOperation = [
+    TypeOperationCaisse.DEPOSIT_SAVINGS,
+    TypeOperationCaisse.WITHDRAWAL_SAVINGS,
+    TypeOperationCaisse.DEPOSIT_CURRENT,
+    TypeOperationCaisse.WITHDRAWAL_CURRENT,
+    TypeOperationCaisse.DEPOSIT_BLOCKED,
+    TypeOperationCaisse.WITHDRAWAL_BLOCKED
+  ].includes(formData.type_operation as any);
 
   // Vérifier si c'est une opération de crédit
-  const isLoanOperation = useMemo(() => {
-    return [
-      TypeOperationCaisse.LOAN_REPAYMENT,
-      TypeOperationCaisse.CREDIT_DISBURSEMENT
-    ].includes(formData.type_operation as any);
-  }, [formData.type_operation]);
+  const isLoanOperation = [
+    TypeOperationCaisse.LOAN_REPAYMENT,
+    TypeOperationCaisse.CREDIT_DISBURSEMENT
+  ].includes(formData.type_operation as any);
 
   // Charger les clients via api-client
   // Utilise isActiveStatus pour gérer les données legacy FR et EN
@@ -201,25 +210,11 @@ export default function CaissePaiementModal({
     });
   }, []);
 
-  // Charger les tontines du client via api-client
-  const loadClientTontines = useCallback(async (clientId: string) => {
-    setLoadingTontines(true);
-    try {
-      const data = await clientSearchApi.getTontines(clientId);
-      setClientTontines(data || []);
-      if (data && data.length === 1) {
-        selectTontine(data[0]);
-      }
-    } catch (error) {
-      console.error('Error loading client tontines:', error);
-      setClientTontines([]);
-    } finally {
-      setLoadingTontines(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (formData.client_id) {
+        // Activer le loading avant le chargement asynchrone
+        setLoadingTontines(true);
+
         // Load detailed client info
         const displayClientSummary = async () => {
              try {
@@ -236,8 +231,8 @@ export default function CaissePaiementModal({
                  setActiveTontinesCount((tontines || []).filter(t =>
                    t.statut === StatutParticipationTontine.ACTIVE || isActiveStatus(t.statut)
                  ).length);
-                 
-                 // Auto-select if tontine op
+
+                 // Auto-select if tontine op and single tontine
                  if (isTontineOperation && tontines && tontines.length === 1) {
                       selectTontine(tontines[0]);
                  }
@@ -261,6 +256,9 @@ export default function CaissePaiementModal({
                  }
              } catch (err) {
                  console.error("Error loading client details", err);
+             } finally {
+                 // Désactiver le loading une fois terminé
+                 setLoadingTontines(false);
              }
         }
         displayClientSummary();
@@ -273,8 +271,9 @@ export default function CaissePaiementModal({
       setSelectedAccount(null);
       setActiveTontinesCount(0);
       setActiveCreditsAmount(0);
+      setLoadingTontines(false);
     }
-  }, [formData.client_id, isTontineOperation, selectTontine]);
+  }, [formData.client_id, isTontineOperation, selectTontine, preSelectedAccountId]);
 
 
 
@@ -662,7 +661,7 @@ export default function CaissePaiementModal({
                   label=""
                   name="client_id"
                   value={formData.client_id}
-                  onChange={(value: string | number) => setFormData({ ...formData, client_id: String(value) })}
+                  onChange={(value: string | number) => setFormData(prev => ({ ...prev, client_id: String(value) }))}
                   options={clients.map(c => ({
                     value: c.id,
                     label: `${c.nom || ''} ${c.prenom || ''}`.trim() || 'Sans Nom',
@@ -706,9 +705,9 @@ export default function CaissePaiementModal({
                     <FileText size={12}/> Nature Opération
                 </label>
                 <div className="relative">
-                    <select 
+                    <select
                        value={formData.type_operation}
-                       onChange={(e) => setFormData({ ...formData, type_operation: e.target.value })}
+                       onChange={(e) => setFormData(prev => ({ ...prev, type_operation: e.target.value }))}
                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-indigo-500 outline-none appearance-none"
                     >
                        <optgroup label="Tontines">
@@ -743,7 +742,8 @@ export default function CaissePaiementModal({
                 </div>
                 
                 {/* Selecteurs Conditionnels (Tontine / Compte / Prêt) */}
-                
+
+
                 {/* 1. TONTINES */}
                 {isTontineOperation && formData.client_id && (
                    <div className="pt-2 animate-in fade-in slide-in-from-top-1">
@@ -846,20 +846,20 @@ export default function CaissePaiementModal({
              <label className="text-xs font-bold text-slate-500 uppercase ml-1 block">Règlement</label>
              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {/* Tuile CASH */}
-                <button 
+                <button
                   type="button"
-                  onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.CASH})}
+                  onClick={() => setFormData(prev => ({ ...prev, mode_paiement: MethodePaiement.CASH }))}
                   className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-emerald-500 ${formData.mode_paiement === MethodePaiement.CASH ? 'border-emerald-500 bg-emerald-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-60 hover:opacity-100 hover:border-slate-600'}`}
                 >
                    <Banknote size={24} className={formData.mode_paiement === MethodePaiement.CASH ? 'text-emerald-500' : 'text-slate-400'} />
                    <span className={`text-[10px] font-bold uppercase ${formData.mode_paiement === MethodePaiement.CASH ? 'text-emerald-400' : 'text-slate-400'}`}>Espèces</span>
                 </button>
-                
+
                 {/* Tuile MTN */}
-                <button 
+                <button
                    type="button"
                    disabled={true /* Disabled for now as per original code */}
-                   onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.MOBILE_MONEY})}
+                   onClick={() => setFormData(prev => ({ ...prev, mode_paiement: MethodePaiement.MOBILE_MONEY }))}
                    className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none relative overflow-hidden ${formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'border-yellow-500 bg-yellow-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-40 grayscale cursor-not-allowed'}`}
                 >
                    <img src={mtnMomoLogo} alt="MTN MoMo" className="h-8 object-contain" />
@@ -868,12 +868,12 @@ export default function CaissePaiementModal({
                       <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full">Bientôt</span>
                    </div>
                 </button>
-  
+
                 {/* Tuile Airtel */}
-                <button 
+                <button
                    type="button"
                    disabled={true /* Disabled for now as per original code */}
-                   onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.MOBILE_MONEY})}
+                   onClick={() => setFormData(prev => ({ ...prev, mode_paiement: MethodePaiement.MOBILE_MONEY }))}
                    className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none relative overflow-hidden ${formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'border-red-500 bg-red-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-40 grayscale cursor-not-allowed'}`}
                 >
                    <img src={airtelMoneyLogo} alt="Airtel Money" className="h-8 object-contain" />
@@ -881,11 +881,11 @@ export default function CaissePaiementModal({
                       <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full">Bientôt</span>
                    </div>
                 </button>
-  
+
                 {/* Tuile Virement */}
-                <button 
+                <button
                    type="button"
-                   onClick={() => setFormData({...formData, mode_paiement: MethodePaiement.TRANSFER})}
+                   onClick={() => setFormData(prev => ({ ...prev, mode_paiement: MethodePaiement.TRANSFER }))}
                    className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all duration-200 outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-500 ${formData.mode_paiement === MethodePaiement.TRANSFER ? 'border-blue-500 bg-blue-500/10 shadow-lg scale-[1.02]' : 'border-slate-800 bg-slate-900/50 opacity-60 hover:opacity-100 hover:border-slate-600'}`}
                 >
                    <Building2 size={24} className={formData.mode_paiement === MethodePaiement.TRANSFER ? 'text-blue-500' : 'text-slate-400'} />
@@ -901,61 +901,61 @@ export default function CaissePaiementModal({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-4 p-4 bg-slate-900/50 rounded-xl border border-blue-900/30">
                    <div className="md:col-span-1">
                        <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Banque Origine</label>
-                       <input 
+                       <input
                           value={formData.banque_origine}
-                          onChange={(e) => setFormData({...formData, banque_origine: e.target.value})}
-                          placeholder="Ex: BGFI" 
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500" 
+                          onChange={(e) => setFormData(prev => ({ ...prev, banque_origine: e.target.value }))}
+                          placeholder="Ex: BGFI"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
                         />
                          {errors.banque_origine && <p className="text-red-500 text-xs mt-1">{errors.banque_origine}</p>}
                    </div>
                    <div className="md:col-span-2">
                        <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Réf. Virement</label>
-                       <input 
+                       <input
                           value={formData.reference_virement}
-                          onChange={(e) => setFormData({...formData, reference_virement: e.target.value})}
-                          placeholder="Réf: VIR-xxx" 
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500" 
+                          onChange={(e) => setFormData(prev => ({ ...prev, reference_virement: e.target.value }))}
+                          placeholder="Réf: VIR-xxx"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
                         />
                         {errors.reference_virement && <p className="text-red-500 text-xs mt-1">{errors.reference_virement}</p>}
                    </div>
                 </div>
              )}
-  
+
              {/* Champs conditionnels Mobile Money (Phone/Ref) - Adapté pour le futur si activé */}
               {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
                 <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
                    <div>
                        <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Téléphone</label>
-                       <input 
+                       <input
                            value={formData.numero_telephone}
-                           onChange={(e) => setFormData({...formData, numero_telephone: e.target.value})}
-                           placeholder="+242..." 
-                           className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500" 
+                           onChange={(e) => setFormData(prev => ({ ...prev, numero_telephone: e.target.value }))}
+                           placeholder="+242..."
+                           className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500"
                        />
                    </div>
                    <div>
                        <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">ID Transaction</label>
-                       <input 
+                       <input
                            value={formData.numero_transaction}
-                           onChange={(e) => setFormData({...formData, numero_transaction: e.target.value})}
-                           placeholder="Trans ID" 
-                           className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500" 
+                           onChange={(e) => setFormData(prev => ({ ...prev, numero_transaction: e.target.value }))}
+                           placeholder="Trans ID"
+                           className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-yellow-500"
                        />
                    </div>
                 </div>
              )}
-  
+
              <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                      <span className={`text-4xl font-bold ${isOperationEntree(formData.type_operation) ? 'text-emerald-500' : 'text-rose-500'}`}>
                          {isOperationEntree(formData.type_operation) ? '+' : '-'}
                      </span>
                 </div>
-                <input 
+                <input
                    type="number"
                    value={formData.montant}
-                   onChange={(e) => setFormData({...formData, montant: e.target.value})}
+                   onChange={(e) => setFormData(prev => ({ ...prev, montant: e.target.value }))}
                    className={`w-full bg-slate-900/50 border-2 rounded-2xl pl-12 pr-16 py-8 text-5xl font-bold text-white placeholder-slate-700 outline-none transition-all text-center tracking-tight ${errors.montant ? 'border-red-500 focus:border-red-400' : 'border-slate-800 focus:border-indigo-500'}`}
                    placeholder="0"
                 />
@@ -981,10 +981,10 @@ export default function CaissePaiementModal({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-slate-800/50">
              <div className="md:col-span-2 space-y-1">
                 <label className="text-[10px] uppercase font-bold text-slate-500 block">Note / Description</label>
-                <input 
+                <input
                    value={formData.description}
-                   onChange={(e) => setFormData({...formData, description: e.target.value})}
-                   placeholder="Ajouter une note ou description..." 
+                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                   placeholder="Ajouter une note ou description..."
                    className={`w-full bg-transparent border-b ${errors.description ? 'border-red-500' : 'border-slate-800 focus:border-indigo-500'} px-0 py-2 text-sm text-white placeholder-slate-600 outline-none transition-colors`}
                 />
                 {errors.description && <p className="text-red-500 text-xs">{errors.description}</p>}

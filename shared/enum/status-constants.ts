@@ -666,6 +666,33 @@ export function isOperationCaisseEntree(value: string): boolean {
   return true; // Par défaut entrée
 }
 
+/**
+ * Normalise un type d'opération (convertit les labels FR ou valeurs alternatives en constantes EN)
+ */
+export function normalizeOperationType(type: string | null | undefined): string {
+  if (!type) return TypeOperationCaisse.TONTINE_CONTRIBUTION;
+  
+  const cleanType = type.trim();
+  
+  // 1. Vérifier si c'est déjà une constante EN
+  const isEnConstant = Object.values(TypeOperationCaisse).includes(cleanType as any);
+  if (isEnConstant) return cleanType;
+  
+  // 2. Rechercher par label FR (insensible à la casse)
+  const found = TYPES_OPERATIONS_CAISSE.find(t => 
+    t.label.toLowerCase() === cleanType.toLowerCase() || 
+    t.value.toLowerCase() === cleanType.toLowerCase()
+  );
+  
+  if (found) return found.value;
+  
+  // 3. Fallback pour les anciens labels si nécessaire
+  if (cleanType === "Encaissement Divers") return TypeOperationCaisse.MISC_COLLECTION;
+  if (cleanType === "Décaissement Divers") return TypeOperationCaisse.MISC_DISBURSEMENT;
+  
+  return cleanType;
+}
+
 
 
 /**
