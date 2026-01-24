@@ -129,7 +129,7 @@ export default function PlatformSidebarContent({
     window.addEventListener('operation-update', handleOperationUpdate as EventListener);
     window.addEventListener('refund-update', handleRefundUpdate as EventListener);
 
-    // Polling interval for refunds (every 30 seconds) for real-time feel
+    // Polling interval for refunds (every 30 seconds) as backup
     const refundPollInterval = setInterval(fetchPendingRefundsCount, 30000);
 
     return () => {

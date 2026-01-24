@@ -2789,11 +2789,17 @@ export function registerFinanceRoutes(app: Express) {
       let query = db.select({
         refund: creditRefundRequests,
         demande: demandesCredit,
-        client: clients
+        client: {
+          id: clients.id,
+          nom: schema.users.nom,
+          prenom: schema.users.prenom,
+          phone: schema.users.telephone,
+        }
       })
       .from(creditRefundRequests)
       .innerJoin(demandesCredit, eq(creditRefundRequests.demandeId, demandesCredit.id))
-      .innerJoin(clients, eq(creditRefundRequests.clientId, clients.id));
+      .innerJoin(clients, eq(creditRefundRequests.clientId, clients.id))
+      .innerJoin(schema.users, eq(clients.userId, schema.users.id));
 
       const conditions = [];
       if (agenceFilter?.agenceId) {
@@ -3012,7 +3018,7 @@ export function registerFinanceRoutes(app: Express) {
             montant: refundAmount.toString(),
             sens: 'DEBIT',
             sourceModule: 'COFFRE',
-            typePaiement: 'Transfert Sortant',
+            typePaiement: 'TRANSFER_OUT',
             sourceId: agencyCoffre.id,
             agenceId: refundDataLocked.agenceId,
             metadata: {
@@ -3028,7 +3034,7 @@ export function registerFinanceRoutes(app: Express) {
             montant: refundAmount.toString(),
             sens: 'CREDIT',
             sourceModule: 'SYSTEME',
-            typePaiement: 'Dépôt Courant',
+            typePaiement: 'DEPOSIT_CURRENT',
             clientId: refundDataLocked.clientId,
             compteId: courantAccount.id,
             metadata: {
@@ -3140,7 +3146,7 @@ export function registerFinanceRoutes(app: Express) {
             sens: 'DEBIT',
             sourceModule: 'CAISSE',
             sourceId: op.id,
-            typePaiement: paymentMethod === 'MOBILE_MONEY' ? 'Mobile Money Sortant' : 'Retrait Espèces',
+            typePaiement: paymentMethod === 'MOBILE_MONEY' ? 'TRANSFER_OUT' : 'WITHDRAWAL_CURRENT',
             sessionCaisseId: sessionCaisseId,
             clientId: refundData.clientId,
             agenceId: refundData.agenceId,
