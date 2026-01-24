@@ -34,15 +34,16 @@ export async function getAllAgentsTerrain(): Promise<any[]> {
   const results = await db
     .select({
       agent: agentsTerrain,
-      user: users
+      user: users,
+      agenceId: employes.agenceId
     })
     .from(agentsTerrain)
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
     .leftJoin(users, eq(employes.userId, users.id))
     .where(notDeleted(agentsTerrain))
     .orderBy(desc(agentsTerrain.createdAt));
-  
-  const enrichedAgents = await Promise.all(results.map(async ({ agent, user }) => {
+
+  const enrichedAgents = await Promise.all(results.map(async ({ agent, user, agenceId }) => {
     // 1. Nombre de clients (distinct clients visited or having paid)
     // Using simple count of related visits/payments for now as proxy if exact portfolio not defined
     const clientsCount = await db
@@ -75,11 +76,12 @@ export async function getAllAgentsTerrain(): Promise<any[]> {
       ...agent,
       nom: user?.nom || "Inconnu",
       prenom: user?.prenom || "",
+      agenceId: agenceId || null,
       nombreClients: clientsCount[0]?.count || 0,
       collectesJour: collectesCount[0]?.count || 0,
       performance: perf,
       // Ensure these match frontend expectations if mapped
-      nombre_clients: clientsCount[0]?.count || 0, 
+      nombre_clients: clientsCount[0]?.count || 0,
       collectes_jour: collectesCount[0]?.count || 0,
     };
   }));
@@ -100,7 +102,8 @@ export async function getAgentsTerrainPaginated(
   const results = await db
     .select({
       agent: agentsTerrain,
-      user: users
+      user: users,
+      agenceId: employes.agenceId
     })
     .from(agentsTerrain)
     .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
@@ -110,7 +113,7 @@ export async function getAgentsTerrainPaginated(
     .limit(perPage)
     .offset((page - 1) * perPage);
 
-  const enrichedAgents = await Promise.all(results.map(async ({ agent, user }) => {
+  const enrichedAgents = await Promise.all(results.map(async ({ agent, user, agenceId }) => {
     const clientsCount = await db
       .select({ count: sql<number>`count(distinct ${visitesTerrain.clientId})` })
       .from(visitesTerrain)
@@ -139,6 +142,7 @@ export async function getAgentsTerrainPaginated(
       prenom: user?.prenom || "",
       telephone: user?.telephone || null,
       photoUrl: user?.photoProfile || null,
+      agenceId: agenceId || null,
       nombreClients: clientsCount[0]?.count || 0,
       collectesJour: collectesCount[0]?.count || 0,
       performance: perf,

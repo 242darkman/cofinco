@@ -222,192 +222,164 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
       
-      {/* Modal Content - Mobile Drawer Style */}
-      <div className="relative w-full sm:max-w-md bg-slate-900 border border-slate-700/50 rounded-t-3xl sm:rounded-2xl max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom duration-300">
+      {/* Modal Content */}
+      <div className="relative w-full max-w-sm bg-slate-900/95 backdrop-blur border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-700/50 px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-violet-500/20 flex items-center justify-center">
-              <UserPlus className="text-violet-400" size={20} />
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 border-b border-slate-700/50 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
+              <UserPlus className="text-violet-400" size={16} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Nouvelle Prospection</h2>
-              <p className="text-xs text-slate-400">Ajouter un prospect rapidement</p>
+              <h2 className="text-base font-bold text-white leading-none">Nouvelle Prospection</h2>
+              <p className="text-[10px] text-slate-400 mt-0.5">Saisie rapide contact</p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-slate-800 transition-colors"
+            className="w-8 h-8 rounded-full hover:bg-slate-800 flex items-center justify-center transition-colors border border-transparent hover:border-slate-700"
           >
-            <X size={20} className="text-slate-400" />
+            <X size={16} className="text-slate-400" />
           </button>
         </div>
 
         {/* Offline Indicator */}
         {!navigator.onLine && (
-          <div className="mx-5 mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2">
-            <WifiOff size={16} className="text-amber-400" />
-            <span className="text-xs text-amber-400">Mode hors-ligne - Les données seront synchronisées</span>
+          <div className="mx-4 mt-3 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center gap-2">
+            <WifiOff size={14} className="text-amber-400" />
+            <span className="text-[10px] font-medium text-amber-400">Mode hors-ligne actif</span>
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[calc(90vh-80px)]">
-          {/* Nom */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Nom du prospect *
-            </label>
-            <input
-              type="text"
-              value={formData.nomProspect}
-              onChange={(e) => setFormData(prev => ({ ...prev, nomProspect: e.target.value }))}
-              placeholder="Ex: Jean Makaya"
-              className={`w-full px-4 py-3 bg-slate-800/50 border rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all ${
-                errors.nomProspect ? 'border-red-500' : 'border-slate-700'
-              }`}
-            />
-            {errors.nomProspect && (
-              <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
-                <AlertCircle size={12} /> {errors.nomProspect}
-              </p>
-            )}
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          {/* Row 1: Nom & Phone */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+                <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Nom du prospect</label>
+                <input
+                type="text"
+                value={formData.nomProspect}
+                onChange={(e) => setFormData(prev => ({ ...prev, nomProspect: e.target.value }))}
+                placeholder="Ex: Jean Makaya"
+                className={`w-full px-3 py-2 bg-slate-800 border rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500 transition-all ${
+                    errors.nomProspect ? 'border-red-500/50' : 'border-slate-700'
+                }`}
+                />
+            </div>
+            <div className="space-y-1">
+                <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Téléphone</label>
+                <input
+                type="tel"
+                value={formData.telephoneProspect}
+                onChange={(e) => setFormData(prev => ({ ...prev, telephoneProspect: e.target.value }))}
+                placeholder="06 XXX XX XX"
+                className={`w-full px-3 py-2 bg-slate-800 border rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500 transition-all ${
+                    errors.telephoneProspect ? 'border-red-500/50' : 'border-slate-700'
+                }`}
+                />
+            </div>
           </div>
 
-          {/* Téléphone */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              <Phone size={14} className="inline mr-1" />
-              Téléphone *
-            </label>
-            <input
-              type="tel"
-              value={formData.telephoneProspect}
-              onChange={(e) => setFormData(prev => ({ ...prev, telephoneProspect: e.target.value }))}
-              placeholder="06 XXX XX XX"
-              className={`w-full px-4 py-3 bg-slate-800/50 border rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all ${
-                errors.telephoneProspect ? 'border-red-500' : 'border-slate-700'
-              }`}
-            />
-            {errors.telephoneProspect && (
-              <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
-                <AlertCircle size={12} /> {errors.telephoneProspect}
-              </p>
-            )}
-          </div>
-
-          {/* Type d'activité */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              <Briefcase size={14} className="inline mr-1" />
-              Type d'activité
-            </label>
-            <select
-              value={formData.typeActivite}
-              onChange={(e) => setFormData(prev => ({ ...prev, typeActivite: e.target.value }))}
-              className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all"
-            >
-              <option value="">Sélectionner...</option>
-              <option value="Commerce">Commerce</option>
-              <option value="Artisanat">Artisanat</option>
-              <option value="Agriculture">Agriculture</option>
-              <option value="Services">Services</option>
-              <option value="Transport">Transport</option>
-              <option value="Restauration">Restauration</option>
-              <option value="Autre">Autre</option>
-            </select>
-          </div>
-
-          {/* GPS Capture */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              <MapPin size={14} className="inline mr-1" />
-              Position GPS
-            </label>
-            <button
-              type="button"
-              onClick={captureGPS}
-              disabled={gpsLoading}
-              className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white hover:bg-slate-700/50 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {gpsLoading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Capture en cours...
-                </>
-              ) : formData.latitude && formData.longitude ? (
-                <>
-                  <CheckCircle size={18} className="text-emerald-400" />
-                  <span className="text-emerald-400">
-                    {formData.latitude}, {formData.longitude}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <MapPin size={18} />
-                  Capturer ma position
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Photo Capture */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              <Camera size={14} className="inline mr-1" />
-              Photo
-            </label>
+          {/* Row 2: Activité */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Type d'activité</label>
             <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoCapture}
-                className="hidden"
-                id="photo-capture"
-              />
-              <label
-                htmlFor="photo-capture"
-                className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white hover:bg-slate-700/50 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {photoPreview ? (
-                  <>
-                    <CheckCircle size={18} className="text-emerald-400" />
-                    <span className="text-emerald-400">Photo capturée</span>
-                  </>
+                <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                <select
+                value={formData.typeActivite}
+                onChange={(e) => setFormData(prev => ({ ...prev, typeActivite: e.target.value }))}
+                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-violet-500 appearance-none cursor-pointer hover:bg-slate-750 transition-all"
+                >
+                <option value="">Sélectionner une activité...</option>
+                <option value="Commerce">Commerce</option>
+                <option value="Artisanat">Artisanat</option>
+                <option value="Agriculture">Agriculture</option>
+                <option value="Services">Services</option>
+                <option value="Transport">Transport</option>
+                <option value="Restauration">Restauration</option>
+                <option value="Autre">Autre</option>
+                </select>
+            </div>
+          </div>
+
+          {/* Row 3: Actions (GPS & Photo) */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* GPS Button */}
+            <button
+                type="button"
+                onClick={captureGPS}
+                disabled={gpsLoading}
+                className={`relative group overflow-hidden border rounded-xl p-3 flex flex-col items-center justify-center gap-1 transition-all ${
+                    formData.latitude && formData.longitude 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'
+                }`}
+            >
+                {gpsLoading ? (
+                    <Loader2 size={20} className="animate-spin text-violet-400" />
+                ) : formData.latitude ? (
+                    <CheckCircle size={20} className="text-emerald-400" />
                 ) : (
-                  <>
-                    <Camera size={18} />
-                    Prendre une photo
-                  </>
+                    <MapPin size={20} className="group-hover:text-violet-400 transition-colors" />
                 )}
-              </label>
-              {photoPreview && (
-                <div className="mt-2 rounded-xl overflow-hidden">
-                  <img src={photoPreview} alt="Preview" className="w-full h-32 object-cover" />
-                </div>
-              )}
+                <span className="text-[10px] font-medium">
+                    {formData.latitude ? 'Position OK' : 'Localiser'}
+                </span>
+            </button>
+
+            {/* Photo Button */}
+            <div className="relative">
+                <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoCapture}
+                    className="hidden"
+                    id="photo-capture"
+                />
+                <label
+                    htmlFor="photo-capture"
+                    className={`h-full cursor-pointer overflow-hidden border rounded-xl p-3 flex flex-col items-center justify-center gap-1 transition-all ${
+                        photoPreview 
+                        ? 'bg-slate-800 border-violet-500/50' 
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'
+                    }`}
+                >
+                    {photoPreview ? (
+                        <>
+                            <div className="absolute inset-0 opacity-40">
+                                <img src={photoPreview} className="w-full h-full object-cover" alt="preview" />
+                            </div>
+                            <div className="absolute inset-0 bg-black/40" />
+                            <CheckCircle size={20} className="text-white relative z-10" />
+                            <span className="text-[10px] font-medium text-white relative z-10">Photo OK</span>
+                        </>
+                    ) : (
+                        <>
+                            <Camera size={20} className="group-hover:text-violet-400 transition-colors" />
+                            <span className="text-[10px] font-medium">Prendre Photo</span>
+                        </>
+                    )}
+                </label>
             </div>
           </div>
 
           {/* Observations */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Observations
-            </label>
+          <div className="space-y-1">
             <textarea
               value={formData.observations}
               onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}
-              placeholder="Notes additionnelles..."
+              placeholder="Observations..."
               rows={2}
-              className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-all resize-none"
+              className="w-full px-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500 resize-none"
             />
           </div>
 
@@ -415,19 +387,14 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 active:scale-[0.98] rounded-xl text-white font-bold text-base shadow-lg shadow-violet-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-3 bg-violet-600 hover:bg-violet-500 active:bg-violet-700 rounded-xl text-white font-bold text-sm shadow-lg shadow-violet-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
           >
             {loading ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Enregistrement...
-              </>
+              <Loader2 size={16} className="animate-spin" />
             ) : (
-              <>
-                <UserPlus size={20} />
-                Enregistrer le prospect
-              </>
+              <UserPlus size={16} />
             )}
+            Valider la prospection
           </button>
         </form>
       </div>
