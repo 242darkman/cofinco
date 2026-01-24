@@ -156,11 +156,13 @@ export const DEMANDE_TRANSITIONS: Record<DemandeStatusType, readonly DemandeStat
   /**
    * APPROVED (Approuvée)
    * - Peut être décaissée
+   * - Peut être rejetée (révision commission)
    * - Peut être annulée (abandon client)
    * - Peut être clôturée sans décaissement (expiration)
    */
   [DemandeStatus.APPROVED]: [
     DemandeStatus.DISBURSED,  // Décaissement
+    DemandeStatus.REJECTED,   // Rejet par commission (révision)
     DemandeStatus.CANCELLED,  // Abandon client
     DemandeStatus.CLOSED,     // Expiration
   ],

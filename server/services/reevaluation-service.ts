@@ -293,7 +293,7 @@ export async function validateEligibility(
   
   // 5. Update reevaluation status
   const nouveauStatut = eligibilityResult.estEligible || override?.force ? StatutReevaluation.AUTHORIZED : StatutReevaluation.REFUSED;
-  
+
   await db.update(reevaluationsCredit)
     .set({
       statut: nouveauStatut,
@@ -304,6 +304,22 @@ export async function validateEligibility(
       updatedAt: new Date()
     })
     .where(eq(reevaluationsCredit.id, reevaluationId));
+
+  // 5b. If eligibility refused, update demande status accordingly
+  if (nouveauStatut === StatutReevaluation.REFUSED && !override?.force) {
+    // Determine if demande should be definitively rejected:
+    // - Max reevaluations reached OR
+    // - Motif is blacklisted (non-reevaluable)
+    const shouldBeDefinitivelyRejected = !eligibilityResult.nombreOk || eligibilityResult.motifBlackliste;
+
+    await db.update(demandesCredit)
+      .set({
+        statut: shouldBeDefinitivelyRejected ? StatutDemande.DEFINITIVELY_REJECTED : StatutDemande.REJECTED,
+        reevaluationEnCours: false,
+        motifRejet: eligibilityResult.motifRefus || 'Éligibilité à la réévaluation refusée',
+      })
+      .where(eq(demandesCredit.id, reevaluation.demandeId));
+  }
   
   // 6. Audit log
   await createAuditLog({
@@ -566,9 +582,9 @@ export async function recordCommitteeDecision(
     .where(eq(reevaluationsCredit.id, reevaluationId))
     .returning();
   
-  // 5. If approved, update the parent DemandeCredit to 'Approuvée après réévaluation'
-  // This status indicates the reevaluation was approved and the demand is ready for commission credit disbursement
+  // 5. Update parent DemandeCredit based on decision
   if (finalStatut === StatutReevaluation.APPROVED) {
+    // Approved: update to 'Approuvée après réévaluation'
     await db.update(demandesCredit)
       .set({
         statut: StatutDemande.APPROVED_AFTER_REEVALUATION,
@@ -576,6 +592,25 @@ export async function recordCommitteeDecision(
         dureeValeur: reevaluation.nouvelleDureeValeur || undefined,
         dureeUnite: reevaluation.nouvelleDureeUnite || undefined,
         reevaluationEnCours: false,
+      })
+      .where(eq(demandesCredit.id, reevaluation.demandeId));
+  } else if (finalStatut === StatutReevaluation.DEFINITIVELY_REJECTED) {
+    // Rejected: check if max reevaluations reached, then mark demande as definitively rejected
+    const demande = await getDemandeById(reevaluation.demandeId);
+    const config = await getConfigReevaluation();
+
+    const nombreReevaluations = (demande?.nombreReevaluations ?? 0) + 1; // +1 for current rejection
+    const maxAtteint = nombreReevaluations >= config.maxReevaluationsParDemande;
+
+    await db.update(demandesCredit)
+      .set({
+        // If max reached OR explicitly rejected by committee -> DEFINITIVELY_REJECTED
+        // Otherwise -> back to REJECTED (can try again later)
+        statut: maxAtteint ? StatutDemande.DEFINITIVELY_REJECTED : StatutDemande.REJECTED,
+        reevaluationEnCours: false,
+        nombreReevaluations: nombreReevaluations,
+        dateRejet: new Date(),
+        motifRejet: commentaire || 'Réévaluation rejetée par le comité',
       })
       .where(eq(demandesCredit.id, reevaluation.demandeId));
   }
