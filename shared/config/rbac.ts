@@ -172,7 +172,7 @@ export type PermissionConfig = {
 
 export const ROLE_PERMISSIONS: PermissionConfig = {
   [SystemRole.ADMIN]: {
-    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide', 'caisseagent.approve', 'caisseagent.reject', 'supervision.view']
+    '*': ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export', 'reevaluations.view', 'reevaluations.create', 'reevaluations.validate', 'reevaluations.decide', 'caisseagent.approve', 'caisseagent.reject', 'supervision.view', 'transfert.init', 'transfert.validate', 'transfert.execute', 'config.view', 'config.edit']
   },
   [SystemRole.CHEF_AGENCE]: {
     'clients': ['view', 'create', 'edit', 'delete'],
