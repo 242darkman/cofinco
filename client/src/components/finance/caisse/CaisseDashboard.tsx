@@ -1134,9 +1134,9 @@ export default function CaisseDashboard({
                 <div>
                     <div className="flex items-center gap-2">
                         <h1 className="text-xl font-bold text-white leading-none mb-0.5">Caisse</h1>
-                        {(currentSession?.caisse_nom || availableCaisse?.nom) && (
+                        {currentSession?.caisse_nom && (
                             <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-bold uppercase tracking-wider border border-cyan-500/20">
-                                {currentSession?.caisse_nom || availableCaisse?.nom}
+                                {currentSession.caisse_nom}
                             </span>
                         )}
                          {hasPendingOpening && (
