@@ -160,7 +160,25 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 6: New elements are required
+   * Rule 6: Fees must not have been refunded (or must be repaid if refunded)
+   */
+  validateFraisNonRembourses: (
+    demande: DemandeCredit,
+    hasRefundPaid: boolean
+  ): ValidationResult => {
+    // If a refund was paid and fees are not yet repaid, block reevaluation
+    if (hasRefundPaid && !demande.fraisEngagementPayes) {
+      return {
+        valid: false,
+        code: 'FRAIS_REMBOURSES_NON_REPAYES',
+        message: 'Les frais de dossier ont été remboursés et doivent être repayés avant de pouvoir effectuer une réévaluation'
+      };
+    }
+    return { valid: true };
+  },
+
+  /**
+   * Rule 7: New elements are required
    */
   validateElementsNouveaux: (
     elementsNouveaux: ElementNouveau[] | undefined, 
@@ -177,7 +195,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 7: Justification minimum length
+   * Rule 8: Justification minimum length
    */
   validateJustification: (justification: string | undefined): ValidationResult => {
     const MIN_LENGTH = 10;
@@ -198,7 +216,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 8: Minimum number of documents
+   * Rule 9: Minimum number of documents
    */
   validateDocuments: (documents: string[] | undefined, config: ConfigReevaluation): ValidationResult => {
     const nbDocuments = documents?.length || 0;
@@ -217,7 +235,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 9: Reevaluation is not locked
+   * Rule 10: Reevaluation is not locked
    */
   validateNonVerrouille: (reevaluation: ReevaluationCredit): ValidationResult => {
     if (reevaluation.verrouille) {
@@ -234,7 +252,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 10: Valid state transitions
+   * Rule 11: Valid state transitions
    */
   validateTransition: (
     statutActuel: string,
@@ -276,10 +294,11 @@ export const REEVALUATION_RULES = {
 export async function validateReevaluationCreation(
   demande: DemandeCredit,
   config: ConfigReevaluation,
-  payload: CreateReevaluationPayload
+  payload: CreateReevaluationPayload,
+  hasRefundPaid: boolean = false
 ): Promise<{ valid: boolean; errors: ValidationResult[] }> {
   const errors: ValidationResult[] = [];
-  
+
   // Apply all rules
   const rules = [
     () => REEVALUATION_RULES.validateDemandeStatus(demande),
@@ -287,18 +306,19 @@ export async function validateReevaluationCreation(
     () => REEVALUATION_RULES.validateNombreMax(demande, config),
     () => REEVALUATION_RULES.validateMotifReevaluable(demande.motifRejet, config),
     () => REEVALUATION_RULES.validatePasDeReevaluationEnCours(demande),
+    () => REEVALUATION_RULES.validateFraisNonRembourses(demande, hasRefundPaid),
     () => REEVALUATION_RULES.validateElementsNouveaux(payload.elementsNouveaux, config),
     () => REEVALUATION_RULES.validateJustification(payload.justification),
     () => REEVALUATION_RULES.validateDocuments(payload.documentsJoints, config),
   ];
-  
+
   for (const rule of rules) {
     const result = rule();
     if (!result.valid) {
       errors.push(result);
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors
@@ -310,45 +330,51 @@ export async function validateReevaluationCreation(
  */
 export function checkEligibilityQuick(
   demande: DemandeCredit,
-  config: ConfigReevaluation
+  config: ConfigReevaluation,
+  hasRefundPaid: boolean = false
 ): {
   estEligible: boolean;
   delaiOk: boolean;
   nombreOk: boolean;
   motifBlackliste: boolean;
   reevaluationEnCours: boolean;
+  fraisRemboursesNonRepayes: boolean;
   joursDepuisRejet: number;
   delaiMinimum: number;
   nombreReevaluations: number;
   maxAutorise: number;
   motifRefus?: string;
 } {
-  const joursDepuisRejet = demande.dateRejet 
+  const joursDepuisRejet = demande.dateRejet
     ? differenceInDays(new Date(), demande.dateRejet)
     : 0;
-  
+
   const delaiOk = joursDepuisRejet >= config.delaiMinimumJours;
   const nombreOk = (demande.nombreReevaluations ?? 0) < config.maxReevaluationsParDemande;
-  
-  const motifBlackliste = demande.motifRejet 
-    ? (config.motifsNonReevaluables || []).some(m => 
+
+  const motifBlackliste = demande.motifRejet
+    ? (config.motifsNonReevaluables || []).some(m =>
         demande.motifRejet!.toLowerCase().includes(m.toLowerCase())
       )
     : false;
-  
+
   const reevaluationEnCours = demande.reevaluationEnCours ?? false;
-  
+
+  // Check if fees were refunded and not repaid
+  const fraisRemboursesNonRepayes = hasRefundPaid && !demande.fraisEngagementPayes;
+
   // Status check: for reevaluation validation, the status can be either 'Rejetée' (initial)
   // or 'Réévaluation en cours' (after reevaluation was created)
   const statutValide = demande.statut === StatutDemande.REJECTED || demande.statut === StatutDemande.REEVALUATION_IN_PROGRESS;
-  
-  const estEligible = 
-    statutValide && 
-    delaiOk && 
-    nombreOk && 
-    !motifBlackliste && 
-    !reevaluationEnCours;
-  
+
+  const estEligible =
+    statutValide &&
+    delaiOk &&
+    nombreOk &&
+    !motifBlackliste &&
+    !reevaluationEnCours &&
+    !fraisRemboursesNonRepayes;
+
   // Determine refusal reason
   let motifRefus: string | undefined;
   if (!delaiOk) {
@@ -359,14 +385,17 @@ export function checkEligibilityQuick(
     motifRefus = 'Le motif de rejet ne permet pas de réévaluation';
   } else if (reevaluationEnCours) {
     motifRefus = 'Une réévaluation est déjà en cours';
+  } else if (fraisRemboursesNonRepayes) {
+    motifRefus = 'Les frais de dossier ont été remboursés et doivent être repayés';
   }
-  
+
   return {
     estEligible,
     delaiOk,
     nombreOk,
     motifBlackliste,
     reevaluationEnCours,
+    fraisRemboursesNonRepayes,
     joursDepuisRejet,
     delaiMinimum: config.delaiMinimumJours,
     nombreReevaluations: demande.nombreReevaluations ?? 0,

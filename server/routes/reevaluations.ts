@@ -7,7 +7,7 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "../auth";
-import { 
+import {
   createReevaluation,
   validateEligibility,
   startEnqueteComplementaire,
@@ -18,7 +18,8 @@ import {
   getReevaluationsByDemande,
   getAuditLogs,
   getDemandeById,
-  getConfigReevaluation
+  getConfigReevaluation,
+  hasRefundBeenPaid
 } from "../services/reevaluation-service";
 import { checkEligibilityQuick, CreateReevaluationPayload } from "../services/reevaluation-validator";
 import { db } from "../db";
@@ -100,27 +101,28 @@ export function registerReevaluationRoutes(app: Express) {
   app.get("/api/demandes/:demandeId/reevaluation-eligibility", async (req: Request, res: Response) => {
     try {
       const { demandeId } = req.params;
-      
+
       const demande = await getDemandeById(demandeId);
       if (!demande) {
-        return res.status(404).json({ 
-          success: false, 
-          error: { code: "DEMANDE_NOT_FOUND", message: "Demande introuvable" } 
+        return res.status(404).json({
+          success: false,
+          error: { code: "DEMANDE_NOT_FOUND", message: "Demande introuvable" }
         });
       }
-      
+
       const config = await getConfigReevaluation();
-      const eligibility = checkEligibilityQuick(demande, config);
-      
+      const hasRefundPaid = await hasRefundBeenPaid(demandeId);
+      const eligibility = checkEligibilityQuick(demande, config, hasRefundPaid);
+
       res.json({
         success: true,
         ...eligibility
       });
     } catch (error: any) {
       console.error("Error checking eligibility:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: { code: "SERVER_ERROR", message: error.message } 
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: error.message }
       });
     }
   });
@@ -174,7 +176,8 @@ export function registerReevaluationRoutes(app: Express) {
       // Get eligibility info for response
       const demande = await getDemandeById(demandeId);
       const config = await getConfigReevaluation();
-      const eligibility = demande ? checkEligibilityQuick(demande, config) : null;
+      const hasRefundPaid = await hasRefundBeenPaid(demandeId);
+      const eligibility = demande ? checkEligibilityQuick(demande, config, hasRefundPaid) : null;
       
       res.status(201).json({
         success: true,

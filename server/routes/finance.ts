@@ -1291,6 +1291,43 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
+  // Get refund status for a demande
+  app.get("/api/demandes-credit/:id/refund-status", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Find any refund request for this demande (not cancelled/rejected)
+      const refunds = await db.select()
+        .from(creditRefundRequests)
+        .where(eq(creditRefundRequests.demandeId, id))
+        .orderBy(desc(creditRefundRequests.createdAt));
+
+      // Find the most relevant refund (paid > in progress > none)
+      const activeRefund = refunds.find(r =>
+        ['PAID', 'PENDING_CAISSE', 'APPROVED', 'SUBMITTED'].includes(r.statut)
+      );
+
+      if (!activeRefund) {
+        return res.json({ refund: null });
+      }
+
+      res.json({
+        refund: addSnakeCaseAliasesDeep({
+          id: activeRefund.id,
+          statut: activeRefund.statut,
+          montantRemboursable: Number(activeRefund.montantRemboursable),
+          montantEncaisse: Number(activeRefund.montantEncaisse),
+          paymentMethod: activeRefund.paymentMethod,
+          paidAt: activeRefund.paidAt,
+          createdAt: activeRefund.createdAt
+        })
+      });
+    } catch (error: any) {
+      console.error("Erreur récupération statut remboursement:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/demandes-credit/:id/enquete", requireAuth, async (req, res) => {
       const enquete = await storage.getEnqueteByDemandeId(req.params.id);
       if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });

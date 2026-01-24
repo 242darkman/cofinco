@@ -10,6 +10,7 @@ export type ToastType = 'success' | 'error' | 'warning' | 'info';
 export interface ToastOptions {
   duration?: number;
   id?: string;
+  description?: string;
 }
 
 // Wrapper around sonner's toast for consistent API
@@ -18,6 +19,7 @@ export const toast = {
     return sonnerToast.success(message, {
       duration: options?.duration ?? 4000,
       id: options?.id,
+      description: options?.description,
     });
   },
 
@@ -25,6 +27,7 @@ export const toast = {
     return sonnerToast.error(message, {
       duration: options?.duration ?? 6000,
       id: options?.id,
+      description: options?.description,
     });
   },
 
@@ -32,6 +35,7 @@ export const toast = {
     return sonnerToast.warning(message, {
       duration: options?.duration ?? 5000,
       id: options?.id,
+      description: options?.description,
     });
   },
 
@@ -39,12 +43,14 @@ export const toast = {
     return sonnerToast.info(message, {
       duration: options?.duration ?? 4000,
       id: options?.id,
+      description: options?.description,
     });
   },
 
   loading(message: string, options?: ToastOptions) {
     return sonnerToast.loading(message, {
       id: options?.id,
+      description: options?.description,
     });
   },
 

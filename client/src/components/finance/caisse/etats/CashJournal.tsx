@@ -542,6 +542,7 @@ function isEntreeOperation(type: string): boolean {
     'ENCAISSEMENT',
     'LOAN_REPAYMENT',
     'REMBOURSEMENT_PRET',
+    'CREDIT_REPAYMENT',
     'TONTINE_COTISATION',
     'TONTINE_CONTRIBUTION',
     'COTISATION_TONTINE',
@@ -552,6 +553,8 @@ function isEntreeOperation(type: string): boolean {
     'TRANSFER_IN',
     'BLOCKED_DEPOSIT',
     'VERSEMENT_COMPTE_BLOQUE',
+    'ENGAGEMENT_FEE', // Frais de dossier crédit
+    'MISC_COLLECTION', // Encaissement divers
   ];
   return entreeTypes.some((t) => type.toUpperCase().includes(t));
 }
@@ -565,7 +568,9 @@ function getOperationLabel(type?: string): string {
     ENCAISSEMENT: 'Encaissement',
     DECAISSEMENT: 'Décaissement',
     LOAN_REPAYMENT: 'Remb. Prêt',
+    CREDIT_REPAYMENT: 'Remb. Crédit',
     CREDIT_DISBURSEMENT: 'Décais. Crédit',
+    ENGAGEMENT_FEE: 'Frais Dossier',
     TONTINE_COTISATION: 'Cotis. Tontine',
     TONTINE_CONTRIBUTION: 'Cotis. Tontine',
     TONTINE_DISTRIBUTION: 'Distrib. Tontine',
@@ -579,6 +584,8 @@ function getOperationLabel(type?: string): string {
     VERSEMENT: 'Vers. Coffre',
     TRANSFER_IN: 'Transfert Entrant',
     TRANSFER_OUT: 'Transfert Sortant',
+    MISC_COLLECTION: 'Encaissement Divers',
+    MISC_DISBURSEMENT: 'Décaissement Divers',
   };
 
   // Recherche partielle

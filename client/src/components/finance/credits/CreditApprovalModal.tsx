@@ -105,6 +105,30 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   const [refundAmount, setRefundAmount] = useState<string>('');
   const [refundLoading, setRefundLoading] = useState(false);
 
+  // Track existing refund for this demande
+  const [existingRefund, setExistingRefund] = useState<{
+    id: string;
+    statut: string;
+    montantRemboursable: number;
+    montantEncaisse: number;
+    paymentMethod?: string;
+    paidAt?: string;
+  } | null>(null);
+
+  // Fetch existing refund info
+  useEffect(() => {
+    if (demande?.id) {
+      fetch(`/api/demandes-credit/${demande.id}/refund-status`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.refund) {
+            setExistingRefund(data.refund);
+          }
+        })
+        .catch(() => { /* No refund exists */ });
+    }
+  }, [demande?.id]);
+
   useEffect(() => {
     if (demande?.id) {
        fetch(`/api/demandes-credit/${demande.id}/enquete`)
@@ -138,12 +162,27 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                        demande.statut.toLowerCase() === 'annulée' ||
                        demande.statut.toLowerCase() === 'cancelled');
 
-  // Can request reevaluation if rejected (not definitively) and eligible
-  const canRequestReevaluation = isRejected && !isDefinitivelyRejected && isEligibleForReevaluation;
+  // Check if refund was already made (paid or in progress)
+  const hasRefundInProgress = existingRefund && ['SUBMITTED', 'APPROVED', 'PENDING_CAISSE'].includes(existingRefund.statut);
+  const hasRefundPaid = existingRefund?.statut === 'PAID';
+  const hasAnyRefund = hasRefundInProgress || hasRefundPaid;
 
-  // Can initiate refund if rejected and fees were paid
+  // Fees need to be repaid if a refund was made
+  const feesNeedRepayment = hasRefundPaid && !demande.frais_engagement_payes;
+
+  // Can request reevaluation if:
+  // - rejected (not definitively)
+  // - eligible
+  // - fees are paid (or never refunded)
+  const canRequestReevaluation = isRejected && !isDefinitivelyRejected && isEligibleForReevaluation && !feesNeedRepayment;
+
+  // Can initiate refund if:
+  // - rejected
+  // - fees were paid
+  // - no refund already exists (or was cancelled/rejected)
   const canInitiateRefund = isRejected && demande.frais_engagement_payes &&
-                            demande.montant_frais_engagement && demande.montant_frais_engagement > 0;
+                            demande.montant_frais_engagement && demande.montant_frais_engagement > 0 &&
+                            !hasAnyRefund;
 
   const showActions = (!isFinished && !isRejected && !isCancelled) || isReevaluating;
 
@@ -499,8 +538,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 </div>
                 {/* Status Fees - Compact Pill */}
                 <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${
-                    demande.frais_engagement_payes 
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                    demande.frais_engagement_payes
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                     : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                 }`}>
                     {demande.frais_engagement_payes ? (
@@ -509,6 +548,22 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                         <><AlertCircle size={12} /> Frais dus: {formatMoney(demande.montant_frais_engagement || 0)}</>
                     )}
                 </div>
+                {/* Refund Status Pill */}
+                {existingRefund && (
+                    <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${
+                        existingRefund.statut === 'PAID'
+                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+                            : 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                    }`}>
+                        {existingRefund.statut === 'PAID' ? (
+                            <><Wallet size={12} /> Remboursé: {formatMoney(existingRefund.montantRemboursable)}</>
+                        ) : existingRefund.statut === 'PENDING_CAISSE' ? (
+                            <><Clock size={12} /> Remb. en caisse</>
+                        ) : (
+                            <><Wallet size={12} /> Remb. en cours</>
+                        )}
+                    </div>
+                )}
             </div>
             <div className="flex items-center gap-2">
                  <ReevaluationEligibilityCheck
@@ -1015,29 +1070,49 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     </>
                 )
              ) : (
-                <div className="flex gap-3 w-full">
-                    {canInitiateRefund && (
-                        <button
-                            onClick={() => setShowRefundModal(true)}
-                            className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
-                        >
-                            <Wallet size={18} /> Rembourser les frais
-                        </button>
+                <div className="flex flex-col gap-2 w-full">
+                    {/* Warning: fees need to be repaid before reevaluation */}
+                    {feesNeedRepayment && isRejected && !isDefinitivelyRejected && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-center">
+                            <p className="text-xs text-amber-400 flex items-center justify-center gap-2">
+                                <AlertCircle size={14} />
+                                Les frais ont été remboursés. Pour demander une réévaluation, le client doit d'abord repayer les frais.
+                            </p>
+                        </div>
                     )}
-                    {canRequestReevaluation && (
-                        <button
-                            onClick={() => setShowReevaluationModal(true)}
-                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
-                        >
-                            <RefreshCw size={18} /> Réévaluation
-                        </button>
+                    {/* Info: refund already in progress */}
+                    {hasRefundInProgress && (
+                        <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 text-center">
+                            <p className="text-xs text-purple-400 flex items-center justify-center gap-2">
+                                <Wallet size={14} />
+                                Remboursement de {formatMoney(existingRefund?.montantRemboursable || 0)} en cours de traitement
+                            </p>
+                        </div>
                     )}
-                    <button
-                        onClick={onClose}
-                        className={`${canRequestReevaluation || canInitiateRefund ? 'px-6' : 'flex-1'} py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition`}
-                    >
-                        {canRequestReevaluation || canInitiateRefund ? 'Fermer' : 'Fermer le dossier'}
-                    </button>
+                    <div className="flex gap-3">
+                        {canInitiateRefund && (
+                            <button
+                                onClick={() => setShowRefundModal(true)}
+                                className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
+                            >
+                                <Wallet size={18} /> Rembourser les frais
+                            </button>
+                        )}
+                        {canRequestReevaluation && (
+                            <button
+                                onClick={() => setShowReevaluationModal(true)}
+                                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
+                            >
+                                <RefreshCw size={18} /> Réévaluation
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className={`${canRequestReevaluation || canInitiateRefund ? 'px-6' : 'flex-1'} py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition`}
+                        >
+                            {canRequestReevaluation || canInitiateRefund ? 'Fermer' : 'Fermer le dossier'}
+                        </button>
+                    </div>
                 </div>
              )}
         </div>

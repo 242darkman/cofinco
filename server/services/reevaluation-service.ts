@@ -7,13 +7,14 @@
 import { db } from '../db';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { differenceInDays } from 'date-fns';
-import { 
-  demandesCredit, 
-  reevaluationsCredit, 
+import {
+  demandesCredit,
+  reevaluationsCredit,
   enquetesComplementaires,
   scoringHistory,
   reevaluationAuditLogs,
   configReevaluation,
+  creditRefundRequests,
   InsertReevaluationCredit,
   InsertEnqueteComplementaire,
   InsertScoringHistory,
@@ -93,8 +94,24 @@ export async function getDemandeById(demandeId: string): Promise<DemandeCredit |
     .from(demandesCredit)
     .where(eq(demandesCredit.id, demandeId))
     .limit(1);
-  
+
   return demande || null;
+}
+
+/**
+ * Check if a refund has been paid for this demande
+ */
+export async function hasRefundBeenPaid(demandeId: string): Promise<boolean> {
+  const [paidRefund] = await db
+    .select({ id: creditRefundRequests.id })
+    .from(creditRefundRequests)
+    .where(and(
+      eq(creditRefundRequests.demandeId, demandeId),
+      eq(creditRefundRequests.statut, 'PAID')
+    ))
+    .limit(1);
+
+  return !!paidRefund;
 }
 
 /**
@@ -111,12 +128,15 @@ export async function createReevaluation(
   if (!demande) {
     return { success: false, errors: [{ code: 'DEMANDE_NOT_FOUND', message: 'Demande introuvable' }] };
   }
-  
+
   // 2. Get config
   const config = await getConfigReevaluation();
-  
-  // 3. Validate
-  const validation = await validateReevaluationCreation(demande, config, payload);
+
+  // 3. Check if a refund has been paid (fees need to be repaid before reevaluation)
+  const hasRefundPaid = await hasRefundBeenPaid(demandeId);
+
+  // 4. Validate
+  const validation = await validateReevaluationCreation(demande, config, payload, hasRefundPaid);
   if (!validation.valid) {
     return { success: false, errors: validation.errors };
   }
