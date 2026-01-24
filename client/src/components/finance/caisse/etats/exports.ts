@@ -38,8 +38,16 @@ const COLORS = {
   textLight: [100, 116, 139] as [number, number, number],  // Slate-500
 };
 
+/**
+ * Formate un nombre avec des espaces réguliers comme séparateurs de milliers
+ * (jsPDF ne rend pas correctement les espaces insécables de toLocaleString)
+ */
+function formatNumber(value: number): string {
+  return value.toLocaleString('fr-FR').replace(/\u00A0/g, ' ');
+}
+
 function formatMoney(value: number): string {
-  return value.toLocaleString('fr-FR') + ' FCFA';
+  return formatNumber(value) + ' FCFA';
 }
 
 function formatDate(date: string | Date): string {
@@ -295,7 +303,7 @@ export function exportJournalPDF(
   doc.text('TOTAL ENTRÉES', 20, cardY + 9);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`+${totalEntrees.toLocaleString('fr-FR')} FCFA`, 20, cardY + 18);
+  doc.text(`+${totalEntrees.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')} FCFA`, 20, cardY + 18);
 
   // Card 2: Sorties
   doc.setFillColor(244, 63, 94);
@@ -306,7 +314,7 @@ export function exportJournalPDF(
   doc.text('TOTAL SORTIES', 20 + cardWidth + cardGap, cardY + 9);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`-${totalSorties.toLocaleString('fr-FR')} FCFA`, 20 + cardWidth + cardGap, cardY + 18);
+  doc.text(`-${totalSorties.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')} FCFA`, 20 + cardWidth + cardGap, cardY + 18);
 
   // Card 3: Opérations
   doc.setFillColor(6, 182, 212);
@@ -329,9 +337,9 @@ export function exportJournalPDF(
       isSession ? entry.type : getOperationLabel(entry.operationType),
       entry.client || entry.caissier || '—',
       entry.reference || '—',
-      entry.sens === 'ENTREE' ? `+${entry.montant.toLocaleString('fr-FR')}` : '',
-      entry.sens === 'SORTIE' ? `-${entry.montant.toLocaleString('fr-FR')}` : '',
-      entry.soldeProgressif.toLocaleString('fr-FR'),
+      entry.sens === 'ENTREE' ? `+${entry.montant.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')}` : '',
+      entry.sens === 'SORTIE' ? `-${entry.montant.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')}` : '',
+      entry.soldeProgressif.toLocaleString('fr-FR').replace(/\u00A0/g, ' '),
     ];
   });
 
@@ -455,7 +463,7 @@ export function exportSynthesePDF(
   doc.text('TOTAL ENTRÉES', 20, y + 10);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`+${totalEntrees.toLocaleString('fr-FR')} FCFA`, 20, y + 22);
+  doc.text(`+${totalEntrees.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')} FCFA`, 20, y + 22);
 
   // Card: Total Sorties
   doc.setFillColor(244, 63, 94);
@@ -466,7 +474,7 @@ export function exportSynthesePDF(
   doc.text('TOTAL SORTIES', 20 + cardWidth + gap, y + 10);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`-${totalSorties.toLocaleString('fr-FR')} FCFA`, 20 + cardWidth + gap, y + 22);
+  doc.text(`-${totalSorties.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')} FCFA`, 20 + cardWidth + gap, y + 22);
 
   y += cardHeight + gap;
 
@@ -481,7 +489,7 @@ export function exportSynthesePDF(
   doc.text('SOLDE NET', 20, y + 10);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${soldeNet >= 0 ? '+' : ''}${soldeNet.toLocaleString('fr-FR')} FCFA`, 20, y + 22);
+  doc.text(`${soldeNet >= 0 ? '+' : ''}${soldeNet.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')} FCFA`, 20, y + 22);
 
   // Card: Conformité
   const confColor = tauxConformite >= 95 ? COLORS.success : tauxConformite >= 80 ? COLORS.warning : COLORS.danger;
@@ -740,7 +748,7 @@ export function exportEcartsPDF(
   doc.text('EXCÉDENTS', 20 + cardWidth + gap, y + 10);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`+${totalEcartPositif.toLocaleString('fr-FR')} FCFA`, 20 + cardWidth + gap, y + 22);
+  doc.text(`+${totalEcartPositif.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')} FCFA`, 20 + cardWidth + gap, y + 22);
 
   // Card 3: Manquants
   doc.setFillColor(...COLORS.danger);
@@ -751,7 +759,7 @@ export function exportEcartsPDF(
   doc.text('MANQUANTS', 20 + (cardWidth + gap) * 2, y + 10);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`-${totalEcartNegatif.toLocaleString('fr-FR')} FCFA`, 20 + (cardWidth + gap) * 2, y + 22);
+  doc.text(`-${totalEcartNegatif.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')} FCFA`, 20 + (cardWidth + gap) * 2, y + 22);
 
   // Card 4: Sessions
   doc.setFillColor(...COLORS.secondary);
@@ -778,9 +786,9 @@ export function exportEcartsPDF(
     return [
       formatDateTime(d.date),
       d.caissier,
-      d.soldeTheorique.toLocaleString('fr-FR'),
-      d.soldeReel.toLocaleString('fr-FR'),
-      `${d.ecart > 0 ? '+' : ''}${d.ecart.toLocaleString('fr-FR')}`,
+      d.soldeTheorique.toLocaleString('fr-FR').replace(/\u00A0/g, ' '),
+      d.soldeReel.toLocaleString('fr-FR').replace(/\u00A0/g, ' '),
+      `${d.ecart > 0 ? '+' : ''}${d.ecart.toLocaleString('fr-FR').replace(/\u00A0/g, ' ')}`,
       `${d.ecartPercent > 0 ? '+' : ''}${d.ecartPercent.toFixed(2)}%`,
       statusLabel,
       d.justification || (d.ecart !== 0 ? 'Non justifié' : '—'),

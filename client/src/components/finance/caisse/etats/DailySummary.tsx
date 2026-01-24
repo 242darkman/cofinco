@@ -505,11 +505,14 @@ function isEntreeOperation(type: string): boolean {
     'LOAN_REPAYMENT',
     'REMBOURSEMENT_PRET',
     'TONTINE_COTISATION',
+    'TONTINE_CONTRIBUTION',  // Cotisation tontine (typeOperation utilisé dans tontine-logic.ts)
     'COTISATION_TONTINE',
     'SAVINGS_DEPOSIT',
     'DEPOT_EPARGNE',
     'APPROVISIONNEMENT',
     'TRANSFER_IN',
+    'BLOCKED_DEPOSIT',
+    'VERSEMENT_COMPTE_BLOQUE',
   ];
   return entreeTypes.some((t) => type.toUpperCase().includes(t));
 }
@@ -520,10 +523,15 @@ function getOperationLabel(type: string): string {
     WITHDRAWAL: 'Retraits',
     LOAN_REPAYMENT: 'Remb. Prêts',
     CREDIT_DISBURSEMENT: 'Décais. Crédits',
+    TONTINE_CONTRIBUTION: 'Cotis. Tontines',  // TONTINE_CONTRIBUTION avant TONTINE_COTISATION
     TONTINE_COTISATION: 'Cotis. Tontines',
     TONTINE_DISTRIBUTION: 'Distrib. Tontines',
+    TONTINE_WITHDRAWAL: 'Distrib. Tontines',  // Ajout pour les distributions
     SAVINGS_DEPOSIT: 'Épargne Dépôts',
     SAVINGS_WITHDRAWAL: 'Épargne Retraits',
+    BLOCKED_DEPOSIT: 'Compte Bloqué Dépôts',
+    BLOCKED_WITHDRAWAL: 'Compte Bloqué Retraits',
+    APPROVISIONNEMENT: 'Approvisionnement',
   };
 
   for (const [key, label] of Object.entries(labels)) {

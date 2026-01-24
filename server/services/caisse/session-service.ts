@@ -763,15 +763,19 @@ export async function closeExpiredSessions(
     }
 
     // Fermer la session avec raison "timeout"
+    // Pour une fermeture automatique, le montant déclaré = théorique (pas de comptage physique)
     await db
       .update(sessionsCaisse)
       .set({
         closedAt: now,
         montantFermetureTheorique: soldeTheorique.toString(),
+        montantFermetureDeclare: soldeTheorique.toString(), // Égal au théorique pour éviter faux écarts
+        montantPhysique: soldeTheorique.toString(),
+        ecart: "0", // Pas d'écart pour fermeture auto
         forcedCloseReason: ForcedCloseReason.TIMEOUT_AUTO,
         forceClosedAt: now,
         forceClosedBy: null,
-        observations: `${session.observations || ""}\n[AUTO-FERMETURE] Session expirée après ${timeoutHours}h d'inactivité.`.trim(),
+        observations: `${session.observations || ""}\n[AUTO-FERMETURE] Session expirée après ${timeoutHours}h d'inactivité. Solde reporté: ${soldeTheorique} FCFA.`.trim(),
       })
       .where(eq(sessionsCaisse.id, session.id));
 
