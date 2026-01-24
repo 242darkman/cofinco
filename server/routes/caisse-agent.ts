@@ -445,6 +445,7 @@ caisseAgentRouter.get(
 /**
  * GET /api/caisse-agent/agents/:id/caisse
  * Récupère le résumé de la caisse d'un agent
+ * Auto-crée la caisse si elle n'existe pas
  */
 caisseAgentRouter.get(
   "/agents/:id/caisse",
@@ -457,11 +458,28 @@ caisseAgentRouter.get(
         return res.status(401).json({ error: "Non authentifié" });
       }
 
-      const summary = await caisseAgentService.getCaisseAgentSummary(agentId);
+      // Essayer de récupérer le résumé existant
+      let summary = await caisseAgentService.getCaisseAgentSummary(agentId);
+
+      // Si la caisse n'existe pas, la créer automatiquement
+      if (!summary) {
+        console.log(`[caisse-agent] Caisse non trouvée pour agent ${agentId}, tentative de création...`);
+        const createResult = await caisseAgentService.createCaisseAgent({
+          agentId,
+          createdBy: userId
+        });
+
+        if (createResult.success && createResult.caisseAgent) {
+          console.log(`[caisse-agent] Caisse créée avec succès: ${createResult.caisseAgent.id}`);
+          summary = await caisseAgentService.getCaisseAgentSummary(agentId);
+        } else {
+          console.log(`[caisse-agent] Échec création caisse: ${createResult.error} (${createResult.errorCode})`);
+        }
+      }
 
       if (!summary) {
         return res.status(404).json({
-          error: "Caisse non trouvée",
+          error: "Impossible de créer ou récupérer la caisse de l'agent. Vérifiez que l'agent existe dans la base de données.",
         });
       }
 

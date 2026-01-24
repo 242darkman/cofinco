@@ -67,6 +67,12 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   useEffect(() => {
     if (targetAgentId) {
       loadAgentData(targetAgentId);
+    } else if (isAdmin) {
+      // Admin deselected agent - reset state
+      setLoading(false);
+      setAgentSummary(null);
+      setRecentTransactions([]);
+      setCurrentAgent(null);
     }
   }, [targetAgentId]);
 
@@ -74,14 +80,18 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     try {
       const agents = await agentTerrainApi.getAllList();
       setAllAgents(agents);
-      
+
       // For non-admin, set current agent automatically
       if (!isAdmin) {
         const activeAgent = agents.find((a: Agent) => a.statut === StatutUser.ACTIVE) || agents[0];
         setCurrentAgent(activeAgent);
+      } else {
+        // Admin without selected agent - stop loading
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error loading agents:', error);
+      setLoading(false);
     }
   };
 
