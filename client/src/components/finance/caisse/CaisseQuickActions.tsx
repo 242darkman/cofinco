@@ -1,74 +1,54 @@
 
 import React, { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Coins, Wallet } from "lucide-react";
+import { Wallet, ArrowRightLeft, CreditCard } from "lucide-react";
 import { Card } from "@/components/ui";
 import { TransfertCoffreModal } from "./TransfertCoffreModal";
 
 interface CaisseQuickActionsProps {
   caisseId: string;
   agenceId: string;
-  onDepot?: () => void;
-  onRetrait?: () => void;
-  onArrete?: () => void;
+  onNouvelleOperation?: () => void;
 }
 
-export function CaisseQuickActions({ caisseId, agenceId, onDepot, onRetrait, onArrete }: CaisseQuickActionsProps) {
+export function CaisseQuickActions({ caisseId, agenceId, onNouvelleOperation }: CaisseQuickActionsProps) {
   const [openTransfert, setOpenTransfert] = useState(false);
 
   return (
     <>
       <div className="mb-6">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-1">Coffre-Fort & Trésorerie</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card 
-            className="cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group"
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-1">Trésorerie</h3>
+        <div className="grid grid-cols-2 gap-3">
+          {/* Nouvelle Opération - Point d'entrée principal pour encaissement/décaissement */}
+          <Card
+            className="cursor-pointer hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all group"
+            padding="sm"
+            onClick={onNouvelleOperation}
+          >
+            <div className="flex flex-col items-center gap-3 py-3">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 text-cyan-400 group-hover:scale-110 transition-transform shadow-lg shadow-cyan-500/10">
+                <CreditCard size={28} />
+              </div>
+              <div className="text-center">
+                <span className="text-sm font-semibold text-slate-200 group-hover:text-white block">Nouvelle Opération</span>
+                <span className="text-[10px] text-slate-500 font-medium">Encaissement • Décaissement</span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Coffre-Fort - Transferts de trésorerie */}
+          <Card
+            className="cursor-pointer hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group"
             padding="sm"
             onClick={() => setOpenTransfert(true)}
           >
-            <div className="flex flex-col items-center gap-3 py-2">
-              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 group-hover:scale-110 transition-transform">
-                <Wallet size={24} />
+            <div className="flex flex-col items-center gap-3 py-3">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 text-indigo-400 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/10">
+                <ArrowRightLeft size={28} />
               </div>
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white">Coffre-Fort</span>
-            </div>
-          </Card>
-
-          <Card 
-            className="cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group"
-            padding="sm"
-            onClick={onDepot}
-          >
-            <div className="flex flex-col items-center gap-3 py-2">
-              <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
-                <ArrowDownLeft size={24} />
+              <div className="text-center">
+                <span className="text-sm font-semibold text-slate-200 group-hover:text-white block">Coffre-Fort</span>
+                <span className="text-[10px] text-slate-500 font-medium">Approvisionnement • Versement</span>
               </div>
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white">Dépôt Rapide</span>
-            </div>
-          </Card>
-
-          <Card 
-            className="cursor-pointer hover:border-red-500/50 hover:bg-red-500/5 transition-all group"
-            padding="sm"
-            onClick={onRetrait}
-          >
-            <div className="flex flex-col items-center gap-3 py-2">
-              <div className="p-3 rounded-xl bg-red-500/10 text-red-400 group-hover:scale-110 transition-transform">
-                <ArrowUpRight size={24} />
-              </div>
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white">Retrait Rapide</span>
-            </div>
-          </Card>
-
-          <Card 
-            className="cursor-pointer hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group"
-            padding="sm"
-            onClick={onArrete}
-          >
-            <div className="flex flex-col items-center gap-3 py-2">
-              <div className="p-3 rounded-xl bg-orange-500/10 text-orange-400 group-hover:scale-110 transition-transform">
-                <Coins size={24} />
-              </div>
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white">Arrêté Caisse</span>
             </div>
           </Card>
         </div>

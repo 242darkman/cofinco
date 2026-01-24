@@ -436,29 +436,12 @@ export default function CaisseDashboard({
     setActiveTab('rapprochement');
   };
 
-  const handleDepotRapide = () => {
+  const handleNouvelleOperation = () => {
     if (currentSession) {
-      setInitialPaymentType('Encaissement Divers');
+      setInitialPaymentType(undefined); // Modal ouvert sans type pré-sélectionné
       setShowPaiement(true);
     } else {
       alert('Veuillez ouvrir une session de caisse');
-    }
-  };
-
-  const handleRetraitRapide = () => {
-    if (currentSession) {
-      setInitialPaymentType('Décaissement Divers');
-      setShowPaiement(true);
-    } else {
-      alert('Veuillez ouvrir une session de caisse');
-    }
-  };
-
-  const handleArreteCaisse = () => {
-    if (currentSession) {
-        setActiveTab('rapprochement');
-    } else {
-        alert('Veuillez ouvrir une session de caisse');
     }
   };
 
@@ -876,12 +859,10 @@ export default function CaisseDashboard({
         return (
           <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
       {currentSession && (
-        <CaisseQuickActions 
-          caisseId={currentSession.caisse_id || ''} 
-          agenceId={currentSession.agence_id || ''} 
-          onDepot={handleDepotRapide}
-          onRetrait={handleRetraitRapide}
-          onArrete={handleArreteCaisse}
+        <CaisseQuickActions
+          caisseId={currentSession.caisse_id || ''}
+          agenceId={currentSession.agence_id || ''}
+          onNouvelleOperation={handleNouvelleOperation}
         />
       )}
       
@@ -917,87 +898,74 @@ export default function CaisseDashboard({
 
       {/* Quick Actions - Clean Cards */}
       <div>
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-1">Actions Rapides</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-             <Card 
-                variant="default" 
-                padding="sm" 
-                className="cursor-pointer hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all group"
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-1">Modules</h3>
+          <div className="grid grid-cols-3 gap-3">
+             {/* Espèces - Gestion des billets et pièces */}
+             <Card
+                variant="default"
+                padding="sm"
+                className="cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group"
                 onClick={() => setActiveTab('especes')}
              >
-                 <div className="flex flex-col items-center gap-3 py-2">
-                     <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
-                         <Wallet size={24} />
+                 <div className="flex flex-col items-center gap-2 py-2">
+                     <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+                         <Wallet size={20} />
                      </div>
-                     <span className="text-sm font-medium text-slate-300 group-hover:text-white">Espèces</span>
+                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">Espèces</span>
                  </div>
              </Card>
 
-             <Card 
-                variant="default" 
-                padding="sm" 
-                className={`cursor-pointer transition-all group ${!mobileMoneyEnabled ? 'opacity-50 pointer-events-none' : 'hover:border-amber-500/50 hover:bg-amber-500/5'}`}
+             {/* Mobile Money - Si activé */}
+             <Card
+                variant="default"
+                padding="sm"
+                className={`cursor-pointer transition-all group ${!mobileMoneyEnabled ? 'opacity-40 pointer-events-none' : 'hover:border-amber-500/50 hover:bg-amber-500/5'}`}
                 onClick={() => mobileMoneyEnabled && setActiveTab('mobilemoney')}
              >
-                 <div className="flex flex-col items-center gap-3 py-2">
-                     <div className="p-3 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
-                         <Smartphone size={24} />
+                 <div className="flex flex-col items-center gap-2 py-2">
+                     <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                         <Smartphone size={20} />
                      </div>
-                     <span className="text-sm font-medium text-slate-300 group-hover:text-white">Mobile Money</span>
+                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">Mobile Money</span>
                  </div>
              </Card>
 
-             <Card 
-                variant="default" 
-                padding="sm" 
-                className="cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group"
-                onClick={() => setActiveTab('transferts')}
-             >
-                 <div className="flex flex-col items-center gap-3 py-2">
-                     <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 group-hover:scale-110 transition-transform">
-                         <ArrowRightLeft size={24} />
-                     </div>
-                     <span className="text-sm font-medium text-slate-300 group-hover:text-white">Transferts</span>
-                 </div>
-             </Card>
-
-             <Card 
-                variant="default" 
-                padding="sm" 
+             {/* États & Rapports */}
+             <Card
+                variant="default"
+                padding="sm"
                 className="cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 transition-all group"
                 onClick={() => setActiveTab('etats')}
              >
-                 <div className="flex flex-col items-center gap-3 py-2">
-                     <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform">
-                         <FileText size={24} />
+                 <div className="flex flex-col items-center gap-2 py-2">
+                     <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform">
+                         <FileText size={20} />
                      </div>
-                     <span className="text-sm font-medium text-slate-300 group-hover:text-white">États</span>
+                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">États</span>
                  </div>
              </Card>
           </div>
 
-       {/* Pending Activations Alert Card - Only show when there are pending accounts */}
-       {comptesEnAttenteCount > 0 && (
-         <Card
-            variant="default"
-            padding="sm"
-            className="cursor-pointer border-orange-500/50 bg-orange-500/10 hover:bg-orange-500/20 transition-all group animate-pulse"
-            onClick={() => setShowActivationDrawer(true)}
-         >
-             <div className="flex flex-col items-center gap-3 py-2">
-                 <div className="relative p-3 rounded-xl bg-orange-500/20 text-orange-400 group-hover:scale-110 transition-transform">
-                     <UserCheck size={24} />
-                     <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full border-2 border-slate-900">
-                       {comptesEnAttenteCount}
-                     </span>
-                 </div>
-                 <span className="text-sm font-bold text-orange-400 group-hover:text-orange-300">
-                   Activations en attente
-                 </span>
-             </div>
-         </Card>
-       )}
-  </div>
+          {/* Pending Activations Alert - Bande d'alerte contextuelle */}
+          {comptesEnAttenteCount > 0 && (
+            <div
+              onClick={() => setShowActivationDrawer(true)}
+              className="mt-3 flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 cursor-pointer hover:bg-orange-500/15 transition-all group"
+            >
+              <div className="relative p-2 rounded-lg bg-orange-500/20 text-orange-400 group-hover:scale-105 transition-transform">
+                <UserCheck size={18} />
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center bg-orange-500 text-white text-[9px] font-bold rounded-full">
+                  {comptesEnAttenteCount}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm font-semibold text-orange-300">Comptes à activer</span>
+                <p className="text-[10px] text-orange-400/70">Versement initial requis</p>
+              </div>
+              <ArrowRightLeft size={16} className="text-orange-400/50 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
+            </div>
+          )}
+      </div>
 
       <PendingActivationDrawer
         open={showActivationDrawer}
