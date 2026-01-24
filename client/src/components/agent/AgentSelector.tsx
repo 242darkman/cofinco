@@ -100,19 +100,32 @@ export default function AgentSelector({
     setSearchQuery('');
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsOpen(!isOpen);
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+    }
+  };
+
   return (
     <div ref={containerRef} className="relative w-full">
-      {/* Trigger Button */}
-      <button
-        type="button"
+      {/* Trigger - using div with role="combobox" to avoid button nesting */}
+      <div
+        role="combobox"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
+        onKeyDown={handleKeyDown}
         className={`
           w-full flex items-center justify-between gap-2 px-4 py-3
           bg-slate-800/50 border border-slate-700 rounded-xl
-          text-left text-white
+          text-left text-white cursor-pointer
           hover:bg-slate-700/50 transition-colors
-          disabled:opacity-50 disabled:cursor-not-allowed
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
           ${isOpen ? 'ring-2 ring-cyan-500/50 border-cyan-500/50' : ''}
         `}
       >
@@ -156,6 +169,7 @@ export default function AgentSelector({
               type="button"
               onClick={handleClear}
               className="p-1 rounded hover:bg-slate-600/50 transition-colors"
+              aria-label="Effacer la sélection"
             >
               <X size={14} className="text-slate-400" />
             </button>
@@ -165,7 +179,7 @@ export default function AgentSelector({
             className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           />
         </div>
-      </button>
+      </div>
 
       {/* Dropdown */}
       {isOpen && (
