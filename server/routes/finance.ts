@@ -2783,7 +2783,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * GET /api/finance/credit-refunds - List refunds with filters
    */
-  app.get("/api/finance/credit-refunds", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
+  app.get("/api/finance/credit-refunds", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       let query = db.select({
@@ -2821,7 +2821,7 @@ export function registerFinanceRoutes(app: Express) {
    * GET /api/finance/credit-refunds/pending/count - Count pending refunds (SUBMITTED + APPROVED)
    * Used for sidebar badge notification
    */
-  app.get("/api/finance/credit-refunds/pending/count", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
+  app.get("/api/finance/credit-refunds/pending/count", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       const conditions = [
@@ -3195,7 +3195,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * GET /api/finance/credit-refunds/pending-caisse - List refunds awaiting caisse validation
    */
-  app.get("/api/finance/credit-refunds/pending-caisse", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess(), async (req, res) => {
+  app.get("/api/finance/credit-refunds/pending-caisse", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
@@ -3224,7 +3224,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * GET /api/finance/credit-refunds/pending-caisse/count - Count refunds awaiting caisse validation
    */
-  app.get("/api/finance/credit-refunds/pending-caisse/count", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess(), async (req, res) => {
+  app.get("/api/finance/credit-refunds/pending-caisse/count", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
