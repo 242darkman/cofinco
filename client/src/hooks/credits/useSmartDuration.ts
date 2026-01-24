@@ -5,34 +5,14 @@ import {
   type FrequenceRemboursement,
   type DureeUnite
 } from '@shared/config/credit-durations';
-import { DureeUnite as DureeUniteEnum, FrequenceRemboursement as FrequenceEnum } from '@shared/enum/status-constants';
+import {
+  normalizeDureeUnite,
+  normalizeFrequenceRemboursement
+} from '@shared/enum/status-constants';
 
-// Mapping pour normaliser les valeurs françaises vers anglaises
-const DUREE_UNITE_NORMALIZE: Record<string, string> = {
-  'Mois': DureeUniteEnum.MONTH,
-  'Jour': DureeUniteEnum.DAY,
-  'Semaine': DureeUniteEnum.WEEK,
-  'MONTH': DureeUniteEnum.MONTH,
-  'DAY': DureeUniteEnum.DAY,
-  'WEEK': DureeUniteEnum.WEEK,
-};
-
-const FREQUENCE_NORMALIZE: Record<string, string> = {
-  'Mensuel': FrequenceEnum.MONTHLY,
-  'Journalier': FrequenceEnum.DAILY,
-  'Hebdomadaire': FrequenceEnum.WEEKLY,
-  'Bimensuel': FrequenceEnum.BI_MONTHLY,
-  'Trimestriel': FrequenceEnum.QUARTERLY,
-  'MONTHLY': FrequenceEnum.MONTHLY,
-  'DAILY': FrequenceEnum.DAILY,
-  'WEEKLY': FrequenceEnum.WEEKLY,
-  'BI_MONTHLY': FrequenceEnum.BI_MONTHLY,
-  'QUARTERLY': FrequenceEnum.QUARTERLY,
-};
-
-// Helper pour normaliser les valeurs
-const normalizeUnit = (unit: string): string => DUREE_UNITE_NORMALIZE[unit] || unit;
-const normalizeFrequence = (freq: string): string => FREQUENCE_NORMALIZE[freq] || freq;
+// Wrappers pour compatibilité avec le code existant
+const normalizeUnit = (unit: string): string => normalizeDureeUnite(unit);
+const normalizeFrequence = (freq: string): string => normalizeFrequenceRemboursement(freq);
 
 /**
  * Interface for a credit plan with duration constraints
@@ -90,16 +70,13 @@ interface ValidationResult {
  * Helper to generate a label for a duration
  */
 const generateLabel = (value: number, unit: string): string => {
+  const normalizedUnit = normalizeUnit(unit);
   const unitLabels: Record<string, string> = {
-    'MONTH': value === 1 ? 'mois' : 'mois',
+    'MONTH': 'mois',
     'DAY': value === 1 ? 'jour' : 'jours',
     'WEEK': value === 1 ? 'semaine' : 'semaines',
-    // Legacy French values (for backwards compatibility)
-    'Mois': value === 1 ? 'mois' : 'mois',
-    'Jour': value === 1 ? 'jour' : 'jours',
-    'Semaine': value === 1 ? 'semaine' : 'semaines',
   };
-  return `${value} ${unitLabels[unit] || unit}`;
+  return `${value} ${unitLabels[normalizedUnit] || normalizedUnit}`;
 };
 
 /**
@@ -112,7 +89,7 @@ const generateLabel = (value: number, unit: string): string => {
 export function useSmartDuration({
   selectedPlan,
   amount,
-  frequence = 'Mensuel',
+  frequence = 'MONTHLY',
 }: UseSmartDurationProps): UseSmartDurationReturn {
   
   /**

@@ -516,6 +516,33 @@ export const DureeUnite = {
 
 export type DureeUniteType = (typeof DureeUnite)[keyof typeof DureeUnite];
 
+/** Labels FR pour l'UI des unités de durée */
+export const DUREE_UNITE_LABELS: Record<DureeUniteType, string> = {
+  [DureeUnite.DAY]: "Jour",
+  [DureeUnite.WEEK]: "Semaine",
+  [DureeUnite.MONTH]: "Mois",
+};
+
+/** Mapping pour normaliser les valeurs françaises vers anglaises (FR -> EN) */
+const DUREE_UNITE_FR_TO_EN: Record<string, DureeUniteType> = {
+  'Jour': DureeUnite.DAY,
+  'Semaine': DureeUnite.WEEK,
+  'Mois': DureeUnite.MONTH,
+};
+
+/**
+ * Normalise une unité de durée (FR ou EN) vers la valeur enum anglaise
+ * Ex: "Jour" -> "DAY", "DAY" -> "DAY"
+ */
+export function normalizeDureeUnite(unit: string | undefined | null): DureeUniteType {
+  if (!unit) return DureeUnite.MONTH;
+  const upperUnit = unit.toUpperCase();
+  if (upperUnit === 'DAY' || upperUnit === 'WEEK' || upperUnit === 'MONTH') {
+    return upperUnit as DureeUniteType;
+  }
+  return DUREE_UNITE_FR_TO_EN[unit] || DureeUnite.MONTH;
+}
+
 // ============================================
 // TYPES DE TRANSACTION ÉPARGNE
 // ============================================
@@ -1260,6 +1287,30 @@ export const FREQUENCE_REMBOURSEMENT_LABELS: Record<FrequenceRemboursementType, 
 export const FREQUENCE_REMBOURSEMENT_OPTIONS = Object.entries(FREQUENCE_REMBOURSEMENT_LABELS).map(
   ([value, label]) => ({ value, label })
 );
+
+/** Mapping pour normaliser les valeurs françaises vers anglaises (FR -> EN) */
+const FREQUENCE_FR_TO_EN: Record<string, FrequenceRemboursementType> = {
+  'Journalier': FrequenceRemboursement.DAILY,
+  'Hebdomadaire': FrequenceRemboursement.WEEKLY,
+  'Mensuel': FrequenceRemboursement.MONTHLY,
+  'Bimensuel': FrequenceRemboursement.BI_MONTHLY,
+  'Bimestriel': FrequenceRemboursement.BI_MONTHLY,
+  'Trimestriel': FrequenceRemboursement.QUARTERLY,
+};
+
+/**
+ * Normalise une fréquence de remboursement (FR ou EN) vers la valeur enum anglaise
+ * Ex: "Journalier" -> "DAILY", "DAILY" -> "DAILY"
+ */
+export function normalizeFrequenceRemboursement(freq: string | undefined | null): FrequenceRemboursementType {
+  if (!freq) return FrequenceRemboursement.MONTHLY;
+  const upperFreq = freq.toUpperCase();
+  if (upperFreq === 'DAILY' || upperFreq === 'WEEKLY' || upperFreq === 'MONTHLY' ||
+      upperFreq === 'BI_MONTHLY' || upperFreq === 'QUARTERLY') {
+    return upperFreq as FrequenceRemboursementType;
+  }
+  return FREQUENCE_FR_TO_EN[freq] || FrequenceRemboursement.MONTHLY;
+}
 
 
 

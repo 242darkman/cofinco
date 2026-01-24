@@ -5,7 +5,7 @@ import { Modal, FormField, SelectField, Button, SearchableSelect } from '../../u
 import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
-import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS } from '@shared/enum/status-constants';
+import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS, normalizeDureeUnite, normalizeFrequenceRemboursement } from '@shared/enum/status-constants';
 import useSmartDuration from '../../../hooks/credits/useSmartDuration';
 import DurationSelector from './DurationSelector';
 
@@ -161,14 +161,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         fixedMontant = String(min);
     }
 
+    // Normaliser les valeurs françaises vers anglaises (ex: "Jour" -> "DAY", "Journalier" -> "DAILY")
+    const rawDureeUnite = plan.dureeUnite || plan.duree_unite;
+    const rawFrequence = plan.frequenceRemboursement || plan.frequence_remboursement;
+
     setFormData(prev => ({
       ...prev,
       credit_plan_id: planId,
       type_credit: normalizeTypeCredit(plan.typeCredit || plan.type_credit),
       taux_interet: String(plan.tauxInteret || plan.taux_interet),
       duree_valeur: String(plan.dureeValeur || plan.duree_valeur),
-      duree_unite: plan.dureeUnite || plan.duree_unite,
-      frequence_remboursement: plan.frequenceRemboursement || plan.frequence_remboursement,
+      duree_unite: normalizeDureeUnite(rawDureeUnite),
+      frequence_remboursement: normalizeFrequenceRemboursement(rawFrequence),
       objet_credit: plan.description ? `${plan.nom} - ${plan.description}` : prev.objet_credit,
       montant_demande: fixedMontant !== undefined ? fixedMontant : prev.montant_demande
     }));
