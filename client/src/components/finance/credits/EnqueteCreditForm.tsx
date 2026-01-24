@@ -462,6 +462,20 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     }
   };
 
+  // Check if form is valid for enabling submit button (real-time validation)
+  const isFormValid = (): boolean => {
+    const MIN_DESC_LENGTH = 10;
+    const hasClient = !!formData.client_id;
+    const hasMontant = formData.montant_demande && parseFloat(formData.montant_demande) > 0;
+    const hasCategorie = !!formData.categorie_activite;
+    const hasTypeActivite = !!formData.type_activite;
+    const hasAnciennete = !!formData.anciennete_activite || !!seniorityValue;
+    const hasDescription = formData.description_activite && formData.description_activite.trim().length >= MIN_DESC_LENGTH;
+    const hasRevenu = formData.revenu_mensuel_declare && parseFloat(formData.revenu_mensuel_declare) > 0;
+
+    return !!(hasClient && hasMontant && hasCategorie && hasTypeActivite && hasAnciennete && hasDescription && hasRevenu);
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -471,6 +485,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
     if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) {
       newErrors.montant_demande = 'Le montant demandé est requis';
+    }
+
+    if (!formData.categorie_activite) {
+      newErrors.categorie_activite = 'La catégorie d\'activité est requise';
     }
 
     if (!formData.type_activite) {
@@ -976,30 +994,37 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
               <label className="block text-xs font-semibold text-slate-300 mb-2">Autres crédits en cours</label>
 
-              <div className="flex gap-1.5 mb-2">
+              <div className="space-y-2 mb-2">
                 <input
                   type="text"
                   value={autreCredit.organisme}
                   onChange={(e) => setAutreCredit({ ...autreCredit, organisme: e.target.value })}
-                  placeholder="Organisme"
-                  className="flex-1 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
+                  placeholder="Nom de l'organisme"
+                  className="w-full bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                 />
-                <input
-                  type="number"
-                  value={autreCredit.montant}
-                  onChange={(e) => setAutreCredit({ ...autreCredit, montant: e.target.value })}
-                  placeholder="Montant"
-                  className="w-20 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
-                />
-                <button type="button" onClick={ajouterAutreCredit} className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1.5 rounded text-xs">+</button>
+                <div className="flex gap-1.5">
+                  <input
+                    type="number"
+                    value={autreCredit.montant}
+                    onChange={(e) => setAutreCredit({ ...autreCredit, montant: e.target.value })}
+                    placeholder="Montant FCFA"
+                    className="flex-1 min-w-0 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={ajouterAutreCredit}
+                    disabled={!autreCredit.organisme || !autreCredit.montant}
+                    className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white w-8 h-8 rounded text-sm font-bold flex items-center justify-center shrink-0 transition"
+                  >+</button>
+                </div>
               </div>
 
               {formData.autres_credits.length > 0 && (
                 <div className="space-y-1">
                   {formData.autres_credits.map((credit, index) => (
-                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1 rounded text-xs">
-                      <span className="text-white">{credit.organisme} - {parseInt(credit.montant).toLocaleString()}</span>
-                      <button type="button" onClick={() => retirerAutreCredit(index)} className="text-red-400 hover:text-red-300 ml-2">×</button>
+                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1.5 rounded text-xs gap-2">
+                      <span className="text-white truncate flex-1"><span className="text-amber-400 font-medium">{credit.organisme}</span> - {parseInt(credit.montant).toLocaleString()} FCFA</span>
+                      <button type="button" onClick={() => retirerAutreCredit(index)} className="text-red-400 hover:text-red-300 shrink-0 w-5 h-5 flex items-center justify-center">×</button>
                     </div>
                   ))}
                 </div>
@@ -1010,33 +1035,40 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
               <label className="block text-xs font-semibold text-slate-300 mb-2">Garanties proposées</label>
 
-              <div className="flex gap-1.5 mb-2">
+              <div className="space-y-2 mb-2">
                 <select
                   value={garantie.type}
                   onChange={(e) => setGarantie({ ...garantie, type: e.target.value })}
-                  className="flex-1 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
+                  className="w-full bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
                 >
-                  <option value="">Type</option>
+                  <option value="">-- Type de garantie --</option>
                   {typesGaranties.map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
-                <input
-                  type="text"
-                  value={garantie.description}
-                  onChange={(e) => setGarantie({ ...garantie, description: e.target.value })}
-                  placeholder="Description"
-                  className="flex-1 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
-                />
-                <button type="button" onClick={ajouterGarantie} className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1.5 rounded text-xs">+</button>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={garantie.description}
+                    onChange={(e) => setGarantie({ ...garantie, description: e.target.value })}
+                    placeholder="Description de la garantie"
+                    className="flex-1 min-w-0 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={ajouterGarantie}
+                    disabled={!garantie.type || !garantie.description}
+                    className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white w-8 h-8 rounded text-sm font-bold flex items-center justify-center shrink-0 transition"
+                  >+</button>
+                </div>
               </div>
 
               {formData.garanties_proposees.length > 0 && (
                 <div className="space-y-1">
                   {formData.garanties_proposees.map((g, index) => (
-                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1 rounded text-xs">
-                      <span className="text-white">{g.type} - {g.description}</span>
-                      <button type="button" onClick={() => retirerGarantie(index)} className="text-red-400 hover:text-red-300 ml-2">×</button>
+                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1.5 rounded text-xs gap-2">
+                      <span className="text-white truncate flex-1"><span className="text-cyan-400 font-medium">{g.type}</span> - {g.description}</span>
+                      <button type="button" onClick={() => retirerGarantie(index)} className="text-red-400 hover:text-red-300 shrink-0 w-5 h-5 flex items-center justify-center">×</button>
                     </div>
                   ))}
                 </div>
@@ -1054,7 +1086,12 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium text-sm transition flex items-center justify-center gap-1.5"
+              disabled={!isFormValid()}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition flex items-center justify-center gap-1.5 ${
+                isFormValid()
+                  ? 'bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer'
+                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              }`}
               data-testid="button-submit-enquete"
             >
               <Save size={16} />
