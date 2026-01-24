@@ -139,8 +139,9 @@ export default function CaisseSupervision({
     setSubmitting(true);
     try {
       // Force closure with current theoretical balance as real balance
+      const soldeTheorique = getSoldeTheorique(selectedSession);
       await sessionCaisseApi.close(selectedSession.id, {
-        solde_reel: selectedSession.solde_theorique,
+        solde_reel: soldeTheorique.toString(),
         ecart: "0",
         billetage_fermeture: {},
         observations: "Fermeture forcée par l'administrateur depuis la supervision."
@@ -158,9 +159,14 @@ export default function CaisseSupervision({
   const resolveSessionStatus = (session: any) => session.computedStatus || computeSessionStatus(session);
   const resolveOpenedAt = (session: any) => session.openedAt || session.opened_at;
   const resolveClosedAt = (session: any) => session.closedAt || session.closed_at;
+  // Helper pour récupérer le solde théorique (nom de champ varie selon les routes)
+  const getSoldeTheorique = (session: any) => {
+    if (!session) return 0;
+    return Number(session.montant_fermeture_theorique || session.montantFermetureTheorique || session.solde_theorique || 0);
+  };
   const activeSessions = sessions.filter((s) => resolveSessionStatus(s) === 'OPEN');
   const closedSessions = sessions.filter((s) => resolveSessionStatus(s) === 'CLOSED');
-  const totalEspeces = activeSessions.reduce((acc, s) => acc + (Number(s.solde_theorique) || 0), 0);
+  const totalEspeces = activeSessions.reduce((acc, s) => acc + getSoldeTheorique(s), 0);
 
   // Liste des caissiers filtrés
   const caissierRoles = new Set([SystemRole.CAISSIER, SystemRole.ADMIN, SystemRole.SUPERVISEUR]);
@@ -304,6 +310,46 @@ export default function CaisseSupervision({
     return `${hours}h ${Math.floor(diff % 60)}min`;
   };
 
+  // Traduction des types d'opération
+  const translateOperationType = (type: string): string => {
+    const translations: Record<string, string> = {
+      'DEPOSIT': 'Dépôt',
+      'WITHDRAWAL': 'Retrait',
+      'ENCAISSEMENT': 'Encaissement',
+      'DECAISSEMENT': 'Décaissement',
+      'LOAN_REPAYMENT': 'Remb. Prêt',
+      'CREDIT_DISBURSEMENT': 'Décais. Crédit',
+      'TONTINE_CONTRIBUTION': 'Cotis. Tontine',
+      'TONTINE_COTISATION': 'Cotis. Tontine',
+      'TONTINE_DISTRIBUTION': 'Distrib. Tontine',
+      'SAVINGS_DEPOSIT': 'Dépôt Épargne',
+      'SAVINGS_WITHDRAWAL': 'Retrait Épargne',
+      'BLOCKED_DEPOSIT': 'Vers. Compte Bloqué',
+      'BLOCKED_WITHDRAWAL': 'Retr. Compte Bloqué',
+      'APPROVISIONNEMENT': 'Approv. Coffre',
+      'VERSEMENT_COFFRE': 'Vers. Coffre',
+      'RETRAIT_COFFRE': 'Retr. Coffre',
+      'TRANSFER_IN': 'Transfert Entrant',
+      'TRANSFER_OUT': 'Transfert Sortant',
+      'ACCOUNT_ACTIVATION': 'Activation Compte',
+      'VERSEMENT_COMPTE_BLOQUE': 'Vers. Compte Bloqué',
+      'RETRAIT_COMPTE_BLOQUE': 'Retr. Compte Bloqué',
+    };
+
+    const upperType = (type || '').toUpperCase();
+
+    // Recherche exacte
+    if (translations[upperType]) return translations[upperType];
+
+    // Recherche partielle
+    for (const [key, label] of Object.entries(translations)) {
+      if (upperType.includes(key)) return label;
+    }
+
+    // Retourner le type formaté si pas de traduction
+    return type.replace(/_/g, ' ');
+  };
+
   // Handle clicking "Prendre la main" - opens confirmation modal
   const handleRequestSupervision = useCallback((session: any) => {
     // Check if user already has an active supervision
@@ -327,7 +373,7 @@ export default function CaisseSupervision({
       targetCaissierName: pendingSupervisionSession.caissier_nom || 'Inconnu',
       targetCaisseName: pendingSupervisionSession.caisse_nom || 'Caisse',
       targetAgenceName: pendingSupervisionSession.agence_nom,
-      currentBalance: Number(pendingSupervisionSession.solde_theorique) || 0,
+      currentBalance: getSoldeTheorique(pendingSupervisionSession),
       openedAt: resolveOpenedAt(pendingSupervisionSession),
       supervisorId: currentUser.id,
       supervisorName: `${currentUser.prenom || ''} ${currentUser.nom || currentUser.name || ''}`.trim(),
@@ -577,7 +623,7 @@ export default function CaisseSupervision({
                               Solde Théorique
                             </span>
                             <span className="text-base sm:text-lg font-mono font-bold text-white">
-                              {formatMoney(Number(session.solde_theorique))}
+                              {formatMoney(getSoldeTheorique(session))}
                             </span>
                           </div>
                         </div>
@@ -813,7 +859,7 @@ export default function CaisseSupervision({
                                   {enCaisse && activeSession ? (
                                     <span className="text-[10px] text-emerald-400 flex items-center gap-1">
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                      En caisse • {formatMoney(Number(activeSession.solde_theorique || 0))}
+                                      En caisse • {formatMoney(getSoldeTheorique(activeSession))}
                                     </span>
                                   ) : (user.statut !== StatutUser.ACTIVE) ? (
                                     <span className="text-[10px] text-red-400 flex items-center gap-1">
@@ -932,7 +978,7 @@ export default function CaisseSupervision({
                 </div>
                 <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 col-span-2 sm:col-span-1">
                   <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold mb-1">Solde Actuel</div>
-                  <div className="text-emerald-400 text-xs sm:text-sm font-mono font-bold">{formatMoney(Number(selectedSession.solde_theorique || 0))}</div>
+                  <div className="text-emerald-400 text-xs sm:text-sm font-mono font-bold">{formatMoney(getSoldeTheorique(selectedSession))}</div>
                 </div>
               </div>
             </div>
@@ -964,9 +1010,10 @@ export default function CaisseSupervision({
                             </td>
                             <td className="p-2 sm:p-3">
                               <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap ${
-                                (op.type_operation || '').toLowerCase().includes('retrait') ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
+                                (op.type_operation || '').toLowerCase().includes('retrait') || (op.type_operation || '').toLowerCase().includes('disbursement') || (op.type_operation || '').toLowerCase().includes('distribution')
+                                  ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
                               }`}>
-                                {op.type_operation || 'Inconnu'}
+                                {translateOperationType(op.type_operation)}
                               </span>
                             </td>
                             <td className={`p-2 sm:p-3 text-right font-mono font-bold whitespace-nowrap text-[10px] sm:text-xs ${
@@ -1030,7 +1077,7 @@ export default function CaisseSupervision({
           <div className="p-4 bg-slate-800/50 rounded-xl space-y-3">
              <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-400">Solde théorique final :</span>
-                <span className="text-white font-mono font-bold">{formatMoney(Number(selectedSession?.solde_theorique))}</span>
+                <span className="text-white font-mono font-bold">{formatMoney(getSoldeTheorique(selectedSession))}</span>
              </div>
              <p className="text-xs text-slate-500 leading-relaxed italic border-t border-slate-700/50 pt-2">
                Note: La session sera fermée avec le solde théorique actuel comme solde réel. Un écart de 0 sera enregistré.
@@ -1131,7 +1178,7 @@ export default function CaisseSupervision({
                   <div className="text-left">
                     <div className="text-sm font-medium text-white">Voir la caisse active</div>
                     <div className="text-xs text-emerald-400">
-                      {formatMoney(Number(getActiveSessionForUser(selectedUser.id)?.solde_theorique || 0))}
+                      {formatMoney(getSoldeTheorique(getActiveSessionForUser(selectedUser.id) || {}))}
                     </div>
                   </div>
                   <ChevronRight size={16} className="ml-auto text-emerald-400 opacity-50 group-hover:opacity-100" />
@@ -1264,7 +1311,7 @@ export default function CaisseSupervision({
                       </div>
                       <div className="text-right">
                         <div className="text-xs font-mono font-bold text-white">
-                          {formatMoney(Number(session.solde_reel || session.solde_theorique || 0))}
+                          {formatMoney(Number(session.solde_reel || session.montant_fermeture_declare || 0) || getSoldeTheorique(session))}
                         </div>
                         {session.ecart && Number(session.ecart) !== 0 && (
                           <div className={`text-[10px] font-mono ${Number(session.ecart) > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
