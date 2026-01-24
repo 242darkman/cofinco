@@ -14,6 +14,7 @@ interface UniversalPaymentSuccessModalProps {
   onClose: () => void;
   term?: string;
   data?: ReceiptData;
+  factureId?: string;
 }
 
 // Copy to clipboard helper
@@ -29,7 +30,8 @@ const copyToClipboard = async (text: string, label: string) => {
 export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModalProps> = ({
   isOpen,
   onClose,
-  data
+  data,
+  factureId
 }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -237,7 +239,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                         <span className="text-sm text-slate-500">Client</span>
                       </div>
                       <span className="text-sm font-medium text-white">
-                        {formatClientName(data.client.nom, data.client.prenom)}
+                        {formatClientName(data.client?.nom || '', data.client?.prenom)}
                       </span>
                     </div>
                   )}
@@ -278,6 +280,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
               data={data}
               showPreview={true}
               variant="default"
+              factureId={factureId}
             />
           </div>
         </div>

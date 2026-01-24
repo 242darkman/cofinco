@@ -20,6 +20,8 @@ export interface ReceiptActionsProps {
   showEmail?: boolean;
   /** Custom class for the container */
   className?: string;
+  /** Optional ID of the invoice from the backend */
+  factureId?: string;
 }
 
 // Format money helper
@@ -41,18 +43,6 @@ const copyToClipboard = async (text: string, label: string) => {
 
 /**
  * ReceiptActions - Shared component for viewing, printing, and exporting receipts/invoices.
- *
- * This component provides:
- * - Tab selection between Ticket (thermal) and A4 Invoice
- * - Print functionality via useReactToPrint
- * - PDF download via useReceiptPDF
- * - Share via Web Share API
- * - Email via mailto
- * - Optional preview of the selected format
- *
- * Used by:
- * - UniversalPaymentSuccessModal (after a successful payment)
- * - TransactionDetailDrawer (viewing transaction history)
  */
 export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
   data,
@@ -60,7 +50,8 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
   variant = 'default',
   showReference = false,
   showEmail = false,
-  className = ''
+  className = '',
+  factureId
 }) => {
   const [activeTab, setActiveTab] = useState<'ticket' | 'facture'>('ticket');
   const [copied, setCopied] = useState(false);
@@ -176,7 +167,7 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {/* Hidden Print Templates (offscreen, not display:none) */}
+      {/* Hidden Print Templates */}
       <div
         aria-hidden="true"
         style={{
@@ -192,7 +183,7 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
         <InvoiceTemplate ref={invoiceRef} data={data} />
       </div>
 
-      {/* Reference Badge - Tappable to copy */}
+      {/* Reference Badge */}
       {showReference && (
         <button
           onClick={handleCopyReference}
@@ -212,7 +203,7 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
             </>
           )}
         </button>
-      )}
+       )}
 
       {/* Print Options Section */}
       <div className="space-y-3">
