@@ -100,6 +100,11 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   const [scheduledDisbursement, setScheduledDisbursement] = useState(false);
   const [disbursementDate, setDisbursementDate] = useState('');
 
+  // Refund modal for already rejected demandes
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [refundAmount, setRefundAmount] = useState<string>('');
+  const [refundLoading, setRefundLoading] = useState(false);
+
   useEffect(() => {
     if (demande?.id) {
        fetch(`/api/demandes-credit/${demande.id}/enquete`)
@@ -123,13 +128,22 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                       demande.statut.toLowerCase() === 'déboursé' || 
                       demande.statut.toLowerCase() === 'approved');
   
-  const isRejected = (demande.statut === StatutDemande.REJECTED || 
+  const isRejected = (demande.statut === StatutDemande.REJECTED ||
                       demande.statut === StatutDemande.DEFINITIVELY_REJECTED ||
                       demande.statut.toLowerCase() === 'rejected');
 
-  const isCancelled = (demande.statut === StatutDemande.CANCELLED || 
-                       demande.statut.toLowerCase() === 'annulée' || 
+  const isDefinitivelyRejected = demande.statut === StatutDemande.DEFINITIVELY_REJECTED;
+
+  const isCancelled = (demande.statut === StatutDemande.CANCELLED ||
+                       demande.statut.toLowerCase() === 'annulée' ||
                        demande.statut.toLowerCase() === 'cancelled');
+
+  // Can request reevaluation if rejected (not definitively) and eligible
+  const canRequestReevaluation = isRejected && !isDefinitivelyRejected && isEligibleForReevaluation;
+
+  // Can initiate refund if rejected and fees were paid
+  const canInitiateRefund = isRejected && demande.frais_engagement_payes &&
+                            demande.montant_frais_engagement && demande.montant_frais_engagement > 0;
 
   const showActions = (!isFinished && !isRejected && !isCancelled) || isReevaluating;
 
@@ -411,6 +425,53 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     setGuarantees([]);
     setErrors({});
   }, []);
+
+  // Handler to initiate refund for already rejected demandes
+  const handleInitiateRefund = useCallback(async () => {
+    if (!refundAmount || Number(refundAmount) <= 0) {
+      toast.warning('Veuillez entrer un montant à rembourser');
+      return;
+    }
+
+    const amount = Number(refundAmount);
+    const maxAmount = demande.montant_frais_engagement || 0;
+
+    if (amount > maxAmount) {
+      toast.error(`Le montant ne peut pas dépasser ${formatMoney(maxAmount)}`);
+      return;
+    }
+
+    setRefundLoading(true);
+    try {
+      const response = await fetch(`/api/demandes-credit/${demande.id}/initiate-refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          montantRemboursement: amount,
+          motif: demande.motif_rejet || 'Remboursement des frais suite au rejet'
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erreur lors de la création du remboursement');
+      }
+
+      toast.success(`Demande de remboursement de ${formatMoney(amount)} créée`, {
+        description: 'La demande est en attente de validation.'
+      });
+      setShowRefundModal(false);
+      setRefundAmount('');
+      onSuccess();
+    } catch (error) {
+      const errorMessage = handleApiError(error, 'Erreur lors de la création du remboursement');
+      toast.error(errorMessage);
+    } finally {
+      setRefundLoading(false);
+    }
+  }, [demande.id, demande.montant_frais_engagement, demande.motif_rejet, refundAmount, onSuccess]);
 
   const getEndettementColor = useCallback((taux: number) => {
     if (taux > 50) return 'text-red-400';
@@ -832,16 +893,73 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 placeholder="Raison du rejet (Obligatoire)..."
                             />
                             {/* Refund option if fees paid */}
-                             {(demande.frais_engagement_payes || (demande.montant_frais_engagement && demande.montant_frais_engagement > 0)) && (
-                                <div className="bg-red-900/10 p-3 rounded-lg border border-red-900/30">
-                                    <label className="text-xs text-red-300 block mb-1">Rembourser les frais (Max: {formatMoney(demande.montant_frais_engagement || 0)})</label>
-                                    <input
-                                        type="number"
-                                        value={reimbursementAmount}
-                                        onChange={(e) => setReimbursementAmount(e.target.value)}
-                                        className="w-full bg-slate-900 border border-red-900/50 rounded px-3 py-1 text-white text-sm"
-                                        placeholder="Montant à rembourser..."
-                                    />
+                            {demande.frais_engagement_payes && demande.montant_frais_engagement && demande.montant_frais_engagement > 0 && (
+                                <div className="bg-amber-900/10 p-3 rounded-lg border border-amber-500/30 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm font-medium text-amber-400 flex items-center gap-2">
+                                            <Wallet size={16} /> Remboursement des frais
+                                        </label>
+                                        <span className="text-xs text-slate-400">
+                                            Payés: {formatMoney(demande.montant_frais_engagement)}
+                                        </span>
+                                    </div>
+
+                                    {/* Quick selection buttons */}
+                                    <div className="grid grid-cols-4 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setReimbursementAmount('')}
+                                            className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
+                                                reimbursementAmount === ''
+                                                    ? 'bg-slate-700 border-slate-500 text-white'
+                                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            Aucun
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setReimbursementAmount(String(Math.round(demande.montant_frais_engagement! * 0.5)))}
+                                            className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
+                                                reimbursementAmount === String(Math.round(demande.montant_frais_engagement! * 0.5))
+                                                    ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            50%
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setReimbursementAmount(String(demande.montant_frais_engagement))}
+                                            className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
+                                                reimbursementAmount === String(demande.montant_frais_engagement)
+                                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            100%
+                                        </button>
+                                        <input
+                                            type="number"
+                                            value={reimbursementAmount}
+                                            onChange={(e) => setReimbursementAmount(e.target.value)}
+                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-white text-xs text-center focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                                            placeholder="Autre"
+                                            max={demande.montant_frais_engagement}
+                                        />
+                                    </div>
+
+                                    {/* Summary */}
+                                    {reimbursementAmount && Number(reimbursementAmount) > 0 && (
+                                        <div className="flex items-center justify-between text-xs bg-slate-800/50 rounded p-2">
+                                            <span className="text-slate-400">À rembourser:</span>
+                                            <span className="text-emerald-400 font-bold">{formatMoney(Number(reimbursementAmount))}</span>
+                                        </div>
+                                    )}
+
+                                    {errors.reimbursement && (
+                                        <p className="text-xs text-red-400">{errors.reimbursement}</p>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -897,12 +1015,30 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     </>
                 )
              ) : (
-                <button
-                    onClick={onClose}
-                    className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"
-                >
-                    Fermer le dossier
-                </button>
+                <div className="flex gap-3 w-full">
+                    {canInitiateRefund && (
+                        <button
+                            onClick={() => setShowRefundModal(true)}
+                            className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
+                        >
+                            <Wallet size={18} /> Rembourser les frais
+                        </button>
+                    )}
+                    {canRequestReevaluation && (
+                        <button
+                            onClick={() => setShowReevaluationModal(true)}
+                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
+                        >
+                            <RefreshCw size={18} /> Réévaluation
+                        </button>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className={`${canRequestReevaluation || canInitiateRefund ? 'px-6' : 'flex-1'} py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition`}
+                    >
+                        {canRequestReevaluation || canInitiateRefund ? 'Fermer' : 'Fermer le dossier'}
+                    </button>
+                </div>
              )}
         </div>
       </div>
@@ -949,6 +1085,114 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
             onSuccess();
           }}
         />
+      )}
+
+      {/* Refund Modal for already rejected demandes */}
+      {showRefundModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md shadow-2xl">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Wallet className="text-amber-400" size={20} />
+                Rembourser les frais
+              </h3>
+              <button
+                onClick={() => { setShowRefundModal(false); setRefundAmount(''); }}
+                className="p-1.5 hover:bg-slate-700 rounded-lg transition"
+              >
+                <X className="text-slate-400" size={18} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {/* Info */}
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="text-amber-400 flex-shrink-0 mt-0.5" size={16} />
+                  <div className="text-sm">
+                    <p className="text-amber-400 font-medium">Demande rejetée</p>
+                    <p className="text-slate-300 text-xs mt-1">
+                      Le client peut être remboursé intégralement ou partiellement.
+                      Le paiement pourra se faire en espèces, Mobile Money ou virement.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount info */}
+              <div className="bg-slate-700/50 rounded-lg p-3 flex justify-between items-center">
+                <span className="text-slate-400 text-sm">Frais payés</span>
+                <span className="text-white font-bold">{formatMoney(demande.montant_frais_engagement || 0)}</span>
+              </div>
+
+              {/* Quick selection buttons */}
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Montant à rembourser</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRefundAmount(String(Math.round((demande.montant_frais_engagement || 0) * 0.5)))}
+                    className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+                      refundAmount === String(Math.round((demande.montant_frais_engagement || 0) * 0.5))
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRefundAmount(String(demande.montant_frais_engagement || 0))}
+                    className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+                      refundAmount === String(demande.montant_frais_engagement || 0)
+                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    100%
+                  </button>
+                  <input
+                    type="number"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm text-center focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                    placeholder="Autre"
+                    max={demande.montant_frais_engagement || 0}
+                  />
+                </div>
+              </div>
+
+              {/* Summary */}
+              {refundAmount && Number(refundAmount) > 0 && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 flex justify-between items-center">
+                  <span className="text-slate-300 text-sm">À rembourser</span>
+                  <span className="text-emerald-400 font-bold text-lg">{formatMoney(Number(refundAmount))}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-700 flex gap-3 justify-end">
+              <button
+                onClick={() => { setShowRefundModal(false); setRefundAmount(''); }}
+                className="px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition"
+                disabled={refundLoading}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleInitiateRefund}
+                disabled={refundLoading || !refundAmount || Number(refundAmount) <= 0}
+                className="px-6 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition flex items-center gap-2"
+              >
+                {refundLoading ? <Loader2 className="animate-spin" size={16} /> : <DollarSign size={16} />}
+                Créer la demande
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

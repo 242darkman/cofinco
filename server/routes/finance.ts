@@ -52,7 +52,7 @@ import {
   type DureeUnite
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
-import { eq, desc, and, sql, count } from "drizzle-orm";
+import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import * as sessionService from "../services/caisse/session-service";
 import { sessionOpeningService } from "../services/caisse/session-opening-service";
@@ -1186,6 +1186,109 @@ export function registerFinanceRoutes(app: Express) {
           console.error("Erreur paiement frais:", error);
           res.status(400).json({ message: error.message });
       }
+  });
+
+  // Initiate refund for already rejected demande
+  app.post("/api/demandes-credit/:id/initiate-refund", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = normalizeKeysDeep(req.body) as { montantRemboursement: number; motif?: string };
+      const user = req.session.user;
+
+      if (!user) {
+        return res.status(401).json({ message: "Non authentifié" });
+      }
+
+      // 1. Validate demande exists and is rejected
+      const demande = await storage.getDemandeCredit(id);
+      if (!demande) {
+        return res.status(404).json({ message: "Demande non trouvée" });
+      }
+
+      const isRejected = demande.statut === StatutDemande.REJECTED ||
+                         demande.statut === StatutDemande.DEFINITIVELY_REJECTED;
+
+      if (!isRejected) {
+        return res.status(400).json({ message: "La demande n'est pas en statut rejeté" });
+      }
+
+      // 2. Validate fees were paid
+      if (!demande.fraisEngagementPayes) {
+        return res.status(400).json({ message: "Aucun frais n'a été payé pour cette demande" });
+      }
+
+      // 3. Validate refund amount
+      const refundAmount = Number(data.montantRemboursement);
+      const maxRefund = Number(demande.montantFraisEngagement || 0);
+
+      if (isNaN(refundAmount) || refundAmount <= 0) {
+        return res.status(400).json({ message: "Montant de remboursement invalide" });
+      }
+
+      if (refundAmount > maxRefund) {
+        return res.status(400).json({
+          message: `Le montant (${refundAmount}) ne peut pas excéder les frais payés (${maxRefund})`
+        });
+      }
+
+      // 4. Check if a refund request already exists for this demande
+      const existingRefunds = await db.select()
+        .from(creditRefundRequests)
+        .where(and(
+          eq(creditRefundRequests.demandeId, id),
+          inArray(creditRefundRequests.statut, ['SUBMITTED', 'APPROVED', 'PENDING_CAISSE'])
+        ));
+
+      if (existingRefunds.length > 0) {
+        return res.status(400).json({
+          message: "Une demande de remboursement est déjà en cours pour ce dossier"
+        });
+      }
+
+      // 5. Create Refund Request
+      const refundRequest = await storage.createCreditRefundRequest({
+        demandeId: demande.id,
+        clientId: demande.clientId,
+        agenceId: user.agenceId!,
+        montantEncaisse: demande.montantFraisEngagement?.toString() || '0',
+        montantRemboursable: refundAmount.toString(),
+        montantNonRemboursable: (maxRefund - refundAmount).toString(),
+        statut: 'SUBMITTED',
+        motifRejetCredit: demande.motifRejet || undefined,
+        motifRemboursement: data.motif || "Remboursement suite rejet de la demande",
+        makerId: user.id,
+        makerAt: new Date(),
+      });
+
+      // 6. Notify via WebSocket
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "CREDIT_UPDATE",
+          payload: { type: 'refund_created', demandeId: id, refundId: refundRequest.id }
+        });
+        if (user.agence) {
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "LIVE_ACTIVITY",
+            payload: {
+              action: `Demande remboursement créée: ${refundAmount.toLocaleString('fr-FR')} FCFA`,
+              user: user.nom || 'Système',
+              type: 'finance',
+              timestamp: new Date().toISOString()
+            }
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: "Demande de remboursement créée avec succès",
+        refund: addSnakeCaseAliasesDeep(refundRequest)
+      });
+    } catch (error: any) {
+      console.error("Erreur création remboursement:", error);
+      res.status(500).json({ message: error.message || "Erreur lors de la création du remboursement" });
+    }
   });
 
   app.get("/api/demandes-credit/:id/enquete", requireAuth, async (req, res) => {
