@@ -443,38 +443,15 @@ export async function deposerSurCompte(
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
-      // Update compte solde
-      const nouveauSolde = await updateCompteSolde(tx, data.compteId, data.montant);
-
-      // Update session caisse if applicable (cash comes in)
-      let nouveauSoldeSession: string | undefined;
-      if (data.sessionCaisseId) {
-        nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, data.montant);
-      }
-
-      // Create transaction record
-      const [transaction] = await tx
-        .insert(transactionsCompte)
-        .values({
-          compteId: data.compteId,
-          mouvementId: mouvement.id,
-          typePaiement: typePaiement as any,
-          montant: data.montant.toString(),
-          soldeApres: nouveauSolde,
-          methodePaiement: data.methodePaiement as any,
-          observations: data.observations,
-          idempotencyKey: data.idempotencyKey,
-          createdBy: userId,
-        } as any)
-        .returning();
-
-      return {
-        result: transaction,
-        additionalEventData: {
-          nouveauSoldeCompte: nouveauSolde,
-          nouveauSoldeSession,
-        },
-      };
+      return processCompteDepot(tx, mouvement, {
+        compteId: data.compteId,
+        montant: data.montant,
+        sessionCaisseId: data.sessionCaisseId,
+        observations: data.observations,
+        typePaiement: typePaiement as any,
+        methodePaiement: data.methodePaiement,
+        userId
+      });
     },
     userId
   ).then(async ({ result, mouvement }) => {
@@ -487,11 +464,79 @@ export async function deposerSurCompte(
       typeCompte: compte.typeCompte,
       agentId: userId,
       sessionCaisseId: data.sessionCaisseId,
-      transactionId: result.id, // ← NOUVEAU: Lier la facture à la transaction
+      transactionId: result.id,
     });
     
     return { transaction: result, mouvement, facture };
   });
+}
+
+/**
+ * Core logic for account deposit within a transaction
+ */
+export async function processCompteDepot(
+  tx: PgTransaction<any, any, any>,
+  mouvement: MouvementFinancier,
+  params: {
+    compteId: string;
+    montant: number;
+    sessionCaisseId?: string;
+    observations?: string;
+    typePaiement: string;
+    methodePaiement: string;
+    userId?: string;
+  }
+) {
+  const { compteId, montant, sessionCaisseId, observations, typePaiement, methodePaiement, userId } = params;
+
+  // Update compte solde
+  const nouveauSolde = await updateCompteSolde(tx, compteId, montant);
+
+  // Update session caisse if applicable (cash comes in)
+  let nouveauSoldeSession: string | undefined;
+  if (sessionCaisseId) {
+    nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, montant);
+  }
+
+  // Create transaction record
+  const [transaction] = await tx
+    .insert(transactionsCompte)
+    .values({
+      compteId: compteId,
+      mouvementId: mouvement.id,
+      typePaiement: typePaiement as any,
+      montant: montant.toString(),
+      soldeApres: nouveauSolde,
+      methodePaiement: methodePaiement as any,
+      observations: observations,
+      createdBy: userId,
+    } as any)
+    .returning();
+
+  // IMPORTANT: Create operation caisse for cash transactions
+  if (sessionCaisseId && methodePaiement === "CASH") {
+    const { validateUserId } = await import("./ledger");
+    const validatedUserId = await validateUserId(tx, userId);
+
+    await tx.insert(operationsCaisse).values({
+      sessionId: sessionCaisseId,
+      mouvementId: mouvement.id,
+      typeOperation: typePaiement as any,
+      montant: montant.toString(),
+      methodePaiement: "CASH" as any,
+      reference: `EPG-${mouvement.reference}`,
+      description: observations || `Dépôt compte ${typePaiement.replace('DEPOSIT_', '')}`,
+      createdBy: validatedUserId,
+    });
+  }
+
+  return {
+    result: transaction,
+    additionalEventData: {
+      nouveauSoldeCompte: nouveauSolde,
+      nouveauSoldeSession,
+    },
+  };
 }
 
 /**
@@ -577,38 +622,15 @@ export async function retirerDuCompte(
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
-      // Update compte solde (negative delta for withdrawal)
-      const nouveauSolde = await updateCompteSolde(tx, data.compteId, -data.montant);
-
-      // Update session caisse if applicable (cash goes out)
-      let nouveauSoldeSession: string | undefined;
-      if (data.sessionCaisseId) {
-        nouveauSoldeSession = await updateSessionSolde(tx, data.sessionCaisseId, -data.montant);
-      }
-
-      // Create transaction record
-      const [transaction] = await tx
-        .insert(transactionsCompte)
-        .values({
-          compteId: data.compteId,
-          mouvementId: mouvement.id,
-          typePaiement: typePaiement as any,
-          montant: data.montant.toString(),
-          soldeApres: nouveauSolde,
-          methodePaiement: data.methodePaiement as any,
-          observations: data.observations,
-          idempotencyKey: data.idempotencyKey,
-          createdBy: userId,
-        })
-        .returning();
-
-      return {
-        result: transaction,
-        additionalEventData: {
-          nouveauSoldeCompte: nouveauSolde,
-          nouveauSoldeSession,
-        },
-      };
+      return processCompteRetrait(tx, mouvement, {
+        compteId: data.compteId,
+        montant: data.montant,
+        sessionCaisseId: data.sessionCaisseId,
+        observations: data.observations,
+        typePaiement: typePaiement as any,
+        methodePaiement: data.methodePaiement,
+        userId
+      });
     },
     userId
   ).then(async ({ result, mouvement }) => {
@@ -625,6 +647,74 @@ export async function retirerDuCompte(
     
     return { transaction: result, mouvement, facture };
   });
+}
+
+/**
+ * Core logic for account withdrawal within a transaction
+ */
+export async function processCompteRetrait(
+  tx: PgTransaction<any, any, any>,
+  mouvement: MouvementFinancier,
+  params: {
+    compteId: string;
+    montant: number;
+    sessionCaisseId?: string;
+    observations?: string;
+    typePaiement: string;
+    methodePaiement: string;
+    userId?: string;
+  }
+) {
+  const { compteId, montant, sessionCaisseId, observations, typePaiement, methodePaiement, userId } = params;
+
+  // Update compte solde (negative delta for withdrawal)
+  const nouveauSolde = await updateCompteSolde(tx, compteId, -montant);
+
+  // Update session caisse if applicable (cash goes out)
+  let nouveauSoldeSession: string | undefined;
+  if (sessionCaisseId) {
+    nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, -montant);
+  }
+
+  // Create transaction record
+  const [transaction] = await tx
+    .insert(transactionsCompte)
+    .values({
+      compteId: compteId,
+      mouvementId: mouvement.id,
+      typePaiement: typePaiement as any,
+      montant: montant.toString(),
+      soldeApres: nouveauSolde,
+      methodePaiement: methodePaiement as any,
+      observations: observations,
+      createdBy: userId,
+    })
+    .returning();
+
+  // IMPORTANT: Create operation caisse for cash transactions
+  if (sessionCaisseId && methodePaiement === "CASH") {
+    const { validateUserId } = await import("./ledger");
+    const validatedUserId = await validateUserId(tx, userId);
+
+    await tx.insert(operationsCaisse).values({
+      sessionId: sessionCaisseId,
+      mouvementId: mouvement.id,
+      typeOperation: typePaiement as any,
+      montant: montant.toString(),
+      methodePaiement: "CASH" as any,
+      reference: `EPG-${mouvement.reference}`,
+      description: observations || `Retrait compte ${typePaiement.replace('WITHDRAWAL_', '')}`,
+      createdBy: validatedUserId,
+    });
+  }
+
+  return {
+    result: transaction,
+    additionalEventData: {
+      nouveauSoldeCompte: nouveauSolde,
+      nouveauSoldeSession,
+    },
+  };
 }
 
 // ============================================================================

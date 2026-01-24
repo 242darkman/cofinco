@@ -1632,3 +1632,28 @@ export const MODE_CALCUL_PAIE_LABELS: Record<ModeCalculPaieType, string> = {
   [ModeCalculPaie.HOURLY]: "Horaire",
   [ModeCalculPaie.DAILY]: "Journalier",
 };
+
+// ============================================
+// STATUT SESSION CAISSE
+// ============================================
+
+export const StatutSessionCaisse = {
+  REQUESTING_FUNDS: "REQUESTING_FUNDS",
+  FUNDS_DISPATCHED: "FUNDS_DISPATCHED",
+  OPEN: "OPEN",
+  CLOSING_COUNT: "CLOSING_COUNT",
+  CLOSING_VALIDATION: "CLOSING_VALIDATION",
+  CLOSED: "CLOSED",
+} as const;
+
+export type StatutSessionCaisseType = (typeof StatutSessionCaisse)[keyof typeof StatutSessionCaisse];
+
+/** Labels FR pour l'UI des statuts de session caisse */
+export const STATUT_SESSION_CAISSE_LABELS: Record<StatutSessionCaisseType, string> = {
+  [StatutSessionCaisse.REQUESTING_FUNDS]: "Demande fonds",
+  [StatutSessionCaisse.FUNDS_DISPATCHED]: "Fonds envoyés",
+  [StatutSessionCaisse.OPEN]: "Ouverte",
+  [StatutSessionCaisse.CLOSING_COUNT]: "Comptage fermeture",
+  [StatutSessionCaisse.CLOSING_VALIDATION]: "Validation fermeture",
+  [StatutSessionCaisse.CLOSED]: "Fermée",
+};

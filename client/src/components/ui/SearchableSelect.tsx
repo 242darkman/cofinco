@@ -64,6 +64,10 @@ interface SearchableSelectProps {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  /** Variant: "default" uses theme colors, "dark" uses slate colors for dark modals/POS */
+  variant?: 'default' | 'dark';
+  /** Show avatar in trigger when option is selected */
+  showAvatarInTrigger?: boolean;
 }
 
 /**
@@ -84,7 +88,9 @@ export default function SearchableSelect({
   helperText,
   required,
   disabled,
-  className = ''
+  className = '',
+  variant = 'default',
+  showAvatarInTrigger = true
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -164,28 +170,57 @@ export default function SearchableSelect({
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`
-          flex items-center justify-between
-          w-full h-10 sm:h-11 px-4
-          bg-input-bg border rounded-lg
-          text-input-text text-sm sm:text-base
+          flex items-center gap-3
+          w-full h-full min-h-[2.75rem] px-4
+          border rounded-xl
+          text-sm sm:text-base
           cursor-pointer
-          transition-colors duration-200
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-input-focus'}
+          transition-all duration-200
+          ${variant === 'dark'
+            ? 'bg-slate-900 border-slate-700 text-white hover:border-slate-500'
+            : 'bg-input-bg border-input-border text-input-text hover:border-input-focus'
+          }
+          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
           ${error
-            ? 'border-status-danger/50 ring-1 ring-status-danger/30'
-            : isOpen ? 'border-input-focus ring-2 ring-input-focus/30' : 'border-input-border'
+            ? 'border-red-500/50 ring-1 ring-red-500/30'
+            : isOpen
+              ? variant === 'dark'
+                ? 'border-indigo-500 ring-2 ring-indigo-500/30'
+                : 'border-input-focus ring-2 ring-input-focus/30'
+              : ''
           }
         `}
       >
-        <span className={`block truncate ${!selectedOption ? 'text-slate-500' : ''}`}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        
-        <div className="flex items-center gap-2">
+        {/* Avatar when selected */}
+        {showAvatarInTrigger && selectedOption && (
+          <OptionAvatar image={selectedOption.image} label={selectedOption.label} />
+        )}
+
+        {/* Placeholder icon when not selected */}
+        {showAvatarInTrigger && !selectedOption && (
+          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0">
+            <Search size={14} className="text-slate-500" />
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          {selectedOption ? (
+            <div>
+              <div className="font-medium truncate">{selectedOption.label}</div>
+              {selectedOption.subLabel && (
+                <div className="text-xs text-slate-500 truncate">{selectedOption.subLabel}</div>
+              )}
+            </div>
+          ) : (
+            <span className="text-slate-500">{placeholder}</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
           {selectedOption && !disabled && (
-            <div 
+            <div
               onClick={handleClear}
-              className="p-1 hover:bg-slate-700/50 rounded-full text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 hover:bg-slate-700/50 rounded-full text-slate-400 hover:text-white transition-colors"
             >
               <X size={14} />
             </div>
@@ -196,12 +231,12 @@ export default function SearchableSelect({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-          
+        <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+
           {/* Search Input */}
-          <div className="p-2 border-b border-slate-700 bg-slate-800/95 sticky top-0 backdrop-blur-sm">
+          <div className="p-3 border-b border-slate-800 bg-slate-900/95 sticky top-0 backdrop-blur-sm">
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 ref={searchInputRef}
                 autoFocus
@@ -211,19 +246,19 @@ export default function SearchableSelect({
                   setSearchQuery(e.target.value);
                   if (onSearchChange) onSearchChange(e.target.value);
                 }}
-                placeholder="Rechercher..."
-                className="w-full h-9 pl-9 pr-3 bg-slate-900/50 border border-slate-700 rounded-md text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500"
+                placeholder="Rechercher par nom ou téléphone..."
+                className="w-full h-10 pl-10 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder-slate-500"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
           </div>
 
           {/* Options List */}
-          <div className="max-h-60 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+          <div className="max-h-72 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
             {isLoading ? (
-              <div className="p-4 flex items-center justify-center gap-2 text-slate-500">
-                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm">Recherche en cours...</span>
+              <div className="p-6 flex items-center justify-center gap-3 text-slate-500">
+                <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm font-medium">Recherche en cours...</span>
               </div>
             ) : filteredOptions.length > 0 ? (
               filteredOptions.map((option) => (
@@ -231,15 +266,15 @@ export default function SearchableSelect({
                   key={option.value}
                   onClick={() => handleSelect(option)}
                   className={`
-                    w-full px-4 py-2.5 flex items-center gap-3
-                    cursor-pointer transition-colors
-                    ${option.disabled 
-                      ? 'bg-slate-900/40 opacity-50 cursor-not-allowed hover:bg-slate-900/60' 
-                      : 'hover:bg-slate-700/50 hover:text-white'
+                    w-full px-4 py-3 flex items-center gap-3
+                    cursor-pointer transition-all duration-150
+                    ${option.disabled
+                      ? 'bg-slate-900/40 opacity-50 cursor-not-allowed'
+                      : 'hover:bg-slate-800'
                     }
-                    ${String(value) === String(option.value) 
-                      ? 'bg-blue-600/20 text-blue-100' 
-                      : 'text-slate-300'
+                    ${String(value) === String(option.value)
+                      ? 'bg-indigo-600/20 border-l-2 border-indigo-500'
+                      : 'border-l-2 border-transparent'
                     }
                   `}
                 >
@@ -247,7 +282,7 @@ export default function SearchableSelect({
                   <OptionAvatar image={option.image} label={option.label} disabled={option.disabled} />
 
                   <div className="flex-1 min-w-0">
-                    <div className={`font-medium truncate flex items-center gap-2 ${option.disabled ? 'text-slate-500' : ''}`}>
+                    <div className={`font-medium truncate flex items-center gap-2 ${option.disabled ? 'text-slate-500' : 'text-white'}`}>
                         {option.label}
                         {option.disabled && (
                             <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold uppercase tracking-wider">
@@ -256,33 +291,34 @@ export default function SearchableSelect({
                         )}
                     </div>
                     {option.subLabel && (
-                      <div className={`text-xs truncate ${option.disabled ? 'text-slate-600' : 'text-slate-500'}`}>
+                      <div className={`text-xs truncate ${option.disabled ? 'text-slate-600' : 'text-slate-400'}`}>
                         {option.subLabel}
                       </div>
                     )}
                   </div>
 
                   {String(value) === String(option.value) && (
-                    <Check size={16} className="text-blue-400" />
+                    <Check size={16} className="text-indigo-400 flex-shrink-0" />
                   )}
                 </div>
               ))
             ) : (
               <div className="p-8 text-center">
-                <div className="mb-2 flex justify-center text-slate-600">
-                  <Search size={32} opacity={0.3} />
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
+                  <Search size={28} className="text-slate-600" />
                 </div>
-                <p className="text-sm text-slate-500 font-medium">
-                  {searchQuery.trim() === '' 
-                    ? "Recherchez un client par son nom ou son numéro de téléphone pour commencer."
-                    : "Aucun client ne correspond à votre recherche"
+                <p className="text-sm text-slate-400 font-medium mb-1">
+                  {searchQuery.trim() === ''
+                    ? "Commencez votre recherche"
+                    : "Aucun résultat trouvé"
                   }
                 </p>
-                {searchQuery.trim() !== '' && (
-                  <p className="text-[11px] text-slate-600 mt-1">
-                    Vérifiez l'orthographe ou essayez d'autres mots-clés
-                  </p>
-                )}
+                <p className="text-xs text-slate-500">
+                  {searchQuery.trim() === ''
+                    ? "Tapez un nom ou un numéro de téléphone"
+                    : "Vérifiez l'orthographe ou essayez d'autres mots-clés"
+                  }
+                </p>
               </div>
             )}
           </div>

@@ -1988,3 +1988,12 @@ export const creditRefundsApi = {
   countPending: () =>
     request<{ count: number }>('/finance/credit-refunds/pending/count'),
 };
+
+// Global Transaction API
+export const transactionApi = {
+  process: (data: any) => request<any>('/transactions/process', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+};
+

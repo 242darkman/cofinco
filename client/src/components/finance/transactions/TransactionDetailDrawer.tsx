@@ -21,6 +21,7 @@ import { toast } from '../../../lib/toast';
 import { formatMoney, formatDate } from '../../../lib/format';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { ReceiptActions } from '../shared/ReceiptActions';
+import { getStatusLabel, ALL_STATUS_LABELS } from '../../../lib/status-labels';
 
 // --- Types ---
 
@@ -83,14 +84,22 @@ function useMediaQuery(query: string) {
 // --- Helper Functions ---
 
 const TYPES_ENTREES = [
+  // Labels FR
   'Dépôt', 'Versement', 'Remboursement', 'Remboursement Crédit', 'Encaissement',
-  'Cotisation Tontine', 'Approvisionnement coffre', 'FRAIS_ENGAGEMENT', 'Frais Engagement',
-  'DEPOT_ESPECES', 'Dépôt Espèces', 'credit', 'Approvisionnement depuis Coffre-Fort'
+  'Cotisation Tontine', 'Approvisionnement coffre', 'Frais Engagement',
+  'Dépôt Espèces', 'credit', 'Approvisionnement depuis Coffre-Fort',
+  // Codes EN (valeurs stockées en DB)
+  'TONTINE_CONTRIBUTION', 'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED',
+  'MISC_COLLECTION', 'LOAN_REPAYMENT', 'CREDIT_REPAYMENT', 'SAFE_SUPPLY',
+  'INITIAL_DEPOSIT', 'ENGAGEMENT_FEE', 'FRAIS_ENGAGEMENT', 'DEPOT_ESPECES',
+  'SAVINGS_DEPOSIT', 'TRANSFER_IN', 'BANK_FEE'
 ];
 
 const isEntree = (type: string): boolean => {
+  if (!type) return false;
+  const typeLower = type.toLowerCase();
   return TYPES_ENTREES.some(t =>
-    type.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(type.toLowerCase())
+    typeLower.includes(t.toLowerCase()) || t.toLowerCase().includes(typeLower)
   );
 };
 
@@ -227,7 +236,7 @@ const DrawerContent = React.memo(function DrawerContent({
         {/* Transaction Type */}
         <p className="text-lg font-medium text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 mb-6">
           {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
-          {transaction.type_operation || transaction.type}
+          {getStatusLabel(transaction.type_operation || transaction.type, ALL_STATUS_LABELS)}
         </p>
 
         {/* Reference (Copyable) */}
@@ -405,11 +414,13 @@ export default function TransactionDetailDrawer({
     const clientNom = clientNameParts[0];
     const clientPrenom = clientNameParts.slice(1).join(' ');
 
+    const typeLabel = getStatusLabel(transaction.type_operation || transaction.type, ALL_STATUS_LABELS);
+
     return {
-      title: `Reçu - ${transaction.type_operation || transaction.type}`,
+      title: `Reçu - ${typeLabel}`,
       reference: transaction.reference,
       date: transaction.date,
-      type: transaction.type_operation || transaction.type,
+      type: typeLabel,
       client: {
         nom: clientNom,
         prenom: clientPrenom,
@@ -422,7 +433,7 @@ export default function TransactionDetailDrawer({
       },
       items: [
         {
-          description: transaction.type_operation || transaction.type,
+          description: typeLabel,
           details: transaction.description,
           quantite: 1,
           montant: transaction.amount,

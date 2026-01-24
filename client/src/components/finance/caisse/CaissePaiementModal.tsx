@@ -5,7 +5,7 @@ import airtelMoneyLogo from '../../../assets/logos/airtel-money.png';
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { clientApi, clientSearchApi, operationCaisseApi, tontineApi, compteEpargneApi } from '../../../lib/api-client';
+import { clientApi, clientSearchApi, transactionApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { VALIDATION_LIMITS } from '../../../lib/validation';
@@ -22,7 +22,11 @@ import {
   MethodePaiementType,
   isOperationCaisseEntree,
   normalizeOperationType,
-  isActiveStatus
+  isActiveStatus,
+  getOperationCaisseLabel,
+  METHODE_PAIEMENT_LABELS,
+  FREQUENCE_TONTINE_LABELS,
+  FrequenceTontineType
 } from '@shared/enum/status-constants';
 import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '../../../lib/status-labels';
 
@@ -179,7 +183,7 @@ export default function CaissePaiementModal({
     setFormData(prev => ({
       ...prev,
       montant: montantCotisation,
-      description: sanitizeInput(`Cotisation ${tontine.tontine.nom} - ${tontine.tontine.frequence}`)
+      description: sanitizeInput(`Cotisation ${tontine.tontine.nom} - ${(FREQUENCE_TONTINE_LABELS as Record<string, string>)[tontine.tontine.frequence] || tontine.tontine.frequence}`)
     }));
     setErrors(prev => {
       const newErrors = { ...prev };
@@ -371,49 +375,53 @@ export default function CaissePaiementModal({
   const executeOperationDirect = useCallback(async (operationData: any) => {
     try {
       setLoading(true);
-      let response;
-      if (formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION && selectedTontine) {
-        response = await tontineApi.addContribution(selectedTontine.tontineId, {
-          clientId: formData.client_id,
-          montant: operationData.montant,
-          methodePaiement: formData.mode_paiement,
-          reference: operationData.reference
-        });
-      } else if (isAccountOperation && selectedAccount && selectedAccount.statut === StatutCompte.PENDING_ACTIVATION && isOperationEntree(formData.type_operation)) {
-          response = await compteEpargneApi.depotInitial(selectedAccount.id, {
-             montant: operationData.montant,
-             sessionCaisseId: sessionId,
-             modePaiement: formData.mode_paiement,
-             idempotencyKey
-          });
-      } else {
-        response = await operationCaisseApi.create({
-          ...operationData,
-          statut: StatutTransaction.POSTED,
-          idempotencyKey
-        });
-      }
+      
+      // Call Unified Global Transaction Service
+      const response = await transactionApi.process({
+        clientId: formData.client_id,
+        amount: Number(formData.montant),
+        paymentMethod: formData.mode_paiement,
+        natureOperation: formData.type_operation,
+        targetId: selectedTontine?.tontineId || selectedAccountId || undefined,
+        description: sanitizeInput(formData.description),
+        
+        // Specific fields
+        tontineId: selectedTontine?.tontineId,
+        membreId: selectedTontine?.id,
+        compteId: selectedAccountId,
+        
+        // Metadata
+        referenceExterne: formData.reference_virement,
+        numeroTransaction: formData.numero_transaction,
+        numeroTelephone: formData.numero_telephone
+      });
       
       const rData: ReceiptData = {
         title: `Reçu de ${formData.type_operation}`,
         reference: operationData.reference,
         date: new Date(),
-        type: formData.type_operation,
+        type: getOperationCaisseLabel(formData.type_operation),
         client: {
           nom: clients.find(c => c.id === formData.client_id)?.nom || 'Client',
           prenom: clients.find(c => c.id === formData.client_id)?.prenom || '',
           telephone: formData.numero_telephone
         },
-        items: [{ description: formData.description, montant: operationData.montant, quantite: 1 }],
-        total: operationData.montant,
-        modePaiement: formData.mode_paiement,
+        items: [{ description: formData.description, montant: operationData.amount, quantite: 1 }],
+        total: Number(formData.montant),
+        modePaiement: METHODE_PAIEMENT_LABELS[formData.mode_paiement] || formData.mode_paiement,
         devise: 'FCFA',
         agent: { nom: 'Caissier', prenom: '' }
       };
 
       await saveReceiptToLoge(rData);
       setReceiptData(rData);
-      setFactureId(response?.facture?.id);
+      
+      // Use the transaction ID or returned object for invoice link if available
+      if (response && response.result && response.result.id) {
+          // If needed, we can try to fetch the invoice ID, but the new service returns the transaction/operation object
+          // For now, we rely on the receipt generation above
+      }
+      
       setShowReceipt(true);
       toast.success('Transaction réussie !');
     } catch (error) {
@@ -423,28 +431,18 @@ export default function CaissePaiementModal({
     } finally {
       setLoading(false);
     }
-  }, [formData, selectedTontine, selectedAccount, sessionId, idempotencyKey, clients, saveReceiptToLoge]);
+  }, [formData, selectedTontine, selectedAccountId, clients, saveReceiptToLoge]);
 
   const handleSubmit = useCallback(async () => {
     if (!validate()) return;
     
-    const operationData = {
-      session_id: sessionId,
-      type_operation: formData.type_operation,
-      montant: parseFloat(formData.montant),
-      mode_paiement: formData.mode_paiement,
-      reference: formData.reference || genererReference(),
-      description: sanitizeInput(formData.description),
-      client_id: formData.client_id,
-      numero_telephone: formData.numero_telephone || null,
-      numero_transaction: formData.numero_transaction || null,
-      tontineId: selectedTontine?.tontineId || null,
-      membreId: selectedTontine?.id || null,
-      compteId: selectedAccountId || null
-    };
-
-    await executeOperationDirect(operationData);
-  }, [validate, formData, sessionId, selectedTontine, selectedAccountId, genererReference, executeOperationDirect]);
+    // We pass minimal data here as the real payload is constructed in executeOperationDirect
+    // based on state
+    await executeOperationDirect({
+       reference: formData.reference || genererReference(),
+       amount: Number(formData.montant) 
+    });
+  }, [validate, formData, genererReference, executeOperationDirect]);
 
   const handleCloseReceipt = useCallback(() => {
     setShowReceipt(false);
@@ -498,23 +496,23 @@ export default function CaissePaiementModal({
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
                    <User size={12}/> Client / Membre
                 </label>
-                <div className="h-14">
-                   <SearchableSelect 
-                      label=""
-                      name="client_id"
-                      value={formData.client_id}
-                      onChange={(value) => setFormData(prev => ({ ...prev, client_id: String(value) }))}
-                      options={clients.map(c => ({
-                        value: c.id,
-                        label: `${c.nom || ''} ${c.prenom || ''}`.trim() || 'Sans Nom',
-                        subLabel: [c.telephone, c.email].filter(Boolean).join(' • '),
-                        image: c.photoProfile || c.photo_profile
-                      }))}
-                      placeholder="Rechercher un client..."
-                      error={errors.client_id}
-                      className="h-full w-full bg-slate-900 border-slate-700 rounded-xl"
-                   />
-                </div>
+                <SearchableSelect
+                   label=""
+                   name="client_id"
+                   value={formData.client_id}
+                   onChange={(value) => setFormData(prev => ({ ...prev, client_id: String(value) }))}
+                   options={clients.map(c => ({
+                     value: c.id,
+                     label: `${c.nom || ''} ${c.prenom || ''}`.trim() || 'Sans Nom',
+                     subLabel: [c.telephone, c.email].filter(Boolean).join(' • '),
+                     image: c.photoProfile || c.photo_profile
+                   }))}
+                   placeholder="Rechercher un client..."
+                   error={errors.client_id}
+                   className="h-14"
+                   variant="dark"
+                   showAvatarInTrigger
+                />
              </div>
   
              <div className="space-y-2">
@@ -540,9 +538,13 @@ export default function CaissePaiementModal({
                         <option value={TypeOperationCaisse.WITHDRAWAL_SAVINGS}>Retrait Épargne</option>
                         <option value={TypeOperationCaisse.DEPOSIT_CURRENT}>Versement Courant</option>
                         <option value={TypeOperationCaisse.WITHDRAWAL_CURRENT}>Retrait Courant</option>
+                        <option value={TypeOperationCaisse.DEPOSIT_BLOCKED}>Versement Compte Bloqué</option>
+                        <option value={TypeOperationCaisse.WITHDRAWAL_BLOCKED}>Retrait Compte Bloqué</option>
                       </optgroup>
-                      <option value={TypeOperationCaisse.MISC_COLLECTION}>Encaissement Divers</option>
-                      <option value={TypeOperationCaisse.MISC_DISBURSEMENT}>Décaissement Divers</option>
+                      <optgroup label="Divers" className="bg-slate-900">
+                        <option value={TypeOperationCaisse.MISC_COLLECTION}>Encaissement Divers</option>
+                        <option value={TypeOperationCaisse.MISC_DISBURSEMENT}>Décaissement Divers</option>
+                      </optgroup>
                    </select>
                    <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none rotate-[-45deg]" />
                 </div>

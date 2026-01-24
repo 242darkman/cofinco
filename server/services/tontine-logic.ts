@@ -17,8 +17,11 @@ import {
   tontinePenalites,
   tontineDistributions,
   operationsCaisse,
-  comptes
+  comptes,
+  mouvementsFinanciers
 } from "@shared/schema";
+import type { PgTransaction } from "drizzle-orm/pg-core";
+import { type MouvementFinancier } from "./ledger";
 import { eq, and, sql, desc, asc, lte } from "drizzle-orm";
 import {
   executeWithLedger,
@@ -278,174 +281,210 @@ export async function dispatchTontinePayment(
       }
     },
     async (tx, mouvement) => {
-      let remaining = amountTotal;
-      const penalitesPaid: DispatchResult['penalitesPaid'] = [];
-      const contributionsCreated: DispatchResult['contributionsCreated'] = [];
-
-      // ========== PRIORITÉ 1 : PÉNALITÉS ==========
-      for (const penalite of penalitesImpayees) {
-        if (remaining <= 0) break;
-        if (remaining >= penalite.montant) {
-          // Payer la pénalité complètement
-          await tx
-            .update(tontinePenalites)
-            .set({
-              statut: DB_STATUT_PENALITE_PAYE,
-              datePaiement: new Date(),
-              updatedAt: new Date()
-            })
-            .where(eq(tontinePenalites.id, penalite.id));
-
-          penalitesPaid.push({ id: penalite.id, montant: penalite.montant });
-          remaining -= penalite.montant;
+      // Delegate to processTontineContribution
+      const result = await processTontineContribution(
+        tx,
+        mouvement,
+        {
+          clientId,
+          tontineId,
+          amountTotal,
+          sessionCaisseId,
+          userId,
+          state
         }
-        // Note: Les pénalités partielles ne sont pas supportées
-      }
-
-      // ========== PRIORITÉ 2 : RATTRAPAGE (TOURS PASSÉS) ==========
-      for (const tour of toursEnRetard) {
-        if (remaining <= 0) break;
-
-        const montantDejaPaye = contributionsParTour.get(tour) || 0;
-        const montantManquant = tontine.montantCotisation - montantDejaPaye;
-
-        if (montantManquant <= 0) continue;
-
-        const montantAPayer = Math.min(remaining, montantManquant);
-        const isComplete = montantAPayer >= montantManquant;
-
-        // Créer la contribution
-        const [contribution] = await tx
-          .insert(contributionsTontine)
-          .values({
-            tontineId,
-            clientId,
-            mouvementId: mouvement.id,
-            typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
-            montant: montantAPayer.toString(),
-            tourNumero: tour,
-            methodePaiement: isCash ? MethodePaiement.CASH : MethodePaiement.TRANSFER,
-            statutTransaction: DB_STATUT_TRANSACTION_POSTE,
-            reference: `${mouvement.reference}-T${tour}`,
-            observations: `Rattrapage Tour ${tour} (${isComplete ? 'Complet' : 'Partiel'})`
-          })
-          .returning();
-
-        contributionsCreated.push({
-          id: contribution.id,
-          tourNumero: tour,
-          montant: montantAPayer,
-          type: isComplete ? 'FULL' : 'PARTIAL'
-        });
-
-        remaining -= montantAPayer;
-      }
-
-      // ========== PRIORITÉ 3 : TOUR COURANT & FUTURS ==========
-      let tourCible = tontine.tourActuel;
-      const maxTour = tontine.nombreMembres; // Un membre ne paie pas plus que le nombre de tours
-
-      while (remaining > 0 && tourCible <= maxTour) {
-        const montantDejaPaye = contributionsParTour.get(tourCible) || 0;
-        const montantManquant = tontine.montantCotisation - montantDejaPaye;
-
-        if (montantManquant <= 0) {
-          tourCible++;
-          continue;
-        }
-
-        const montantAPayer = Math.min(remaining, montantManquant);
-        const isComplete = montantAPayer >= montantManquant;
-
-        // Créer la contribution
-        const [contribution] = await tx
-          .insert(contributionsTontine)
-          .values({
-            tontineId,
-            clientId,
-            mouvementId: mouvement.id,
-            typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
-            montant: montantAPayer.toString(),
-            tourNumero: tourCible,
-            methodePaiement: isCash ? MethodePaiement.CASH : MethodePaiement.TRANSFER,
-            statutTransaction: DB_STATUT_TRANSACTION_POSTE,
-            reference: `${mouvement.reference}-T${tourCible}`,
-            observations: tourCible > tontine.tourActuel
-              ? `Avance Tour ${tourCible} (${isComplete ? 'Complet' : 'Partiel'})`
-              : `Tour ${tourCible} (${isComplete ? 'Complet' : 'Partiel'})`
-          })
-          .returning();
-
-        contributionsCreated.push({
-          id: contribution.id,
-          tourNumero: tourCible,
-          montant: montantAPayer,
-          type: isComplete ? 'FULL' : 'PARTIAL'
-        });
-
-        // Mettre à jour le cache local pour les tours suivants
-        contributionsParTour.set(tourCible, montantDejaPaye + montantAPayer);
-
-        remaining -= montantAPayer;
-
-        if (isComplete) {
-          tourCible++;
-        }
-      }
-
-      // ========== MISES À JOUR FINALES ==========
-
-      // 1. Mettre à jour le solde de la tontine
-      await updateTontineSolde(tx, tontineId, amountTotal);
-
-      // 2. Mettre à jour le solde de la session caisse (si espèces)
-      let nouveauSoldeSession;
-      if (isCash && sessionCaisseId) {
-        nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, amountTotal);
-
-        // Créer l'opération caisse
-        const validatedUserId = await validateUserId(tx, userId);
-        await tx.insert(operationsCaisse).values({
-          sessionId: sessionCaisseId,
-          mouvementId: mouvement.id,
-          typeOperation: "TONTINE_CONTRIBUTION" as any,
-          montant: amountTotal.toString(),
-          methodePaiement: "CASH" as any,
-          reference: `TON-DISPATCH-${mouvement.reference}`,
-          description: `Paiement Tontine Groupé: ${contributionsCreated.length} contribution(s)`,
-          createdBy: validatedUserId
-        });
-      }
-
-      // 3. Mettre à jour les stats du membre
-      const totalContributions = contributionsCreated.reduce((sum, c) => sum + c.montant, 0);
-      if (totalContributions > 0) {
-        await tx.execute(sql`
-          UPDATE membres_tontine
-          SET total_cotisations = COALESCE(total_cotisations, 0) + ${totalContributions},
-              updated_at = NOW()
-          WHERE tontine_id = ${tontineId}
-          AND client_id = ${clientId}
-        `);
-      }
-
-      const result: DispatchResult = {
-        penalitesPaid,
-        contributionsCreated,
-        remainingAmount: remaining,
-        totalDispatched: amountTotal - remaining,
-        mouvementId: mouvement.id
-      };
-
-      return {
-        result,
-        additionalEventData: {
-          nouveauSoldeSession
-        }
-      };
+      );
+      
+      return result;
     },
     userId
   ).then(({ result }) => result);
+}
+
+/**
+ * Core logic for processing tontine contribution within a transaction
+ */
+export async function processTontineContribution(
+  tx: PgTransaction<any, any, any>,
+  mouvement: MouvementFinancier,
+  params: {
+    clientId: string;
+    tontineId: string;
+    amountTotal: number;
+    sessionCaisseId?: string;
+    userId?: string;
+    state: MemberTontineState;
+  }
+) {
+  const { clientId, tontineId, amountTotal, sessionCaisseId, userId, state } = params;
+  const { tontine, penalitesImpayees, contributionsParTour, toursEnRetard } = state;
+  const isCash = !!sessionCaisseId;
+
+  let remaining = amountTotal;
+  const penalitesPaid: DispatchResult['penalitesPaid'] = [];
+  const contributionsCreated: DispatchResult['contributionsCreated'] = [];
+
+  // ========== PRIORITÉ 1 : PÉNALITÉS ==========
+  for (const penalite of penalitesImpayees) {
+    if (remaining <= 0) break;
+    if (remaining >= penalite.montant) {
+      // Payer la pénalité complètement
+      await tx
+        .update(tontinePenalites)
+        .set({
+          statut: DB_STATUT_PENALITE_PAYE,
+          datePaiement: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(tontinePenalites.id, penalite.id));
+
+      penalitesPaid.push({ id: penalite.id, montant: penalite.montant });
+      remaining -= penalite.montant;
+    }
+    // Note: Les pénalités partielles ne sont pas supportées
+  }
+
+  // ========== PRIORITÉ 2 : RATTRAPAGE (TOURS PASSÉS) ==========
+  for (const tour of toursEnRetard) {
+    if (remaining <= 0) break;
+
+    const montantDejaPaye = contributionsParTour.get(tour) || 0;
+    const montantManquant = tontine.montantCotisation - montantDejaPaye;
+
+    if (montantManquant <= 0) continue;
+
+    const montantAPayer = Math.min(remaining, montantManquant);
+    const isComplete = montantAPayer >= montantManquant;
+
+    // Créer la contribution
+    const [contribution] = await tx
+      .insert(contributionsTontine)
+      .values({
+        tontineId,
+        clientId,
+        mouvementId: mouvement.id,
+        typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
+        montant: montantAPayer.toString(),
+        tourNumero: tour,
+        methodePaiement: isCash ? MethodePaiement.CASH : MethodePaiement.TRANSFER,
+        statutTransaction: DB_STATUT_TRANSACTION_POSTE,
+        reference: `${mouvement.reference}-T${tour}`,
+        observations: `Rattrapage Tour ${tour} (${isComplete ? 'Complet' : 'Partiel'})`
+      })
+      .returning();
+
+    contributionsCreated.push({
+      id: contribution.id,
+      tourNumero: tour,
+      montant: montantAPayer,
+      type: isComplete ? 'FULL' : 'PARTIAL'
+    });
+
+    remaining -= montantAPayer;
+  }
+
+  // ========== PRIORITÉ 3 : TOUR COURANT & FUTURS ==========
+  let tourCible = tontine.tourActuel;
+  const maxTour = tontine.nombreMembres; // Un membre ne paie pas plus que le nombre de tours
+
+  while (remaining > 0 && tourCible <= maxTour) {
+    const montantDejaPaye = contributionsParTour.get(tourCible) || 0;
+    const montantManquant = tontine.montantCotisation - montantDejaPaye;
+
+    if (montantManquant <= 0) {
+      tourCible++;
+      continue;
+    }
+
+    const montantAPayer = Math.min(remaining, montantManquant);
+    const isComplete = montantAPayer >= montantManquant;
+
+    // Créer la contribution
+    const [contribution] = await tx
+      .insert(contributionsTontine)
+      .values({
+        tontineId,
+        clientId,
+        mouvementId: mouvement.id,
+        typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
+        montant: montantAPayer.toString(),
+        tourNumero: tourCible,
+        methodePaiement: isCash ? MethodePaiement.CASH : MethodePaiement.TRANSFER,
+        statutTransaction: DB_STATUT_TRANSACTION_POSTE,
+        reference: `${mouvement.reference}-T${tourCible}`,
+        observations: tourCible > tontine.tourActuel
+          ? `Avance Tour ${tourCible} (${isComplete ? 'Complet' : 'Partiel'})`
+          : `Tour ${tourCible} (${isComplete ? 'Complet' : 'Partiel'})`
+      })
+      .returning();
+
+    contributionsCreated.push({
+      id: contribution.id,
+      tourNumero: tourCible,
+      montant: montantAPayer,
+      type: isComplete ? 'FULL' : 'PARTIAL'
+    });
+
+    // Mettre à jour le cache local pour les tours suivants
+    contributionsParTour.set(tourCible, montantDejaPaye + montantAPayer);
+
+    remaining -= montantAPayer;
+
+    if (isComplete) {
+      tourCible++;
+    }
+  }
+
+  // ========== MISES À JOUR FINALES ==========
+
+  // 1. Mettre à jour le solde de la tontine
+  await updateTontineSolde(tx, tontineId, amountTotal);
+
+  // 2. Mettre à jour le solde de la session caisse (si espèces)
+  let nouveauSoldeSession;
+  if (isCash && sessionCaisseId) {
+    nouveauSoldeSession = await updateSessionSolde(tx, sessionCaisseId, amountTotal);
+
+    // Créer l'opération caisse
+    const validatedUserId = await validateUserId(tx, userId);
+    await tx.insert(operationsCaisse).values({
+      sessionId: sessionCaisseId,
+      mouvementId: mouvement.id,
+      typeOperation: "TONTINE_CONTRIBUTION" as any,
+      montant: amountTotal.toString(),
+      methodePaiement: "CASH" as any,
+      reference: `TON-DISPATCH-${mouvement.reference}`,
+      description: `Paiement Tontine Groupé: ${contributionsCreated.length} contribution(s)`,
+      createdBy: validatedUserId
+    });
+  }
+
+  // 3. Mettre à jour les stats du membre
+  const totalContributions = contributionsCreated.reduce((sum, c) => sum + c.montant, 0);
+  if (totalContributions > 0) {
+    await tx.execute(sql`
+      UPDATE membres_tontine
+      SET total_cotisations = COALESCE(total_cotisations, 0) + ${totalContributions},
+          updated_at = NOW()
+      WHERE tontine_id = ${tontineId}
+      AND client_id = ${clientId}
+    `);
+  }
+
+  const result: DispatchResult = {
+    penalitesPaid,
+    contributionsCreated,
+    remainingAmount: remaining,
+    totalDispatched: amountTotal - remaining,
+    mouvementId: mouvement.id
+  };
+
+  return {
+    result,
+    additionalEventData: {
+      nouveauSoldeSession
+    }
+  };
 }
 
 // ============ UTILITY FUNCTIONS ============
@@ -673,91 +712,141 @@ export async function distributeTontineGain(
       }
     },
     async (tx, mouvement) => {
-      // Créer la distribution
-      const [distribution] = await tx
-        .insert(tontineDistributions)
-        .values({
+      // Delegate to processTontineDistribution
+      const result = await processTontineDistribution(
+        tx,
+        mouvement,
+        {
           tontineId,
           membreId,
           tourNumero,
-          montantTotal: montantTotal.toString(),
-          dateDistribution: new Date(),
+          montantTotal,
+          modeDistribution,
           modePaiement,
-          referencePaiement: mouvement.reference,
-          notes: notes || `Distribution automatique - Mode: ${modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL ? 'Retrait espèces' : 'Virement compte'}`
-        })
-        .returning();
+          sessionCaisseId,
+          compteId,
+          userId,
+          notes,
+          reference: mouvement.reference,
+          tontineNom: tontineData.nom
+        }
+      );
 
-      // Mettre à jour le solde de la tontine (débit)
-      await tx.execute(sql`
-        UPDATE tontines
-        SET solde = COALESCE(solde, 0) - ${montantTotal},
-            updated_at = NOW()
-        WHERE id = ${tontineId}
-      `);
-
-      // Marquer le membre comme ayant reçu son bénéfice
-      await tx
-        .update(membresTontine)
-        .set({
-          aRecuBenefice: true,
-          dateBenefice: new Date(),
-          updatedAt: new Date()
-        })
-        .where(eq(membresTontine.id, membreId));
-
-      // Traitement spécifique selon le mode de distribution
-      if (modeDistribution === ModeDistributionTontine.ACCOUNT_TRANSFER && compteId) {
-        // Créditer le compte épargne du bénéficiaire
-        await tx.execute(sql`
-          UPDATE comptes_epargne
-          SET solde_courant = COALESCE(solde_courant, 0) + ${montantTotal},
-              updated_at = NOW()
-          WHERE id = ${compteId}
-        `);
-
-        // Note: On pourrait aussi créer une entrée dans les mouvements du compte
-      } else if (modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL && sessionCaisseId) {
-        // Débiter la session caisse (le montant sort en espèces)
-        await tx.execute(sql`
-          UPDATE sessions_caisse
-          SET solde_courant = COALESCE(solde_courant, 0) - ${montantTotal},
-              updated_at = NOW()
-          WHERE id = ${sessionCaisseId}
-        `);
-
-        // Créer l'opération caisse
-        const validatedUserId = await validateUserId(tx, userId);
-        await tx.insert(operationsCaisse).values({
-          sessionId: sessionCaisseId,
-          mouvementId: mouvement.id,
-          typeOperation: "TONTINE_DISTRIBUTION" as any,
-          montant: montantTotal.toString(),
-          methodePaiement: modePaiement as any,
-          reference: `TON-DIST-${mouvement.reference}`,
-          description: `Distribution Tontine "${tontineData.nom}" - Tour #${tourNumero}`,
-          createdBy: validatedUserId
-        });
-      }
-
-      const result: DistributionResult = {
-        distributionId: distribution.id,
-        beneficiaireId: membreId,
-        montantTotal,
-        modeDistribution,
-        modePaiement,
-        compteId: modeDistribution === ModeDistributionTontine.ACCOUNT_TRANSFER ? compteId : undefined,
-        reference: mouvement.reference,
-        tourNumero
-      };
-
-      return {
-        result,
-        // additionalEventData removed - distributionType is not part of the expected schema
-      };
+      return result;
     },
     userId
   ).then(({ result }) => result);
+}
+
+/**
+ * Core logic for processing tontine distribution within a transaction
+ */
+export async function processTontineDistribution(
+  tx: PgTransaction<any, any, any>,
+  mouvement: MouvementFinancier,
+  params: {
+    tontineId: string;
+    membreId: string;
+    tourNumero: number;
+    montantTotal: number;
+    modeDistribution: string;
+    modePaiement: string;
+    sessionCaisseId?: string;
+    compteId?: string;
+    userId?: string;
+    notes?: string;
+    reference: string;
+    tontineNom: string;
+  }
+) {
+  const { 
+    tontineId, membreId, tourNumero, montantTotal, 
+    modeDistribution, modePaiement, sessionCaisseId, 
+    compteId, userId, notes, reference, tontineNom 
+  } = params;
+
+  // Créer la distribution
+  const [distribution] = await tx
+    .insert(tontineDistributions)
+    .values({
+      tontineId,
+      membreId,
+      tourNumero,
+      montantTotal: montantTotal.toString(),
+      dateDistribution: new Date(),
+      modePaiement,
+      referencePaiement: reference,
+      notes: notes || `Distribution automatique - Mode: ${modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL ? 'Retrait espèces' : 'Virement compte'}`
+    })
+    .returning();
+
+  // Mettre à jour le solde de la tontine (débit)
+  await tx.execute(sql`
+    UPDATE tontines
+    SET solde = COALESCE(solde, 0) - ${montantTotal},
+        updated_at = NOW()
+    WHERE id = ${tontineId}
+  `);
+
+  // Marquer le membre comme ayant reçu son bénéfice
+  await tx
+    .update(membresTontine)
+    .set({
+      aRecuBenefice: true,
+      dateBenefice: new Date(),
+      updatedAt: new Date()
+    })
+    .where(eq(membresTontine.id, membreId));
+
+  // Traitement spécifique selon le mode de distribution
+  if (modeDistribution === ModeDistributionTontine.ACCOUNT_TRANSFER && compteId) {
+    // Créditer le compte épargne du bénéficiaire
+    await tx.execute(sql`
+      UPDATE comptes
+      SET solde_courant = COALESCE(solde_courant, 0) + ${montantTotal},
+          updated_at = NOW()
+      WHERE id = ${compteId}
+    `);
+
+    // Note: On pourrait aussi créer une entrée dans les mouvements du compte
+  } else if (modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL && sessionCaisseId) {
+    // Débiter la session caisse (le montant sort en espèces)
+    await tx.execute(sql`
+      UPDATE sessions_caisse
+      SET solde_courant = COALESCE(solde_courant, 0) - ${montantTotal},
+          updated_at = NOW()
+      WHERE id = ${sessionCaisseId}
+    `);
+
+    // Créer l'opération caisse
+    const validatedUserId = await validateUserId(tx, userId);
+    await tx.insert(operationsCaisse).values({
+      sessionId: sessionCaisseId,
+      mouvementId: mouvement.id,
+      typeOperation: "TONTINE_DISTRIBUTION" as any,
+      montant: montantTotal.toString(),
+      methodePaiement: modePaiement as any,
+      reference: `TON-DIST-${mouvement.reference}`,
+      description: `Distribution Tontine "${tontineNom}" - Tour #${tourNumero}`,
+      createdBy: validatedUserId
+    });
+  }
+
+  const result: DistributionResult = {
+    distributionId: distribution.id,
+    beneficiaireId: membreId,
+    montantTotal,
+    modeDistribution,
+    modePaiement,
+    compteId: modeDistribution === ModeDistributionTontine.ACCOUNT_TRANSFER ? compteId : undefined,
+    reference: reference, // Use provided reference
+    tourNumero
+  };
+
+  return {
+    result,
+    // additionalEventData removed - distributionType is not part of the expected schema
+  };
 }
 
 export default {
@@ -766,5 +855,7 @@ export default {
   getMemberPaymentSummary,
   isTourFullyPaid,
   previewPaymentDispatch,
-  distributeTontineGain
+  distributeTontineGain,
+  processTontineContribution,
+  processTontineDistribution
 };

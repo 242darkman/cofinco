@@ -13,6 +13,7 @@ import { registerMessagesRoutes } from "./routes/messages";
 import { createServer, type Server } from "http";
 import { setupWebSocket, setWsInstance } from "./ws-server";
 import { registerAccountingRoutes } from "./routes/accounting";
+import { transactionsRouter } from "./routes/transactions";
 import { registerRbacRoutes } from "./routes/rbac";
 import { registerAgencesRoutes } from "./routes/agences";
 import { registerEmployesRoutes } from "./routes/employes";
@@ -44,6 +45,7 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/caisses", caisseAdminRouter); // Advanced caisse admin operations
   app.use("/api/maintenance-mode", maintenanceRouter);
   app.use("/api/transferts-inter-coffres", transfertsInterCoffresRouter);
+  app.use("/api/transactions", transactionsRouter);
 
   // Admin - Regularisation Module (gestion des tâches de régularisation)
   app.use("/api/admin/regularisations", regularisationRouter);
