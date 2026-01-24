@@ -62,6 +62,10 @@ export function ProvisionCoffreModal({
       });
       queryClient.invalidateQueries({ queryKey: ["coffre-stats"] });
       queryClient.invalidateQueries({ queryKey: ["transferts-coffre"] }); // Although strictly not a transfer, history might be relevant
+
+      // Rafraîchir le dashboard en temps réel
+      window.dispatchEvent(new CustomEvent('refresh-dashboard'));
+
       onOpenChange(false);
       reset();
       setStep("form");

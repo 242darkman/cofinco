@@ -423,6 +423,11 @@ export default function CaissePaiementModal({
       }
       
       setShowReceipt(true);
+
+      // Émettre l'événement pour rafraîchir le dashboard en temps réel
+      window.dispatchEvent(new CustomEvent('refresh-dashboard'));
+      window.dispatchEvent(new CustomEvent('transaction-created'));
+
       toast.success('Transaction réussie !');
     } catch (error) {
       const msg = handleApiError(error, 'Erreur de transaction');

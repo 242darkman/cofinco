@@ -65,17 +65,17 @@ export async function getGlobalStats(agenceId?: string): Promise<DashboardStats>
       }).from(coffresForts)
       .where(withCoffreAgence()),
 
-      // Somme Caisses - Calcul dynamique:
-      // 1. Sessions actives: montant d'ouverture (les opérations sont en cours)
+      // Somme Caisses - Calcul dynamique en temps réel:
+      // 1. Sessions actives: montant_fermeture_theorique (mis à jour à chaque opération)
       // 2. Sessions fermées: montant de fermeture déclaré (dernière session par caisse)
       // Note: On utilise une sous-requête pour obtenir le solde réel de chaque caisse
       db.execute(sql`
         SELECT COALESCE(SUM(solde_reel), 0) as total FROM (
           SELECT DISTINCT ON (c.id)
             CASE
-              -- Session active: utiliser montant d'ouverture
-              WHEN s.closed_at IS NULL THEN COALESCE(CAST(s.montant_ouverture AS DECIMAL), 0)
-              -- Dernière session fermée: utiliser montant déclaré
+              -- Session active: utiliser montant_fermeture_theorique (solde temps réel)
+              WHEN s.closed_at IS NULL THEN COALESCE(CAST(s.montant_fermeture_theorique AS DECIMAL), CAST(s.montant_ouverture AS DECIMAL), 0)
+              -- Dernière session fermée: utiliser montant déclaré ou théorique
               ELSE COALESCE(CAST(s.montant_fermeture_declare AS DECIMAL), CAST(s.montant_fermeture_theorique AS DECIMAL), 0)
             END as solde_reel
           FROM caisses c
