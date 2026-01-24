@@ -811,19 +811,15 @@ export async function processTontineDistribution(
     // Note: On pourrait aussi créer une entrée dans les mouvements du compte
   } else if (modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL && sessionCaisseId) {
     // Débiter la session caisse (le montant sort en espèces)
-    await tx.execute(sql`
-      UPDATE sessions_caisse
-      SET solde_courant = COALESCE(solde_courant, 0) - ${montantTotal},
-          updated_at = NOW()
-      WHERE id = ${sessionCaisseId}
-    `);
+    // IMPORTANT: Utiliser updateSessionSolde pour mettre à jour montantFermetureTheorique
+    await updateSessionSolde(tx, sessionCaisseId, -montantTotal);
 
     // Créer l'opération caisse
     const validatedUserId = await validateUserId(tx, userId);
     await tx.insert(operationsCaisse).values({
       sessionId: sessionCaisseId,
       mouvementId: mouvement.id,
-      typeOperation: "TONTINE_DISTRIBUTION" as any,
+      typeOperation: "TONTINE_WITHDRAWAL" as any,
       montant: montantTotal.toString(),
       methodePaiement: modePaiement as any,
       reference: `TON-DIST-${mouvement.reference}`,

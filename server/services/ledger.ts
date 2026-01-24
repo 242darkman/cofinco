@@ -402,29 +402,54 @@ export async function updateCreditSolde(
 
 /**
  * Update session caisse solde theorique within a transaction (Atomic Update)
+ * IMPORTANT: Synchronise aussi le solde de la caisse physique pour garantir la cohérence
+ *            en cas de fermeture inattendue de la session
+ *
+ * @param tx - Transaction PostgreSQL
+ * @param sessionId - ID de la session caisse
+ * @param delta - Montant à ajouter (positif = entrée, négatif = sortie)
+ * @param syncCaisseBalance - Si true, synchronise aussi caisses.solde (défaut: true)
+ *                            Mettre à false pour les transferts de clôture où le solde
+ *                            caisse est déjà géré par finalizeClose
  */
 export async function updateSessionSolde(
   tx: PgTransaction<any, any, any>,
   sessionId: string,
-  delta: number
+  delta: number,
+  syncCaisseBalance: boolean = true
 ): Promise<string> {
-  // Pessimistic Lock
-  await tx
-    .select({ id: sessionsCaisse.id })
+  // Pessimistic Lock on session
+  const [session] = await tx
+    .select({ id: sessionsCaisse.id, caisseId: sessionsCaisse.caisseId })
     .from(sessionsCaisse)
     .where(eq(sessionsCaisse.id, sessionId))
     .for("update");
 
+  if (!session) throw new Error(`Session ${sessionId} not found`);
+
+  // 1. Mettre à jour le solde théorique de la session (montantFermetureTheorique)
   const [updated] = await tx.update(sessionsCaisse)
-    .set({ 
-      montantFermetureTheorique: sql`${sessionsCaisse.montantFermetureTheorique} + ${delta}`,
+    .set({
+      montantFermetureTheorique: sql`COALESCE(${sessionsCaisse.montantFermetureTheorique}, 0) + ${delta}`,
+      lastActivity: new Date(),
       updatedAt: new Date()
     })
     .where(eq(sessionsCaisse.id, sessionId))
     .returning({ solde: sessionsCaisse.montantFermetureTheorique });
-  
-  if (!updated) throw new Error(`Session ${sessionId} not found`);
-  return updated.solde;
+
+  // 2. Synchroniser le solde de la caisse physique pour cohérence en cas de crash
+  //    Cela garantit que caisses.solde reflète toujours le solde temps réel
+  //    Note: Désactivé pour les transferts de clôture où le solde est géré séparément
+  if (syncCaisseBalance && session.caisseId) {
+    await tx.update(caisses)
+      .set({
+        solde: sql`COALESCE(${caisses.solde}, 0) + ${delta}`,
+        updatedAt: new Date()
+      })
+      .where(eq(caisses.id, session.caisseId));
+  }
+
+  return updated?.solde || "0";
 }
 
 /**

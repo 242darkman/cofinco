@@ -22,6 +22,7 @@ import {
   credits,
   comptes,
   evenementsOutbox,
+  sessionsCaisse,
   type OperationTerrain,
   type ApproveOperationInput,
   type RejectOperationInput,
@@ -31,8 +32,8 @@ import {
   transactionsCompte,
 } from "@shared/schema";
 import { StatutTransaction, TypeCompte, TypeOperationCaisse, type TypeOperationCaisseType } from "@shared/enum/status-constants";
-import { eq, sql } from "drizzle-orm";
-import { generateReference, updateCreditSolde, type MouvementFinancier } from "../ledger";
+import { eq, sql, and, isNull } from "drizzle-orm";
+import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Type pour les résultats d'approbation
@@ -540,13 +541,33 @@ export class ApprovalService {
       .returning();
 
     // 5. Mettre à jour solde CaisseAgence (atomique)
-    await tx
-      .update(caisses)
-      .set({
-        solde: sql`${caisses.solde} + ${montant}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(caisses.id, operation.destinationCaisseId!));
+    // Vérifier s'il y a une session active sur la caisse de destination
+    const [activeSession] = await tx
+      .select({ id: sessionsCaisse.id })
+      .from(sessionsCaisse)
+      .where(
+        and(
+          eq(sessionsCaisse.caisseId, operation.destinationCaisseId!),
+          isNull(sessionsCaisse.closedAt)
+        )
+      )
+      .limit(1);
+
+    if (activeSession) {
+      // Session active: utiliser updateSessionSolde pour synchroniser
+      // session.montantFermetureTheorique ET caisses.solde
+      await updateSessionSolde(tx, activeSession.id, montant, true);
+    } else {
+      // Pas de session active: mettre à jour seulement caisses.solde
+      // La prochaine session reprendra ce solde à l'ouverture
+      await tx
+        .update(caisses)
+        .set({
+          solde: sql`${caisses.solde} + ${montant}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(caisses.id, operation.destinationCaisseId!));
+    }
 
     return { success: true, mouvements: [mouvementCaisseAgent, mouvementCaisse] };
   }

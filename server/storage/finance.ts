@@ -2679,16 +2679,12 @@ export async function createCashTransactionWithLedger(data: {
       },
     },
     async (tx, mouvement) => {
-      // 1. Mettre à jour le solde de la session (théorique)
+      // 1. Mettre à jour le solde de la session (théorique) ET le solde caisse (syncCaisseBalance=true par défaut)
+      // Note: updateSessionSolde met à jour automatiquement caisses.solde pour maintenir la cohérence
       const nouveauSoldeSession = await updateSessionSolde(tx, data.sessionId, cashDelta);
+      // nouveauSoldeCaisse est maintenant synchronisé avec nouveauSoldeSession via updateSessionSolde
 
-      // 2. Mettre à jour le solde de la caisse physique (réel en temps réel)
-      let nouveauSoldeCaisse: string | undefined;
-      if (session.session.caisseId) {
-        nouveauSoldeCaisse = await updateCaisseSolde(tx, session.session.caisseId, cashDelta);
-      }
-
-      // 3. Mettre à jour le compte client si applicable
+      // 2. Mettre à jour le compte client si applicable
       let nouveauSoldeCompte: string | undefined;
       let transaction: TransactionCompte | undefined;
 
@@ -2742,7 +2738,8 @@ export async function createCashTransactionWithLedger(data: {
           soldes: {
             sessionApres: nouveauSoldeSession,
             compteApres: nouveauSoldeCompte,
-            caisseApres: nouveauSoldeCaisse,
+            // caisseApres est maintenant synchronisé avec sessionApres via updateSessionSolde
+            caisseApres: nouveauSoldeSession,
           },
         },
         additionalEventData: {

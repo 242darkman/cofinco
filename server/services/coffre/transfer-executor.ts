@@ -12,8 +12,7 @@ import { StatutTransaction, StatutTransfertCoffre, TypeOperationCaisse, MethodeP
 import { eq, sql, desc, and, isNull } from "drizzle-orm";
 import { getWsInstance } from "../../ws-server";
 
-// import { generateReference, createMouvementFinancier } from "../ledger"; // Need to make sure this exists or I implement it.
-// I will implement helper functions here if they don't exist, to be safe.
+import { updateSessionSolde } from "../ledger";
 
 import type { TransfertCoffreCaisse } from "@shared/schema";
 
@@ -156,6 +155,10 @@ export async function executeTransfertCoffre(
     let operationSource: any = null;
     let operationDest: any = null;
 
+    // Variables pour tracker si updateSessionSolde a été appelé (pour éviter double mise à jour caisse)
+    let sessionSoldeUpdatedForSource = false;
+    let sessionSoldeUpdatedForDest = false;
+
     // Si Caisse -> Coffre (Source = Caisse)
     if (!isCoffreSource) {
         // Caisse Source: Versement vers coffre (Sortie)
@@ -173,11 +176,12 @@ export async function executeTransfertCoffre(
                 statut: StatutTransaction.POSTED
             }).returning();
             operationSource = op;
-            
-            // Update Session montantFermetureTheorique (Sortie)
-            await tx.update(sessionsCaisse)
-                .set({ montantFermetureTheorique: sql`${sessionsCaisse.montantFermetureTheorique} - ${montant}`, updatedAt: new Date() })
-                .where(eq(sessionsCaisse.id, sessionId));
+
+            // Update Session montantFermetureTheorique + Caisse solde (Sortie)
+            // Pour les transferts de clôture: syncCaisseBalance=false car le solde caisse
+            // a déjà été défini à montantReporte par finalizeClose
+            await updateSessionSolde(tx, sessionId, -montant, !isClosingTransfer);
+            sessionSoldeUpdatedForSource = true;
         }
     }
 
@@ -186,8 +190,8 @@ export async function executeTransfertCoffre(
         // Caisse Dest: Approvisionnement depuis coffre (Entrée)
         // Need to find session for Dest Caisse
         // Assuming sessionExecuteId corresponds to the executing cashier receiving funds
-        const sessionId = sessionExecuteId; 
-        
+        const sessionId = sessionExecuteId;
+
         if (sessionId) {
             const [op] = await tx.insert(operationsCaisse).values({
                 sessionId,
@@ -201,27 +205,31 @@ export async function executeTransfertCoffre(
             }).returning();
             operationDest = op;
 
-             // Update Session montantFermetureTheorique (Entrée)
-             await tx.update(sessionsCaisse)
-                .set({ montantFermetureTheorique: sql`${sessionsCaisse.montantFermetureTheorique} + ${montant}`, updatedAt: new Date() })
-                .where(eq(sessionsCaisse.id, sessionId));
+             // Update Session montantFermetureTheorique + Caisse solde (Entrée)
+             await updateSessionSolde(tx, sessionId, montant, true);
+             sessionSoldeUpdatedForDest = true;
         }
     }
 
     // 9. Mise à jour des Soldes Réels
+    // Note: caisses.solde est maintenant synchronisé par updateSessionSolde quand une session existe
+    // On n'appelle updateBalance('caisse') QUE si updateSessionSolde n'a pas été appelé (fallback)
     const soldeDestAvant = parseFloat((isCoffreSource ? caisse.solde : coffre.solde) || "0");
 
     if (isCoffreSource) {
         await updateBalance(tx, 'coffre', coffre.id, -montant); // Coffre Debit
-        await updateBalance(tx, 'caisse', caisse.id, montant);  // Caisse Credit
-    } else {
-        // Pour les transferts de clôture (CAISSE_VERS_COFFRE), le solde de la caisse
-        // a déjà été mis à jour dans finalizeClose (= montantReporte).
-        // On ne doit PAS débiter la caisse à nouveau, seulement créditer le coffre.
-        if (!isClosingTransfer) {
-            await updateBalance(tx, 'caisse', caisse.id, -montant); // Caisse Debit (sauf clôture)
+        // Caisse Credit: seulement si pas de session (fallback)
+        if (!sessionSoldeUpdatedForDest) {
+            await updateBalance(tx, 'caisse', caisse.id, montant);
         }
-        await updateBalance(tx, 'coffre', coffre.id, montant);  // Coffre Credit
+    } else {
+        // Coffre Credit (toujours)
+        await updateBalance(tx, 'coffre', coffre.id, montant);
+        // Caisse Debit: seulement si pas de session ET pas transfert de clôture
+        // (les transferts de clôture ont déjà le bon solde via finalizeClose)
+        if (!sessionSoldeUpdatedForSource && !isClosingTransfer) {
+            await updateBalance(tx, 'caisse', caisse.id, -montant);
+        }
     }
 
     // 10. Finaliser le transfert
