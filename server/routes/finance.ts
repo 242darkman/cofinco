@@ -1806,6 +1806,23 @@ export function registerFinanceRoutes(app: Express) {
       }
   });
 
+  // Récupérer les opérations par sessionId (pour les rapports)
+  app.get("/api/operations-caisse", requireAuth, async (req, res) => {
+      try {
+        const { sessionId } = req.query;
+
+        if (!sessionId || typeof sessionId !== 'string') {
+          return res.status(400).json({ message: "sessionId requis" });
+        }
+
+        const operations = await storage.getOperationsBySession(sessionId);
+        res.json(addSnakeCaseAliasesDeep(operations));
+      } catch (error: any) {
+        console.error("Erreur récupération opérations par session:", error);
+        res.status(500).json({ message: error.message });
+      }
+  });
+
   // Opération caisse (roles: admin, chef, caisse)
   app.post("/api/operations-caisse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
       try {
