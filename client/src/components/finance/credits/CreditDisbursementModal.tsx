@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   X, AlertCircle, DollarSign, Calendar, Wallet, Clock,
   AlertTriangle, ArrowRight, Vault, RefreshCw, Phone,
-  Banknote, CreditCard, Smartphone, Info
+  Banknote, CreditCard, Smartphone, Info, User, Loader2
 } from 'lucide-react';
 import { creditApi, isInsufficientFundsError, extractInsufficientFundsData, type InsufficientFundsErrorData } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -33,6 +33,7 @@ interface Demande {
     prenom?: string;
     email?: string;
     phone: string;
+    photo_url?: string;
   };
 }
 
@@ -80,6 +81,17 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
 
   // Canal de décaissement (ACCOUNT, CASH, MOBILE_MONEY)
   const [disbursementChannel, setDisbursementChannel] = useState<DisbursementChannelType>(DisbursementChannel.ACCOUNT);
+
+  // Helper: convert storage key to display URL for avatars
+  const getAvatarUrl = (photoUrl: string | null | undefined): string | null => {
+    if (!photoUrl) return null;
+    if (photoUrl.startsWith('http') || photoUrl.startsWith('data:')) {
+      return photoUrl;
+    }
+    return `/api/storage/files/${encodeURIComponent(photoUrl)}`;
+  };
+
+  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photo_url), [demande.clients.photo_url]);
 
   // Helper: convert V2 duration to days
   const convertDureeEnJours = (valeur: number, unite: string): number => {
@@ -392,276 +404,231 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
   // RENDU : VUE NORMALE DE DÉCAISSEMENT
   // ============================================================================
 
+  // ============================================================================
+  // RENDU : VUE NORMALE DE DÉCAISSEMENT (REDESIGN V2)
+  // ============================================================================
+
   return (
     <>
-      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div className="p-6 border-b border-slate-700 flex justify-between items-center sticky top-0 bg-slate-800">
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+        <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+          
+          {/* === HEADER === */}
+          <div className="bg-slate-800/80 border-b border-slate-700 p-4 flex justify-between items-center shrink-0">
             <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <DollarSign className="text-emerald-400" /> Commission Crédit - Décaissement
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <DollarSign size={18} className="text-emerald-400" /> 
+                Décaissement Crédit
               </h2>
-              <p className="text-slate-400 text-sm mt-1">Validation finale et versement des fonds</p>
+              <p className="text-slate-400 text-xs">Validation et transfert des fonds</p>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-white"><X /></button>
+            <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700 transition">
+                <X size={20} />
+            </button>
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Info Bénéficiaire */}
-            <div className="bg-slate-700/50 rounded-lg p-4 grid md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">Bénéficiaire</h3>
-                <p className="text-white font-semibold text-lg">{formatClientName(demande.clients.nom, demande.clients.prenom)}</p>
-                <p className="text-slate-400">{demande.clients.phone}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">Crédit Approuvé</h3>
-                <p className="text-emerald-400 font-bold text-2xl">{formatMoney(montantDecaissement)}</p>
-                <p className="text-slate-300 text-sm">{nombreEcheancesCalc} échéances de {formatMoney(mensualite)}</p>
-              </div>
-            </div>
-
-            {/* Canal de décaissement */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-400 uppercase flex items-center gap-2">
-                <Wallet size={16} /> Canal de décaissement
-              </h3>
-
-              <div className="grid grid-cols-3 gap-3">
-                {/* Compte Courant */}
-                <button
-                  type="button"
-                  onClick={() => setDisbursementChannel(DisbursementChannel.ACCOUNT)}
-                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                    disbursementChannel === DisbursementChannel.ACCOUNT
-                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
-                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
-                  }`}
-                >
-                  <CreditCard size={24} />
-                  <div className="text-center">
-                    <div className="font-semibold text-sm">Compte</div>
-                    <div className="text-xs text-slate-400">Virement interne</div>
-                  </div>
-                </button>
-
-                {/* Espèces */}
-                <button
-                  type="button"
-                  onClick={() => setDisbursementChannel(DisbursementChannel.CASH)}
-                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                    disbursementChannel === DisbursementChannel.CASH
-                      ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
-                  }`}
-                >
-                  <Banknote size={24} />
-                  <div className="text-center">
-                    <div className="font-semibold text-sm">Espèces</div>
-                    <div className="text-xs text-slate-400">Retrait caisse</div>
-                  </div>
-                </button>
-
-                {/* Mobile Money */}
-                <button
-                  type="button"
-                  onClick={() => setDisbursementChannel(DisbursementChannel.MOBILE_MONEY)}
-                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                    disbursementChannel === DisbursementChannel.MOBILE_MONEY
-                      ? 'border-purple-500 bg-purple-500/10 text-purple-400'
-                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
-                  }`}
-                >
-                  <Smartphone size={24} />
-                  <div className="text-center">
-                    <div className="font-semibold text-sm">Mobile</div>
-                    <div className="text-xs text-slate-400">MoMo / OM</div>
-                  </div>
-                </button>
-              </div>
-
-              {/* Info-bulle selon le canal sélectionné */}
-              {disbursementChannel === DisbursementChannel.CASH && (
-                <div className="bg-orange-900/20 border border-orange-700/50 rounded-xl p-4 flex items-start gap-3">
-                  <Info className="text-orange-400 flex-shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-orange-200 font-medium">Décaissement à la caisse</p>
-                    <p className="text-slate-300 text-sm mt-1">
-                      Le dossier sera transmis à la caisse pour paiement physique.
-                      Le client devra se présenter au guichet avec sa pièce d'identité pour récupérer les fonds.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {disbursementChannel === DisbursementChannel.MOBILE_MONEY && (
-                <div className="bg-purple-900/20 border border-purple-700/50 rounded-xl p-4 flex items-start gap-3">
-                  <Info className="text-purple-400 flex-shrink-0 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-purple-200 font-medium">Décaissement Mobile Money</p>
-                    <p className="text-slate-300 text-sm mt-1">
-                      Le montant sera envoyé sur le numéro Mobile Money enregistré du client: <span className="text-white font-semibold">{demande.clients.phone}</span>
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {disbursementChannel === DisbursementChannel.ACCOUNT && (
-                <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-xl p-4">
-                  <p className="text-slate-300">
-                    Le montant de <span className="text-emerald-400 font-semibold">{formatMoney(montantDecaissement)}</span> sera
-                    crédité sur le <span className="text-white font-semibold">compte courant</span> du client.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Options de planification */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-400 uppercase flex items-center gap-2">
-                <Clock size={16} /> Planification du décaissement
-              </h3>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDecaissementType('immediat')}
-                  className={`flex-1 p-3 rounded-lg border-2 transition-all ${
-                    decaissementType === 'immediat'
-                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
-                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
-                  }`}
-                >
-                  <div className="font-semibold">Immédiat</div>
-                  <div className="text-xs text-slate-400 mt-1">Décaisser maintenant</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDecaissementType('programme')}
-                  className={`flex-1 p-3 rounded-lg border-2 transition-all ${
-                    decaissementType === 'programme'
-                      ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
-                  }`}
-                >
-                  <div className="font-semibold">Programmé</div>
-                  <div className="text-xs text-slate-400 mt-1">Choisir une date</div>
-                </button>
-              </div>
-
-              {decaissementType === 'programme' && (
-                <div className="grid md:grid-cols-2 gap-4 p-4 bg-slate-700/30 rounded-lg">
-                  <FormField
-                    name="dateDecaissement"
-                    label="Date de décaissement"
-                    type="date"
-                    value={dateDecaissement}
-                    onChange={(e) => {
-                      setDateDecaissement(e.target.value);
-                      setDelaiJours(0);
-                    }}
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Ou dans X jours</label>
-                    <div className="flex gap-2">
-                      {[1, 3, 7, 14, 30].map(jours => (
-                        <button
-                          key={jours}
-                          type="button"
-                          onClick={() => {
-                            setDelaiJours(jours);
-                            const d = new Date();
-                            d.setDate(d.getDate() + jours);
-                            setDateDecaissement(d.toISOString().split('T')[0]);
-                          }}
-                          className={`px-3 py-2 rounded text-sm font-medium transition-all ${
-                            delaiJours === jours
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                          }`}
-                        >
-                          {jours}j
-                        </button>
-                      ))}
+          <div className="p-4 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+            {/* 1. BENEFICIARY & AMOUNT (Horizontal Compact Card) */}
+            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col sm:flex-row justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 overflow-hidden">
+                        {clientAvatarUrl ? (
+                          <img
+                            src={clientAvatarUrl}
+                            alt={formatClientName(demande.clients.nom, demande.clients.prenom)}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="1.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>')}`;
+                            }}
+                          />
+                        ) : (
+                          <User size={20} />
+                        )}
                     </div>
-                  </div>
+                    <div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Bénéficiaire</div>
+                        <div className="text-white font-bold text-sm sm:text-base">{formatClientName(demande.clients.nom, demande.clients.prenom)}</div>
+                        <div className="text-slate-400 text-xs flex items-center gap-1">
+                             <Phone size={10} /> {demande.clients.phone}
+                        </div>
+                    </div>
                 </div>
-              )}
+                <div className="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-slate-700 pt-3 sm:pt-0 pl-0 sm:pl-4">
+                     <div className="text-xs text-emerald-500 uppercase tracking-wider font-semibold">Net à Décaisser</div>
+                     <div className="text-2xl font-bold text-white tracking-tight">{formatMoney(montantDecaissement)}</div>
+                     <div className="text-slate-500 text-xs">
+                         {nombreEcheancesCalc} échéances de {formatMoney(mensualite)}
+                     </div>
+                </div>
             </div>
 
-            {/* Résumé */}
-            <div className="bg-slate-700/30 rounded-lg p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Canal:</span>
-                <span className={`font-medium ${
-                  disbursementChannel === DisbursementChannel.CASH ? 'text-orange-400' :
-                  disbursementChannel === DisbursementChannel.MOBILE_MONEY ? 'text-purple-400' : 'text-emerald-400'
-                }`}>
-                  {DISBURSEMENT_CHANNEL_LABELS[disbursementChannel]}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Date de décaissement:</span>
-                <span className="text-white font-medium flex items-center gap-2">
-                  <Calendar size={14} />
-                  {disbursementChannel === DisbursementChannel.CASH
-                    ? 'À la présentation du client'
-                    : dateEffectiveDecaissement.toLocaleDateString('fr-FR', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })
-                  }
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Date de fin du crédit:</span>
-                <span className="text-white font-medium">
-                  {dateFin.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Montant total à rembourser:</span>
-                <span className="text-amber-400 font-semibold">{formatMoney(montantTotal)}</span>
-              </div>
+            {/* 2. CHANNEL SELECTOR */}
+            <div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-2">
+                    <Wallet size={14} /> Canal de Versement
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setDisbursementChannel(DisbursementChannel.ACCOUNT)}
+                        className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
+                        disbursementChannel === DisbursementChannel.ACCOUNT
+                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 ring-1 ring-emerald-500/50'
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600'
+                        }`}
+                    >
+                        <CreditCard size={20} />
+                        <span className="text-xs font-medium">Compte</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setDisbursementChannel(DisbursementChannel.CASH)}
+                        className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
+                        disbursementChannel === DisbursementChannel.CASH
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-400 ring-1 ring-amber-500/50'
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600'
+                        }`}
+                    >
+                        <Banknote size={20} />
+                        <span className="text-xs font-medium">Espèces</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setDisbursementChannel(DisbursementChannel.MOBILE_MONEY)}
+                        className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
+                        disbursementChannel === DisbursementChannel.MOBILE_MONEY
+                            ? 'bg-purple-500/10 border-purple-500 text-purple-400 ring-1 ring-purple-500/50'
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600'
+                        }`}
+                    >
+                        <Smartphone size={20} />
+                        <span className="text-xs font-medium">Mobile</span>
+                    </button>
+                </div>
+
+                {/* Contextual Info Box */}
+                <div className="mt-2 bg-slate-800/50 border border-slate-700 p-3 rounded-lg text-xs transition-all">
+                    {disbursementChannel === DisbursementChannel.ACCOUNT && (
+                        <p className="text-slate-300">
+                             Virement automatique sur le <span className="text-emerald-400 font-semibold">Compte Courant</span> du client. Solde disponible immédiatement.
+                        </p>
+                    )}
+                    {disbursementChannel === DisbursementChannel.CASH && (
+                        <p className="text-slate-300">
+                            Génère un ordre de retrait <span className="text-amber-400 font-semibold">Caisse</span>. Le client devra présenter sa pièce d'identité au guichet.
+                        </p>
+                    )}
+                    {disbursementChannel === DisbursementChannel.MOBILE_MONEY && (
+                         <p className="text-slate-300">
+                             Transfert vers le numéro <span className="text-purple-400 font-semibold">{demande.clients.phone}</span>. Des frais opérateur peuvent s'appliquer.
+                         </p>
+                    )}
+                </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-4">
-              <Button variant="outline" onClick={onClose} className="flex-1">Annuler</Button>
-              {canDisburse ? (
-                <Button
-                  variant="primary"
-                  onClick={() => setShowConfirm(true)}
-                  disabled={loading}
-                  className={`flex-1 ${
-                    disbursementChannel === DisbursementChannel.CASH
-                      ? 'bg-orange-600 hover:bg-orange-500'
-                      : disbursementChannel === DisbursementChannel.MOBILE_MONEY
-                        ? 'bg-purple-600 hover:bg-purple-500'
-                        : 'bg-emerald-600 hover:bg-emerald-500'
-                  }`}
+            {/* 3. SCHEDULING (Compact Segment) */}
+            <div className="bg-slate-800 rounded-xl p-1 border border-slate-700 flex text-xs font-semibold">
+                <button
+                    onClick={() => setDecaissementType('immediat')}
+                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                        decaissementType === 'immediat' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-300'
+                    }`}
                 >
-                  {loading
-                    ? 'Traitement...'
-                    : disbursementChannel === DisbursementChannel.CASH
-                      ? 'Envoyer à la caisse'
-                      : disbursementChannel === DisbursementChannel.MOBILE_MONEY
-                        ? 'Envoyer via Mobile Money'
-                        : decaissementType === 'immediat'
-                          ? 'Décaisser maintenant'
-                          : 'Programmer le décaissement'
-                  }
-                </Button>
-              ) : (
-                <div className="flex-1 px-6 py-2 bg-slate-700 text-slate-400 rounded-lg text-center flex items-center justify-center gap-2 text-sm">
-                  <AlertCircle size={16} aria-hidden="true" />
-                  Permission requise
-                </div>
-              )}
+                    <Clock size={14} /> Immédiat
+                </button>
+                <div className="w-px bg-slate-700 my-1"></div>
+                <button
+                    onClick={() => setDecaissementType('programme')}
+                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                        decaissementType === 'programme' ? 'bg-slate-700 text-blue-400 shadow' : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                >
+                    <Calendar size={14} /> Programmé
+                </button>
             </div>
+
+             {decaissementType === 'programme' && (
+                <div className="animate-in slide-in-from-top-2 fade-in bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                    <div className="grid grid-cols-2 gap-3 items-center">
+                         <input
+                            type="date"
+                            value={dateDecaissement}
+                            onChange={(e) => {
+                                setDateDecaissement(e.target.value);
+                                setDelaiJours(0);
+                            }}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-white text-sm w-full"
+                         />
+                         <div className="flex gap-1">
+                            {[1, 3, 7].map(j => (
+                                <button
+                                    key={j}
+                                    onClick={() => {
+                                        setDelaiJours(j);
+                                        const d = new Date(); d.setDate(d.getDate() + j);
+                                        setDateDecaissement(d.toISOString().split('T')[0]);
+                                    }}
+                                    className={`flex-1 px-3 py-1.5 text-xs rounded border transition-colors ${
+                                        delaiJours === j ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-600 text-slate-400 hover:bg-slate-700'
+                                    }`}
+                                >
+                                    +{j}j
+                                </button>
+                            ))}
+                         </div>
+                    </div>
+                </div>
+             )}
+
+            {/* 4. SUMMARY FOOTER CARD */}
+            <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-xs space-y-2">
+                 <div className="flex justify-between">
+                     <span className="text-slate-500">Date d'effet</span>
+                     <span className="text-white">{dateEffectiveDecaissement.toLocaleDateString('fr-FR')}</span>
+                 </div>
+                 <div className="flex justify-between">
+                     <span className="text-slate-500">Première échéance</span>
+                     <span className="text-white">
+                         {new Date(new Date(dateEffectiveDecaissement).getTime() + 30*24*60*60*1000).toLocaleDateString('fr-FR')} (Est.)
+                     </span>
+                 </div>
+                 <div className="border-t border-slate-800 pt-2 flex justify-between font-bold">
+                     <span className="text-slate-400">Total à Rembourser</span>
+                     <span className="text-amber-400">{formatMoney(montantTotal)}</span>
+                 </div>
+            </div>
+            
+          </div>
+
+          {/* === ACTIONS === */}
+          <div className="p-4 bg-slate-800 border-t border-slate-700 flex gap-3 shrink-0">
+             <Button variant="outline" onClick={onClose} className="border-slate-600 text-slate-300 hover:bg-slate-700">
+                 Annuler
+             </Button>
+             {canDisburse ? (
+                 <Button
+                    variant="primary"
+                    onClick={() => setShowConfirm(true)}
+                    disabled={loading}
+                    className={`flex-1 font-bold shadow-lg ${
+                        disbursementChannel === DisbursementChannel.CASH 
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/20' 
+                        : disbursementChannel === DisbursementChannel.MOBILE_MONEY
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/20'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'
+                    }`}
+                 >
+                    {loading ? <Loader2 className="animate-spin" size={18} /> : 
+                     decaissementType === 'programme' ? 'Valider la Programmation' : 'Confirmer le Décaissement'}
+                 </Button>
+             ) : (
+                 <div className="flex-1 px-4 py-2 bg-slate-700 text-slate-500 rounded-lg text-xs text-center flex items-center justify-center gap-2">
+                     <AlertCircle size={14} /> Droit insuffisant
+                 </div>
+             )}
           </div>
         </div>
       </div>

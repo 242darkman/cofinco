@@ -351,9 +351,7 @@ export function checkEligibilityQuick(
   
   // Determine refusal reason
   let motifRefus: string | undefined;
-  if (!statutValide) {
-    motifRefus = 'La demande doit être au statut Rejetée';
-  } else if (!delaiOk) {
+  if (!delaiOk) {
     motifRefus = `Délai minimum de ${config.delaiMinimumJours} jours non atteint`;
   } else if (!nombreOk) {
     motifRefus = `Nombre maximum de réévaluations atteint (${config.maxReevaluationsParDemande})`;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Check, X, Loader2 } from 'lucide-react';
 
 interface EligibilityResult {
@@ -24,20 +24,26 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Use ref to store callback to avoid re-fetching when callback changes
+  const onEligibilityChangeRef = useRef(onEligibilityChange);
+  useEffect(() => {
+    onEligibilityChangeRef.current = onEligibilityChange;
+  }, [onEligibilityChange]);
+
   useEffect(() => {
     const checkEligibility = async () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const response = await fetch(`/api/demandes/${demandeId}/reevaluation-eligibility`, {
           credentials: 'include'
         });
         const data = await response.json();
-        
+
         if (data.success) {
           setEligibility(data);
-          onEligibilityChange?.(data.estEligible);
+          onEligibilityChangeRef.current?.(data.estEligible);
         } else {
           setError(data.error?.message || 'Erreur lors de la vérification');
         }
@@ -51,7 +57,7 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
     if (demandeId) {
       checkEligibility();
     }
-  }, [demandeId, onEligibilityChange]);
+  }, [demandeId]);
 
   if (loading) {
     return (
@@ -143,14 +149,6 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
           <p className="text-xs text-blue-400 flex items-center gap-2">
             <Loader2 size={12} className="animate-spin" />
             Une réévaluation est déjà en cours
-          </p>
-        </div>
-      )}
-      
-      {!eligibility.estEligible && eligibility.motifRefus && !eligibility.reevaluationEnCours && (
-        <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <p className="text-xs text-red-400">
-            {eligibility.motifRefus}
           </p>
         </div>
       )}

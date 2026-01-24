@@ -544,6 +544,7 @@ export const statutRefundRequestEnum = pgEnum("statut_refund_request_enum", [
   "SUBMITTED",
   "APPROVED",
   "REJECTED",
+  "PENDING_CAISSE",  // En attente de validation caisse (espèces/mobile money)
   "PAID",
   "CANCELLED",
 ]);

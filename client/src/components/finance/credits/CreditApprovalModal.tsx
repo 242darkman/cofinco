@@ -1,5 +1,11 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, MessageSquare, UserCheck, RefreshCw, Clock, Trash2 } from 'lucide-react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react'; // v2.1 redesign
+
+import { 
+  X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, 
+  Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, MessageSquare, 
+  UserCheck, RefreshCw, Clock, Trash2, Calendar, CreditCard, MapPin, Phone, Mail, 
+  LayoutDashboard, ArrowRight, Wallet, Percent, PiggyBank 
+} from 'lucide-react';
 import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -44,7 +50,6 @@ interface Demande {
     phone: string;
     taux_remboursement?: number;
     credit_total?: number;
-
     photo_url?: string;
   };
   deleted_at?: string | null;
@@ -111,18 +116,19 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     }
   }, [demande?.id]);
 
-  const isFinished = (demande.statut.toLowerCase() === 'approuvée' || 
-                      demande.statut.toLowerCase() === 'décaissée' || 
-                      demande.statut.toLowerCase() === 'déboursé' ||
-                      demande.statut.toLowerCase() === 'approuve' ||
+  const isFinished = (demande.statut === StatutDemande.APPROVED || 
+                      demande.statut === StatutDemande.DISBURSED || 
+                      demande.statut === StatutDemande.CLOSED ||
+                      demande.statut === StatutDemande.APPROVED_AFTER_REEVALUATION ||
+                      demande.statut.toLowerCase() === 'déboursé' || 
                       demande.statut.toLowerCase() === 'approved');
   
-  const isRejected = (demande.statut.toLowerCase() === 'rejetée' || 
-                      demande.statut.toLowerCase() === 'rejete' || 
+  const isRejected = (demande.statut === StatutDemande.REJECTED || 
+                      demande.statut === StatutDemande.DEFINITIVELY_REJECTED ||
                       demande.statut.toLowerCase() === 'rejected');
 
-  const isCancelled = (demande.statut.toLowerCase() === 'annulée' || 
-                       demande.statut.toLowerCase() === 'annule' || 
+  const isCancelled = (demande.statut === StatutDemande.CANCELLED || 
+                       demande.statut.toLowerCase() === 'annulée' || 
                        demande.statut.toLowerCase() === 'cancelled');
 
   const showActions = (!isFinished && !isRejected && !isCancelled) || isReevaluating;
@@ -188,11 +194,77 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     };
   }, [demande]);
 
+  // Solvency Analysis - Dynamic Calculation
+  const { solvencyScore, solvencyColor, solvencyAnalysis } = useMemo(() => {
+    let score = 0;
+    const analysis: string[] = [];
+
+    // 1. Debt Ratio (Max 40 pts)
+    if (tauxEndettement < 30) {
+        score += 40;
+        analysis.push("Endettement faible (< 30%).");
+    } else if (tauxEndettement < 45) {
+        score += 20;
+        analysis.push("Endettement modéré.");
+    } else {
+        analysis.push("Endettement critique (> 45%).");
+    }
+
+    // 2. Residual Income (Max 30 pts)
+    const revenu = demande.revenus_mensuels ?? 0;
+    const charges = demande.charges_mensuelles ?? 0; // Note: charges might need to come from survey if not in demande
+    // Using a simple estimate: Residual = Income - Estimated Charges (default 30% if unknown) - New Loan Payment
+    const estimatedCharges = charges > 0 ? charges : (revenu * 0.3);
+    const resteAVivre = revenu - estimatedCharges - mensualite;
+
+    if (resteAVivre > 150000) {
+        score += 30;
+        analysis.push("Reste à vivre confortable.");
+    } else if (resteAVivre > 50000) {
+        score += 15;
+    } else {
+        analysis.push("Reste à vivre faible.");
+    }
+
+    // 3. Reliability (Max 30 pts)
+    const reliability = demande.clients.taux_remboursement ?? 0;
+    if (reliability >= 90) {
+        score += 30;
+        analysis.push("Historique client excellent.");
+    } else if (reliability >= 50) {
+        score += 10;
+    } else {
+        analysis.push("Historique de remboursement fragile.");
+    }
+
+    // Determine Color & Verbal Dictum
+    let color = 'text-red-500';
+    if (score >= 70) color = 'text-emerald-500';
+    else if (score >= 40) color = 'text-amber-500';
+
+    return {
+        solvencyScore: score,
+        solvencyColor: color,
+        solvencyAnalysis: analysis.join(" ")
+    };
+  }, [tauxEndettement, demande.revenus_mensuels, demande.charges_mensuelles, mensualite, demande.clients.taux_remboursement]);
+
   // Safe escaped values - Use formatClientName for consistent formatting
   const safeClientName = useMemo(() => {
     const formatted = formatClientName(demande.clients.nom, demande.clients.prenom);
     return escapeHtml(formatted);
   }, [demande.clients.nom, demande.clients.prenom]);
+
+  // Convert storage key to display URL for avatars
+  const getAvatarUrl = (photoUrl: string | null | undefined): string | null => {
+    if (!photoUrl) return null;
+    if (photoUrl.startsWith('http') || photoUrl.startsWith('data:')) {
+      return photoUrl;
+    }
+    return `/api/storage/files/${encodeURIComponent(photoUrl)}`;
+  };
+
+  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photo_url), [demande.clients.photo_url]);
 
   const addGuarantee = useCallback(() => {
     setGuarantees(prev => [...prev, { type_garantie: 'Hypothèque', description: '', valeur_estimee: '' }]);
@@ -290,6 +362,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     setLoading(true);
 
     try {
+      // Si remboursement demandé, on met à jour la demande pour déclencher le process de remboursement
+      // (selon API)
       const payload: any = {
         statut: 'REJECTED',
         motif_rejet: sanitizeInput(commentaire)
@@ -298,15 +372,13 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       // Add reimbursement if entered
       if (reimbursementAmount) {
          const amount = parseFloat(reimbursementAmount);
-         // Client-side validation is good, but API should also handle it.
-         // We trust validateForm has prevented this call if invalid.
          payload.montantRemboursement = amount;
       }
 
       await demandeCreditApi.update(demande.id, payload);
 
       const successMessage = reimbursementAmount 
-        ? `Demande rejetée. Une demande de remboursement de ${formatMoney(Number(reimbursementAmount))} a été créée pour validation.`
+        ? `Demande rejetée. Remboursement de ${formatMoney(Number(reimbursementAmount))} initié.`
         : 'Demande de crédit rejetée avec succès.';
       
       toast.success(successMessage, { duration: 5000 });
@@ -343,810 +415,521 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   const getEndettementColor = useCallback((taux: number) => {
     if (taux > 50) return 'text-red-400';
     if (taux > 40) return 'text-amber-400';
-    return 'text-green-400';
+    return 'text-emerald-400';
   }, []);
 
   return (
-    <>
-      <div
-        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="approval-modal-title"
-      >
-        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex justify-between items-center z-10">
-            <div>
-              <h2 id="approval-modal-title" className="text-2xl font-bold text-white flex items-center gap-3">
-                Analyse de Demande
-                <Badge value={demande.statut} size="sm" />
-              </h2>
-              <p className="text-slate-400 text-sm mt-1">{demande.numero_demande}</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition"
-              aria-label="Fermer"
-              disabled={loading}
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          {/* ====== FEES STATUS BANNER - Above the Fold ====== */}
-          <div className={`mx-6 mt-4 p-4 rounded-xl flex items-center gap-4 ${
-              (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
-                ? 'bg-slate-500/10 border border-slate-500/30'
-                : demande.frais_engagement_payes 
-                    ? 'bg-emerald-500/10 border border-emerald-500/30' 
-                    : 'bg-amber-500/10 border border-amber-500/30'
-          }`}>
-              <div className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                  (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
-                    ? 'bg-slate-500/20'
-                    : demande.frais_engagement_payes ? 'bg-emerald-500/20' : 'bg-amber-500/20'
-              }`}>
-                  {demande.statut === StatutDemande.CANCELLED ? (
-                      <XCircle className="text-slate-400" size={24} />
-                  ) : !!demande.deleted_at ? (
-                      <Trash2 className="text-slate-400" size={24} />
-                  ) : demande.frais_engagement_payes ? (
-                      <CheckCircle className="text-emerald-400" size={24} />
-                  ) : (
-                      <AlertCircle className="text-amber-400" size={24} />
-                  )}
-              </div>
-              <div className="flex-1">
-                  <h4 className={`font-bold text-sm ${
-                      (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
-                        ? 'text-slate-400'
-                        : demande.frais_engagement_payes ? 'text-emerald-400' : 'text-amber-400'
-                  }`}>
-                      {!!demande.deleted_at 
-                        ? 'Demande Supprimée 🗑️' 
-                        : (demande.statut === StatutDemande.CANCELLED 
-                          ? 'Demande Annulée' 
-                          : demande.frais_engagement_payes ? 'Frais de Dossier Payés ✅' : 'Frais de Dossier en Attente ⚠️')}
-                  </h4>
-                  <p className={`text-xs ${
-                      (demande.statut === StatutDemande.CANCELLED) || !!demande.deleted_at
-                        ? 'text-slate-400/80'
-                        : demande.frais_engagement_payes ? 'text-emerald-300/80' : 'text-amber-300/80'
-                  }`}>
-                      {!!demande.deleted_at 
-                          ? "Cette demande a été supprimée des archives actives."
-                          : (demande.statut === StatutDemande.CANCELLED
-                          ? (demande.frais_engagement_payes 
-                              ? `Cette demande a été annulée. Les frais d'engagement de ${formatMoney(demande.montant_frais_engagement || 0)} ont été réglés.`
-                              : "Cette demande a été annulée. Aucun frais d'engagement n'a été perçu.")
-                          : (demande.frais_engagement_payes 
-                              ? `Montant payé : ${formatMoney(demande.montant_frais_engagement || 0)}`
-                              : demande.montant_frais_engagement 
-                                  ? `Montant dû : ${formatMoney(demande.montant_frais_engagement)}`
-                                  : 'Le client doit régler les frais avant traitement.'))
-                      }
-                  </p>
-              </div>
-          </div>
-          {/* ====== END FEES STATUS BANNER ====== */}
-
-          <div className="p-6 space-y-6">
-            {/* Client & Demande Info */}
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Client Info */}
-              <div className="bg-slate-700/50 rounded-lg p-4" role="region" aria-label="Informations client">
-                <div className="flex items-center gap-2 mb-3">
-                  <User className="text-cyan-400" size={20} aria-hidden="true" />
-                  <h3 className="text-lg font-bold text-white">Informations Client</h3>
+    <div
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+                        {/* === HEADER COMPACT === */}
+        {/* === HEADER COMPACT === */}
+        <div className="bg-slate-800/80 border-b border-slate-700 p-4 flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-3">
+                <div className="flex flex-col">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        Analyse Crédit
+                        <Badge value={demande.statut} size="sm" />
+                    </h2>
+                    <span className="text-slate-400 text-xs font-mono">{demande.numero_demande}</span>
                 </div>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Nom:</dt>
-                    <dd className="text-white font-semibold">{safeClientName}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Email:</dt>
-                    <dd className="text-white">{demande.clients.email || 'N/A'}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Téléphone:</dt>
-                    <dd className="text-white">{demande.clients.phone}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Taux Remboursement:</dt>
-                    <dd className="text-green-400 font-bold">{demande.clients.taux_remboursement ?? 0}%</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Crédits en cours:</dt>
-                    <dd className="text-white">{formatMoney(demande.clients.credit_total ?? 0)}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              {/* Demande Info */}
-              <div className="bg-slate-700/50 rounded-lg p-4" role="region" aria-label="Détails de la demande">
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText className="text-blue-400" size={20} aria-hidden="true" />
-                  <h3 className="text-lg font-bold text-white">Détails de la Demande</h3>
+                {/* Status Fees - Compact Pill */}
+                <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${
+                    demande.frais_engagement_payes 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                }`}>
+                    {demande.frais_engagement_payes ? (
+                        <><CheckCircle size={12} /> Frais Payés: {formatMoney(demande.montant_frais_engagement || 0)}</>
+                    ) : (
+                        <><AlertCircle size={12} /> Frais dus: {formatMoney(demande.montant_frais_engagement || 0)}</>
+                    )}
                 </div>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Date:</dt>
-                    <dd className="text-white">
-                      {new Date(demande.created_at || demande.date_demande).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                      })}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Type:</dt>
-                    <dd className="text-white">{demande.type_credit || 'Standard'}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Montant:</dt>
-                    <dd className="text-white font-bold">{formatMoney(demande.montant_demande)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Durée:</dt>
-                    <dd className="text-white">{demande.duree_valeur} {demande.duree_unite === 'Jour' ? 'jours' : demande.duree_unite === 'Semaine' ? 'semaines' : 'mois'}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Échéances:</dt>
-                    <dd className="text-white">{nombreEcheancesCalc} paiements ({demande.frequence_remboursement})</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Taux:</dt>
-                    <dd className="text-white">{demande.taux_interet}%</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-slate-400">Mensualité/Quotidien:</dt>
-                    <dd className="text-green-400 font-bold">{formatMoney(mensualite)}</dd>
-                  </div>
-                </dl>
-              </div>
             </div>
-
-            {/* Objet du Crédit */}
-            <div className="bg-slate-700/50 rounded-lg p-4">
-              <h3 className="text-lg font-bold text-white mb-3">Objet du Crédit</h3>
-              <p className="text-slate-300">{escapeHtml(demande.objet_credit)}</p>
-            </div>
-
-            {/* Motif Rejet (si applicable) */}
-            {isRejected && demande.motif_rejet && (
-              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
-                <h3 className="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
-                   <XCircle size={18} /> Motif du Rejet
-                </h3>
-                <p className="text-slate-300 italic">"{demande.motif_rejet}"</p>
-              </div>
-            )}
-
-            {/* Reevaluation Section for rejected demands */}
-            {isRejected && !isCancelled && !demande.deleted_at && (
-              <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4">
-                <h3 className="text-lg font-bold text-blue-400 mb-4 flex items-center gap-2">
-                  <RefreshCw size={18} /> Réévaluation de la demande
-                </h3>
-                <ReevaluationEligibilityCheck
-                  demandeId={demande.id}
-                  onEligibilityChange={setIsEligibleForReevaluation}
-                />
-                
+            <div className="flex items-center gap-2">
+                 <ReevaluationEligibilityCheck
+                    demandeId={demande.id}
+                    onEligibilityChange={(isEligible) => setIsEligibleForReevaluation(isEligible)}
+                 />
                 <button
-                  onClick={() => setShowReevaluationModal(true)}
-                  className="mt-4 w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                onClick={onClose}
+                className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition"
+                disabled={loading}
                 >
-                  <RefreshCw size={20} />
-                  Gérer la Réévaluation
+                <X size={20} />
                 </button>
-              </div>
-            )}
+            </div>
+        </div>
 
-            {/* Financial Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4" role="region" aria-label="Indicateurs financiers">
-              <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/50 rounded-lg p-4">
-                <div className="text-green-400 text-sm mb-1">Revenus</div>
-                <div className="text-xl md:text-2xl font-bold text-white break-words">
-                  {formatMoney(demande.revenus_mensuels ?? 0)}
+        {/* === SCROLLABLE CONTENT === */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-5">
+            
+            {/* 1. TOP STATS ROW (KPIs) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-blue-500/50 transition-colors">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
+                        <DollarSign size={14} className="text-blue-400" /> Montant Demandé
+                    </div>
+                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.montant_demande)}</div>
                 </div>
-                {demande.type_revenu === 'Journalier' && demande.revenu_journalier && (
-                  <div className="text-[10px] text-green-300/70 mt-1 italic">
-                    {formatMoney(demande.revenu_journalier)}/j
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/50 rounded-lg p-4">
-                <div className="text-cyan-400 text-sm mb-1">Charges</div>
-                <div className="text-xl md:text-2xl font-bold text-white break-words">
-                  {formatMoney(demande.charges_mensuelles ?? 0)}
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-purple-500/50 transition-colors">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
+                        <Wallet size={14} className="text-purple-400" /> Mensualité Est
+                    </div>
+                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(mensualite)}</div>
+                    <div className="text-[10px] text-slate-500">
+                        {demande.frequence_remboursement === 'DAILY' ? 'Journalier' : 
+                         demande.frequence_remboursement === 'WEEKLY' ? 'Hebdomadaire' : 
+                         demande.frequence_remboursement === 'MONTHLY' ? 'Mensuel' : 
+                         demande.frequence_remboursement}
+                    </div>
                 </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 border border-emerald-500/50 rounded-lg p-4">
-                <div className="text-emerald-400 text-sm mb-1">Endettement</div>
-                <div className={`text-2xl font-bold ${getEndettementColor(tauxEndettement)}`}>
-                  {tauxEndettement.toFixed(1)}%
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-emerald-500/50 transition-colors">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
+                        <PiggyBank size={14} className="text-emerald-400" /> Revenus Net
+                    </div>
+                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.revenus_mensuels ?? 0)}</div>
                 </div>
-                {tauxEndettement > 40 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <AlertTriangle size={12} className="text-amber-400" aria-hidden="true" />
-                    <span className="text-xs text-amber-400">Attention</span>
-                  </div>
-                )}
-              </div>
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-amber-500/50 transition-colors">
+                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
+                        <Percent size={14} className="text-amber-400" /> Endettement
+                    </div>
+                    <div className={`text-lg md:text-xl font-bold ${getEndettementColor(tauxEndettement)}`}>
+                        {tauxEndettement.toFixed(1)}%
+                    </div>
+                    {tauxEndettement > 40 && <div className="text-[10px] text-amber-500 font-medium">Attention</div>}
+                </div>
             </div>
 
-            {enquetes.length > 0 && (
-              <div className="space-y-4">
-                 <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2">
-                    <Shield size={18} /> Résultats des Enquêtes ({enquetes.length})
-                 </h3>
-                 {enquetes.map((enquete, index) => {
-                   const isExpanded = expandedEnquete === (enquete.id || `enquete-${index}`);
-                   const enqueteId = enquete.id || `enquete-${index}`;
-                   const isLatest = index === 0;
-
-                   // Determine status styling
-                   const getStatutStyle = (statut: string) => {
-                     const s = (statut || '').toLowerCase();
-                     if (s.includes('approuv') || s === 'approved') return { bg: 'bg-emerald-500/20', border: 'border-emerald-500/50', text: 'text-emerald-400', label: 'Approuvé' };
-                     if (s.includes('rejet') || s === 'rejected') return { bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400', label: 'Rejeté' };
-                     if (s.includes('cours') || s === 'in_progress') return { bg: 'bg-blue-500/20', border: 'border-blue-500/50', text: 'text-blue-400', label: 'En cours' };
-                     if (s.includes('reduit') || s === 'reduced') return { bg: 'bg-amber-500/20', border: 'border-amber-500/50', text: 'text-amber-400', label: 'Réduit' };
-                     return { bg: 'bg-purple-500/20', border: 'border-purple-500/50', text: 'text-purple-400', label: 'En attente' };
-                   };
-
-                   const statutStyle = getStatutStyle(enquete.statut);
-
-                   return (
-                     <div
-                       key={enqueteId}
-                       className={`${statutStyle.bg} border ${statutStyle.border} rounded-xl overflow-hidden transition-all duration-300 ${!isLatest && !isExpanded ? 'opacity-60' : ''}`}
-                     >
-                       {/* Header - Always visible */}
-                       <button
-                         onClick={() => setExpandedEnquete(isExpanded ? null : enqueteId)}
-                         className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
-                         aria-expanded={isExpanded}
-                       >
-                         <div className="flex items-center gap-4">
-                           <div className={`w-12 h-12 rounded-full ${statutStyle.bg} border ${statutStyle.border} flex items-center justify-center`}>
-                             <Shield className={statutStyle.text} size={22} />
-                           </div>
-                           <div className="text-left">
-                             <div className="flex items-center gap-2">
-                               <span className="text-white font-bold">Enquête #{enquetes.length - index}</span>
-                               {isLatest && (
-                                 <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full border border-cyan-500/30">
-                                   Dernière
-                                 </span>
-                               )}
+            {/* 2. MAIN GRID (Client + Details) */}
+            <div className="grid md:grid-cols-3 gap-5">
+                {/* LEFT: Client Profile */}
+                <div className="md:col-span-1 space-y-3">
+                    <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
+                        <div className="h-20 bg-gradient-to-r from-blue-900 to-slate-900 relative">
+                             <div className="absolute -bottom-8 left-4 w-16 h-16 rounded-full bg-slate-800 border-4 border-slate-800 flex items-center justify-center overflow-hidden">
+                                {clientAvatarUrl ? (
+                                    <img
+                                      src={clientAvatarUrl}
+                                      alt={safeClientName}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.onerror = null;
+                                        target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="1.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>')}`;
+                                      }}
+                                    />
+                                ) : (
+                                    <User size={30} className="text-slate-500" />
+                                )}
                              </div>
-                             <div className="flex items-center gap-3 mt-1">
-                               <span className={`text-sm ${statutStyle.text} font-semibold`}>{statutStyle.label}</span>
-                               <span className="text-slate-500">•</span>
-                               <span className="text-slate-400 text-sm">
-                                 {new Date(enquete.created_at || Date.now()).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                               </span>
-                             </div>
-                           </div>
-                         </div>
-
-                         <div className={`p-2 rounded-lg transition-colors ${isExpanded ? 'bg-white/10' : 'bg-transparent'}`}>
-                           {isExpanded ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
-                         </div>
-                       </button>
-
-                       {/* Expandable Content */}
-                       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                         <div className="px-4 pb-4 space-y-4 border-t border-slate-700/50">
-                           {/* Montant demandé */}
-                           {enquete.montant_demande && (
-                             <div className="pt-4 flex items-center gap-3 bg-slate-800/30 rounded-lg p-3">
-                               <DollarSign size={20} className="text-cyan-400" />
-                               <div>
-                                 <div className="text-xs text-slate-400">Montant évalué lors de l'enquête</div>
-                                 <div className="text-xl font-bold text-cyan-400">{formatMoney(enquete.montant_demande)}</div>
-                               </div>
-                             </div>
-                           )}
-
-                           {/* Financial Overview */}
-                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                               <DollarSign size={16} className="mx-auto mb-1 text-green-400" />
-                               <div className="text-lg font-bold text-white">
-                                 {(() => {
-                                   const typeRevenu = enquete.type_revenu || enquete.typeRevenu;
-                                   if (typeRevenu === 'Journalier' && (enquete.revenu_journalier || enquete.revenuJournalier)) {
-                                     return formatMoney(enquete.revenu_journalier || enquete.revenuJournalier || 0);
-                                   }
-                                   return formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0);
-                                 })()}
-                               </div>
-                               <div className="text-xs text-slate-400">
-                                 {(enquete.type_revenu || enquete.typeRevenu) === 'Journalier' ? 'Revenu/Jour' : 'Revenu Mensuel'}
-                               </div>
-                             </div>
-                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                               <TrendingUp size={16} className="mx-auto mb-1 text-cyan-400" />
-                               <div className="text-lg font-bold text-white">{formatMoney(enquete.charges_mensuelles || enquete.chargesMensuelles || 0)}</div>
-                               <div className="text-xs text-slate-400">Charges</div>
-                             </div>
-                             <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                               <Briefcase size={16} className="mx-auto mb-1 text-purple-400" />
-                               <div className="text-lg font-bold text-white">{formatMoney(enquete.capacite_remboursement || enquete.capaciteRemboursement || 0)}</div>
-                               <div className="text-xs text-slate-400">Capacité Remb.</div>
-                             </div>
-                           </div>
-
-                           {/* Activité & Situation */}
-                           <div className="grid md:grid-cols-2 gap-4">
-                             {/* Left Column - Activité */}
-                             <div className="bg-slate-800/30 rounded-lg p-4">
-                               <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                                 <Briefcase size={14} className="text-amber-400" /> Activité Professionnelle
-                               </h4>
-                               <dl className="space-y-2 text-sm">
-                                 {(enquete.categorie_activite || enquete.categorieActivite) && (
-                                   <div className="flex justify-between items-center">
-                                     <dt className="text-slate-400">Catégorie:</dt>
-                                     <dd className="text-amber-400 font-semibold">{enquete.categorie_activite || enquete.categorieActivite}</dd>
-                                   </div>
-                                 )}
-                                 {(enquete.type_activite || enquete.typeActivite) && (
-                                   <div className="flex justify-between items-center">
-                                     <dt className="text-slate-400">Type:</dt>
-                                     <dd className="text-white font-medium">{enquete.type_activite || enquete.typeActivite}</dd>
-                                   </div>
-                                 )}
-                                 <div className="flex justify-between items-center">
-                                   <dt className="text-slate-400">Ancienneté:</dt>
-                                   <dd className="text-white font-medium">
-                                     {(() => {
-                                       const mois = enquete.anciennete_activite || enquete.ancienneteActivite;
-                                       if (!mois) return 'Non spécifié';
-                                       if (mois >= 12) {
-                                         const ans = Math.floor(mois / 12);
-                                         const reste = mois % 12;
-                                         return reste > 0 ? `${ans} an${ans > 1 ? 's' : ''} et ${reste} mois` : `${ans} an${ans > 1 ? 's' : ''}`;
-                                       }
-                                       return `${mois} mois`;
-                                     })()}
-                                   </dd>
-                                 </div>
-                                 {(enquete.objet_credit || enquete.objetCredit) && (
-                                   <div className="pt-2 border-t border-slate-700/50">
-                                     <dt className="text-slate-400 text-xs mb-1">Description:</dt>
-                                     <dd className="text-slate-300 text-xs italic">"{enquete.objet_credit || enquete.objetCredit}"</dd>
-                                   </div>
-                                 )}
-                               </dl>
-                             </div>
-
-                             {/* Right Column - Situation Financière */}
-                             <div className="bg-slate-800/30 rounded-lg p-4">
-                               <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                                 <DollarSign size={14} className="text-green-400" /> Situation Financière
-                               </h4>
-                               <dl className="space-y-2 text-sm">
-                                 <div className="flex justify-between items-center">
-                                   <dt className="text-slate-400">Type de revenu:</dt>
-                                   <dd className="text-white font-medium">{enquete.type_revenu || enquete.typeRevenu || 'Non spécifié'}</dd>
-                                 </div>
-                                 {(enquete.type_revenu || enquete.typeRevenu) === 'Journalier' && (enquete.revenu_journalier || enquete.revenuJournalier) && (
-                                   <>
-                                     <div className="flex justify-between items-center">
-                                       <dt className="text-slate-400">Revenu journalier:</dt>
-                                       <dd className="text-green-400 font-semibold">{formatMoney(enquete.revenu_journalier || enquete.revenuJournalier)}/j</dd>
-                                     </div>
-                                     <div className="flex justify-between items-center bg-green-500/10 -mx-2 px-2 py-1 rounded">
-                                       <dt className="text-slate-400">Revenu mensuel (calculé):</dt>
-                                       <dd className="text-green-400 font-bold">{formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0)}</dd>
-                                     </div>
-                                   </>
-                                 )}
-                                 {(enquete.type_revenu || enquete.typeRevenu) !== 'Journalier' && (
-                                   <div className="flex justify-between items-center">
-                                     <dt className="text-slate-400">Revenu mensuel:</dt>
-                                     <dd className="text-green-400 font-semibold">{formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0)}</dd>
-                                   </div>
-                                 )}
-                                 <div className="flex justify-between items-center">
-                                   <dt className="text-slate-400">Autres prêts:</dt>
-                                   <dd className="text-white font-medium">{formatMoney(enquete.autre_prets || enquete.autrePrets || 0)}</dd>
-                                 </div>
-                                 <div className="flex justify-between items-center">
-                                   <dt className="text-slate-400">Personnes à charge:</dt>
-                                   <dd className="text-white font-medium">{enquete.personnes_charge ?? enquete.personnesCharge ?? 0}</dd>
-                                 </div>
-                                 {(enquete.type_habitation || enquete.typeHabitation) && (
-                                   <div className="flex justify-between items-center">
-                                     <dt className="text-slate-400">Habitation:</dt>
-                                     <dd className="text-white font-medium">{enquete.type_habitation || enquete.typeHabitation}</dd>
-                                   </div>
-                                 )}
-                               </dl>
-                             </div>
-                           </div>
-
-                           {/* Evaluation & Recommandation */}
-                           <div className="space-y-3">
-                             {enquete.evaluation_activite && (
-                               <div className="bg-slate-800/30 rounded-lg p-4">
-                                 <h4 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
-                                   <Briefcase size={14} className="text-amber-400" /> Évaluation de l'Activité
-                                 </h4>
-                                 <p className="text-slate-300 text-sm leading-relaxed">{enquete.evaluation_activite}</p>
-                               </div>
-                             )}
-
-                             {(enquete.recommandation || enquete.observations) && (
-                               <div className={`rounded-lg p-4 ${statutStyle.bg} border ${statutStyle.border}`}>
-                                 <h4 className={`text-sm font-semibold ${statutStyle.text} mb-2 flex items-center gap-2`}>
-                                   <MessageSquare size={14} /> Recommandation de l'Agent
-                                 </h4>
-                                 <p className="text-white text-sm leading-relaxed italic">
-                                   "{enquete.recommandation || enquete.observations || 'Aucune recommandation spécifique'}"
-                                 </p>
-                               </div>
-                             )}
-                           </div>
-
-                           {/* Agent Info */}
-                           {enquete.created_by && (
-                             <div className="flex items-center gap-2 pt-2 border-t border-slate-700/50">
-                               <UserCheck size={14} className="text-slate-500" />
-                               <span className="text-xs text-slate-500">
-                                 Enquête réalisée par l'agent terrain
-                               </span>
-                             </div>
-                           )}
-                         </div>
-                       </div>
-                     </div>
-                   );
-                 })}
-              </div>
-            )}
-
-            {/* Workflow Timeline */}
-            <div className="bg-slate-700/30 rounded-lg p-6">
-               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <Clock size={18} className="text-amber-400" />
-                  Historique du Workflow
-               </h3>
-               <CreditTimeline demandeId={demande.id} compact />
-            </div>
-
-            {/* Approval Form */}
-            {action === 'approve' && (
-              <div className="bg-green-500/10 border border-green-500/50 rounded-lg p-4 space-y-4">
-                <div className="flex items-center gap-2">
-                  <Shield className="text-green-400" size={20} aria-hidden="true" />
-                  <h3 className="text-lg font-bold text-green-400">Approbation du Crédit</h3>
-                </div>
-
-                <div>
-                  <label htmlFor="commentaire-approval" className="block text-sm font-semibold text-slate-300 mb-2">
-                    Commentaire d'Analyse
-                  </label>
-                  <textarea
-                    id="commentaire-approval"
-                    value={commentaire}
-                    onChange={(e) => setCommentaire(e.target.value)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                    rows={3}
-                    placeholder="Notes d'analyse et conditions..."
-                    maxLength={1000}
-                    disabled={loading}
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="text-sm font-semibold text-slate-300">Garanties (optionnel)</label>
-                    <button
-                      type="button"
-                      onClick={addGuarantee}
-                      disabled={loading || guarantees.length >= 5}
-                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500"
-                      aria-label="Ajouter une garantie"
-                    >
-                      + Ajouter
-                    </button>
-                  </div>
-
-                  {guarantees.map((guarantee, index) => (
-                    <div key={index} className="bg-slate-700/50 rounded-lg p-3 mb-3">
-                      <div className="grid md:grid-cols-3 gap-3">
-                        <div>
-                          <label htmlFor={`guarantee-type-${index}`} className="sr-only">
-                            Type de garantie {index + 1}
-                          </label>
-                          <select
-                            id={`guarantee-type-${index}`}
-                            value={guarantee.type_garantie}
-                            onChange={(e) => updateGuarantee(index, 'type_garantie', e.target.value)}
-                            className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            disabled={loading}
-                          >
-                            {GUARANTEE_TYPES.map(type => (
-                              <option key={type.value} value={type.value}>{type.label}</option>
-                            ))}
-                          </select>
                         </div>
-                        <div>
-                          <label htmlFor={`guarantee-desc-${index}`} className="sr-only">
-                            Description garantie {index + 1}
-                          </label>
-                          <input
-                            id={`guarantee-desc-${index}`}
-                            type="text"
-                            value={guarantee.description}
-                            onChange={(e) => updateGuarantee(index, 'description', e.target.value)}
-                            placeholder="Description"
-                            className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            maxLength={200}
-                            disabled={loading}
-                          />
+                        <div className="pt-10 px-4 pb-4">
+                            <h3 className="font-bold text-white text-lg leading-tight">{safeClientName}</h3>
+                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                <Mail size={12} /> {demande.clients.email || 'Pas d\'email'}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                <Phone size={12} /> {demande.clients.phone || 'Pas de téléphone'}
+                            </div>
+                            
+                            <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-2 text-center">
+                                <div>
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Score Remb.</div>
+                                    <div className="text-emerald-400 font-bold">{demande.clients.taux_remboursement ?? 0}%</div>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">En cours</div>
+                                    <div className="text-white font-bold text-xs">{formatMoney(demande.clients.credit_total ?? 0)}</div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <label htmlFor={`guarantee-value-${index}`} className="sr-only">
-                              Valeur estimée garantie {index + 1}
-                            </label>
-                            <input
-                              id={`guarantee-value-${index}`}
-                              type="number"
-                              inputMode="numeric"
-                              min="0"
-                              max={VALIDATION_LIMITS.MAX_CREDIT}
-                              value={guarantee.valeur_estimee}
-                              onChange={(e) => updateGuarantee(index, 'valeur_estimee', e.target.value)}
-                              placeholder="Valeur (FCFA)"
-                              className={`w-full bg-slate-700 border ${errors[`guarantee_${index}`] ? 'border-red-500' : 'border-slate-600'} rounded px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500`}
-                              disabled={loading}
-                              aria-invalid={!!errors[`guarantee_${index}`]}
-                            />
-                            {errors[`guarantee_${index}`] && (
-                              <p className="text-red-400 text-xs mt-1" role="alert">{errors[`guarantee_${index}`]}</p>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeGuarantee(index)}
-                            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition focus:outline-none focus:ring-2 focus:ring-red-500"
-                            aria-label={`Supprimer garantie ${index + 1}`}
-                            disabled={loading}
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Scheduled Disbursement */}
-                <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={scheduledDisbursement}
-                      onChange={(e) => setScheduledDisbursement(e.target.checked)}
-                      className="w-5 h-5 rounded border-slate-600 bg-slate-700 focus:ring-2 focus:ring-blue-500"
-                      disabled={loading}
-                    />
-                    <div>
-                      <p className="font-semibold text-white">Programmer le décaissement</p>
-                      <p className="text-sm text-slate-400">
-                        Le décaissement sera effectué automatiquement à la date choisie (9h du matin)
-                      </p>
+                    
+                    {/* Objet Credit Card */}
+                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                         <div className="flex items-center gap-2 mb-2 text-amber-400 font-semibold text-sm">
+                             <Briefcase size={14} /> Objet du crédit
+                         </div>
+                         <p className="text-slate-300 text-sm leading-relaxed italic">
+                             "{escapeHtml(demande.objet_credit)}"
+                         </p>
                     </div>
-                  </label>
 
-                  {scheduledDisbursement && (
-                    <div className="mt-4">
-                      <label htmlFor="disbursement-date" className="block text-sm font-semibold text-slate-300 mb-2">
-                        Date de décaissement <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        id="disbursement-date"
-                        type="date"
-                        value={disbursementDate}
-                        onChange={(e) => setDisbursementDate(e.target.value)}
-                        min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
-                        className={`w-full bg-slate-700 border ${errors.disbursementDate ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                        disabled={loading}
-                        required
-                      />
-                      {errors.disbursementDate && (
-                        <p className="text-red-400 text-sm mt-1" role="alert">{errors.disbursementDate}</p>
-                      )}
-                      <p className="text-xs text-slate-400 mt-2">
-                        💡 Le décaissement sera exécuté automatiquement à 9h du matin à la date choisie
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Rejection Form */}
-            {action === 'reject' && (
-              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <XCircle className="text-red-400" size={20} aria-hidden="true" />
-                  <h3 className="text-lg font-bold text-red-400">Rejet de la Demande</h3>
-                </div>
-                <label htmlFor="commentaire-reject" className="block text-sm font-semibold text-slate-300 mb-2">
-                  Motif du Rejet <span className="text-red-400">*</span>
-                </label>
-                  <textarea
-                    id="commentaire-reject"
-                    value={commentaire}
-                    onChange={(e) => {
-                      setCommentaire(e.target.value);
-                      if (errors.commentaire) setErrors(prev => ({ ...prev, commentaire: '' }));
-                    }}
-                    className={`w-full bg-slate-700 border ${errors.commentaire ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500`}
-                    rows={3}
-                    placeholder="Expliquer les raisons du rejet..."
-                    maxLength={1000}
-                    disabled={loading}
-                    aria-invalid={!!errors.commentaire}
-                    aria-describedby={errors.commentaire ? 'reject-error' : undefined}
-                  />
-                  {errors.commentaire && (
-                    <p id="reject-error" className="text-red-400 text-sm mt-1" role="alert">{errors.commentaire}</p>
-                  )}
-
-                {/* Refund Input - Only if fees paid */}
-                {(demande.frais_engagement_payes || (demande.montant_frais_engagement && demande.montant_frais_engagement > 0)) && (
-                   <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-600">
-                      <div className="flex justify-between items-center mb-2">
-                        <label htmlFor="reimbursement-amount" className="text-sm font-semibold text-slate-300">
-                          Remboursement des Frais (Optionnel)
-                        </label>
-                        <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">
-                          Payé: {formatMoney(demande.montant_frais_engagement || 0)}
-                        </span>
-                      </div>
-                      
-                      <div className="relative">
-                        <input
-                          id="reimbursement-amount"
-                          type="number"
-                          value={reimbursementAmount}
-                          onChange={(e) => setReimbursementAmount(e.target.value)}
-                          className={`w-full bg-slate-700 border ${errors.reimbursement ? 'border-red-500' : 'border-slate-600'} rounded-lg pl-3 pr-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500`}
-                          placeholder="Montant du remboursement"
-                          min="0"
-                          max={demande.montant_frais_engagement}
-                          disabled={loading}
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">
-                          FCFA
+                    {/* Solvency Analysis Card (Dynamic) */}
+                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                        <div className="flex items-center justify-between mb-3">
+                             <div className="flex items-center gap-2 text-slate-300 font-semibold text-sm">
+                                 <TrendingUp size={14} className={solvencyColor} /> Score Solvabilité
+                             </div>
+                             <span className={`text-xl font-bold ${solvencyColor}`}>{solvencyScore}/100</span>
                         </div>
-                      </div>
-                      {errors.reimbursement ? (
-                        <p className="text-red-400 text-xs mt-1">{errors.reimbursement}</p>
-                      ) : (
-                        <p className="text-slate-400 text-xs mt-1">
-                          Laissez vide si aucun remboursement. Le montant sera crédité sur le compte courant du client.
+                        
+                        {/* Progress Bar */}
+                        <div className="w-full bg-slate-700/50 rounded-full h-2 mb-3">
+                            <div 
+                                className={`h-2 rounded-full transition-all duration-1000 ${
+                                    solvencyScore >= 70 ? 'bg-emerald-500' : 
+                                    solvencyScore >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                                }`} 
+                                style={{ width: `${solvencyScore}%` }}
+                            ></div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            {solvencyAnalysis || "Analyse en cours..."}
                         </p>
-                      )}
-                   </div>
-                )}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              {showActions ? (
-                !action ? (
-                  canApproveCredits ? (
-                    <>
-                      <button
-                        onClick={() => setAction('reject')}
-                        disabled={loading}
-                        className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
-                      >
-                        <XCircle size={20} aria-hidden="true" />
-                        Rejeter
-                      </button>
-                      <button
-                        onClick={() => setAction('approve')}
-                        disabled={loading}
-                        className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                      >
-                        <CheckCircle size={20} aria-hidden="true" />
-                        Approuver
-                      </button>
-                    </>
-                  ) : (
-                    <div className="flex-1 px-6 py-3 bg-slate-700 text-slate-400 rounded-lg text-center flex items-center justify-center gap-2">
-                      <AlertCircle size={20} aria-hidden="true" />
-                      Vous n'avez pas la permission d'approuver les crédits
                     </div>
-                  )
-                ) : (
-                  <>
-                    <button
-                      onClick={handleCancel}
-                      disabled={loading}
-                      className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      onClick={handleSubmitAction}
-                      disabled={loading}
-                      className={`flex-1 px-6 py-3 ${
-                        action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
-                      } text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 ${
-                        action === 'approve' ? 'focus:ring-green-500' : 'focus:ring-red-500'
-                      } flex items-center justify-center gap-2`}
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 size={20} className="animate-spin" aria-hidden="true" />
-                          Traitement...
-                        </>
-                      ) : action === 'approve' ? (
-                        'Confirmer Approbation'
-                      ) : (
-                        'Confirmer Rejet'
-                      )}
-                    </button>
-                  </>
-                )
-              ) : (
-                <div className="flex-1 flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={onClose}
-                    className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
-                  >
-                    Fermer le dossier
-                  </button>
                 </div>
-              )}
+
+                {/* RIGHT: Request Details & Verification */}
+                <div className="md:col-span-2 space-y-4">
+                     {/* Details Grid */}
+                     <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                        <h4 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wide flex items-center gap-2">
+                             <LayoutDashboard size={14} /> Caractéristiques
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-2">
+                            <div>
+                                <div className="text-xs text-slate-500 mb-1">Date Demande</div>
+                                <div className="text-sm text-white font-medium flex items-center gap-1">
+                                    <Calendar size={12} className="text-slate-600" />
+                                    {new Date(demande.created_at || demande.date_demande).toLocaleDateString('fr-FR')}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-slate-500 mb-1">Durée</div>
+                                <div className="text-sm text-white font-medium">
+                                    {demande.duree_valeur} <span className="text-slate-400 lowercase">
+                                        {['Jour', 'day', 'Day', 'JOUR', 'DAY'].includes(demande.duree_unite)
+                                            ? (demande.duree_valeur === 1 ? 'jour' : 'jours') :
+                                         ['Semaine', 'week', 'Week', 'SEMAINE', 'WEEK'].includes(demande.duree_unite)
+                                            ? (demande.duree_valeur === 1 ? 'semaine' : 'semaines') :
+                                         ['Mois', 'month', 'Month', 'MOIS', 'MONTH'].includes(demande.duree_unite)
+                                            ? 'mois' : demande.duree_unite}
+                                    </span>
+                                </div>
+                            </div>
+                             <div>
+                                <div className="text-xs text-slate-500 mb-1">Nb Échéances</div>
+                                <div className="text-sm text-white font-medium">
+                                    {nombreEcheancesCalc} <span className="text-slate-400 text-xs">
+                                        ({demande.frequence_remboursement === 'DAILY' ? 'Journalier' : 
+                                          demande.frequence_remboursement === 'WEEKLY' ? 'Hebdomadaire' : 
+                                          demande.frequence_remboursement === 'MONTHLY' ? 'Mensuel' : 
+                                          demande.frequence_remboursement})
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-slate-500 mb-1">Taux Intérêt</div>
+                                <div className="text-sm text-white font-medium">{demande.taux_interet}%</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-slate-500 mb-1">Type Crédit</div>
+                                <div className="text-sm text-white font-medium truncate">
+                                    {demande.type_credit === 'PERSONAL' ? 'Personnel' : 
+                                     demande.type_credit === 'BUSINESS' ? 'Business' : 
+                                     (demande.type_credit || 'Standard')}
+                                </div>
+                            </div>
+                        </div>
+                     </div>
+
+                     {/* Enquêtes Section (Compact) */}
+                     {enquetes.length > 0 && (
+                         <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                             <div className="p-3 bg-slate-800/80 border-b border-slate-700 flex justify-between items-center">
+                                 <h4 className="text-sm font-semibold text-purple-400 flex items-center gap-2">
+                                     <Shield size={14} /> Vérification Terrain ({enquetes.length})
+                                 </h4>
+                             </div>
+                             
+                             <div className="divide-y divide-slate-700/50">
+                                 {enquetes.map((enquete, idx) => (
+                                     <div key={enquete.id || idx} className="p-3 hover:bg-slate-700/30 transition-colors">
+                                         <div 
+                                            className="flex items-center justify-between cursor-pointer"
+                                            onClick={() => setExpandedEnquete(expandedEnquete === (enquete.id || idx) ? null : (enquete.id || idx))}
+                                         >
+                                             <div className="flex items-center gap-3">
+                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                                     (enquete.statut || '').toLowerCase().includes('appro') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600/20 text-slate-400'
+                                                 }`}>
+                                                     <Shield size={14} />
+                                                 </div>
+                                                 <div>
+                                                     <div className="text-sm text-white font-medium">Enquête #{enquetes.length - idx}</div>
+                                                     <div className="text-[10px] text-slate-400">
+                                                         {new Date(enquete.created_at).toLocaleDateString()} - Agent {enquete.created_by_name || 'Terrain'}
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                             {expandedEnquete === (enquete.id || idx) ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                                         </div>
+                                         
+                                         {/* Enhanced Expanded View - RESTORED FULL DETAILS */}
+                                         {expandedEnquete === (enquete.id || idx) && (
+                                             <div className="mt-3 pl-11 pr-2 pb-1 text-sm space-y-3 animation-fade-in border-t border-slate-700/50 pt-3">
+                                                 {/* Financial Grid */}
+                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                     <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
+                                                         <div className="text-xs text-slate-500">Revenus Estimés</div>
+                                                         <div className="text-emerald-400 font-bold">
+                                                            {formatMoney(enquete.revenu_mensuel || enquete.revenuMensuel || 0)}
+                                                         </div>
+                                                     </div>
+                                                     <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
+                                                         <div className="text-xs text-slate-500">Charges</div>
+                                                         <div className="text-white font-bold">
+                                                             {formatMoney(enquete.charges_mensuelles || enquete.chargesMensuelles || 0)}
+                                                         </div>
+                                                     </div>
+                                                     <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
+                                                         <div className="text-xs text-slate-500">Capacité Remb.</div>
+                                                         <div className="text-purple-400 font-bold">
+                                                             {formatMoney(
+                                                                 (enquete.capacite_remboursement || enquete.capaciteRemboursement) 
+                                                                 ?? Math.max(0, (enquete.revenu_mensuel || enquete.revenuMensuel || 0) - (enquete.charges_mensuelles || enquete.chargesMensuelles || 0))
+                                                             )}
+                                                         </div>
+                                                     </div>
+                                                 </div>
+
+                                                 {/* Activity Details */}
+                                                 <div className="grid md:grid-cols-2 gap-4 text-xs">
+                                                     <div className="space-y-2">
+                                                         <div>
+                                                             <span className="text-slate-500">Activité:</span>{' '}
+                                                             <span className="text-white">{enquete.type_activite || enquete.typeActivite || 'N/A'}</span>
+                                                         </div>
+                                                         <div>
+                                                             <span className="text-slate-500">Catégorie:</span>{' '}
+                                                             <span className="text-amber-400">{enquete.categorie_activite || enquete.categorieActivite || 'N/A'}</span>
+                                                         </div>
+                                                          <div>
+                                                             <span className="text-slate-500">Ancienneté:</span>{' '}
+                                                             <span className="text-white">{enquete.anciennete_activite || enquete.ancienneteActivite} mois</span>
+                                                         </div>
+                                                     </div>
+                                                     <div className="space-y-2">
+                                                          <div>
+                                                             <span className="text-slate-500">Habitation:</span>{' '}
+                                                             <span className="text-white">{enquete.type_habitation || enquete.typeHabitation || 'N/A'}</span>
+                                                         </div>
+                                                         <div>
+                                                             <span className="text-slate-500">Pers. à charge:</span>{' '}
+                                                             <span className="text-white">{enquete.personnes_charge ?? enquete.personnesCharge ?? 0}</span>
+                                                         </div>
+                                                         <div>
+                                                             <span className="text-slate-500">Autres prêts:</span>{' '}
+                                                             <span className="text-white">{formatMoney(enquete.autre_prets || enquete.autrePrets || 0)}</span>
+                                                         </div>
+                                                     </div>
+                                                 </div>
+
+                                                 {/* Analysis & Comments - RESTORED EVALUATION */}
+                                                 <div className="space-y-2">
+                                                     {enquete.evaluation_activite && (
+                                                         <div className="bg-slate-900/50 p-3 rounded border border-slate-700/50">
+                                                             <span className="text-slate-500 block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
+                                                                <Briefcase size={12} className="text-amber-400" /> Analyse de l'Activité
+                                                             </span>
+                                                             <p className="text-slate-300 text-sm leading-relaxed">
+                                                                 {enquete.evaluation_activite}
+                                                             </p>
+                                                         </div>
+                                                     )}
+                                                     
+                                                     <div className="bg-slate-900/50 p-3 rounded border border-slate-700/50">
+                                                         <span className="text-slate-500 block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
+                                                            <MessageSquare size={12} className="text-purple-400" /> Avis / Recommandation
+                                                         </span>
+                                                         <p className="text-white italic text-sm">
+                                                             "{enquete.recommandation || enquete.observations || 'Aucune observation'}"
+                                                         </p>
+                                                     </div>
+                                                 </div>
+                                                 
+                                                 {/* Agent */}
+                                                 {enquete.created_by && (
+                                                     <div className="flex items-center gap-2 justify-end text-xs text-slate-500">
+                                                         <UserCheck size={12} />
+                                                         Vérifié par {enquete.created_by_name || 'Agent Terrain'}
+                                                     </div>
+                                                 )}
+                                             </div>
+                                         )}
+                                     </div>
+                                 ))}
+                             </div>
+                         </div>
+                     )}
+
+                     {/* Workflow Timeline (Collapsed by default logic if needed, but keeping it visible as requested) */}
+                     {/* We can make it compact */}
+                     <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700">
+                         <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-slate-300">
+                             <Clock size={14} className="text-amber-400" /> Historique
+                         </div>
+                         <CreditTimeline demandeId={demande.id} compact />
+                     </div>
+                </div>
             </div>
-          </div>
+
+            {/* ACTION AREA - Contextual Forms */}
+            {showActions && action && (
+                <div className="bg-slate-800 rounded-xl p-4 border border-slate-600 shadow-lg animate-in fade-in slide-in-from-bottom-4">
+                    {action === 'approve' ? (
+                        <div className="space-y-4">
+                            <h3 className="font-bold text-green-400 flex items-center gap-2">
+                                <CheckCircle size={18} /> Finaliser l'approbation
+                            </h3>
+                            
+                            <textarea
+                                value={commentaire}
+                                onChange={(e) => setCommentaire(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                rows={2}
+                                placeholder="Ajouter une note d'approbation (optionnel)..."
+                            />
+
+                            <div className="flex gap-4 items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                                <input
+                                  type="checkbox"
+                                  checked={scheduledDisbursement}
+                                  onChange={(e) => setScheduledDisbursement(e.target.checked)}
+                                  className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-green-600 focus:ring-green-500"
+                                />
+                                <div className="flex-1">
+                                    <span className="text-sm font-medium text-white block">Programmer le décaissement automatique</span>
+                                    {scheduledDisbursement && (
+                                        <input
+                                            type="date"
+                                            value={disbursementDate}
+                                            onChange={(e) => setDisbursementDate(e.target.value)}
+                                            min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                                            className="mt-2 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm w-full sm:w-auto"
+                                            required
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <h3 className="font-bold text-red-400 flex items-center gap-2">
+                                <XCircle size={18} /> Motiver le rejet
+                            </h3>
+                            <textarea
+                                value={commentaire}
+                                onChange={(e) => setCommentaire(e.target.value)}
+                                className="w-full bg-slate-900 border border-red-900/50 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                                rows={2}
+                                placeholder="Raison du rejet (Obligatoire)..."
+                            />
+                            {/* Refund option if fees paid */}
+                             {(demande.frais_engagement_payes || (demande.montant_frais_engagement && demande.montant_frais_engagement > 0)) && (
+                                <div className="bg-red-900/10 p-3 rounded-lg border border-red-900/30">
+                                    <label className="text-xs text-red-300 block mb-1">Rembourser les frais (Max: {formatMoney(demande.montant_frais_engagement || 0)})</label>
+                                    <input
+                                        type="number"
+                                        value={reimbursementAmount}
+                                        onChange={(e) => setReimbursementAmount(e.target.value)}
+                                        className="w-full bg-slate-900 border border-red-900/50 rounded px-3 py-1 text-white text-sm"
+                                        placeholder="Montant à rembourser..."
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+
+        {/* === FOOTER ACTIONS === */}
+        <div className="bg-slate-800 border-t border-slate-700 p-4 flex flex-col sm:flex-row gap-3 shrink-0">
+             {showActions ? (
+                !action ? (
+                    canApproveCredits ? (
+                        <>
+                            <button
+                                onClick={() => setAction('reject')}
+                                disabled={loading}
+                                className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-red-600/90 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                            >
+                                <XCircle size={18} /> Rejeter
+                            </button>
+                            <button
+                                onClick={() => setAction('approve')}
+                                disabled={loading}
+                                className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+                            >
+                                <CheckCircle size={18} /> Approuver le crédit
+                            </button>
+                        </>
+                    ) : (
+                         <div className="w-full text-center text-slate-500 text-sm py-2">
+                             Modération uniquement (Permissions insuffisantes)
+                         </div>
+                    )
+                ) : (
+                    <>
+                        <button
+                            onClick={handleCancel}
+                            className="px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            onClick={handleSubmitAction}
+                            disabled={loading}
+                            className={`flex-1 px-4 py-2.5 ${
+                                action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
+                            } text-white rounded-lg font-bold transition flex items-center justify-center gap-2`}
+                        >
+                            {loading && <Loader2 size={16} className="animate-spin" />}
+                            Confirmer {action === 'approve' ? 'Approbation' : 'Rejet'}
+                        </button>
+                    </>
+                )
+             ) : (
+                <button
+                    onClick={onClose}
+                    className="w-full px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition"
+                >
+                    Fermer le dossier
+                </button>
+             )}
         </div>
       </div>
-
-      {/* Confirmation Dialog - Approval */}
+      
+      {/* Modals & Dialogs */}
       <ConfirmDialog
         isOpen={showConfirmApprove}
-        title="Confirmer l'approbation du crédit"
-        message={`Vous êtes sur le point d'approuver un crédit de ${formatMoney(montantBase)} pour ${safeClientName}. Le dossier sera envoyé en Commission Crédit pour décaissement.`}
-        confirmText="Confirmer Approbation"
+        title="Confirmer l'approbation"
+        message={`Approuver le crédit de ${formatMoney(montantBase)} pour ${safeClientName} ?`}
+        confirmText="Oui, Approuver"
         cancelText="Annuler"
         onConfirm={handleApprove}
         onClose={() => setShowConfirmApprove(false)}
         variant="success"
       />
 
-      {/* Confirmation Dialog - Rejection */}
       <ConfirmDialog
         isOpen={showConfirmReject}
-        title="Confirmer le rejet de la demande"
-        message={`Vous êtes sur le point de rejeter la demande de crédit de ${safeClientName} pour un montant de ${formatMoney(demande.montant_demande)}. Le client sera notifié du rejet.`}
-        confirmText="Confirmer le rejet"
+        title="Confirmer le rejet"
+        message="Êtes-vous sûr de vouloir rejeter cette demande ?"
+        confirmText="Oui, Rejeter"
         cancelText="Annuler"
         onConfirm={handleReject}
         onClose={() => setShowConfirmReject(false)}
         variant="danger"
       />
 
-      {/* Reevaluation Modal */}
       {showReevaluationModal && (
         <ReevaluationModal
           demande={{
@@ -1162,11 +945,11 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
           onClose={() => setShowReevaluationModal(false)}
           onSuccess={() => {
             setShowReevaluationModal(false);
-            toast.success('Demande de réévaluation soumise avec succès');
+            toast.success('Réévaluation soumise');
             onSuccess();
           }}
         />
       )}
-    </>
+    </div>
   );
 }

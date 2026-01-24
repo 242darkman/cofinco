@@ -867,8 +867,19 @@ export function registerFinanceRoutes(app: Express) {
 
       let updated;
 
+      // Auto-transition: UNDER_INVESTIGATION → INVESTIGATION_COMPLETE → APPROVED
+      // When approving from investigation status, automatically complete the investigation first
+      if (updateData.statut === StatutDemande.APPROVED && existing.statut === StatutDemande.UNDER_INVESTIGATION) {
+        // First transition to INVESTIGATION_COMPLETE, then to APPROVED in a transaction
+        updated = await db.transaction(async (tx) => {
+          // Step 1: Complete the investigation
+          await storage.updateDemandeCredit(id, { statut: StatutDemande.INVESTIGATION_COMPLETE }, tx);
+          // Step 2: Approve
+          return await storage.updateDemandeCredit(id, updateData, tx);
+        });
+      }
       // Logic for Refund on Rejection
-      if (updateData.statut === StatutDemande.REJECTED && updateData.montantRemboursement && Number(updateData.montantRemboursement) > 0) {
+      else if (updateData.statut === StatutDemande.REJECTED && updateData.montantRemboursement && Number(updateData.montantRemboursement) > 0) {
           const refundAmount = Number(updateData.montantRemboursement);
 
           updated = await db.transaction(async (tx) => {
@@ -2743,178 +2754,175 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   /**
-   * POST /api/finance/credit-refunds/:id/pay - Execute Payment (Cash or Account)
+   * POST /api/finance/credit-refunds/:id/pay - Execute Payment (Cash, Account or Mobile Money)
+   *
+   * Flow:
+   * - ACCOUNT: Direct transfer to client's current account (immediate)
+   * - CASH/MOBILE_MONEY: Requires caisse validation - sets status to PENDING_CAISSE
    */
-  app.post("/api/finance/credit-refunds/:id/pay", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CAISSIER, SystemRole.CHEF_AGENCE), async (req, res) => {
-    const { method, sessionCaisseId } = req.body; // method: 'CASH' | 'ACCOUNT'
+  app.post("/api/finance/credit-refunds/:id/pay", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+    const { method, sessionCaisseId } = req.body; // method: 'CASH' | 'ACCOUNT' | 'MOBILE_MONEY'
     const user = req.session.user!;
 
     try {
-       // Using simpler transaction wrapper because we need explicit logic
        const refundId = req.params.id;
-       
+
+       // Get refund first
+       const [refundData] = await db
+          .select()
+          .from(creditRefundRequests)
+          .where(eq(creditRefundRequests.id, refundId));
+
+       if (!refundData) {
+          return res.status(404).json({ message: "Remboursement non trouvé" });
+       }
+       if (refundData.statut !== 'APPROVED') {
+          return res.status(400).json({ message: `Le remboursement doit être approuvé avant paiement (statut actuel: ${refundData.statut})` });
+       }
+
+       // For CASH or MOBILE_MONEY: Set to PENDING_CAISSE and notify caisse
+       if (method === 'CASH' || method === 'MOBILE_MONEY') {
+          // Update to PENDING_CAISSE status
+          await db.update(creditRefundRequests).set({
+             statut: 'PENDING_CAISSE',
+             paymentMethod: method,
+             updatedAt: new Date()
+          }).where(eq(creditRefundRequests.id, refundId));
+
+          // Log Audit
+          await logAudit(req, "REFUND_PENDING_CAISSE", "credit_refund", refundId, { method }, "success", "medium");
+
+          // Broadcast WebSocket notification for caisse
+          const wsInstance = getWsInstance();
+          if (wsInstance) {
+             wsInstance.broadcast({
+                type: "REFUND_PENDING_CAISSE",
+                payload: {
+                   refundId,
+                   method,
+                   amount: refundData.montantRemboursable,
+                   agenceId: refundData.agenceId,
+                   clientId: refundData.clientId
+                }
+             });
+          }
+
+          const updated = await storage.getCreditRefundRequest(refundId);
+          return res.json({
+             ...(addSnakeCaseAliasesDeep(updated) as Record<string, unknown>),
+             message: method === 'CASH'
+                ? 'Remboursement en attente de validation caisse. Le caissier doit confirmer le paiement.'
+                : 'Remboursement Mobile Money en attente de validation caisse.'
+          });
+       }
+
+       // For ACCOUNT: Execute immediate payment (existing flow)
        await db.transaction(async (tx) => {
           // 1. Lock and Get Refund
-          const [refundData] = await tx
+          const [refundDataLocked] = await tx
              .select()
              .from(creditRefundRequests)
-             .where(eq(creditRefundRequests.id, refundId))
-             //.for('update') // drizzle support for lock? .for('update') might need raw sql or specific driver support
-             ;
-             
-          if (!refundData) throw new Error("Refund not found");
-          if (refundData.statut !== 'APPROVED') throw new Error("Refund must be APPROVED before payment");
+             .where(eq(creditRefundRequests.id, refundId));
 
-          const amount = Number(refundData.montantRemboursable);
+          if (!refundDataLocked) throw new Error("Refund not found");
+          if (refundDataLocked.statut !== 'APPROVED') throw new Error("Refund must be APPROVED before payment");
+
+          const amount = Number(refundDataLocked.montantRemboursable);
 
           // 2. Prepare Ledger Transaction
-          // Dynamic import removed
           let mouvement;
           let paymentRefString = '';
 
-          if (method === 'ACCOUNT') {
-             // Credit Client Account
-             const clientAccounts = await storage.getComptesByClient(refundData.clientId);
-             const courantAccount = clientAccounts.find(c => c.typeCompte === TypeCompte.CURRENT && c.statut === StatutCompte.ACTIVE);
-             if (!courantAccount) throw new Error("No active current account found for client");
+          // Credit Client Account (ACCOUNT method only at this point)
+          const clientAccounts = await storage.getComptesByClient(refundDataLocked.clientId);
+          const courantAccount = clientAccounts.find(c => c.typeCompte === TypeCompte.CURRENT && c.statut === StatutCompte.ACTIVE);
+          if (!courantAccount) throw new Error("No active current account found for client");
 
+          // Get client for agency info
+          const client = await storage.getClient(refundDataLocked.clientId);
+          if (!client) throw new Error("Client not found");
 
+          // CRITICAL: Always use the CLIENT'S agency for the source of funds
+          const sourceAgenceId = client.agenceId;
+          if (!sourceAgenceId) throw new Error("Client has no agency assigned");
 
-             // 1. Identify Client Account & Agency
-             // Already found above as 'courantAccount'. We also need the client to know THEIR agency
-             const client = await storage.getClient(refundData.clientId);
-             if (!client) throw new Error("Client not found");
-             
-             // CRITICAL: Always use the CLIENT'S agency for the source of funds, 
-             // regardless of who is processing the refund (e.g. Admin at Siege)
-             const sourceAgenceId = client.agenceId;
+          // Identify Agency Safe (Coffre-Fort) for Source of Funds
+          const [agencyCoffre] = await tx.select()
+              .from(coffresForts)
+              .where(eq(coffresForts.ownerId, sourceAgenceId));
+          if (!agencyCoffre) throw new Error("Agency safe not found for refund source");
 
-
-             if (!sourceAgenceId) throw new Error("Client has no agency assigned");
-
-             if (!courantAccount) throw new Error("Client has no current account to receive refund");
-
-             // 2. Identify Agency Safe (Coffre-Fort) for Source of Funds
-             const [agencyCoffre] = await tx.select()
-                 .from(coffresForts)
-                 .where(
-                     eq(coffresForts.ownerId, sourceAgenceId)
-                 );
-             if (!agencyCoffre) throw new Error("Agency safe not found for refund source");
-
-             // 3. Check Safe Balance
-             const safeBalance = Number(agencyCoffre.solde || 0);
-             const refundAmount = Number(amount);
-             if (safeBalance < refundAmount) {
-                 throw new Error(`Insufficient funds in agency safe (Required: ${refundAmount}, Available: ${safeBalance})`);
-             }
-
-             // 4. DEBIT SAFE (Source)
-             // 4a. Update Safe Balance
-             await tx.update(coffresForts)
-               .set({ 
-                   solde: sql`${coffresForts.solde} - ${refundAmount}`,
-                   updatedAt: new Date()
-               })
-               .where(eq(coffresForts.id, agencyCoffre.id));
-
-             // 4b. Create Debit Mouvement (Coffre)
-             const coffreMouvement = await createMouvementFinancier(tx, {
-               montant: refundAmount.toString(),
-               sens: 'DEBIT',
-               sourceModule: 'COFFRE', // Money leaves the safe
-               typePaiement: 'Transfert Sortant',
-               sourceId: agencyCoffre.id,
-               agenceId: refundData.agenceId,
-               metadata: { 
-                   type: 'REFUND_SOURCE', 
-                   refundId: refundData.id, 
-                   coffreId: agencyCoffre.id,
-                   description: `Source pour rbt frais (Ref: ${refundData.id})`
-               }
-             }, user.id);
-
-             // 5. CREDIT CLIENT ACCOUNT (Destination)
-             // 5a. Create Credit Mouvement (Account) linked to source
-             mouvement = await createMouvementFinancier(tx, {
-               montant: refundAmount.toString(),
-               sens: 'CREDIT',
-               sourceModule: 'SYSTEME', // Or 'COFFRE' but functionally it's a deposit
-               typePaiement: 'Dépôt Courant',
-               clientId: refundData.clientId,
-               compteId: courantAccount.id,
-               // Link to the source debit for audit
-               metadata: { 
-                   type: 'REFUND_PAYMENT', 
-                   refundId: refundData.id, 
-                   demandeId: refundData.demandeId,
-                   sourceMouvementId: coffreMouvement.id 
-               }
-             }, user.id);
-             
-             // 5b. Update Client Account Balance
-             // We use the helper if available, or manual update if not easily reachable in this scope.
-             // Given imports, we'll do manual SQL update to be safe and atomic here.
-             const [updatedAccount] = await tx.update(comptes)
-                 .set({
-                     soldeCourant: sql`${comptes.soldeCourant} + ${refundAmount}`,
-                     updatedAt: new Date()
-                 })
-                 .where(eq(comptes.id, courantAccount.id))
-                 .returning();
-
-             // 5c. Create Transaction Record (Crucial for History Display)
-             await tx.insert(transactionsCompte).values({
-               compteId: courantAccount.id,
-               mouvementId: mouvement.id,
-               typePaiement: 'DEPOSIT_CURRENT',
-               montant: refundAmount.toString(),
-               soldeApres: updatedAccount.soldeCourant,
-               methodePaiement: 'TRANSFER',
-               observations: `Remboursement Frais Dossier (Ref: ${refundData.id})`,
-               createdBy: user.id
-             });
-             
-             paymentRefString = `VIREMENT-${mouvement.reference}`;
-
-          } else if (method === 'CASH') {
-             // Cash Payment (Requires Active Session)
-             if (!sessionCaisseId) throw new Error("Session Caisse ID required for cash payment");
-             
-             // Check Session Balance
-             const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionCaisseId));
-             if (!session || session.closedAt) throw new Error("Session caisse invalid or closed");
-             
-             // Debit Caisse -> Insert Operation
-             const [op] = await tx.insert(operationsCaisse).values({
-               sessionId: sessionCaisseId,
-               typeOperation: 'WITHDRAWAL_CURRENT',
-               montant: amount.toString(),
-               methodePaiement: 'CASH',
-               reference: `REFUND-${refundData.id.substring(0,8)}`,
-               description: `Remboursement Frais (Ref: ${refundData.id})`,
-               clientId: refundData.clientId,
-               createdBy: user.id
-             }).returning();
-             
-             // Ledger Mouvement
-             mouvement = await createMouvementFinancier(tx, {
-               montant: amount.toString(),
-               sens: 'DEBIT',
-               sourceModule: 'SYSTEME',
-               sourceId: op.id,
-               typePaiement: 'Retrait Courant',
-               sessionCaisseId: sessionCaisseId,
-               clientId: refundData.clientId,
-               metadata: { type: 'REFUND_PAYMENT', refundId: refundData.id, operationId: op.id, demandeId: refundData.demandeId }
-             }, user.id);
-             
-             paymentRefString = `CASH-${op.reference}`;
-          } else {
-             throw new Error("Invalid payment method");
+          // Check Safe Balance
+          const safeBalance = Number(agencyCoffre.solde || 0);
+          const refundAmount = Number(amount);
+          if (safeBalance < refundAmount) {
+              throw new Error(`Insufficient funds in agency safe (Required: ${refundAmount}, Available: ${safeBalance})`);
           }
 
-          // 3. Update Refund Note Status
+          // DEBIT SAFE (Source)
+          await tx.update(coffresForts)
+            .set({
+                solde: sql`${coffresForts.solde} - ${refundAmount}`,
+                updatedAt: new Date()
+            })
+            .where(eq(coffresForts.id, agencyCoffre.id));
+
+          // Create Debit Mouvement (Coffre)
+          const coffreMouvement = await createMouvementFinancier(tx, {
+            montant: refundAmount.toString(),
+            sens: 'DEBIT',
+            sourceModule: 'COFFRE',
+            typePaiement: 'Transfert Sortant',
+            sourceId: agencyCoffre.id,
+            agenceId: refundDataLocked.agenceId,
+            metadata: {
+                type: 'REFUND_SOURCE',
+                refundId: refundDataLocked.id,
+                coffreId: agencyCoffre.id,
+                description: `Source pour rbt frais (Ref: ${refundDataLocked.id})`
+            }
+          }, user.id);
+
+          // CREDIT CLIENT ACCOUNT (Destination)
+          mouvement = await createMouvementFinancier(tx, {
+            montant: refundAmount.toString(),
+            sens: 'CREDIT',
+            sourceModule: 'SYSTEME',
+            typePaiement: 'Dépôt Courant',
+            clientId: refundDataLocked.clientId,
+            compteId: courantAccount.id,
+            metadata: {
+                type: 'REFUND_PAYMENT',
+                refundId: refundDataLocked.id,
+                demandeId: refundDataLocked.demandeId,
+                sourceMouvementId: coffreMouvement.id
+            }
+          }, user.id);
+
+          // Update Client Account Balance
+          const [updatedAccount] = await tx.update(comptes)
+              .set({
+                  soldeCourant: sql`${comptes.soldeCourant} + ${refundAmount}`,
+                  updatedAt: new Date()
+              })
+              .where(eq(comptes.id, courantAccount.id))
+              .returning();
+
+          // Create Transaction Record
+          await tx.insert(transactionsCompte).values({
+            compteId: courantAccount.id,
+            mouvementId: mouvement.id,
+            typePaiement: 'DEPOSIT_CURRENT',
+            montant: refundAmount.toString(),
+            soldeApres: updatedAccount.soldeCourant,
+            methodePaiement: 'TRANSFER',
+            observations: `Remboursement Frais Dossier (Ref: ${refundDataLocked.id})`,
+            createdBy: user.id
+          });
+
+          paymentRefString = `VIREMENT-${mouvement.reference}`;
+
+          // Update Refund Status to PAID
           await tx.update(creditRefundRequests).set({
              statut: 'PAID',
              paidAt: new Date(),
@@ -2922,7 +2930,7 @@ export function registerFinanceRoutes(app: Express) {
              paymentMethod: method,
              paymentReference: paymentRefString,
              mouvementId: mouvement.id
-          }).where(eq(creditRefundRequests.id, refundData.id));
+          }).where(eq(creditRefundRequests.id, refundDataLocked.id));
           
        });
 
@@ -2931,6 +2939,166 @@ export function registerFinanceRoutes(app: Express) {
        
     } catch (error: any) {
        console.error("Payment Error", error);
+       res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * POST /api/finance/credit-refunds/:id/validate-caisse - Caisse validates and executes Cash/Mobile Money payment
+   *
+   * This endpoint is called by caisse staff to confirm a PENDING_CAISSE refund.
+   * It requires an active caisse session and executes the actual payment.
+   */
+  app.post("/api/finance/credit-refunds/:id/validate-caisse", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), async (req, res) => {
+    const { sessionCaisseId } = req.body;
+    const user = req.session.user!;
+
+    try {
+       const refundId = req.params.id;
+
+       // Validate session caisse is required for cash payments
+       if (!sessionCaisseId) {
+          return res.status(400).json({ message: "Session caisse requise pour valider le paiement" });
+       }
+
+       await db.transaction(async (tx) => {
+          // 1. Get and validate refund
+          const [refundData] = await tx
+             .select()
+             .from(creditRefundRequests)
+             .where(eq(creditRefundRequests.id, refundId));
+
+          if (!refundData) throw new Error("Remboursement non trouvé");
+          if (refundData.statut !== 'PENDING_CAISSE') {
+             throw new Error(`Le remboursement doit être en attente de caisse (statut actuel: ${refundData.statut})`);
+          }
+
+          const amount = Number(refundData.montantRemboursable);
+          const paymentMethod = refundData.paymentMethod || 'CASH';
+
+          // 2. Validate session
+          const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionCaisseId));
+          if (!session || session.closedAt) {
+             throw new Error("Session caisse invalide ou fermée");
+          }
+
+          // 3. Create caisse operation (outgoing payment)
+          const [op] = await tx.insert(operationsCaisse).values({
+            sessionId: sessionCaisseId,
+            typeOperation: 'WITHDRAWAL_CURRENT',
+            montant: amount.toString(),
+            methodePaiement: paymentMethod === 'MOBILE_MONEY' ? 'MOBILE_MONEY' : 'CASH',
+            reference: `REFUND-${refundData.id.substring(0,8)}`,
+            description: `Remboursement Frais ${paymentMethod === 'MOBILE_MONEY' ? 'Mobile Money' : 'Espèces'} (Ref: ${refundData.id})`,
+            clientId: refundData.clientId,
+            createdBy: user.id
+          }).returning();
+
+          // 4. Create ledger mouvement
+          const mouvement = await createMouvementFinancier(tx, {
+            montant: amount.toString(),
+            sens: 'DEBIT',
+            sourceModule: 'CAISSE',
+            sourceId: op.id,
+            typePaiement: paymentMethod === 'MOBILE_MONEY' ? 'Mobile Money Sortant' : 'Retrait Espèces',
+            sessionCaisseId: sessionCaisseId,
+            clientId: refundData.clientId,
+            agenceId: refundData.agenceId,
+            metadata: {
+               type: 'REFUND_PAYMENT',
+               refundId: refundData.id,
+               operationId: op.id,
+               demandeId: refundData.demandeId,
+               method: paymentMethod
+            }
+          }, user.id);
+
+          const paymentRefString = paymentMethod === 'MOBILE_MONEY'
+             ? `MOMO-${op.reference}`
+             : `CASH-${op.reference}`;
+
+          // 5. Update refund to PAID
+          await tx.update(creditRefundRequests).set({
+             statut: 'PAID',
+             paidAt: new Date(),
+             paidBy: user.id,
+             paymentReference: paymentRefString,
+             mouvementId: mouvement.id,
+             updatedAt: new Date()
+          }).where(eq(creditRefundRequests.id, refundData.id));
+       });
+
+       // Log audit
+       await logAudit(req, "VALIDATE_CAISSE_REFUND", "credit_refund", refundId, { sessionCaisseId }, "success", "medium");
+
+       // Broadcast update
+       const wsInstance = getWsInstance();
+       if (wsInstance) {
+          wsInstance.broadcast({
+             type: "REFUND_PAID",
+             payload: { refundId }
+          });
+       }
+
+       const updated = await storage.getCreditRefundRequest(refundId);
+       res.json({
+          ...(addSnakeCaseAliasesDeep(updated) as Record<string, unknown>),
+          message: 'Paiement validé avec succès. Le remboursement a été effectué.'
+       });
+
+    } catch (error: any) {
+       console.error("Caisse Validation Error", error);
+       res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * GET /api/finance/credit-refunds/pending-caisse - List refunds awaiting caisse validation
+   */
+  app.get("/api/finance/credit-refunds/pending-caisse", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess(), async (req, res) => {
+    try {
+       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+
+       const conditions = [eq(creditRefundRequests.statut, 'PENDING_CAISSE')];
+       if (agenceFilter?.agenceId) {
+          conditions.push(eq(creditRefundRequests.agenceId, agenceFilter.agenceId));
+       }
+
+       const results = await db.select({
+          refund: creditRefundRequests,
+          demande: demandesCredit,
+          client: clients
+       })
+       .from(creditRefundRequests)
+       .innerJoin(demandesCredit, eq(creditRefundRequests.demandeId, demandesCredit.id))
+       .innerJoin(clients, eq(creditRefundRequests.clientId, clients.id))
+       .where(and(...conditions))
+       .orderBy(desc(creditRefundRequests.updatedAt));
+
+       res.json(addSnakeCaseAliasesDeep(results));
+    } catch (error: any) {
+       res.status(500).json({ message: error.message });
+    }
+  });
+
+  /**
+   * GET /api/finance/credit-refunds/pending-caisse/count - Count refunds awaiting caisse validation
+   */
+  app.get("/api/finance/credit-refunds/pending-caisse/count", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess(), async (req, res) => {
+    try {
+       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+
+       const conditions = [eq(creditRefundRequests.statut, 'PENDING_CAISSE')];
+       if (agenceFilter?.agenceId) {
+          conditions.push(eq(creditRefundRequests.agenceId, agenceFilter.agenceId));
+       }
+
+       const [result] = await db.select({ count: count() })
+          .from(creditRefundRequests)
+          .where(and(...conditions));
+
+       res.json({ count: result?.count || 0 });
+    } catch (error: any) {
        res.status(500).json({ message: error.message });
     }
   });

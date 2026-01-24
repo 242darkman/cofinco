@@ -360,8 +360,11 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       clients: client ? {
         nom: user?.nom,
         prenom: user?.prenom,
-        telephone: user?.telephone,
-        photoProfile: user?.photoProfile,
+        email: user?.email,
+        phone: user?.telephone,
+        photo_url: user?.photoProfile,
+        taux_remboursement: Number(client.tauxRemboursement) || 0,
+        credit_total: Number(client.creditTotal) || 0,
         agence: agence?.nom,
         agenceId: client.agenceId
       } : undefined
