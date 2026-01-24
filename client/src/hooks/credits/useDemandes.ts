@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { StatutDemande } from '@shared/enum/status-constants';
 
 export interface DemandeCredit {
   id: string;
@@ -165,18 +166,36 @@ export function useDemandes() {
     }
   };
 
-  const getDemandesEnAttente = () => demandes.filter(d => d.statut === 'en_attente' || d.statut === 'pending');
+  // Normalize status to handle both legacy French and new English values
+  const normalizeStatut = (statut?: string): string => {
+    if (!statut) return StatutDemande.PENDING_FEES;
+    const s = statut.toLowerCase();
+    // Legacy French -> English
+    if (s === 'en_attente' || s === 'pending') return StatutDemande.PENDING_FEES;
+    if (s === 'approuve' || s === 'approuvee' || s === 'approved') return StatutDemande.APPROVED;
+    if (s === 'rejete' || s === 'rejetee' || s === 'rejected') return StatutDemande.REJECTED;
+    return statut.toUpperCase();
+  };
+
+  const getDemandesEnAttente = () => demandes.filter(d => {
+    const normalized = normalizeStatut(d.statut);
+    return normalized === StatutDemande.PENDING_FEES;
+  });
 
   const getStatutColor = (statut: string) => {
+    const normalized = normalizeStatut(statut);
     const colors: Record<string, string> = {
-      'en_attente': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      'pending': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      'approuve': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      'approved': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      'rejete': 'bg-red-500/20 text-red-400 border-red-500/30',
-      'rejected': 'bg-red-500/20 text-red-400 border-red-500/30'
+      [StatutDemande.PENDING_FEES]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      [StatutDemande.READY_FOR_INVESTIGATION]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      [StatutDemande.UNDER_INVESTIGATION]: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+      [StatutDemande.INVESTIGATION_COMPLETE]: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+      [StatutDemande.APPROVED]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      [StatutDemande.REJECTED]: 'bg-red-500/20 text-red-400 border-red-500/30',
+      [StatutDemande.DISBURSED]: 'bg-green-500/20 text-green-400 border-green-500/30',
+      [StatutDemande.CLOSED]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+      [StatutDemande.CANCELLED]: 'bg-gray-500/20 text-gray-400 border-gray-500/30'
     };
-    return colors[statut.toLowerCase()] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    return colors[normalized] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
   };
 
   useEffect(() => {

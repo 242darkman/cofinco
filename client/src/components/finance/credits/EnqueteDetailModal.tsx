@@ -79,11 +79,11 @@ export default function EnqueteDetailModal({ enquete, onClose }: EnqueteDetailMo
              <div>
                 <span className="text-slate-400 text-sm block">Statut Actuel</span>
                 <Badge variant={
-                    enquete.statut === 'approuve' ? 'success' :
-                    enquete.statut === 'rejete' ? 'danger' :
-                    enquete.statut === 'reduit' ? 'warning' : 'neutral'
+                    enquete.statut === 'APPROVED' ? 'success' :
+                    enquete.statut === 'REJECTED' ? 'danger' :
+                    enquete.statut === 'REDUCED' ? 'warning' : 'neutral'
                 }
-                value={enquete.statut?.toUpperCase()}
+                value={enquete.statut}
                 />
              </div>
           </div>

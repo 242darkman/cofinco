@@ -120,7 +120,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
   const { uploadFile: uploadActivityPhoto, isUploading: isUploadingPhoto } = useMinIOUpload({
     path: 'credit-investigations',
-    isPublic: false // Sensitive data
+    isPublic: true // Must be public to display in UI
   });
 
   useEffect(() => {
@@ -365,6 +365,16 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     }));
   };
 
+  // Convert storage key to display URL
+  const getPhotoDisplayUrl = (keyOrUrl: string): string => {
+    // If it's already a full URL (http/https or data URL), return as-is
+    if (keyOrUrl.startsWith('http') || keyOrUrl.startsWith('data:')) {
+      return keyOrUrl;
+    }
+    // Otherwise, it's a storage key - convert to API URL
+    return `/api/storage/files/${encodeURIComponent(keyOrUrl)}`;
+  };
+
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -514,7 +524,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
         geoLongitude: geoLocation.longitude,
         geoAccuracy: geoLocation.accuracy,
         geoTimestamp: geoLocation.timestamp,
-        statut: 'en_attente'
+        statut: 'PENDING'
       };
 
       // Offline Check
@@ -942,7 +952,15 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
               {formData.photos_activite.map((photo, index) => (
                 <div key={index} className="relative w-20 h-20">
-                  <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover rounded-lg" />
+                  <img
+                    src={getPhotoDisplayUrl(photo)}
+                    alt={`Photo ${index + 1}`}
+                    className="w-full h-full object-cover rounded-lg"
+                    onError={(e) => {
+                      // Show placeholder on error
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect fill="%23374151" width="80" height="80"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239CA3AF" font-size="10">Erreur</text></svg>';
+                    }}
+                  />
                   <button
                     type="button"
                     onClick={() => removePhoto(index)}

@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { StatutEnqueteCredit, STATUT_ENQUETE_CREDIT_LABELS } from '@shared/enum/status-constants';
+
+type StatutEnqueteCreditType = typeof StatutEnqueteCredit[keyof typeof StatutEnqueteCredit];
 
 export interface EnqueteCredit {
   id: string;
@@ -7,7 +10,7 @@ export interface EnqueteCredit {
   credit_id?: string;
   montant_demande: number;
   montant_approuve?: number;
-  statut: 'en_attente' | 'en_cours' | 'approuve' | 'rejete' | 'reduit';
+  statut: StatutEnqueteCreditType;
   type_activite: string;
   revenus_mensuels?: number;
   charges_mensuelles?: number;
@@ -46,7 +49,7 @@ export function useEnquetes() {
     try {
       const response = await fetch('/api/enquetes-credit');
       if (!response.ok) throw new Error('Erreur serveur');
-      
+
       const data = await response.json();
       setEnquetes(data || []);
     } catch (err) {
@@ -79,7 +82,7 @@ export function useEnquetes() {
 
   const validateEnquete = async (
     enqueteId: string,
-    decision: 'approuve' | 'rejete' | 'reduit',
+    decision: 'APPROVED' | 'REJECTED' | 'REDUCED',
     montantApprouve?: number,
     commentaire?: string,
     raison?: string
@@ -122,44 +125,39 @@ export function useEnquetes() {
 
   const isExpanded = (id: string) => expandedEnquetes.has(id);
 
-  const normalizeStatut = (statut?: string): 'en_attente' | 'en_cours' | 'approuve' | 'rejete' | 'reduit' => {
-    if (!statut) return 'en_attente';
+  // Normalize legacy French statuses to English enum values
+  const normalizeStatut = (statut?: string): StatutEnqueteCreditType => {
+    if (!statut) return StatutEnqueteCredit.PENDING;
     const normalized = statut.toLowerCase().replace(/[éè]/g, 'e');
-    
-    if (normalized.includes('attente') || normalized === 'pending') return 'en_attente';
-    if (normalized.includes('cours') || normalized === 'in_progress') return 'en_cours';
-    if (normalized.includes('approuve') || normalized === 'approved') return 'approuve';
-    if (normalized.includes('rejete') || normalized === 'rejected') return 'rejete';
-    if (normalized.includes('reduit') || normalized === 'reduced') return 'reduit';
-    
-    return 'en_attente';
+
+    // Handle both legacy French and new English values
+    if (normalized === 'pending' || normalized.includes('attente')) return StatutEnqueteCredit.PENDING;
+    if (normalized === 'in_progress' || normalized.includes('cours')) return StatutEnqueteCredit.IN_PROGRESS;
+    if (normalized === 'approved' || normalized.includes('approuve')) return StatutEnqueteCredit.APPROVED;
+    if (normalized === 'rejected' || normalized.includes('rejete')) return StatutEnqueteCredit.REJECTED;
+    if (normalized === 'reduced' || normalized.includes('reduit')) return StatutEnqueteCredit.REDUCED;
+
+    return StatutEnqueteCredit.PENDING;
   };
 
   const formatStatut = (statut?: string) => {
     const normalized = normalizeStatut(statut);
-    const labels: Record<string, string> = {
-      'en_attente': 'En attente',
-      'en_cours': 'En cours',
-      'approuve': 'Approuvé',
-      'rejete': 'Rejeté',
-      'reduit': 'Réduit'
-    };
-    return labels[normalized] || 'En attente';
+    return STATUT_ENQUETE_CREDIT_LABELS[normalized] || 'En attente';
   };
 
   const getStatutColor = (statut?: string) => {
     const normalized = normalizeStatut(statut);
-    const colors: Record<string, string> = {
-      'en_attente': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      'en_cours': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      'approuve': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      'rejete': 'bg-red-500/20 text-red-400 border-red-500/30',
-      'reduit': 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+    const colors: Record<StatutEnqueteCreditType, string> = {
+      [StatutEnqueteCredit.PENDING]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      [StatutEnqueteCredit.IN_PROGRESS]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      [StatutEnqueteCredit.APPROVED]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      [StatutEnqueteCredit.REJECTED]: 'bg-red-500/20 text-red-400 border-red-500/30',
+      [StatutEnqueteCredit.REDUCED]: 'bg-purple-500/20 text-purple-400 border-purple-500/30'
     };
     return colors[normalized];
   };
 
-  const getEnquetesEnAttente = () => enquetes.filter(e => normalizeStatut(e.statut) === 'en_attente');
+  const getEnquetesEnAttente = () => enquetes.filter(e => normalizeStatut(e.statut) === StatutEnqueteCredit.PENDING);
 
   useEffect(() => {
     fetchEnquetes();

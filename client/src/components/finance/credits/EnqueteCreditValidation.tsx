@@ -26,11 +26,11 @@ interface Enquete extends EnqueteCredit {
 interface EnqueteCreditValidationProps {
   enquete: Enquete;
   onClose: () => void;
-  onValidate: (decision: 'approuve' | 'rejete' | 'reduit', montantApprouve?: number, commentaire?: string, raison?: string) => void;
+  onValidate: (decision: 'APPROVED' | 'REJECTED' | 'REDUCED', montantApprouve?: number, commentaire?: string, raison?: string) => void;
 }
 
 export default function EnqueteCreditValidation({ enquete, onClose, onValidate }: EnqueteCreditValidationProps) {
-  const [decision, setDecision] = useState<'approuve' | 'rejete' | 'reduit' | null>(null);
+  const [decision, setDecision] = useState<'APPROVED' | 'REJECTED' | 'REDUCED' | null>(null);
   const [montantApprouve, setMontantApprouve] = useState(enquete.montant_recommande || enquete.montant_demande);
   const [commentaire, setCommentaire] = useState('');
   const [raisonRefus, setRaisonRefus] = useState('');
@@ -61,8 +61,8 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
     
     setSubmitting(true);
     try {
-      const montant = decision === 'approuve' ? montantApprouve : decision === 'reduit' ? montantApprouve : undefined;
-      const raison = decision === 'rejete' ? raisonRefus : decision === 'reduit' ? raisonReduction : undefined;
+      const montant = decision === 'APPROVED' ? montantApprouve : decision === 'REDUCED' ? montantApprouve : undefined;
+      const raison = decision === 'REJECTED' ? raisonRefus : decision === 'REDUCED' ? raisonReduction : undefined;
 
       await onValidate(decision, montant, commentaire, raison);
     } finally {
@@ -298,46 +298,46 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
 
             <div className="grid md:grid-cols-3 gap-4 mb-6">
               <button
-                onClick={() => setDecision('approuve')}
+                onClick={() => setDecision('APPROVED')}
                 className={`p-4 rounded-lg border-2 transition ${
-                  decision === 'approuve'
+                  decision === 'APPROVED'
                     ? 'border-green-500 bg-green-500/20'
                     : 'border-slate-600 bg-slate-800/50 hover:border-green-500/50'
                 }`}
               >
-                <CheckCircle className={`mx-auto mb-2 ${decision === 'approuve' ? 'text-green-400' : 'text-slate-400'}`} size={32} />
-                <p className={`font-semibold ${decision === 'approuve' ? 'text-green-400' : 'text-slate-300'}`}>Approuver</p>
+                <CheckCircle className={`mx-auto mb-2 ${decision === 'APPROVED' ? 'text-green-400' : 'text-slate-400'}`} size={32} />
+                <p className={`font-semibold ${decision === 'APPROVED' ? 'text-green-400' : 'text-slate-300'}`}>Approuver</p>
                 <p className="text-xs text-slate-500 mt-1">Accorder le crédit</p>
               </button>
 
               <button
-                onClick={() => setDecision('reduit')}
+                onClick={() => setDecision('REDUCED')}
                 className={`p-4 rounded-lg border-2 transition ${
-                  decision === 'reduit'
+                  decision === 'REDUCED'
                     ? 'border-cyan-500 bg-cyan-500/20'
                     : 'border-slate-600 bg-slate-800/50 hover:border-cyan-500/50'
                 }`}
               >
-                <TrendingDown className={`mx-auto mb-2 ${decision === 'reduit' ? 'text-cyan-400' : 'text-slate-400'}`} size={32} />
-                <p className={`font-semibold ${decision === 'reduit' ? 'text-cyan-400' : 'text-slate-300'}`}>Réduire</p>
+                <TrendingDown className={`mx-auto mb-2 ${decision === 'REDUCED' ? 'text-cyan-400' : 'text-slate-400'}`} size={32} />
+                <p className={`font-semibold ${decision === 'REDUCED' ? 'text-cyan-400' : 'text-slate-300'}`}>Réduire</p>
                 <p className="text-xs text-slate-500 mt-1">Montant inférieur</p>
               </button>
 
               <button
-                onClick={() => setDecision('rejete')}
+                onClick={() => setDecision('REJECTED')}
                 className={`p-4 rounded-lg border-2 transition ${
-                  decision === 'rejete'
+                  decision === 'REJECTED'
                     ? 'border-blue-500 bg-blue-500/20'
                     : 'border-slate-600 bg-slate-800/50 hover:border-blue-500/50'
                 }`}
               >
-                <XCircle className={`mx-auto mb-2 ${decision === 'rejete' ? 'text-blue-400' : 'text-slate-400'}`} size={32} />
-                <p className={`font-semibold ${decision === 'rejete' ? 'text-blue-400' : 'text-slate-300'}`}>Rejeter</p>
+                <XCircle className={`mx-auto mb-2 ${decision === 'REJECTED' ? 'text-blue-400' : 'text-slate-400'}`} size={32} />
+                <p className={`font-semibold ${decision === 'REJECTED' ? 'text-blue-400' : 'text-slate-300'}`}>Rejeter</p>
                 <p className="text-xs text-slate-500 mt-1">Refuser le crédit</p>
               </button>
             </div>
 
-            {decision === 'approuve' && (
+            {decision === 'APPROVED' && (
               <div className="space-y-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
                 <div>
                   <label className="block text-sm font-semibold text-green-300 mb-2">
@@ -353,7 +353,7 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
               </div>
             )}
 
-            {decision === 'reduit' && (
+            {decision === 'REDUCED' && (
               <div className="space-y-4 bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
                 <div>
                   <label className="block text-sm font-semibold text-cyan-300 mb-2">
@@ -385,7 +385,7 @@ export default function EnqueteCreditValidation({ enquete, onClose, onValidate }
               </div>
             )}
 
-            {decision === 'rejete' && (
+            {decision === 'REJECTED' && (
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                 <label className="block text-sm font-semibold text-blue-300 mb-2">
                   Raison du refus
