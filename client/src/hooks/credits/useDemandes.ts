@@ -68,14 +68,22 @@ export function useDemandes() {
         body: JSON.stringify({ montant_approuve: montantApprouve })
       });
 
-      if (!response.ok) throw new Error('Erreur approbation');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors de l\'approbation');
+      }
 
       await fetchDemandes();
       invalidateCounts();
+      toast.success('Demande approuvée', {
+        description: `Montant approuvé: ${montantApprouve.toLocaleString()} FCFA`
+      });
       return true;
     } catch (err) {
       console.error('Erreur approbation:', err);
-      setError(err instanceof Error ? err.message : 'Erreur approbation');
+      const message = err instanceof Error ? err.message : 'Erreur approbation';
+      setError(message);
+      toast.error('Échec de l\'approbation', { description: message });
       return false;
     }
   };
@@ -88,14 +96,22 @@ export function useDemandes() {
         body: JSON.stringify({ motif })
       });
 
-      if (!response.ok) throw new Error('Erreur rejet');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors du rejet');
+      }
 
       await fetchDemandes();
       invalidateCounts();
+      toast.success('Demande rejetée', {
+        description: 'Le client sera notifié du rejet'
+      });
       return true;
     } catch (err) {
       console.error('Erreur rejet:', err);
-      setError(err instanceof Error ? err.message : 'Erreur rejet');
+      const message = err instanceof Error ? err.message : 'Erreur rejet';
+      setError(message);
+      toast.error('Échec du rejet', { description: message });
       return false;
     }
   };
@@ -106,14 +122,22 @@ export function useDemandes() {
         method: 'DELETE'
       });
 
-      if (!response.ok) throw new Error('Erreur suppression');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors de la suppression');
+      }
 
       await fetchDemandes();
       invalidateCounts();
+      toast.success('Demande supprimée', {
+        description: 'La demande a été supprimée avec succès'
+      });
       return true;
     } catch (err) {
       console.error('Erreur suppression:', err);
-      setError(err instanceof Error ? err.message : 'Erreur suppression');
+      const message = err instanceof Error ? err.message : 'Erreur suppression';
+      setError(message);
+      toast.error('Échec de la suppression', { description: message });
       return false;
     }
   };
@@ -126,14 +150,22 @@ export function useDemandes() {
         body: JSON.stringify({ motif })
       });
 
-      if (!response.ok) throw new Error('Erreur annulation');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors de l\'annulation');
+      }
 
       await fetchDemandes();
       invalidateCounts();
+      toast.success('Demande annulée', {
+        description: 'La demande a été annulée avec succès'
+      });
       return true;
     } catch (err) {
       console.error('Erreur annulation:', err);
-      setError(err instanceof Error ? err.message : 'Erreur annulation');
+      const message = err instanceof Error ? err.message : 'Erreur annulation';
+      setError(message);
+      toast.error('Échec de l\'annulation', { description: message });
       return false;
     }
   };

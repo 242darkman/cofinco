@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { StatutEnquete, StatutEnqueteType } from '@shared/enum/status-constants';
 
 // Labels for enquête status
@@ -75,14 +76,22 @@ export function useEnquetes() {
         body: JSON.stringify(enqueteData)
       });
 
-      if (!response.ok) throw new Error('Erreur création');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors de la création de l\'enquête');
+      }
 
       await fetchEnquetes();
       invalidateCounts();
+      toast.success('Enquête créée avec succès', {
+        description: 'Le dossier est maintenant en cours d\'enquête'
+      });
       return true;
     } catch (err) {
       console.error('Erreur création enquete:', err);
-      setError(err instanceof Error ? err.message : 'Erreur création');
+      const message = err instanceof Error ? err.message : 'Erreur lors de la création';
+      setError(message);
+      toast.error('Échec de la création', { description: message });
       return false;
     }
   };
@@ -106,14 +115,29 @@ export function useEnquetes() {
         })
       });
 
-      if (!response.ok) throw new Error('Erreur validation');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erreur lors de la validation');
+      }
 
       await fetchEnquetes();
       invalidateCounts();
+
+      // Toast de succès selon la décision
+      const messages: Record<string, { title: string; description: string }> = {
+        APPROVED: { title: 'Demande approuvée', description: 'Le crédit est prêt pour décaissement' },
+        REJECTED: { title: 'Demande rejetée', description: 'Le client sera notifié du rejet' },
+        REDUCED: { title: 'Montant réduit', description: `Nouveau montant: ${montantApprouve?.toLocaleString()} FCFA` }
+      };
+      const msg = messages[decision] || { title: 'Validation effectuée', description: '' };
+      toast.success(msg.title, { description: msg.description });
+
       return true;
     } catch (err) {
       console.error('Erreur validation:', err);
-      setError(err instanceof Error ? err.message : 'Erreur validation');
+      const message = err instanceof Error ? err.message : 'Erreur lors de la validation';
+      setError(message);
+      toast.error('Échec de la validation', { description: message });
       return false;
     }
   };

@@ -1385,24 +1385,32 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enquetes));
   });
 
-  app.post("/api/enquetes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR), async (req, res) => {
-      const data = normalizeKeysDeep(req.body);
-      const parsed = insertEnqueteCreditSchema.parse(data);
-      const enquete = await storage.createEnqueteCredit(parsed);
-      
-      // Update Demande Status
-      if (enquete.demandeId) {
-          // Si l'enquête est créée, on considère qu'elle est terminée et prête pour approbation
-          await storage.updateDemandeCredit(enquete.demandeId, { statut: StatutDemande.INVESTIGATION_COMPLETE as any });
-      }
+  app.post("/api/enquetes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR, SystemRole.AGENT_TERRAIN), async (req, res) => {
+      try {
+          const data = normalizeKeysDeep(req.body);
+          const parsed = insertEnqueteCreditSchema.parse(data);
+          const enquete = await storage.createEnqueteCredit(parsed);
 
-      // Notify Credit Update
-       const wsInstance = getWsInstance();
-      if (wsInstance) {
-          wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'enquete_new', demandeId: parsed.demandeId } });
-      }
+          // Update Demande Status - Transition vers "En enquête" (pas "Enquête terminée")
+          // Workflow: READY_FOR_INVESTIGATION -> UNDER_INVESTIGATION -> INVESTIGATION_COMPLETE
+          if (enquete.demandeId) {
+              await storage.updateDemandeCredit(enquete.demandeId, { statut: StatutDemande.UNDER_INVESTIGATION as any });
+          }
 
-      res.json(addSnakeCaseAliasesDeep(enquete));
+          // Notify Credit Update
+          const wsInstance = getWsInstance();
+          if (wsInstance) {
+              wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'enquete_new', demandeId: parsed.demandeId } });
+          }
+
+          res.json(addSnakeCaseAliasesDeep(enquete));
+      } catch (error: any) {
+          console.error('[Enquete Create Error]', error);
+          res.status(500).json({
+              message: error.message || 'Erreur lors de la création de l\'enquête',
+              code: 'ENQUETE_CREATE_ERROR'
+          });
+      }
   });
 
   app.post("/api/enquetes-credit/:id/valider", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
@@ -1421,10 +1429,11 @@ export function registerFinanceRoutes(app: Express) {
           });
       }
 
-      // Map decision to standardized enum value
-      const statutEnquete = decision === 'approuve'
+      // Map decision to standardized enum value (handle both EN and legacy FR values)
+      const decisionLower = decision?.toLowerCase?.() || decision;
+      const statutEnquete = (decisionLower === 'approved' || decisionLower === 'approuve')
         ? StatutEnquete.APPROVED
-        : decision === 'rejete'
+        : (decisionLower === 'rejected' || decisionLower === 'rejete')
           ? StatutEnquete.REJECTED
           : StatutEnquete.REDUCED;
 
@@ -1433,19 +1442,25 @@ export function registerFinanceRoutes(app: Express) {
           recommandation: commentaire || raison // Store comment
       });
 
-      // Update Demande status if enquete is approved/rejected
+      // Update Demande status - Workflow: UNDER_INVESTIGATION -> INVESTIGATION_COMPLETE -> APPROVED/REJECTED
       if (enquete.demandeId) {
-          let nouveauStatutDemande: string = StatutDemande.UNDER_INVESTIGATION; // Default
-          if (decision === 'approuve' || decision === 'reduit') {
+          // Step 1: Transition to INVESTIGATION_COMPLETE (enquête terminée)
+          await storage.updateDemandeCredit(enquete.demandeId, {
+              statut: StatutDemande.INVESTIGATION_COMPLETE as any
+          });
+
+          // Step 2: Transition to final status based on decision
+          let nouveauStatutDemande: string = StatutDemande.INVESTIGATION_COMPLETE;
+          if (decision === 'APPROVED' || decision === 'approuve' || decision === 'REDUCED' || decision === 'reduit') {
               nouveauStatutDemande = StatutDemande.APPROVED; // Prêt pour décaissement
-          } else if (decision === 'rejete') {
+          } else if (decision === 'REJECTED' || decision === 'rejete') {
               nouveauStatutDemande = StatutDemande.REJECTED; // Rejetée suite enquête
           }
 
           await storage.updateDemandeCredit(enquete.demandeId, {
               statut: nouveauStatutDemande as any,
               montantApprouve: montant_approuve ? montant_approuve.toString() : undefined,
-              motifRejet: decision === 'rejete' ? raison : undefined
+              motifRejet: (decision === 'REJECTED' || decision === 'rejete') ? raison : undefined
           });
 
           // Notify
