@@ -20,9 +20,10 @@ import {
   users,
   coffresForts,
   configCoffreFort,
+  comptageBillets,
 } from "@shared/schema";
 import { eq, and, isNull, inArray, desc } from "drizzle-orm";
-import { StatutTransfertCoffre } from "@shared/enum/status-constants";
+import { StatutTransfertCoffre, StatutCaisse } from "@shared/enum/status-constants";
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
 import { getWsInstance } from "../../ws-server";
@@ -717,21 +718,41 @@ export class SessionOpeningService {
           .where(eq(sessionsCaisse.id, sessionId))
           .returning();
 
-        // 7. Mettre à jour le solde de la caisse physique
+        // 7. Mettre à jour le solde et le STATUT de la caisse physique
         await tx
           .update(caisses)
           .set({
             solde: soldeOuverture.toString(),
+            statut: StatutCaisse.OPEN, // CRITIQUE: Synchroniser le statut avec la session
             updatedAt: new Date(),
           })
           .where(eq(caisses.id, session.caisseId));
 
-        // 8. Détecter un éventuel écart entre montant demandé et montant reçu
+        // 8. Enregistrer le Billetage d'Ouverture dans comptage_billets
+        const billetageTotal = calculateBilletageTotal(billetageReception);
+        await tx.insert(comptageBillets).values({
+          sessionId: sessionId,
+          typeComptage: "OUVERTURE",
+          billets10000: billetageReception["10000"] || 0,
+          billets5000: billetageReception["5000"] || 0,
+          billets2000: billetageReception["2000"] || 0,
+          billets1000: billetageReception["1000"] || 0,
+          billets500: billetageReception["500"] || 0,
+          pieces250: billetageReception["250"] || 0,
+          pieces100: billetageReception["100"] || 0,
+          pieces50: billetageReception["50"] || 0,
+          pieces25: billetageReception["25"] || 0,
+          totalCalcule: billetageTotal.toString(),
+          totalDeclare: billetageTotal.toString(),
+          observations: "Billetage d'ouverture de session",
+        });
+
+        // 9. Détecter un éventuel écart entre montant demandé et montant reçu
         const montantDemande = Number(session.montantDemande || 0);
         const ecartReception = montantRecu - montantDemande;
         const hasEcart = Math.abs(ecartReception) > 1; // Tolérance de 1 FCFA
 
-        // 9. Log d'audit
+        // 10. Log d'audit
         await tx.insert(sessionsCaisseAuditLogs).values({
           sessionId,
           action: "OPENED",
@@ -751,7 +772,7 @@ export class SessionOpeningService {
           userAgent,
         });
 
-        // 10. Notifications WebSocket en temps réel
+        // 11. Notifications WebSocket en temps réel
         try {
           const ws = getWsInstance();
           if (ws && session.agenceId) {
@@ -1109,6 +1130,7 @@ export class SessionOpeningService {
             agenceId,
             statut: "OPEN" as any,
             montantOuverture: soldeExistant.toString(),
+            montantFermetureTheorique: soldeExistant.toString(), // Initialiser le solde théorique
             soldeVeille: soldeExistant.toString(), // Le solde vient de la veille (fonds reporté)
             billetageOuverture: {}, // Pas de billetage à compter, c'est le fonds reporté
             openedAt: new Date(),
@@ -1120,7 +1142,16 @@ export class SessionOpeningService {
           })
           .returning();
 
-        // 6. Log d'audit
+        // 6. CRITIQUE: Mettre à jour le statut de la caisse
+        await tx
+          .update(caisses)
+          .set({
+            statut: StatutCaisse.OPEN,
+            updatedAt: new Date(),
+          })
+          .where(eq(caisses.id, caisseId));
+
+        // 7. Log d'audit
         await tx.insert(sessionsCaisseAuditLogs).values({
           sessionId: newSession.id,
           action: "DIRECT_OPEN",
@@ -1136,7 +1167,7 @@ export class SessionOpeningService {
           userAgent,
         });
 
-        // 7. Notification WebSocket en temps réel
+        // 8. Notification WebSocket en temps réel
         try {
           const ws = getWsInstance();
           if (ws) {

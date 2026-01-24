@@ -1782,20 +1782,22 @@ export function registerFinanceRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(caisses));
   });
 
-  // Opérations caisse du jour (pour la session active de l'utilisateur)
+  // Opérations caisse du jour (historique de la CAISSE physique, pas de l'utilisateur)
+  // CORRECTION: Filtre par caisseId pour voir tout l'historique de la machine
   app.get("/api/operations-caisse/today", requireAuth, async (req, res) => {
       try {
         const user = req.session.user!;
 
-        // Récupérer la session active de l'utilisateur
+        // Récupérer la session active de l'utilisateur pour identifier la caisse
         const activeSession = await storage.getActiveSessionForUser(user.id);
 
         if (!activeSession) {
           return res.json([]); // Pas de session active, pas d'opérations
         }
 
-        // Récupérer toutes les opérations de cette session
-        const operations = await storage.getOperationsBySession(activeSession.id);
+        // CORRECTION: Récupérer toutes les opérations de cette CAISSE (pas seulement la session)
+        // Cela permet de voir l'historique de la caisse physique, peu importe qui a fait les opérations
+        const operations = await storage.getOperationsByCaisse(activeSession.caisseId);
 
         res.json(addSnakeCaseAliasesDeep(operations));
       } catch (error: any) {

@@ -24,9 +24,10 @@ import {
   coffresForts,
   mouvementsFinanciers,
   operationsCaisse,
+  comptageBillets,
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, count } from "drizzle-orm";
-import { StatutTransfertCoffre, isOperationCaisseEntree } from "@shared/enum/status-constants";
+import { StatutTransfertCoffre, StatutCaisse, isOperationCaisseEntree } from "@shared/enum/status-constants";
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
 import { createMouvementFinancier } from "../ledger";
@@ -352,7 +353,26 @@ export class SessionClosingService {
           .where(eq(sessionsCaisse.id, sessionId))
           .returning();
 
-        // 9. Créer log d'audit
+        // 9. Enregistrer le Billetage de Fermeture dans comptage_billets
+        await tx.insert(comptageBillets).values({
+          sessionId: sessionId,
+          typeComptage: "FERMETURE",
+          billets10000: billetageFermeture["10000"] || 0,
+          billets5000: billetageFermeture["5000"] || 0,
+          billets2000: billetageFermeture["2000"] || 0,
+          billets1000: billetageFermeture["1000"] || 0,
+          billets500: billetageFermeture["500"] || 0,
+          pieces250: billetageFermeture["250"] || 0,
+          pieces100: billetageFermeture["100"] || 0,
+          pieces50: billetageFermeture["50"] || 0,
+          pieces25: billetageFermeture["25"] || 0,
+          totalCalcule: montantPhysique.toString(),
+          totalDeclare: montantPhysique.toString(),
+          ecart: ecart.toString(),
+          observations: ecartJustification || "Billetage de fermeture de session",
+        });
+
+        // 10. Créer log d'audit
         await tx.insert(sessionsCaisseAuditLogs).values({
           sessionId,
           action: "COUNT_SUBMITTED",
@@ -369,7 +389,7 @@ export class SessionClosingService {
           userAgent,
         });
 
-        // 10. Si écart significatif, créer une entrée dans l'historique des écarts
+        // 11. Si écart significatif, créer une entrée dans l'historique des écarts
         if (Math.abs(ecart) > ECART_MINEUR_SEUIL) {
           await this.recordEcartAudit(tx, {
             sessionId,
@@ -538,10 +558,12 @@ export class SessionClosingService {
 
         // 7. Mettre à jour la caisse physique
         // Le solde de la caisse = montant reporté (ce qui reste pour demain)
+        // CRITIQUE: Mettre le statut à CLOSED et libérer le verrouillage
         await tx
           .update(caisses)
           .set({
             solde: montantReporte.toString(),
+            statut: StatutCaisse.CLOSED, // CRITIQUE: Synchroniser le statut
             updatedAt: new Date(),
           })
           .where(eq(caisses.id, session.caisseId));

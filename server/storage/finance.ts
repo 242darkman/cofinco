@@ -972,6 +972,36 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return db.select().from(operationsCaisse).where(eq(operationsCaisse.sessionId, sessionId)).orderBy(desc(operationsCaisse.createdAt));
   }
 
+  /**
+   * Récupère toutes les opérations d'une CAISSE physique (toutes sessions confondues)
+   * Permet de voir l'historique complet de la machine, pas seulement la session active
+   * Limité aux opérations du jour pour performance
+   */
+  export async function getOperationsByCaisse(caisseId: string): Promise<OperationCaisse[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Récupérer toutes les sessions de cette caisse
+    const sessions = await db.select({ id: sessionsCaisse.id })
+      .from(sessionsCaisse)
+      .where(eq(sessionsCaisse.caisseId, caisseId));
+
+    if (sessions.length === 0) return [];
+
+    const sessionIds = sessions.map(s => s.id);
+
+    // Récupérer toutes les opérations de ces sessions (du jour)
+    return db.select()
+      .from(operationsCaisse)
+      .where(
+        and(
+          inArray(operationsCaisse.sessionId, sessionIds),
+          gte(operationsCaisse.createdAt, today)
+        )
+      )
+      .orderBy(desc(operationsCaisse.createdAt));
+  }
+
   export async function getSessionsByCaissier(caissierId: string): Promise<SessionCaisse[]> {
     return db.select().from(sessionsCaisse).where(eq(sessionsCaisse.caissierId, caissierId)).orderBy(desc(sessionsCaisse.openedAt));
   }
