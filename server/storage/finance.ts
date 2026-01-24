@@ -967,9 +967,40 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return session || undefined;
   }
 
-  // Operations Caisse
-  export async function getOperationsBySession(sessionId: string): Promise<OperationCaisse[]> {
-    return db.select().from(operationsCaisse).where(eq(operationsCaisse.sessionId, sessionId)).orderBy(desc(operationsCaisse.createdAt));
+  // Operations Caisse - avec jointure client/users pour afficher le nom
+  export async function getOperationsBySession(sessionId: string) {
+    const results = await db.select({
+      id: operationsCaisse.id,
+      sessionId: operationsCaisse.sessionId,
+      mouvementId: operationsCaisse.mouvementId,
+      typeOperation: operationsCaisse.typeOperation,
+      statut: operationsCaisse.statut,
+      montant: operationsCaisse.montant,
+      methodePaiement: operationsCaisse.methodePaiement,
+      reference: operationsCaisse.reference,
+      idempotencyKey: operationsCaisse.idempotencyKey,
+      description: operationsCaisse.description,
+      clientId: operationsCaisse.clientId,
+      presenceVerification: operationsCaisse.presenceVerification,
+      metadata: operationsCaisse.metadata,
+      createdBy: operationsCaisse.createdBy,
+      createdAt: operationsCaisse.createdAt,
+      annulledAt: operationsCaisse.annulledAt,
+      reversedAt: operationsCaisse.reversedAt,
+      updatedAt: operationsCaisse.updatedAt,
+      deletedAt: operationsCaisse.deletedAt,
+      // Client info (nom/prenom/telephone sont dans la table users, pas clients)
+      client_nom: users.nom,
+      client_prenom: users.prenom,
+      client_telephone: users.telephone,
+    })
+    .from(operationsCaisse)
+    .leftJoin(clients, eq(operationsCaisse.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
+    .where(eq(operationsCaisse.sessionId, sessionId))
+    .orderBy(desc(operationsCaisse.createdAt));
+
+    return results;
   }
 
   /**

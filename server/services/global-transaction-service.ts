@@ -198,6 +198,7 @@ export class GlobalTransactionService {
              const distResult = await processTontineDistribution(tx, mouvement, {
                 tontineId: payload.tontineId,
                 membreId: payload.membreId,
+                clientId: payload.clientId, // Pour l'affichage dans le journal caisse
                 tourNumero: tourNumero, // FIXME: Needs logic to identify correct round
                 montantTotal: payload.amount,
                 modeDistribution: "CASH_WITHDRAWAL",

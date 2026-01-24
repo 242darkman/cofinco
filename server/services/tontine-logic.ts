@@ -450,6 +450,7 @@ export async function processTontineContribution(
     await tx.insert(operationsCaisse).values({
       sessionId: sessionCaisseId,
       mouvementId: mouvement.id,
+      clientId: clientId, // Lien vers le client pour afficher son nom dans le journal
       typeOperation: "TONTINE_CONTRIBUTION" as any,
       montant: amountTotal.toString(),
       methodePaiement: "CASH" as any,
@@ -719,6 +720,7 @@ export async function distributeTontineGain(
         {
           tontineId,
           membreId,
+          clientId: membreData.clientId, // Pour l'affichage dans le journal caisse
           tourNumero,
           montantTotal,
           modeDistribution,
@@ -747,6 +749,7 @@ export async function processTontineDistribution(
   params: {
     tontineId: string;
     membreId: string;
+    clientId: string; // Client ID pour l'affichage dans le journal caisse
     tourNumero: number;
     montantTotal: number;
     modeDistribution: string;
@@ -759,10 +762,10 @@ export async function processTontineDistribution(
     tontineNom: string;
   }
 ) {
-  const { 
-    tontineId, membreId, tourNumero, montantTotal, 
-    modeDistribution, modePaiement, sessionCaisseId, 
-    compteId, userId, notes, reference, tontineNom 
+  const {
+    tontineId, membreId, clientId, tourNumero, montantTotal,
+    modeDistribution, modePaiement, sessionCaisseId,
+    compteId, userId, notes, reference, tontineNom
   } = params;
 
   // Créer la distribution
@@ -819,6 +822,7 @@ export async function processTontineDistribution(
     await tx.insert(operationsCaisse).values({
       sessionId: sessionCaisseId,
       mouvementId: mouvement.id,
+      clientId: clientId, // Lien vers le client pour afficher son nom dans le journal
       typeOperation: "TONTINE_WITHDRAWAL" as any,
       montant: montantTotal.toString(),
       methodePaiement: modePaiement as any,
