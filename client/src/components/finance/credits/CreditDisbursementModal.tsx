@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import {
   X, AlertCircle, DollarSign, Calendar, Wallet, Clock,
-  AlertTriangle, ArrowRight, Vault, RefreshCw, Phone
+  AlertTriangle, ArrowRight, Vault, RefreshCw, Phone,
+  Banknote, CreditCard, Smartphone, Info
 } from 'lucide-react';
 import { creditApi, isInsufficientFundsError, extractInsufficientFundsData, type InsufficientFundsErrorData } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -9,7 +10,7 @@ import { toast } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Button, FormField } from '../../ui';
-import { StatutCoffre } from '@shared/enum/status-constants';
+import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type DisbursementChannelType } from '@shared/enum/status-constants';
 
 interface Demande {
   id: string;
@@ -76,6 +77,9 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
   const [decaissementType, setDecaissementType] = useState<'immediat' | 'programme'>('immediat');
   const [dateDecaissement, setDateDecaissement] = useState(new Date().toISOString().split('T')[0]);
   const [delaiJours, setDelaiJours] = useState(0);
+
+  // Canal de décaissement (ACCOUNT, CASH, MOBILE_MONEY)
+  const [disbursementChannel, setDisbursementChannel] = useState<DisbursementChannelType>(DisbursementChannel.ACCOUNT);
 
   // Helper: convert V2 duration to days
   const convertDureeEnJours = (valeur: number, unite: string): number => {
@@ -157,12 +161,19 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
         dateFin: dateFin.toISOString().split('T')[0],
         dateSolvabilite: dateFin.toISOString().split('T')[0],
         soldeRestant: montantTotal.toString(),
-        decaissementImmediat: decaissementType === 'immediat'
+        decaissementImmediat: decaissementType === 'immediat',
+        disbursementChannel // Nouveau paramètre
       });
 
       toast.success(result.message || 'Crédit décaissé avec succès');
 
-      if (result.compteCourant) {
+      // Afficher un message différent selon le canal
+      if (result.disbursementChannel === 'CASH') {
+        toast.info(
+          `Le client doit se présenter à la caisse pour récupérer ${formatMoney(montantDecaissement)}`,
+          { duration: 6000 }
+        );
+      } else if (result.compteCourant) {
         toast.info(
           `Compte ${result.compteCourant.numero} crédité - Nouveau solde: ${formatMoney(result.compteCourant.nouveauSolde)}`,
           { duration: 5000 }
@@ -410,16 +421,99 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
               </div>
             </div>
 
-            {/* Destination des fonds */}
-            <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Wallet className="text-emerald-400" size={20} />
-                <h3 className="text-sm font-bold text-emerald-400 uppercase">Destination des fonds</h3>
+            {/* Canal de décaissement */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-400 uppercase flex items-center gap-2">
+                <Wallet size={16} /> Canal de décaissement
+              </h3>
+
+              <div className="grid grid-cols-3 gap-3">
+                {/* Compte Courant */}
+                <button
+                  type="button"
+                  onClick={() => setDisbursementChannel(DisbursementChannel.ACCOUNT)}
+                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
+                    disbursementChannel === DisbursementChannel.ACCOUNT
+                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  <CreditCard size={24} />
+                  <div className="text-center">
+                    <div className="font-semibold text-sm">Compte</div>
+                    <div className="text-xs text-slate-400">Virement interne</div>
+                  </div>
+                </button>
+
+                {/* Espèces */}
+                <button
+                  type="button"
+                  onClick={() => setDisbursementChannel(DisbursementChannel.CASH)}
+                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
+                    disbursementChannel === DisbursementChannel.CASH
+                      ? 'border-orange-500 bg-orange-500/10 text-orange-400'
+                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  <Banknote size={24} />
+                  <div className="text-center">
+                    <div className="font-semibold text-sm">Espèces</div>
+                    <div className="text-xs text-slate-400">Retrait caisse</div>
+                  </div>
+                </button>
+
+                {/* Mobile Money */}
+                <button
+                  type="button"
+                  onClick={() => setDisbursementChannel(DisbursementChannel.MOBILE_MONEY)}
+                  className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
+                    disbursementChannel === DisbursementChannel.MOBILE_MONEY
+                      ? 'border-purple-500 bg-purple-500/10 text-purple-400'
+                      : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  <Smartphone size={24} />
+                  <div className="text-center">
+                    <div className="font-semibold text-sm">Mobile</div>
+                    <div className="text-xs text-slate-400">MoMo / OM</div>
+                  </div>
+                </button>
               </div>
-              <p className="text-slate-300">
-                Le montant de <span className="text-emerald-400 font-semibold">{formatMoney(montantDecaissement)}</span> sera
-                crédité sur le <span className="text-white font-semibold">compte courant</span> du client.
-              </p>
+
+              {/* Info-bulle selon le canal sélectionné */}
+              {disbursementChannel === DisbursementChannel.CASH && (
+                <div className="bg-orange-900/20 border border-orange-700/50 rounded-xl p-4 flex items-start gap-3">
+                  <Info className="text-orange-400 flex-shrink-0 mt-0.5" size={18} />
+                  <div>
+                    <p className="text-orange-200 font-medium">Décaissement à la caisse</p>
+                    <p className="text-slate-300 text-sm mt-1">
+                      Le dossier sera transmis à la caisse pour paiement physique.
+                      Le client devra se présenter au guichet avec sa pièce d'identité pour récupérer les fonds.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {disbursementChannel === DisbursementChannel.MOBILE_MONEY && (
+                <div className="bg-purple-900/20 border border-purple-700/50 rounded-xl p-4 flex items-start gap-3">
+                  <Info className="text-purple-400 flex-shrink-0 mt-0.5" size={18} />
+                  <div>
+                    <p className="text-purple-200 font-medium">Décaissement Mobile Money</p>
+                    <p className="text-slate-300 text-sm mt-1">
+                      Le montant sera envoyé sur le numéro Mobile Money enregistré du client: <span className="text-white font-semibold">{demande.clients.phone}</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {disbursementChannel === DisbursementChannel.ACCOUNT && (
+                <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-xl p-4">
+                  <p className="text-slate-300">
+                    Le montant de <span className="text-emerald-400 font-semibold">{formatMoney(montantDecaissement)}</span> sera
+                    crédité sur le <span className="text-white font-semibold">compte courant</span> du client.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Options de planification */}
@@ -499,15 +593,27 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
             {/* Résumé */}
             <div className="bg-slate-700/30 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Canal:</span>
+                <span className={`font-medium ${
+                  disbursementChannel === DisbursementChannel.CASH ? 'text-orange-400' :
+                  disbursementChannel === DisbursementChannel.MOBILE_MONEY ? 'text-purple-400' : 'text-emerald-400'
+                }`}>
+                  {DISBURSEMENT_CHANNEL_LABELS[disbursementChannel]}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Date de décaissement:</span>
                 <span className="text-white font-medium flex items-center gap-2">
                   <Calendar size={14} />
-                  {dateEffectiveDecaissement.toLocaleDateString('fr-FR', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
+                  {disbursementChannel === DisbursementChannel.CASH
+                    ? 'À la présentation du client'
+                    : dateEffectiveDecaissement.toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })
+                  }
                 </span>
               </div>
               <div className="flex justify-between text-sm">
@@ -530,9 +636,24 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                   variant="primary"
                   onClick={() => setShowConfirm(true)}
                   disabled={loading}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                  className={`flex-1 ${
+                    disbursementChannel === DisbursementChannel.CASH
+                      ? 'bg-orange-600 hover:bg-orange-500'
+                      : disbursementChannel === DisbursementChannel.MOBILE_MONEY
+                        ? 'bg-purple-600 hover:bg-purple-500'
+                        : 'bg-emerald-600 hover:bg-emerald-500'
+                  }`}
                 >
-                  {loading ? 'Traitement...' : decaissementType === 'immediat' ? 'Décaisser maintenant' : 'Programmer le décaissement'}
+                  {loading
+                    ? 'Traitement...'
+                    : disbursementChannel === DisbursementChannel.CASH
+                      ? 'Envoyer à la caisse'
+                      : disbursementChannel === DisbursementChannel.MOBILE_MONEY
+                        ? 'Envoyer via Mobile Money'
+                        : decaissementType === 'immediat'
+                          ? 'Décaisser maintenant'
+                          : 'Programmer le décaissement'
+                  }
                 </Button>
               ) : (
                 <div className="flex-1 px-6 py-2 bg-slate-700 text-slate-400 rounded-lg text-center flex items-center justify-center gap-2 text-sm">
@@ -549,14 +670,24 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
         isOpen={showConfirm}
         title="Confirmer le décaissement"
         message={
-          decaissementType === 'immediat'
-            ? `Confirmez-vous le décaissement immédiat de ${formatMoney(montantDecaissement)} vers le compte courant du client ? Un crédit actif sera créé et le compte sera crédité.`
-            : `Confirmez-vous la programmation du décaissement de ${formatMoney(montantDecaissement)} pour le ${dateEffectiveDecaissement.toLocaleDateString('fr-FR')} ? Le crédit sera créé et le compte courant du client sera crédité à cette date.`
+          disbursementChannel === DisbursementChannel.CASH
+            ? `Confirmez-vous l'envoi de cet ordre de paiement à la caisse ? Le client ${formatClientName(demande.clients.nom, demande.clients.prenom)} devra se présenter au guichet pour récupérer ${formatMoney(montantDecaissement)}.`
+            : disbursementChannel === DisbursementChannel.MOBILE_MONEY
+              ? `Confirmez-vous l'envoi de ${formatMoney(montantDecaissement)} via Mobile Money au numéro ${demande.clients.phone} ?`
+              : decaissementType === 'immediat'
+                ? `Confirmez-vous le décaissement immédiat de ${formatMoney(montantDecaissement)} vers le compte courant du client ? Un crédit actif sera créé et le compte sera crédité.`
+                : `Confirmez-vous la programmation du décaissement de ${formatMoney(montantDecaissement)} pour le ${dateEffectiveDecaissement.toLocaleDateString('fr-FR')} ?`
         }
-        confirmText={decaissementType === 'immediat' ? "Confirmer et Décaisser" : "Programmer"}
+        confirmText={
+          disbursementChannel === DisbursementChannel.CASH
+            ? "Envoyer à la caisse"
+            : disbursementChannel === DisbursementChannel.MOBILE_MONEY
+              ? "Envoyer via Mobile"
+              : decaissementType === 'immediat' ? "Confirmer et Décaisser" : "Programmer"
+        }
         onConfirm={handleDisbursement}
         onClose={() => setShowConfirm(false)}
-        variant="success"
+        variant={disbursementChannel === DisbursementChannel.CASH ? "warning" : "success"}
       />
     </>
   );

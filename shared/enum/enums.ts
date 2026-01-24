@@ -104,6 +104,27 @@ export const statutCreditEnum = pgEnum("statut_credit_enum", [
   "PAID",
   "CLOSED",
   "CANCELLED",
+  "WAITING_DISBURSEMENT", // En attente de décaissement physique (caisse)
+]);
+
+// ============================================
+// CANAL DE DÉCAISSEMENT
+// ============================================
+
+export const disbursementChannelEnum = pgEnum("disbursement_channel_enum", [
+  "ACCOUNT",      // Virement vers compte courant (flux existant)
+  "CASH",         // Espèces à la caisse
+  "MOBILE_MONEY", // Mobile Money (API externe)
+]);
+
+// ============================================
+// STATUT DE DÉCAISSEMENT
+// ============================================
+
+export const disbursementStatusEnum = pgEnum("disbursement_status_enum", [
+  "PENDING",     // En attente (pour CASH: attente du caissier)
+  "PROCESSING",  // En cours de traitement
+  "COMPLETED",   // Terminé
 ]);
 
 // ============================================

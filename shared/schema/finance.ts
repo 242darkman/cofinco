@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -107,6 +107,13 @@ export const credits = pgTable(
     remboursementCompteId: uuid("remboursement_compte_id").references(() => comptes.id), // Optionnel: Compte épargne ou autre, sinon compte courant
     lastAutoRepaymentCheck: timestamp("last_auto_repayment_check"),
 
+    // Canal de décaissement (Multi-Canal)
+    disbursementChannel: disbursementChannelEnum("disbursement_channel").default("ACCOUNT"),
+    disbursementStatus: disbursementStatusEnum("disbursement_status"),
+    paymentReference: text("payment_reference"), // N° reçu caisse ou ID transaction MoMo
+    disbursedAt: timestamp("disbursed_at"), // Date effective du décaissement physique
+    disbursedBy: uuid("disbursed_by").references(() => users.id), // Caissier qui a effectué le décaissement
+
     createdBy: uuid("created_by"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -131,6 +138,8 @@ export const credits = pgTable(
     idxRemboursementAuto: index("idx_credits_remboursement_auto").on(t.remboursementAutomatique),
     // Index pour soft delete
     idxDeletedAt: index("idx_credits_deleted_at").on(t.deletedAt),
+    // Index pour les décaissements en attente (workflow caisse)
+    idxDisbursementPending: index("idx_credits_disbursement_pending").on(t.disbursementChannel, t.disbursementStatus),
   }),
 );
 

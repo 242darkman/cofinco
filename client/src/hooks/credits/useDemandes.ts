@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 export interface DemandeCredit {
@@ -31,9 +32,15 @@ export interface DemandeCredit {
 }
 
 export function useDemandes() {
+  const queryClient = useQueryClient();
   const [demandes, setDemandes] = useState<DemandeCredit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper to invalidate counts after mutations
+  const invalidateCounts = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/demandes-credit/counts'] });
+  };
 
   const fetchDemandes = async () => {
     setLoading(true);
@@ -63,6 +70,7 @@ export function useDemandes() {
       if (!response.ok) throw new Error('Erreur approbation');
 
       await fetchDemandes();
+      invalidateCounts();
       return true;
     } catch (err) {
       console.error('Erreur approbation:', err);
@@ -82,6 +90,7 @@ export function useDemandes() {
       if (!response.ok) throw new Error('Erreur rejet');
 
       await fetchDemandes();
+      invalidateCounts();
       return true;
     } catch (err) {
       console.error('Erreur rejet:', err);
@@ -99,6 +108,7 @@ export function useDemandes() {
       if (!response.ok) throw new Error('Erreur suppression');
 
       await fetchDemandes();
+      invalidateCounts();
       return true;
     } catch (err) {
       console.error('Erreur suppression:', err);
@@ -118,6 +128,7 @@ export function useDemandes() {
       if (!response.ok) throw new Error('Erreur annulation');
 
       await fetchDemandes();
+      invalidateCounts();
       return true;
     } catch (err) {
       console.error('Erreur annulation:', err);
@@ -141,7 +152,8 @@ export function useDemandes() {
 
       const data = await response.json();
       await fetchDemandes();
-      
+      invalidateCounts();
+
       // Return the full response including facture
       return { success: true, facture: data.facture };
     } catch (err) {

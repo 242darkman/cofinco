@@ -171,7 +171,8 @@ export function registerFinanceRoutes(app: Express) {
      }
   });
 
-  // Décaissement de crédit (crée le crédit + crédite le compte courant du client)
+  // Décaissement de crédit (crée le crédit + gère le canal de décaissement)
+  // Canaux supportés: ACCOUNT (compte courant), CASH (espèces caisse), MOBILE_MONEY
   app.post("/api/credits/decaissement", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), requireAgenceAccess(), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body) as any;
@@ -221,13 +222,42 @@ export function registerFinanceRoutes(app: Express) {
       const numeroCredit = `CRED-${creditId.substring(0, 8).toUpperCase()}`;
       const montantDecaissement = parseFloat(demande.montantApprouve?.toString() || demande.montantDemande.toString());
 
+      // Canal de décaissement (ACCOUNT par défaut pour rétrocompatibilité)
+      const disbursementChannel = data.disbursementChannel || data.channel || 'ACCOUNT';
+      const validChannels = ['ACCOUNT', 'CASH', 'MOBILE_MONEY'];
+      if (!validChannels.includes(disbursementChannel)) {
+        return res.status(400).json({ message: `Canal de décaissement invalide: ${disbursementChannel}. Valeurs acceptées: ${validChannels.join(', ')}` });
+      }
+
       // Déterminer si c'est un décaissement immédiat ou programmé
       const decaissementImmediat = data.decaissementImmediat !== false; // true par défaut
       const dateDecaissement = data.dateDebut || new Date().toISOString().split('T')[0];
       const aujourdhui = new Date().toISOString().split('T')[0];
       const estProgramme = !decaissementImmediat || dateDecaissement > aujourdhui;
 
-      // 4. Créer le crédit
+      // Récupérer les infos client pour les notifications
+      const client = await storage.getClient(demande.clientId);
+      const clientName = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : 'Client';
+
+      // 4. Déterminer le statut initial du crédit selon le canal
+      let statutInitial: string;
+      let disbursementStatus: string | null = null;
+
+      if (disbursementChannel === 'CASH') {
+        // Canal ESPÈCES: Le crédit attend le décaissement physique par le caissier
+        statutInitial = StatutCredit.WAITING_DISBURSEMENT;
+        disbursementStatus = 'PENDING';
+      } else if (disbursementChannel === 'MOBILE_MONEY') {
+        // Canal MOBILE_MONEY: En attente du callback API (à implémenter)
+        statutInitial = estProgramme ? StatutCredit.PENDING : StatutCredit.ACTIVE;
+        disbursementStatus = 'PROCESSING';
+      } else {
+        // Canal ACCOUNT (par défaut): Flux existant
+        statutInitial = estProgramme ? StatutCredit.PENDING : StatutCredit.ACTIVE;
+        disbursementStatus = estProgramme ? null : 'COMPLETED';
+      }
+
+      // 5. Créer le crédit
       const creditData = {
         id: creditId,
         clientId: demande.clientId,
@@ -237,52 +267,100 @@ export function registerFinanceRoutes(app: Express) {
         duree: data.duree || demande.nombreEcheances || demande.dureeValeur,
         typeCredit: demande.typeCredit || 'Personnel',
         objetCredit: demande.objetCredit,
-        demandeId: demande.id, // Link to the original application
-        // Si programmé, le crédit est "PENDING" (du décaissement), sinon "ACTIVE"
-        statut: estProgramme ? StatutCredit.PENDING : StatutCredit.ACTIVE,
+        demandeId: demande.id,
+        statut: statutInitial,
         echeance: demande.frequenceRemboursement,
         dateDebut: new Date(dateDecaissement),
         dateFin: data.dateFin ? new Date(data.dateFin) : null,
         dateSolvabilite: data.dateSolvabilite ? new Date(data.dateSolvabilite) : null,
         soldeRestant: data.soldeRestant || (montantDecaissement * (1 + parseFloat(demande.tauxInteret.toString()) / 100)).toString(),
         agenceId: compteCourant.agenceId,
+        // Nouveaux champs multi-canal
+        disbursementChannel: disbursementChannel as any,
+        disbursementStatus: disbursementStatus as any,
       };
 
       const parsed = insertCreditSchema.parse(creditData);
       const credit = await storage.createCredit(parsed);
 
       let nouveauSolde = parseFloat(compteCourant.soldeCourant || '0');
+      let message = '';
 
-      // 5. Si décaissement immédiat: créditer le compte courant du client
-      if (!estProgramme) {
-          try {
-             const result = await storage.createDecaissementWithLedger({
-                 creditId: credit.id,
-                 compteId: compteCourant.id,
-                 montant: montantDecaissement.toString(),
-                 numeroCredit
-             }, user?.id);
-             
-             // Update local helper
-             nouveauSolde += montantDecaissement;
-
-          } catch (err: any) {
-              console.error("Erreur Ledger lors du décaissement:", err);
-              // Fallback or rollback? Since we already created the credit, we might be in a half-state if ledger fails.
-              // Ideally createCredit should be inside the ledger transaction too... 
-              // But for now, let's bubble up the error.
-              throw new Error(`Erreur lors du décaissement effectif: ${err.message}`);
+      // 6. Traitement selon le canal de décaissement
+      switch (disbursementChannel) {
+        case 'CASH':
+          // ===== CANAL ESPÈCES =====
+          // Ne pas toucher à l'argent maintenant
+          // Émettre une notification WebSocket vers le dashboard caisse
+          const wsInstance = getWsInstance();
+          if (wsInstance) {
+            // Notification spécifique pour le dashboard caisse
+            wsInstance.broadcast({
+              type: "CAISSE_UPDATE",
+              payload: {
+                subtype: 'NEW_LOAN_DISBURSEMENT',
+                creditId: credit.id,
+                numeroCredit,
+                clientName,
+                clientId: demande.clientId,
+                montant: montantDecaissement,
+                agenceId: compteCourant.agenceId,
+                timestamp: new Date().toISOString()
+              }
+            });
           }
+          message = `Ordre de paiement envoyé à la caisse. Le client ${clientName} doit se présenter au guichet pour récupérer ${montantDecaissement.toLocaleString()} FCFA.`;
+          break;
+
+        case 'MOBILE_MONEY':
+          // ===== CANAL MOBILE MONEY =====
+          // TODO: Intégrer avec le Payment Gateway (Orange Money, MTN MoMo, etc.)
+          // Pour l'instant, on simule un succès
+          message = `Paiement Mobile Money initié pour ${montantDecaissement.toLocaleString()} FCFA. Le client recevra une notification SMS.`;
+          // Note: Dans une implémentation réelle, on appellerait PaymentGateway.disburse()
+          // et le statut passerait à ACTIVE après le callback de confirmation
+          break;
+
+        case 'ACCOUNT':
+        default:
+          // ===== CANAL COMPTE (flux existant) =====
+          if (!estProgramme) {
+            try {
+              const result = await storage.createDecaissementWithLedger({
+                creditId: credit.id,
+                compteId: compteCourant.id,
+                montant: montantDecaissement.toString(),
+                numeroCredit
+              }, user?.id);
+
+              nouveauSolde += montantDecaissement;
+
+              // Mettre à jour le statut de décaissement
+              await storage.updateCredit(credit.id, {
+                disbursementStatus: 'COMPLETED' as any,
+                disbursedAt: new Date(),
+                disbursedBy: user?.id
+              });
+
+            } catch (err: any) {
+              console.error("Erreur Ledger lors du décaissement:", err);
+              throw new Error(`Erreur lors du décaissement effectif: ${err.message}`);
+            }
+          }
+          message = estProgramme
+            ? `Décaissement programmé pour le ${new Date(dateDecaissement).toLocaleDateString('fr-FR')}. Crédit ${numeroCredit} créé en attente.`
+            : `Crédit ${numeroCredit} décaissé. ${montantDecaissement.toLocaleString()} FCFA crédités sur le compte ${compteCourant.numeroCompte}`;
+          break;
       }
 
       // 7. Mettre à jour le statut de la demande
-      // Note: On met "Décaissée" dans les deux cas car le décaissement est engagé.
-      // L'information de programmation est stockée dans le crédit (statut "En attente de décaissement")
       await storage.updateDemandeCredit(demande.id, { statut: StatutDemande.DISBURSED });
 
       // 8. Log audit
       await logAudit(
         req,
+        disbursementChannel === 'CASH' ? "DECAISSEMENT_CASH_INITIE" :
+        disbursementChannel === 'MOBILE_MONEY' ? "DECAISSEMENT_MOMO_INITIE" :
         estProgramme ? "DECAISSEMENT_PROGRAMME" : "DECAISSEMENT_CREDIT",
         "credit",
         credit.id,
@@ -292,24 +370,40 @@ export function registerFinanceRoutes(app: Express) {
           compteId: compteCourant.id,
           numeroCredit,
           programme: estProgramme,
-          dateDecaissement: estProgramme ? dateDecaissement : null
+          dateDecaissement: estProgramme ? dateDecaissement : null,
+          disbursementChannel,
+          disbursementStatus
         },
         "success",
         "high"
       );
 
-      // 9. Broadcast updates
-      const wsInstance = getWsInstance();
+      // 9. Broadcast updates (sauf pour CASH qui a déjà été notifié)
+      const wsInstanceBroadcast = getWsInstance();
       const userAgence = user?.agence;
-      if (wsInstance && userAgence) {
-        wsInstance.broadcastToAgency(userAgence, { type: "CREDIT_UPDATE", payload: { type: 'credit_decaissement', id: credit.id, programme: estProgramme } });
-        wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
-        wsInstance.broadcastToAgency(userAgence, {
+      if (wsInstanceBroadcast && userAgence) {
+        wsInstanceBroadcast.broadcastToAgency(userAgence, {
+          type: "CREDIT_UPDATE",
+          payload: {
+            type: 'credit_decaissement',
+            id: credit.id,
+            programme: estProgramme,
+            disbursementChannel
+          }
+        });
+        wsInstanceBroadcast.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
+
+        // Activité live avec info sur le canal
+        const channelLabel = disbursementChannel === 'CASH' ? '(Espèces)' :
+                            disbursementChannel === 'MOBILE_MONEY' ? '(Mobile Money)' : '';
+        wsInstanceBroadcast.broadcastToAgency(userAgence, {
           type: "LIVE_ACTIVITY",
           payload: {
-            action: estProgramme
-              ? `Décaissement programmé: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte} (${dateDecaissement})`
-              : `Décaissement: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte}`,
+            action: disbursementChannel === 'CASH'
+              ? `Décaissement en attente ${channelLabel}: ${montantDecaissement.toLocaleString()} FCFA pour ${clientName}`
+              : estProgramme
+                ? `Décaissement programmé: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte} (${dateDecaissement})`
+                : `Décaissement ${channelLabel}: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte}`,
             user: user?.nom || 'Système',
             type: 'credit',
             timestamp: new Date().toISOString()
@@ -317,21 +411,18 @@ export function registerFinanceRoutes(app: Express) {
         });
       }
 
-      // Message de réponse selon le type de décaissement
-      const message = estProgramme
-        ? `Décaissement programmé pour le ${new Date(dateDecaissement).toLocaleDateString('fr-FR')}. Crédit ${numeroCredit} créé en attente.`
-        : `Crédit ${numeroCredit} décaissé. ${montantDecaissement.toLocaleString()} FCFA crédités sur le compte ${compteCourant.numeroCompte}`;
-
       res.status(201).json({
         success: true,
         credit: addSnakeCaseAliasesDeep(credit),
-        compteCourant: estProgramme ? null : {
+        compteCourant: (estProgramme || disbursementChannel === 'CASH') ? null : {
           id: compteCourant.id,
           numero: compteCourant.numeroCompte,
           nouveauSolde
         },
         programme: estProgramme,
         dateDecaissement: estProgramme ? dateDecaissement : null,
+        disbursementChannel,
+        disbursementStatus,
         message
       });
     } catch (error: any) {
@@ -348,6 +439,218 @@ export function registerFinanceRoutes(app: Express) {
       res.status(500).json({
         success: false,
         message: error.message || "Erreur lors du décaissement"
+      });
+    }
+  });
+
+  // =====================================================
+  // DÉCAISSEMENT CAISSE - Endpoints pour le workflow asynchrone
+  // =====================================================
+
+  /**
+   * GET /api/credits/pending-disbursements
+   * Liste les crédits en attente de décaissement physique à la caisse
+   */
+  app.get("/api/credits/pending-disbursements", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
+    try {
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      const pendingDisbursements = await storage.getPendingLoanDisbursements(agenceFilter?.agenceId);
+
+      res.json({
+        success: true,
+        data: pendingDisbursements.map(item => ({
+          ...(addSnakeCaseAliasesDeep(item.credit) as Record<string, unknown>),
+          client: item.client
+        })),
+        count: pendingDisbursements.length
+      });
+    } catch (error: any) {
+      console.error("Erreur récupération décaissements en attente:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Erreur lors de la récupération des décaissements en attente"
+      });
+    }
+  });
+
+  /**
+   * POST /api/credits/:id/caisse-payout
+   * Exécute le décaissement physique par le caissier
+   * C'est ce bouton "Décaisser" qui sort l'argent et active le prêt
+   */
+  app.post("/api/credits/:id/caisse-payout", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
+    try {
+      const { id: creditId } = req.params;
+      const data = normalizeKeysDeep(req.body) as any;
+      const user = req.session.user;
+
+      if (!user?.id) {
+        return res.status(401).json({ message: "Utilisateur non authentifié" });
+      }
+
+      // Vérifier que le caissier a une session ouverte
+      if (!data.sessionCaisseId) {
+        return res.status(400).json({ message: "L'ID de la session de caisse est requis" });
+      }
+
+      // Exécuter le décaissement
+      const result = await storage.processLoanCashPayout({
+        creditId,
+        sessionCaisseId: data.sessionCaisseId,
+        paymentReference: data.paymentReference || data.receiptNumber
+      }, user.id);
+
+      // Log audit
+      await logAudit(
+        req,
+        "DECAISSEMENT_CAISSE_EXECUTE",
+        "credit",
+        creditId,
+        {
+          sessionCaisseId: data.sessionCaisseId,
+          paymentReference: data.paymentReference,
+          montant: result.credit.montant,
+          numeroCredit: result.credit.numeroCredit
+        },
+        "success",
+        "high"
+      );
+
+      // Broadcast updates
+      const wsInstance = getWsInstance();
+      const userAgence = user?.agence;
+      if (wsInstance) {
+        // Notification globale pour la caisse
+        wsInstance.broadcast({
+          type: "CAISSE_UPDATE",
+          payload: {
+            subtype: 'LOAN_DISBURSEMENT_COMPLETED',
+            creditId,
+            numeroCredit: result.credit.numeroCredit,
+            montant: result.credit.montant,
+            timestamp: new Date().toISOString()
+          }
+        });
+
+        // Notification crédit
+        if (userAgence) {
+          wsInstance.broadcastToAgency(userAgence, {
+            type: "CREDIT_UPDATE",
+            payload: {
+              type: 'credit_activated',
+              id: creditId
+            }
+          });
+          wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
+          wsInstance.broadcastToAgency(userAgence, {
+            type: "LIVE_ACTIVITY",
+            payload: {
+              action: `Décaissement espèces effectué: ${parseFloat(result.credit.montant).toLocaleString()} FCFA - Crédit ${result.credit.numeroCredit} activé`,
+              user: user?.nom || 'Caissier',
+              type: 'credit',
+              timestamp: new Date().toISOString()
+            }
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        credit: addSnakeCaseAliasesDeep(result.credit),
+        mouvement: result.mouvement,
+        echeances: result.echeances,
+        message: `Crédit ${result.credit.numeroCredit} décaissé et activé avec succès.`
+      });
+
+    } catch (error: any) {
+      console.error("Erreur décaissement caisse:", error);
+
+      if (error instanceof DecaissementInsufficientFundsError) {
+        return res.status(error.httpStatus).json({
+          success: false,
+          error: error.data,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: error.message || "Erreur lors du décaissement caisse"
+      });
+    }
+  });
+
+  /**
+   * POST /api/credits/:id/cancel-disbursement
+   * Annule un décaissement en attente (si le client ne se présente pas)
+   */
+  app.post("/api/credits/:id/cancel-disbursement", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
+    try {
+      const { id: creditId } = req.params;
+      const data = normalizeKeysDeep(req.body) as any;
+      const user = req.session.user;
+
+      const credit = await storage.getCredit(creditId);
+      if (!credit) {
+        return res.status(404).json({ message: "Crédit non trouvé" });
+      }
+
+      if (credit.statut !== 'WAITING_DISBURSEMENT') {
+        return res.status(400).json({
+          message: `Impossible d'annuler: le crédit n'est pas en attente de décaissement (statut: ${credit.statut})`
+        });
+      }
+
+      // Mettre à jour le crédit
+      const updatedCredit = await storage.updateCredit(creditId, {
+        statut: StatutCredit.CANCELLED,
+        disbursementStatus: 'COMPLETED' as any // Completed = processed (even if cancelled)
+      });
+
+      // Mettre à jour la demande associée si elle existe
+      if (credit.demandeId) {
+        await storage.updateDemandeCredit(credit.demandeId, {
+          statut: StatutDemande.REJECTED
+        });
+      }
+
+      // Log audit
+      await logAudit(
+        req,
+        "DECAISSEMENT_ANNULE",
+        "credit",
+        creditId,
+        {
+          raison: data.raison || "Client non présenté",
+          numeroCredit: credit.numeroCredit
+        },
+        "success",
+        "medium"
+      );
+
+      // Broadcast
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "CAISSE_UPDATE",
+          payload: {
+            subtype: 'LOAN_DISBURSEMENT_CANCELLED',
+            creditId,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+
+      res.json({
+        success: true,
+        credit: addSnakeCaseAliasesDeep(updatedCredit),
+        message: `Décaissement du crédit ${credit.numeroCredit} annulé.`
+      });
+
+    } catch (error: any) {
+      console.error("Erreur annulation décaissement:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Erreur lors de l'annulation"
       });
     }
   });
@@ -439,7 +742,7 @@ export function registerFinanceRoutes(app: Express) {
             }
         }
 
-        res.json(addSnakeCaseAliasesDeep(mapping));
+        res.json(mapping);
       } catch (error: any) {
           console.error("Error fetching credit counts:", error);
           res.status(500).json({ message: "Erreur lors du comptage des dossiers" });

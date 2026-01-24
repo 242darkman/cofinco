@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, AlertCircle, CheckCircle, X, Wallet, ArrowRight, Shield, Building, User } from 'lucide-react';
-import { Modal, Button, FormField, SelectField, Badge } from '../../ui';
+import { DollarSign, AlertCircle, CheckCircle, X, Wallet, Shield } from 'lucide-react';
+import { Modal, Button, FormField, Badge } from '../../ui';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { computeSessionStatus, formatMoney } from '../../../lib/format';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { sessionCaisseApi, authApi } from '../../../lib/api-client';
 import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { MethodePaiement, METHODE_PAIEMENT_LABELS, type MethodePaiementType } from '@shared/enum/status-constants';
 
 interface CreditFeesPaymentModalProps {
   demande: any;
@@ -24,8 +25,8 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
     ? parseFloat(demande.montant_frais_engagement) 
     : (demande.montant_demande || 0) * 0.10;
 
-  const [amount, setAmount] = useState(calculatedFee.toString()); 
-  const [method, setMethod] = useState('Espèces');
+  const [amount, setAmount] = useState(calculatedFee.toString());
+  const [method, setMethod] = useState<MethodePaiementType>(MethodePaiement.CASH);
   const [loading, setLoading] = useState(false);
   
   // Success modal state
@@ -197,100 +198,98 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
   return (
     <>
     <Modal isOpen={true} onClose={onClose} title="Paiement des Frais d'Engagement" size="md">
-        <div className="space-y-6">
-            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                <div className="flex justify-between items-start mb-2">
+        <div className="space-y-4">
+            <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
+                <div className="flex justify-between items-center">
                     <div>
-                        <div className="text-sm text-slate-400">Demande</div>
-                        <div className="font-bold text-white text-lg">{demande.numero_demande}</div>
+                        <div className="font-bold text-white">{demande.numero_demande}</div>
+                        <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            Client: <span className="text-white">{demande.clients?.nom} {demande.clients?.prenom}</span>
+                            <Badge value={demande.clients?.agence || 'N/A'} variant="neutral" className="text-[10px] py-0 px-1.5" />
+                        </div>
                     </div>
                     <div className="text-right">
-                        <div className="text-sm text-slate-400">Montant Crédit</div>
                          <div className="font-bold text-emerald-400">{formatMoney(demande.montant_demande)}</div>
                     </div>
                 </div>
-                 <div className="text-sm text-slate-400 flex items-center gap-2 mt-2">
-                    Client: <span className="text-white font-medium">{demande.clients?.nom} {demande.clients?.prenom}</span> 
-                    <Badge value={demande.clients?.agence || 'N/A'} variant="neutral" className="text-xs py-0 px-2" />
-                 </div>
             </div>
 
             {checkingSession ? (
-                <div className="py-8 text-center text-slate-400 animate-pulse">Vérification de la caisse...</div>
+                <div className="py-6 text-center text-slate-400 animate-pulse text-sm">Vérification de la caisse...</div>
             ) : !activeSession && !showCaisseList ? (
-                <div className="space-y-4">
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex flex-col items-center text-center gap-2">
-                        <Wallet className="text-amber-500 mb-1" size={32} />
-                        <h3 className="font-bold text-amber-500">Aucune Caisse Active</h3>
-                        <div className="text-sm text-amber-200/80">
+                <div className="space-y-3">
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex flex-col items-center text-center gap-1.5">
+                        <Wallet className="text-amber-500" size={24} />
+                        <h3 className="font-bold text-amber-500 text-sm">Aucune Caisse Active</h3>
+                        <div className="text-xs text-amber-200/80">
                              Pour encaisser, il faut une caisse active.
                         </div>
                     </div>
-                    
+
                     {isAdmin && (
-                        <Button variant="outline" onClick={fetchAgencyCaisses} className="w-full justify-center border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10">
-                            <Shield size={16} className="mr-2" />
+                        <Button variant="outline" size="sm" onClick={fetchAgencyCaisses} className="w-full justify-center border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10">
+                            <Shield size={14} className="mr-1.5" />
                             Prendre en main une caisse ({demande.clients?.agence || 'Agence Client'})
                         </Button>
                     )}
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {/* Active Session Display */}
                     {activeSession && (
-                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex justify-between items-center text-emerald-400 text-sm">
-                            <div className="flex gap-3">
-                                <CheckCircle className="shrink-0" size={18} />
-                                <div>
-                                    <p className="font-medium">Caisse: {activeSession.caisse_nom || 'Ma Caisse'} {takenSession ? '(Prise en main)' : ''}</p>
-                                    <p className="text-xs opacity-80 mt-0.5 pointer-events-none">Caissier: {activeSession.caissier_nom}</p>
+                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 flex justify-between items-center text-emerald-400 text-sm">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle className="shrink-0" size={16} />
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium">Caisse: {activeSession.caisse_nom || 'Ma Caisse'}</span>
+                                    <span className="text-xs opacity-70">({activeSession.caissier_nom})</span>
                                 </div>
                             </div>
                             {isAdmin && !showCaisseList && (
-                                <Button size="sm" variant="ghost" className="h-7 text-xs hover:bg-emerald-500/20" onClick={fetchAgencyCaisses}>Changer</Button>
+                                <Button size="sm" variant="ghost" className="h-6 text-xs px-2 hover:bg-emerald-500/20" onClick={fetchAgencyCaisses}>Changer</Button>
                             )}
                         </div>
                     )}
 
                     {/* Caisse Selection List */}
                     {showCaisseList && (
-                        <div className="bg-slate-900 rounded-lg border border-slate-700 p-4 animate-in fade-in zoom-in-95">
-                            <div className="flex justify-between mb-3">
+                        <div className="bg-slate-900 rounded-lg border border-slate-700 p-3 animate-in fade-in zoom-in-95">
+                            <div className="flex justify-between mb-2">
                                 <h4 className="text-sm font-medium text-slate-300">Choisir une caisse ({demande.clients?.agence})</h4>
-                                <button onClick={() => setShowCaisseList(false)}><X size={16} className="text-slate-500" /></button>
+                                <button onClick={() => setShowCaisseList(false)}><X size={14} className="text-slate-500" /></button>
                             </div>
-                            
+
                             {loadingCaisses ? (
-                                <div className="text-center py-4 text-slate-500 text-sm">Chargement...</div>
+                                <div className="text-center py-3 text-slate-500 text-sm">Chargement...</div>
                             ) : (
-                                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar">
                                     {agencyCaisses.map(c => (
-                                        <div key={c.id} className="flex items-center justify-between p-3 rounded bg-slate-800 border border-slate-700">
+                                        <div key={c.id} className="flex items-center justify-between px-2.5 py-2 rounded bg-slate-800 border border-slate-700">
                                             <div>
                                                 <div className="text-sm font-medium text-white">{c.nom}</div>
                                                 <div className="text-xs text-slate-400 flex items-center gap-1">
                                                     {c.active_session ? (
-                                                        <span className="text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Ouverte ({c.active_session.caissier_nom})</span>
+                                                        <span className="text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"/> Ouverte</span>
                                                     ) : (
                                                         <span className="text-slate-500 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-slate-500"/> Fermée</span>
                                                     )}
                                                 </div>
                                             </div>
-                                            
+
                                             {openingCaisseId === c.id ? (
-                                                <div className="flex items-center gap-2">
-                                                    <input 
-                                                        type="number" 
-                                                        className="w-20 bg-slate-950 border border-slate-600 rounded px-2 py-1 text-xs text-white"
-                                                        placeholder="Solde Init"
+                                                <div className="flex items-center gap-1.5">
+                                                    <input
+                                                        type="number"
+                                                        className="w-16 bg-slate-950 border border-slate-600 rounded px-1.5 py-1 text-xs text-white"
+                                                        placeholder="Solde"
                                                         value={soldeInitial}
                                                         onChange={e => setSoldeInitial(e.target.value)}
                                                         autoFocus
                                                     />
-                                                    <Button size="sm" variant="primary" className="h-7 text-xs" onClick={confirmOpenCaisse} disabled={loadingOpen}>OK</Button>
+                                                    <Button size="sm" variant="primary" className="h-6 text-xs px-2" onClick={confirmOpenCaisse} disabled={loadingOpen}>OK</Button>
                                                 </div>
                                             ) : (
-                                                <Button size="sm" variant="outline" className="h-7 text-xs border-slate-600 hover:bg-slate-700" onClick={() => handleTakeControl(c)}>
+                                                <Button size="sm" variant="outline" className="h-6 text-xs px-2 border-slate-600 hover:bg-slate-700" onClick={() => handleTakeControl(c)}>
                                                     {c.active_session ? 'Choisir' : 'Ouvrir'}
                                                 </Button>
                                             )}
@@ -303,36 +302,36 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
 
                     {!showCaisseList && !showConfirm && (
                         <>
-                             <FormField 
-                                label="Montant Frais (10% - Fixe)" 
+                             <FormField
+                                label="Montant Frais (10% - Fixe)"
                                 name="amount"
-                                value={amount ? `${Number(amount).toLocaleString()} FCFA` : ''} 
+                                value={amount ? `${Number(amount).toLocaleString()} FCFA` : ''}
                                 readOnly
                                 disabled
                                 icon={DollarSign}
-                                className="bg-slate-800/30 border-slate-700/50 text-slate-500 font-bold text-lg opacity-80 cursor-not-allowed"
+                                className="bg-slate-800/30 border-slate-700/50 text-slate-500 font-bold opacity-80 cursor-not-allowed"
                              />
-    
+
                              <div className="space-y-1">
-                                <label className="text-sm font-medium text-slate-300">Méthode de Paiement</label>
+                                <label className="text-xs font-medium text-slate-300">Méthode de Paiement</label>
                                 <select
                                     value={method}
-                                    onChange={(e) => setMethod(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2.5 px-3 text-white focus:outline-none focus:border-emerald-500 shadow-sm"
+                                    onChange={(e) => setMethod(e.target.value as MethodePaiementType)}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white focus:outline-none focus:border-emerald-500"
                                 >
-                                    <option value="Espèces">Espèces</option>
-                                    <option value="Mobile Money">Mobile Money</option>
-                                    <option value="Virement">Virement</option>
+                                    <option value={MethodePaiement.CASH}>{METHODE_PAIEMENT_LABELS[MethodePaiement.CASH]}</option>
+                                    <option value={MethodePaiement.MOBILE_MONEY}>{METHODE_PAIEMENT_LABELS[MethodePaiement.MOBILE_MONEY]}</option>
+                                    <option value={MethodePaiement.TRANSFER}>{METHODE_PAIEMENT_LABELS[MethodePaiement.TRANSFER]}</option>
                                 </select>
                              </div>
-                             
-                             <div className="flex gap-3 justify-end pt-4">
-                                <Button variant="ghost" onClick={onClose} disabled={loading}>Annuler</Button>
-                                <Button 
-                                    variant="primary" 
-                                    onClick={() => setShowConfirm(true)} 
+
+                             <div className="flex gap-3 justify-center pt-3">
+                                <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>Annuler</Button>
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setShowConfirm(true)}
                                     disabled={loading || !amount || (!activeSession && !isAdmin)}
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[160px]"
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[140px]"
                                 >
                                     Suivant
                                 </Button>
@@ -341,43 +340,43 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
                     )}
 
                     {showConfirm && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-5 text-center">
-                                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <AlertCircle className="text-emerald-500" size={32} />
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 text-center">
+                                <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <AlertCircle className="text-emerald-500" size={24} />
                                 </div>
-                                <h3 className="text-lg font-bold text-white mb-2">Confirmation du paiement</h3>
-                                <p className="text-slate-400 text-sm leading-relaxed">
+                                <h3 className="font-bold text-white mb-1">Confirmation du paiement</h3>
+                                <p className="text-slate-400 text-xs">
                                     Vous êtes sur le point de procéder au paiement automatique des frais d'engagement.
                                 </p>
                             </div>
 
-                            <div className="bg-slate-900/50 rounded-xl border border-slate-700 p-4 space-y-3">
+                            <div className="bg-slate-900/50 rounded-lg border border-slate-700 p-3 space-y-2">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-500">Montant à payer</span>
                                     <span className="text-white font-bold text-lg">{formatMoney(parseFloat(amount))}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-500">Mode de paiement</span>
-                                    <Badge value={method} variant="neutral" />
+                                    <Badge value={METHODE_PAIEMENT_LABELS[method]} variant="neutral" />
                                 </div>
-                                <div className="h-px bg-slate-700/50 my-1" />
+                                <div className="h-px bg-slate-700/50" />
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-slate-500">Caisse utilisée</span>
                                     <span className="text-emerald-400 font-medium">{activeSession?.caisse_nom || 'Ma Caisse'}</span>
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 justify-end">
-                                <Button 
-                                    variant="ghost" 
+                            <div className="flex gap-3 justify-center pt-2">
+                                <Button
+                                    variant="ghost"
                                     onClick={() => setShowConfirm(false)}
                                     disabled={loading}
                                 >
                                     Retour
                                 </Button>
-                                <Button 
-                                    variant="primary" 
+                                <Button
+                                    variant="primary"
                                     onClick={handlePayment}
                                     isLoading={loading}
                                     className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-[140px]"
@@ -412,7 +411,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess, on
             montant: parseFloat(paidFacture.montant_total || amount),
           }],
           total: parseFloat(paidFacture.montant_total || amount),
-          modePaiement: method,
+          modePaiement: METHODE_PAIEMENT_LABELS[method],
           devise: 'FCFA',
           notes: `Demande de crédit: ${formatMoney(demande.montant_demande)}`,
         } as ReceiptData}

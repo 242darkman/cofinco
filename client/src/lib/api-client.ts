@@ -527,6 +527,7 @@ export const creditApi = {
     dateSolvabilite?: string;
     soldeRestant?: string;
     decaissementImmediat?: boolean;
+    disbursementChannel?: 'ACCOUNT' | 'CASH' | 'MOBILE_MONEY';
   }) =>
     request<any>('/credits/decaissement', {
       method: 'POST',

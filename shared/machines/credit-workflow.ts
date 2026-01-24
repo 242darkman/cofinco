@@ -4,26 +4,20 @@
  * Définition stricte des transitions de statut autorisées pour les crédits.
  * Ce fichier est partagé entre le Backend et le Frontend.
  *
- * Convention:
- * - Les valeurs EN sont la cible (nouvelles valeurs standardisées)
- * - Les valeurs FR sont supportées pour rétro-compatibilité (legacy)
- *
  * Cycle de vie d'un crédit:
- * 1. PENDING (En attente) - Crédit créé, en attente d'activation après décaissement
- * 2. ACTIVE (Actif) - Crédit actif, en cours de remboursement
- * 3. LATE (En retard) - Échéances impayées
- * 4. PAID (Soldé) - Remboursement complet
- * 5. CLOSED (Clôturé) - Crédit fermé (peut être soldé ou en perte)
- * 6. CANCELLED (Annulé) - Crédit annulé avant activation
+ * 1. PENDING - Crédit créé, en attente d'activation après décaissement
+ * 2. WAITING_DISBURSEMENT - Crédit approuvé, en attente de décaissement physique (CASH)
+ * 3. ACTIVE - Crédit actif, en cours de remboursement
+ * 4. LATE - Échéances impayées
+ * 5. PAID - Remboursement complet
+ * 6. CLOSED - Crédit fermé (peut être soldé ou en perte)
+ * 7. CANCELLED - Crédit annulé avant activation
  */
 
 // ============================================================================
 // STATUT CREDIT - VALEURS
 // ============================================================================
 
-/**
- * Statuts de crédit en anglais (cible standardisée)
- */
 export const CreditStatus = {
   PENDING: "PENDING",
   ACTIVE: "ACTIVE",
@@ -31,52 +25,10 @@ export const CreditStatus = {
   PAID: "PAID",
   CLOSED: "CLOSED",
   CANCELLED: "CANCELLED",
+  WAITING_DISBURSEMENT: "WAITING_DISBURSEMENT",
 } as const;
 
 export type CreditStatusType = typeof CreditStatus[keyof typeof CreditStatus];
-
-/**
- * Mapping FR -> EN pour rétro-compatibilité
- * Les valeurs françaises actuellement en base de données
- */
-export const CREDIT_STATUS_FR_TO_EN: Record<string, CreditStatusType> = {
-  "En attente": CreditStatus.PENDING,
-  "Actif": CreditStatus.ACTIVE,
-  "En retard": CreditStatus.LATE,
-  "Soldé": CreditStatus.PAID,
-  "Clôturé": CreditStatus.CLOSED,
-  "Annulé": CreditStatus.CANCELLED,
-};
-
-/**
- * Mapping EN -> FR pour affichage
- */
-export const CREDIT_STATUS_EN_TO_FR: Record<CreditStatusType, string> = {
-  [CreditStatus.PENDING]: "En attente",
-  [CreditStatus.ACTIVE]: "Actif",
-  [CreditStatus.LATE]: "En retard",
-  [CreditStatus.PAID]: "Soldé",
-  [CreditStatus.CLOSED]: "Clôturé",
-  [CreditStatus.CANCELLED]: "Annulé",
-};
-
-/**
- * Normalise un statut (FR ou EN) vers la valeur EN standardisée
- */
-export function normalizeCreditStatus(status: string): CreditStatusType {
-  // Déjà en EN ?
-  if (Object.values(CreditStatus).includes(status as CreditStatusType)) {
-    return status as CreditStatusType;
-  }
-  // Conversion FR -> EN
-  const normalized = CREDIT_STATUS_FR_TO_EN[status];
-  if (normalized) {
-    return normalized;
-  }
-  // Fallback: retourner tel quel (peut causer une erreur de validation plus tard)
-  console.warn(`[CreditWorkflow] Unknown status: ${status}, defaulting to PENDING`);
-  return CreditStatus.PENDING;
-}
 
 // ============================================================================
 // TRANSITIONS AUTORISÉES
@@ -84,63 +36,66 @@ export function normalizeCreditStatus(status: string): CreditStatusType {
 
 /**
  * Définition des transitions autorisées pour chaque statut
- *
- * Format: { [fromStatus]: [allowedTargetStatuses] }
  */
 export const CREDIT_TRANSITIONS: Record<CreditStatusType, readonly CreditStatusType[]> = {
   /**
-   * PENDING (En attente)
-   * - Peut être activé après décaissement
+   * PENDING
+   * - Peut être activé après décaissement automatique (compte)
+   * - Peut passer en attente de décaissement (caisse)
    * - Peut être annulé si le décaissement n'a pas lieu
    */
   [CreditStatus.PENDING]: [
-    CreditStatus.ACTIVE,     // Décaissement effectué
-    CreditStatus.CANCELLED,  // Annulation avant décaissement
+    CreditStatus.ACTIVE,
+    CreditStatus.WAITING_DISBURSEMENT,
+    CreditStatus.CANCELLED,
   ],
 
   /**
-   * ACTIVE (Actif)
+   * WAITING_DISBURSEMENT
+   * - Peut être activé quand le caissier effectue le paiement
+   * - Peut être annulé si le client ne se présente pas
+   */
+  [CreditStatus.WAITING_DISBURSEMENT]: [
+    CreditStatus.ACTIVE,
+    CreditStatus.CANCELLED,
+  ],
+
+  /**
+   * ACTIVE
    * - Peut passer en retard si échéances impayées
    * - Peut être soldé si remboursement complet
    * - Peut être clôturé (fin de contrat, perte, etc.)
    */
   [CreditStatus.ACTIVE]: [
-    CreditStatus.LATE,   // Retard de paiement
-    CreditStatus.PAID,   // Remboursement complet
-    CreditStatus.CLOSED, // Clôture (perte, radiation, etc.)
+    CreditStatus.LATE,
+    CreditStatus.PAID,
+    CreditStatus.CLOSED,
   ],
 
   /**
-   * LATE (En retard)
+   * LATE
    * - Peut revenir actif si régularisation
    * - Peut être soldé si paiement intégral
    * - Peut être clôturé (passage en perte)
    */
   [CreditStatus.LATE]: [
-    CreditStatus.ACTIVE, // Régularisation des arriérés
-    CreditStatus.PAID,   // Remboursement complet
-    CreditStatus.CLOSED, // Passage en perte / radiation
+    CreditStatus.ACTIVE,
+    CreditStatus.PAID,
+    CreditStatus.CLOSED,
   ],
 
   /**
-   * PAID (Soldé)
+   * PAID
    * - Peut être clôturé pour archivage
-   * - État quasi-terminal
    */
   [CreditStatus.PAID]: [
-    CreditStatus.CLOSED, // Archivage final
+    CreditStatus.CLOSED,
   ],
 
-  /**
-   * CLOSED (Clôturé)
-   * - État terminal, aucune transition possible
-   */
+  /** CLOSED - État terminal */
   [CreditStatus.CLOSED]: [],
 
-  /**
-   * CANCELLED (Annulé)
-   * - État terminal, aucune transition possible
-   */
+  /** CANCELLED - État terminal */
   [CreditStatus.CANCELLED]: [],
 } as const;
 
@@ -150,54 +105,40 @@ export const CREDIT_TRANSITIONS: Record<CreditStatusType, readonly CreditStatusT
 
 /**
  * Vérifie si une transition est autorisée
- *
- * @param from - Statut actuel (FR ou EN)
- * @param to - Statut cible (FR ou EN)
- * @returns true si la transition est autorisée
  */
-export function canTransitionCredit(from: string, to: string): boolean {
-  const normalizedFrom = normalizeCreditStatus(from);
-  const normalizedTo = normalizeCreditStatus(to);
-
-  // Même statut = pas de transition nécessaire
-  if (normalizedFrom === normalizedTo) {
-    return true;
-  }
-
-  const allowedTransitions = CREDIT_TRANSITIONS[normalizedFrom];
-  return allowedTransitions.includes(normalizedTo);
+export function canTransitionCredit(from: CreditStatusType, to: CreditStatusType): boolean {
+  if (from === to) return true;
+  return CREDIT_TRANSITIONS[from].includes(to);
 }
 
 /**
  * Valide une transition et lance une erreur si interdite
- *
- * @param from - Statut actuel (FR ou EN)
- * @param to - Statut cible (FR ou EN)
- * @throws Error si la transition est interdite
  */
 export function validateCreditTransition(from: string, to: string): void {
-  const normalizedFrom = normalizeCreditStatus(from);
-  const normalizedTo = normalizeCreditStatus(to);
+  const fromStatus = from as CreditStatusType;
+  const toStatus = to as CreditStatusType;
 
-  // Même statut = OK
-  if (normalizedFrom === normalizedTo) {
-    return;
-  }
+  if (fromStatus === toStatus) return;
 
-  if (!canTransitionCredit(normalizedFrom, normalizedTo)) {
-    const fromLabel = CREDIT_STATUS_EN_TO_FR[normalizedFrom] || normalizedFrom;
-    const toLabel = CREDIT_STATUS_EN_TO_FR[normalizedTo] || normalizedTo;
-    const allowedTargets = CREDIT_TRANSITIONS[normalizedFrom]
-      .map(s => CREDIT_STATUS_EN_TO_FR[s] || s)
-      .join(", ") || "aucun";
-
+  if (!canTransitionCredit(fromStatus, toStatus)) {
+    const allowedTargets = CREDIT_TRANSITIONS[fromStatus]?.join(", ") || "aucun";
     throw new CreditTransitionError(
-      `Transition interdite: "${fromLabel}" → "${toLabel}". ` +
-      `Transitions autorisées depuis "${fromLabel}": [${allowedTargets}]`,
-      normalizedFrom,
-      normalizedTo
+      `Transition interdite: "${fromStatus}" → "${toStatus}". Transitions autorisées: [${allowedTargets}]`,
+      fromStatus,
+      toStatus
     );
   }
+}
+
+/**
+ * Normalise un statut (rétrocompatibilité simple)
+ */
+export function normalizeCreditStatus(status: string): CreditStatusType {
+  if (Object.values(CreditStatus).includes(status as CreditStatusType)) {
+    return status as CreditStatusType;
+  }
+  console.warn(`[CreditWorkflow] Unknown status: ${status}, defaulting to PENDING`);
+  return CreditStatus.PENDING;
 }
 
 /**
@@ -218,12 +159,9 @@ export class CreditTransitionError extends Error {
 }
 
 // ============================================================================
-// METADATA & HELPERS UI
+// METADATA UI
 // ============================================================================
 
-/**
- * Métadonnées pour chaque statut (couleurs, icônes, etc.)
- */
 export const CREDIT_STATUS_METADATA: Record<CreditStatusType, {
   label: string;
   color: string;
@@ -273,20 +211,24 @@ export const CREDIT_STATUS_METADATA: Record<CreditStatusType, {
     icon: "XCircle",
     description: "Crédit annulé avant activation",
   },
+  [CreditStatus.WAITING_DISBURSEMENT]: {
+    label: "En attente décaissement",
+    color: "text-orange-700",
+    bgColor: "bg-orange-100",
+    icon: "Wallet",
+    description: "Crédit approuvé, en attente de décaissement physique à la caisse",
+  },
 };
 
 /**
  * Retourne les transitions possibles depuis un statut donné
  */
-export function getAvailableCreditTransitions(currentStatus: string): Array<{
+export function getAvailableCreditTransitions(currentStatus: CreditStatusType): Array<{
   status: CreditStatusType;
   label: string;
   description: string;
 }> {
-  const normalized = normalizeCreditStatus(currentStatus);
-  const transitions = CREDIT_TRANSITIONS[normalized];
-
-  return transitions.map(status => ({
+  return CREDIT_TRANSITIONS[currentStatus].map(status => ({
     status,
     label: CREDIT_STATUS_METADATA[status].label,
     description: CREDIT_STATUS_METADATA[status].description,
@@ -296,15 +238,13 @@ export function getAvailableCreditTransitions(currentStatus: string): Array<{
 /**
  * Vérifie si un crédit est dans un état terminal
  */
-export function isCreditTerminal(status: string): boolean {
-  const normalized = normalizeCreditStatus(status);
-  return CREDIT_TRANSITIONS[normalized].length === 0;
+export function isCreditTerminal(status: CreditStatusType): boolean {
+  return CREDIT_TRANSITIONS[status].length === 0;
 }
 
 /**
  * Vérifie si un crédit est actif (remboursements en cours)
  */
-export function isCreditActive(status: string): boolean {
-  const normalized = normalizeCreditStatus(status);
-  return normalized === CreditStatus.ACTIVE || normalized === CreditStatus.LATE;
+export function isCreditActive(status: CreditStatusType): boolean {
+  return status === CreditStatus.ACTIVE || status === CreditStatus.LATE;
 }

@@ -90,9 +90,41 @@ export const StatutCredit = {
   PAID: "PAID",
   CLOSED: "CLOSED",
   CANCELLED: "CANCELLED",
+  WAITING_DISBURSEMENT: "WAITING_DISBURSEMENT", // En attente de décaissement physique (caisse)
 } as const;
 
 export type StatutCreditType = (typeof StatutCredit)[keyof typeof StatutCredit];
+
+// ============================================
+// CANAL DE DÉCAISSEMENT
+// ============================================
+
+export const DisbursementChannel = {
+  ACCOUNT: "ACCOUNT",       // Virement vers compte courant
+  CASH: "CASH",             // Espèces à la caisse
+  MOBILE_MONEY: "MOBILE_MONEY", // Mobile Money
+} as const;
+
+export type DisbursementChannelType = (typeof DisbursementChannel)[keyof typeof DisbursementChannel];
+
+/** Labels FR pour le canal de décaissement */
+export const DISBURSEMENT_CHANNEL_LABELS: Record<DisbursementChannelType, string> = {
+  [DisbursementChannel.ACCOUNT]: "Compte Courant",
+  [DisbursementChannel.CASH]: "Espèces (Caisse)",
+  [DisbursementChannel.MOBILE_MONEY]: "Mobile Money",
+};
+
+// ============================================
+// STATUT DE DÉCAISSEMENT
+// ============================================
+
+export const DisbursementStatus = {
+  PENDING: "PENDING",       // En attente
+  PROCESSING: "PROCESSING", // En cours
+  COMPLETED: "COMPLETED",   // Terminé
+} as const;
+
+export type DisbursementStatusType = (typeof DisbursementStatus)[keyof typeof DisbursementStatus];
 
 // ============================================
 // TYPE CREDIT (Catégorie de crédit)

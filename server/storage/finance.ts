@@ -1950,7 +1950,7 @@ export async function payerFraisEngagement(data: {
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionCaisseId!,
         mouvementId: mouvement.id,
-        typeOperation: "Frais Engagement" as any,
+        typeOperation: TypeOperationCaisse.ENGAGEMENT_FEE,
         montant: data.montant,
         methodePaiement: data.methodePaiement as any,
         reference,
@@ -2515,6 +2515,222 @@ export async function createDecaissementWithLedger(data: {
         },
         userId
     ).then(({ result, mouvement }) => ({ credit: result, mouvement }));
+}
+
+/**
+ * Process a Cash Loan Disbursement by the Cashier
+ * This is called when the cashier clicks "Pay" on a pending loan disbursement.
+ *
+ * Steps:
+ * 1. Verify caisse session is open
+ * 2. Verify sufficient balance in the coffre
+ * 3. Verify credit is in WAITING_DISBURSEMENT status
+ * 4. Debit the coffre (cash goes out)
+ * 5. Update credit status to ACTIVE
+ * 6. Generate repayment schedule (echeancier)
+ *
+ * @param data - Disbursement details
+ * @param userId - The cashier performing the operation
+ */
+export async function processLoanCashPayout(data: {
+    creditId: string;
+    sessionCaisseId: string;
+    paymentReference?: string; // Receipt number
+}, userId: string): Promise<{
+    credit: Credit;
+    mouvement: MouvementFinancier;
+    echeances?: any[];
+}> {
+    // 1. Validate credit exists and is in correct state
+    const [credit] = await db.select().from(credits).where(eq(credits.id, data.creditId));
+    if (!credit) {
+        throw new Error("Crédit non trouvé");
+    }
+
+    if (credit.statut !== 'WAITING_DISBURSEMENT') {
+        throw new Error(`Ce crédit n'est pas en attente de décaissement (statut actuel: ${credit.statut})`);
+    }
+
+    if (credit.disbursementChannel !== 'CASH') {
+        throw new Error(`Ce crédit n'est pas configuré pour un décaissement en espèces (canal: ${credit.disbursementChannel})`);
+    }
+
+    if (credit.disbursementStatus !== 'PENDING') {
+        throw new Error(`Le décaissement n'est pas en attente (statut: ${credit.disbursementStatus})`);
+    }
+
+    // 2. Validate caisse session
+    const [session] = await db.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, data.sessionCaisseId));
+    if (!session) {
+        throw new Error("Session de caisse non trouvée");
+    }
+
+    if (session.statut !== 'OPEN') {
+        throw new Error("La session de caisse n'est pas ouverte");
+    }
+
+    // 3. Find the coffre for the agency
+    if (!credit.agenceId) {
+        throw new Error("Le crédit n'est lié à aucune agence");
+    }
+
+    const [coffre] = await db.select().from(coffresForts).where(
+        eq(coffresForts.ownerId, credit.agenceId)
+    );
+
+    let targetCoffre = coffre;
+    if (!targetCoffre) {
+        const [coffreSiege] = await db.select().from(coffresForts).where(
+            eq(coffresForts.ownerType, "SIEGE")
+        );
+        targetCoffre = coffreSiege;
+    }
+
+    if (!targetCoffre) {
+        throw new Error("Aucun coffre-fort trouvé pour cette agence");
+    }
+
+    // 4. Check balance
+    const montant = parseFloat(credit.montant);
+    const soldeCoffre = parseFloat(targetCoffre.solde || "0");
+
+    if (soldeCoffre < montant) {
+        throw new DecaissementInsufficientFundsError(
+            montant,
+            soldeCoffre,
+            targetCoffre.id,
+            targetCoffre.code,
+            targetCoffre.nom
+        );
+    }
+
+    // Get client info for the ledger entry (need to join with users for nom/prenom)
+    const [clientWithUser] = await db.select({
+        client: clients,
+        user: { nom: users.nom, prenom: users.prenom }
+    })
+    .from(clients)
+    .leftJoin(users, eq(clients.userId, users.id))
+    .where(eq(clients.id, credit.clientId));
+
+    // 5. Execute the disbursement with ledger
+    return executeWithLedger(
+        "CAISSE",
+        {
+            montant: credit.montant,
+            sens: "DEBIT", // Money leaving the coffre
+            clientId: credit.clientId,
+            creditId: data.creditId,
+            sessionCaisseId: data.sessionCaisseId,
+            methodePaiement: "CASH",
+            typePaiement: "LOAN_DISBURSEMENT",
+            agenceId: credit.agenceId,
+            referenceExterne: data.paymentReference || `LOAN-${credit.numeroCredit}`,
+            metadata: {
+                description: `Décaissement prêt ${credit.numeroCredit} - ${clientWithUser?.user?.nom || ''} ${clientWithUser?.user?.prenom || ''}`,
+                coffreId: targetCoffre.id,
+                coffreCode: targetCoffre.code,
+                soldeCoffreAvant: soldeCoffre,
+                channel: 'CASH'
+            }
+        },
+        async (tx, mouvement) => {
+            // 6. Debit the Coffre
+            const newSoldeCoffre = soldeCoffre - montant;
+            await tx.update(coffresForts)
+                .set({ solde: newSoldeCoffre.toString(), updatedAt: new Date() })
+                .where(eq(coffresForts.id, targetCoffre.id));
+
+            // 7. Update session theoretical balance
+            const sessionSoldeTheorique = parseFloat(session.montantFermetureTheorique || "0");
+            const newSessionSolde = sessionSoldeTheorique - montant;
+            await tx.update(sessionsCaisse)
+                .set({ montantFermetureTheorique: newSessionSolde.toString(), updatedAt: new Date() })
+                .where(eq(sessionsCaisse.id, data.sessionCaisseId));
+
+            // 8. Create caisse operation record
+            await tx.insert(operationsCaisse).values({
+                sessionId: data.sessionCaisseId,
+                typeOperation: 'CREDIT_DISBURSEMENT',
+                montant: credit.montant,
+                methodePaiement: 'CASH',
+                clientId: credit.clientId,
+                mouvementId: mouvement.id,
+                reference: `LOAN-${credit.numeroCredit}-${Date.now()}`,
+                description: `Décaissement prêt ${credit.numeroCredit}`,
+            });
+
+            // 9. Update credit to ACTIVE
+            const [updatedCredit] = await tx.update(credits)
+                .set({
+                    statut: 'ACTIVE' as any,
+                    disbursementStatus: 'COMPLETED' as any,
+                    paymentReference: data.paymentReference,
+                    disbursedAt: new Date(),
+                    disbursedBy: userId,
+                    dateDebut: new Date(), // Start date is now (when cash is handed over)
+                    updatedAt: new Date()
+                })
+                .where(eq(credits.id, data.creditId))
+                .returning();
+
+            // 10. Echeancier generation is handled by the remboursement system
+            // No separate echeances table - repayments are tracked via remboursements
+
+            return {
+                result: updatedCredit,
+                additionalEventData: {
+                    nouveauSoldeCoffre: newSoldeCoffre.toString()
+                }
+            };
+        },
+        userId
+    ).then(({ result, mouvement }) => ({
+        credit: result as Credit,
+        mouvement,
+        echeances: []
+    }));
+}
+
+/**
+ * Get pending loan disbursements for a specific agency
+ * Used by the cashier dashboard to see which loans need to be paid out
+ */
+export async function getPendingLoanDisbursements(agenceId?: string): Promise<Array<{
+    credit: Credit;
+    client: { id: string; nom: string; prenom: string | null; photoUrl?: string | null };
+    demande?: any;
+}>> {
+    // Build base conditions
+    const baseConditions = and(
+        eq(credits.statut, 'WAITING_DISBURSEMENT' as any),
+        eq(credits.disbursementChannel, 'CASH' as any),
+        eq(credits.disbursementStatus, 'PENDING' as any),
+        agenceId ? eq(credits.agenceId, agenceId) : undefined
+    );
+
+    const results = await db.select({
+        credit: credits,
+        clientId: clients.id,
+        userNom: users.nom,
+        userPrenom: users.prenom,
+        userPhotoProfile: users.photoProfile
+    })
+    .from(credits)
+    .innerJoin(clients, eq(credits.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
+    .where(baseConditions)
+    .orderBy(desc(credits.createdAt));
+
+    return results.map(r => ({
+        credit: r.credit,
+        client: {
+            id: r.clientId,
+            nom: r.userNom || 'N/A',
+            prenom: r.userPrenom,
+            photoUrl: r.userPhotoProfile
+        }
+    }));
 }
 
 /**

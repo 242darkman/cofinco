@@ -130,9 +130,9 @@ const TabGroup: React.FC<TabGroupProps> = ({
         const isActive = activeTab === tab.key;
         const Icon = tab.icon;
 
-        // Custom default style if no class provided
+        // Custom default style if no class provided - high contrast for active state
         const defaultBadgeStyle = isActive
-             ? 'bg-white/20 text-white'
+             ? 'bg-white text-emerald-600 font-bold'
              : 'bg-slate-600 text-slate-300';
 
         return (

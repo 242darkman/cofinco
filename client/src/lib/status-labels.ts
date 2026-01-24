@@ -104,6 +104,7 @@ export const CREDIT_STATUS_LABELS: Record<StatutCreditType, string> = {
   PAID: "Soldé",
   CLOSED: "Clôturé",
   CANCELLED: "Annulé",
+  WAITING_DISBURSEMENT: "En attente décaissement",
 };
 
 export const CREDIT_STATUS_COLORS: Record<StatutCreditType, string> = {
@@ -113,6 +114,7 @@ export const CREDIT_STATUS_COLORS: Record<StatutCreditType, string> = {
   PAID: "bg-green-500/20 text-green-400 border-green-500/30",
   CLOSED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
   CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  WAITING_DISBURSEMENT: "bg-orange-500/20 text-orange-400 border-orange-500/30",
 };
 
 // ============================================

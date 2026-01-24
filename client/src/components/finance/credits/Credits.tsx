@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, Wifi, WifiOff, Eye, Check, X, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight } from 'lucide-react';
+import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
 import { useCredits } from '../../../hooks/credits/useCredits';
@@ -14,7 +14,6 @@ import CreditApprovalModal from './CreditApprovalModal';
 import CreditDisbursementModal from './CreditDisbursementModal';
 import CreditCommissionRejectionModal from './CreditCommissionRejectionModal';
 import CreditFeesPaymentModal from './CreditFeesPaymentModal';
-import EnqueteDetailModal from './EnqueteDetailModal';
 import ReferenceTable from './CreditRemboursement';
 import { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';
 import { formatClientName, resolveClientPhotoUrl } from '../../../lib/format';
@@ -49,17 +48,13 @@ interface CreditsProps {
 
 export default function CreditsRefactored({ userRole, activeView, onModuleChange }: CreditsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
-  const [demandeSubTab, setDemandeSubTab] = useState<'to_process' | 'approved'>('to_process');
   const [selectedCredit, setSelectedCredit] = useState<string | null>(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [showEnqueteForm, setShowEnqueteForm] = useState(false);
-  const [showValidationModal, setShowValidationModal] = useState(false);
-  const [selectedEnquete, setSelectedEnquete] = useState<string | null>(null);
   const [selectedDemande, setSelectedDemande] = useState<any>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [showDisbursementModal, setShowDisbursementModal] = useState(false); // New modal state
+  const [showDisbursementModal, setShowDisbursementModal] = useState(false);
   const [showCommissionRejectionModal, setShowCommissionRejectionModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const [showFeesModal, setShowFeesModal] = useState(false);
   const [creditsPage, setCreditsPage] = useState(1);
   const [demandesPage, setDemandesPage] = useState(1);
@@ -295,11 +290,6 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
   const isLoading = credits.loading || demandes.loading || enquetes.loading;
 
-  const isApprovedStatus = (status: string) => {
-    const s = status.toLowerCase().trim();
-    return ['approuve', 'approuvée', 'approved', 'décaissée', 'décaissé', 'decaissee', 'déboursé', 'debourse', 'déboursée', 'enquête terminée', 'enquete terminee'].includes(s);
-  };
-
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -485,11 +475,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                   key={item.id}
                                   onClick={() => {
                                      setSelectedDemande(item);
-                                     if (item.statut === StatutDemande.INVESTIGATION_COMPLETE) {
-                                        setShowApprovalModal(true);
-                                     } else {
-                                        setShowDetailModal(true);
-                                     }
+                                     setShowApprovalModal(true);
                                   }}
                                   className="bg-slate-800/50 hover:bg-slate-800 border border-red-500/20 hover:border-red-500/50 rounded-lg p-3 cursor-pointer transition-all flex items-center justify-between group"
                                >
@@ -1029,16 +1015,6 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             setSelectedDemande(null);
             demandes.fetchDemandes();
             credits.fetchCredits();
-          }}
-        />
-      )}
-
-      {selectedEnquete && showDetailModal && (
-        <EnqueteDetailModal
-          enquete={enquetes.enquetes.find(e => e.id === selectedEnquete) as any}
-          onClose={() => {
-            setShowDetailModal(false);
-            setSelectedEnquete(null);
           }}
         />
       )}

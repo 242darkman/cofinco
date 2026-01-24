@@ -562,6 +562,22 @@ export interface IStorage {
     createDureeSuggeree(duree: InsertDureeSuggeree): Promise<DureeSuggeree>;
     updateDureeSuggeree(id: string, duree: Partial<InsertDureeSuggeree>): Promise<DureeSuggeree | undefined>;
     deleteDureeSuggeree(id: string): Promise<boolean>;
+
+    // Multi-channel Disbursement (CASH payout at caisse)
+    processLoanCashPayout(data: {
+        creditId: string;
+        sessionCaisseId: string;
+        paymentReference?: string;
+    }, userId: string): Promise<{
+        credit: Credit;
+        mouvement: any;
+        echeances?: any[];
+    }>;
+    getPendingLoanDisbursements(agenceId?: string): Promise<Array<{
+        credit: Credit;
+        client: { id: string; nom: string; prenom: string | null; photoUrl?: string | null };
+        demande?: any;
+    }>>;
 }
 
 // Aggregate all helper/modules into one object

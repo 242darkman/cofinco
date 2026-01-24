@@ -9,8 +9,6 @@
 export {
   CreditStatus,
   type CreditStatusType,
-  CREDIT_STATUS_FR_TO_EN,
-  CREDIT_STATUS_EN_TO_FR,
   CREDIT_TRANSITIONS,
   CREDIT_STATUS_METADATA,
   normalizeCreditStatus,

@@ -32,6 +32,7 @@ import { isAdminRole } from '@shared/types/roles';
 import CaisseAccessControl from './CaisseAccessControl';
 import CaisseClientInfos from './CaisseClientInfos';
 import CaisseHistoriqueGlobal from './CaisseHistoriqueGlobal';
+import PendingDisbursements from './PendingDisbursements';
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
 import { PendingActivationDrawer } from './PendingActivationDrawer';
@@ -509,6 +510,28 @@ export default function CaisseDashboard({
     switch (activeTab) {
       case 'operations':
         return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} onBack={() => setActiveTab('dashboard')} /></div> : null;
+      case 'prets-decaissement':
+        return currentSession ? (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
+            <div className="flex items-center gap-2 px-4 md:px-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveTab('dashboard')}
+                icon={ArrowRightLeft}
+                className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180"
+              />
+              <h2 className="text-lg font-bold text-white">Décaissements Prêts en Attente</h2>
+            </div>
+            <PendingDisbursements
+              sessionCaisseId={currentSession.id}
+              onDisbursementComplete={() => {
+                refetchSession();
+                refetchTransactions();
+              }}
+            />
+          </div>
+        ) : null;
       case 'historique':
         return (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -942,6 +965,21 @@ export default function CaisseDashboard({
                          <FileText size={20} />
                      </div>
                      <span className="text-xs font-medium text-slate-300 group-hover:text-white">États</span>
+                 </div>
+             </Card>
+
+             {/* Décaissements Prêts */}
+             <Card
+                variant="default"
+                padding="sm"
+                className="cursor-pointer hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group relative"
+                onClick={() => setActiveTab('prets-decaissement')}
+             >
+                 <div className="flex flex-col items-center gap-2 py-2">
+                     <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-400 group-hover:scale-110 transition-transform">
+                         <CreditCard size={20} />
+                     </div>
+                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">Prêts</span>
                  </div>
              </Card>
           </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface EnqueteCredit {
   id: string;
@@ -28,10 +29,16 @@ export interface EnqueteCredit {
 }
 
 export function useEnquetes() {
+  const queryClient = useQueryClient();
   const [enquetes, setEnquetes] = useState<EnqueteCredit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedEnquetes, setExpandedEnquetes] = useState<Set<string>>(new Set());
+
+  // Helper to invalidate counts after mutations
+  const invalidateCounts = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/demandes-credit/counts'] });
+  };
 
   const fetchEnquetes = async () => {
     setLoading(true);
@@ -61,6 +68,7 @@ export function useEnquetes() {
       if (!response.ok) throw new Error('Erreur création');
 
       await fetchEnquetes();
+      invalidateCounts();
       return true;
     } catch (err) {
       console.error('Erreur création enquete:', err);
@@ -91,6 +99,7 @@ export function useEnquetes() {
       if (!response.ok) throw new Error('Erreur validation');
 
       await fetchEnquetes();
+      invalidateCounts();
       return true;
     } catch (err) {
       console.error('Erreur validation:', err);
