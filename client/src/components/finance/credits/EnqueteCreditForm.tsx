@@ -80,6 +80,24 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   const [seniorityValue, setSeniorityValue] = useState<string>('');
   const [seniorityUnit, setSeniorityUnit] = useState<'days' | 'months' | 'years'>('months');
 
+  // Calculate initial revenue values from demande
+  const getInitialRevenuMensuel = () => {
+    // Priority: revenus_mensuels > revenu_mensuel > calculated from journalier
+    if (initialData?.revenus_mensuels) return initialData.revenus_mensuels.toString();
+    if (initialData?.revenu_mensuel) return initialData.revenu_mensuel.toString();
+    if (initialData?.revenu_journalier) {
+      const journalier = parseFloat(initialData.revenu_journalier);
+      return (journalier * 26).toString(); // Default 26 work days
+    }
+    return '';
+  };
+
+  const getInitialTypeRevenu = () => {
+    if (initialData?.type_revenu) return initialData.type_revenu;
+    if (initialData?.revenu_journalier && !initialData?.revenus_mensuels && !initialData?.revenu_mensuel) return 'Journalier';
+    return 'Mensuel';
+  };
+
   const [formData, setFormData] = useState({
     demandeId: initialData?.id || '',
     client_id: clientId || initialData?.client_id || '',
@@ -87,12 +105,13 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     categorie_activite: initialData?.categorie_activite || '',
     type_activite: initialData?.type_activite || '',
     anciennete_activite: initialData?.anciennete_activite || '',
-    description_activite: initialData?.objet_credit || '', 
-    revenu_journalier: '',
+    description_activite: initialData?.objet_credit || initialData?.description_activite || '',
+    revenu_journalier: initialData?.revenu_journalier?.toString() || '',
     jours_travail_mois: '26',
-    revenu_mensuel_declare: '',
-    type_revenu: 'Mensuel', // 'Mensuel' or 'Journalier'
-    charges_mensuelles: '',
+    // Pre-fill from demande credit request
+    revenu_mensuel_declare: getInitialRevenuMensuel(),
+    type_revenu: getInitialTypeRevenu(),
+    charges_mensuelles: initialData?.charges_mensuelles?.toString() || '',
     autres_credits: [] as any[],
     garanties_proposees: [] as any[],
     photos_activite: [] as string[],
@@ -110,7 +129,13 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     }
   }, [clientId]);
 
+  // Track if user manually changed revenu_journalier
+  const userChangedJournalier = useRef(false);
+
   useEffect(() => {
+    // Only recalculate if user manually changed the journalier field
+    if (!userChangedJournalier.current) return;
+
     const revenuJournalier = parseFloat(formData.revenu_journalier) || 0;
     const joursTravail = parseInt(formData.jours_travail_mois) || 26;
     const revenuMensuel = revenuJournalier * joursTravail;
@@ -516,37 +541,35 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
   return (
     <>
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700 p-6 flex items-center justify-between z-10">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-2xl font-bold text-white">
-              Enquête de Crédit
-            </h2>
-            <p className="text-slate-400 text-sm mt-1">
+            <h2 className="text-lg font-bold text-white">Enquête de Crédit</h2>
+            <p className="text-slate-400 text-xs">
               Client : {clientNom || (selectedClient ? formatClientName(selectedClient.nom, (selectedClient as any).prenom) : 'Non sélectionné')}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+            className="p-1.5 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
             data-testid="button-close-enquete"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {!clientId && (
-            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 mb-4">
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                <User size={16} className="inline mr-2" />
+            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                <User size={14} className="inline mr-1.5" />
                 Sélectionner le Client à Enquêter *
               </label>
               <select
                 value={formData.client_id}
                 onChange={handleClientChange}
-                className={`w-full bg-slate-700 border ${!formData.client_id ? 'border-slate-600' : 'border-blue-500'} rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full bg-slate-700 border ${!formData.client_id ? 'border-slate-600' : 'border-cyan-500'} rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                 data-testid="select-client"
               >
                 <option value="">-- Choisir un client --</option>
@@ -556,26 +579,26 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               </select>
 
               {selectedClient && (
-                <div className="mt-4 flex items-center gap-4 p-3 bg-slate-700/50 rounded-lg">
-                  <div className="w-16 h-16 bg-slate-600 rounded-full flex items-center justify-center overflow-hidden border-2 border-slate-500">
+                <div className="mt-2 flex items-center gap-3 p-2 bg-slate-700/50 rounded-lg">
+                  <div className="w-10 h-10 bg-slate-600 rounded-full flex items-center justify-center overflow-hidden border border-slate-500">
                     {selectedClient.photo_url ? (
                       <img src={selectedClient.photo_url} alt={selectedClient.nom} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-xl font-bold text-white">{selectedClient.nom.charAt(0)}</span>
+                      <span className="text-sm font-bold text-white">{selectedClient.nom.charAt(0)}</span>
                     )}
                   </div>
                   <div>
-                    <h3 className="font-bold text-white">{formatClientName(selectedClient.nom, (selectedClient as any).prenom)}</h3>
-                    <p className="text-sm text-cyan-400">Client sélectionné pour enquête</p>
+                    <h3 className="font-semibold text-white text-sm">{formatClientName(selectedClient.nom, (selectedClient as any).prenom)}</h3>
+                    <p className="text-xs text-cyan-400">Client sélectionné</p>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex gap-3">
-            <AlertCircle className="text-blue-400 flex-shrink-0" size={20} />
-            <div className="text-sm text-blue-300">
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2 flex gap-2 items-center">
+            <AlertCircle className="text-blue-400 flex-shrink-0" size={16} />
+            <div className="text-xs text-blue-300">
               Cette enquête sera évaluée par un agent terrain puis approuvée par le chef d'agence ou le responsable crédit.
             </div>
           </div>
@@ -593,34 +616,32 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
           {/* Affichage de l'adresse résolue via Hook */}
           {geoLocation.latitude && geoLocation.longitude && (
-             <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
-                <div className="text-xs font-semibold text-cyan-400 mb-2">Adresse du site</div>
-                <LocationDisplay 
-                  latitude={geoLocation.latitude} 
-                  longitude={geoLocation.longitude} 
-                  className="text-white"
+             <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2">
+                <div className="text-[10px] font-semibold text-cyan-400 mb-1">Adresse du site</div>
+                <LocationDisplay
+                  latitude={geoLocation.latitude}
+                  longitude={geoLocation.longitude}
+                  className="text-white text-sm"
                 />
-
              </div>
           )}
 
             {/* GPS Security Warning */}
             {geoLocation.distanceFromClient !== null && geoLocation.distanceFromClient !== undefined && geoLocation.distanceFromClient > 200 && (
-              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 flex items-start gap-3 animate-pulse">
-                 <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="bg-red-500/10 border border-red-500/50 rounded-lg px-3 py-2 flex items-start gap-2 animate-pulse">
+                 <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
                  <div>
-                    <h4 className="text-red-400 font-bold text-sm">Alerte de Sécurité GPS</h4>
-                    <p className="text-red-300 text-xs mt-1">
-                      La position capturée est à <span className="font-bold">{Math.round(geoLocation.distanceFromClient)}m</span> de l'adresse connue du client. 
-                      Veuillez vérifier qu'il ne s'agit pas d'une tentative de fraude.
+                    <h4 className="text-red-400 font-bold text-xs">Alerte de Sécurité GPS</h4>
+                    <p className="text-red-300 text-[11px] mt-0.5">
+                      Position à <span className="font-bold">{Math.round(geoLocation.distanceFromClient)}m</span> de l'adresse connue du client.
                     </p>
                  </div>
               </div>
             )}
 
           <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
-              <DollarSign size={16} className="inline mr-2" />
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <DollarSign size={14} className="inline mr-1" />
               Montant du crédit demandé (FCFA) *
             </label>
             <input
@@ -629,28 +650,28 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               step="1000"
               value={formData.montant_demande}
               onChange={(e) => handleChange('montant_demande', e.target.value)}
-              className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border ${
-                errors.montant_demande ? 'border-blue-500' : 'border-slate-600'
+              className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
+                errors.montant_demande ? 'border-cyan-500' : 'border-slate-600'
               } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
               placeholder="500000"
               data-testid="input-montant-demande"
             />
-            {errors.montant_demande && <p className="text-blue-400 text-xs mt-1">{errors.montant_demande}</p>}
+            {errors.montant_demande && <p className="text-cyan-400 text-xs mt-0.5">{errors.montant_demande}</p>}
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                <Briefcase size={16} className="inline mr-2" />
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <Briefcase size={14} className="inline mr-1" />
                 Catégorie d'activité *
               </label>
               <select
                 value={formData.categorie_activite}
                 onChange={(e) => handleCategorieChange(e.target.value)}
-                className="w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="w-full bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 data-testid="select-categorie-activite"
               >
-                <option value="">Sélectionner une catégorie...</option>
+                <option value="">Sélectionner...</option>
                 {Object.keys(categoriesActivite).map(categorie => (
                   <option key={categorie} value={categorie}>{categorie}</option>
                 ))}
@@ -658,80 +679,81 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                <Briefcase size={16} className="inline mr-2" />
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <Briefcase size={14} className="inline mr-1" />
                 Type d'activité *
               </label>
               <select
                 value={formData.type_activite}
                 onChange={(e) => handleChange('type_activite', e.target.value)}
-                className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border ${
-                  errors.type_activite ? 'border-blue-500' : 'border-slate-600'
+                className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
+                  errors.type_activite ? 'border-cyan-500' : 'border-slate-600'
                 } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                 disabled={!formData.categorie_activite}
                 data-testid="select-type-activite"
               >
-                <option value="">
-                  {formData.categorie_activite ? 'Sélectionner un type...' : 'Choisir d\'abord une catégorie'}
-                </option>
+                <option value="">{formData.categorie_activite ? 'Sélectionner...' : 'Catégorie d\'abord'}</option>
                 {formData.categorie_activite && categoriesActivite[formData.categorie_activite]?.map(type => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-              {errors.type_activite && <p className="text-blue-400 text-xs mt-1">{errors.type_activite}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
-                <Calendar size={16} className="inline mr-2" />
-                Ancienneté dans l'activité *
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  value={seniorityValue}
-                  onChange={(e) => setSeniorityValue(e.target.value)}
-                  className={`flex-1 bg-slate-800 text-white px-4 py-3 rounded-lg border ${
-                    errors.anciennete_activite ? 'border-blue-500' : 'border-slate-600'
-                  } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                  placeholder={seniorityUnit === 'days' ? 'Ex: 90' : seniorityUnit === 'months' ? 'Ex: 6' : 'Ex: 2'}
-                />
-                <select
-                  value={seniorityUnit}
-                  onChange={(e) => setSeniorityUnit(e.target.value as 'days' | 'months' | 'years')}
-                  className="bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 min-w-[120px]"
-                >
-                  <option value="days">Jours</option>
-                  <option value="months">Mois</option>
-                  <option value="years">Années</option>
-                </select>
-              </div>
-              {seniorityValue && (
-                <div className="mt-2 text-xs text-cyan-400 flex items-center gap-1">
-                  <CheckCircle size={12} />
-                  <span>
-                    <span className="font-semibold">{formatConversion(parseFloat(seniorityValue), seniorityUnit)}</span>
-                  </span>
-                </div>
-              )}
-              {errors.anciennete_activite && <p className="text-blue-400 text-xs mt-1">{errors.anciennete_activite}</p>}
+              {errors.type_activite && <p className="text-cyan-400 text-xs mt-0.5">{errors.type_activite}</p>}
             </div>
           </div>
 
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <label className="block text-sm font-semibold text-slate-300 mb-3">
-              <TrendingUp size={16} className="inline mr-2" />
-              Calcul du Revenu Mensuel
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <Calendar size={14} className="inline mr-1" />
+              Ancienneté dans l'activité *
             </label>
-            
-            <div className="flex bg-slate-700/50 p-1 rounded-lg w-fit mb-4">
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                value={seniorityValue}
+                onChange={(e) => setSeniorityValue(e.target.value)}
+                className={`flex-1 bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
+                  errors.anciennete_activite ? 'border-cyan-500' : 'border-slate-600'
+                } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                placeholder={seniorityUnit === 'days' ? '90' : seniorityUnit === 'months' ? '6' : '2'}
+              />
+              <select
+                value={seniorityUnit}
+                onChange={(e) => setSeniorityUnit(e.target.value as 'days' | 'months' | 'years')}
+                className="bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 min-w-[100px]"
+              >
+                <option value="days">Jours</option>
+                <option value="months">Mois</option>
+                <option value="years">Années</option>
+              </select>
+            </div>
+            {seniorityValue && (
+              <div className="mt-1 text-xs text-cyan-400 flex items-center gap-1">
+                <CheckCircle size={10} />
+                <span className="font-medium">{formatConversion(parseFloat(seniorityValue), seniorityUnit)}</span>
+              </div>
+            )}
+            {errors.anciennete_activite && <p className="text-cyan-400 text-xs mt-0.5">{errors.anciennete_activite}</p>}
+          </div>
+
+          <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                <TrendingUp size={14} />
+                Calcul du Revenu Mensuel
+              </label>
+              {formData.revenu_mensuel_declare && initialData?.revenus_mensuels && (
+                <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">Pré-rempli depuis demande</span>
+              )}
+            </div>
+
+            <div className="flex bg-slate-700/50 p-0.5 rounded-lg w-fit mb-3">
               <button
                 type="button"
                 onClick={() => handleChange('type_revenu', 'Mensuel')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition ${
                   formData.type_revenu === 'Mensuel'
-                    ? 'bg-cyan-600 text-white shadow-lg'
+                    ? 'bg-cyan-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -740,9 +762,9 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               <button
                 type="button"
                 onClick={() => handleChange('type_revenu', 'Journalier')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition ${
                   formData.type_revenu === 'Journalier'
-                    ? 'bg-cyan-600 text-white shadow-lg'
+                    ? 'bg-cyan-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -750,107 +772,87 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               </button>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
-              {formData.type_revenu === 'Journalier' ? (
-                <>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Revenu journalier (FCFA)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.revenu_journalier}
-                      onChange={(e) => {
-                        const journalier = e.target.value;
-                        const jours = '26';
-                        const mensuel = journalier ? (parseFloat(journalier) * parseInt(jours)).toString() : '';
-                        setFormData(prev => ({
-                          ...prev,
-                          revenu_journalier: journalier,
-                          revenu_mensuel_declare: mensuel
-                        }));
-                      }}
-                      className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      placeholder="10000"
-                      data-testid="input-revenu-journalier"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Revenu mensuel calculé (FCFA) *</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        readOnly
-                        value={formData.revenu_mensuel_declare}
-                        className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-700 focus:outline-none font-semibold cursor-not-allowed`}
-                        placeholder="260000"
-                        data-testid="input-revenu-mensuel"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-cyan-400">
-                        Auto
-                      </span>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="md:col-span-3">
-                  <label className="block text-xs text-slate-400 mb-1">Revenu mensuel fixe (FCFA) *</label>
+            {formData.type_revenu === 'Journalier' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-0.5">Revenu journalier (FCFA)</label>
                   <input
                     type="number"
                     min="0"
-                    value={formData.revenu_mensuel_declare}
-                    onChange={(e) => handleChange('revenu_mensuel_declare', e.target.value)}
-                    className={`w-full bg-slate-700 text-white px-4 py-3 rounded-lg border ${
-                      errors.revenu_mensuel_declare ? 'border-blue-500' : 'border-cyan-500'
-                    } focus:outline-none focus:ring-2 focus:ring-cyan-500 font-semibold`}
-                    placeholder="260000"
-                    data-testid="input-revenu-mensuel-fixe"
+                    value={formData.revenu_journalier}
+                    onChange={(e) => {
+                      const journalier = e.target.value;
+                      const mensuel = journalier ? (parseFloat(journalier) * 26).toString() : '';
+                      setFormData(prev => ({
+                        ...prev,
+                        revenu_journalier: journalier,
+                        revenu_mensuel_declare: mensuel
+                      }));
+                    }}
+                    className="w-full bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    placeholder="10000"
+                    data-testid="input-revenu-journalier"
                   />
-                  {errors.revenu_mensuel_declare && <p className="text-blue-400 text-xs mt-1">{errors.revenu_mensuel_declare}</p>}
                 </div>
-              )}
-            </div>
-            
-            {formData.type_revenu === 'Journalier' && formData.revenu_journalier && (
-              <div className="mt-3 text-sm text-slate-400 bg-slate-700/30 p-2 rounded flex items-center gap-2">
-                <TrendingUp size={14} className="text-cyan-400" />
-                <span>Calcul: {parseFloat(formData.revenu_journalier).toLocaleString()} FCFA × {formData.jours_travail_mois} jours = <span className="text-cyan-400 font-semibold">{(parseFloat(formData.revenu_journalier) * parseInt(formData.jours_travail_mois)).toLocaleString()} FCFA/mois</span></span>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-0.5">Revenu mensuel calculé *</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      readOnly
+                      value={formData.revenu_mensuel_declare}
+                      className="w-full bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-700 text-sm font-semibold cursor-not-allowed"
+                      placeholder="260000"
+                      data-testid="input-revenu-mensuel"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-cyan-400">Auto</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-0.5">Revenu mensuel fixe (FCFA) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.revenu_mensuel_declare}
+                  onChange={(e) => handleChange('revenu_mensuel_declare', e.target.value)}
+                  className={`w-full bg-slate-700 text-white px-3 py-2 rounded-lg border text-sm font-semibold ${
+                    errors.revenu_mensuel_declare ? 'border-cyan-500' : 'border-cyan-500/50'
+                  } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  placeholder="260000"
+                  data-testid="input-revenu-mensuel-fixe"
+                />
+                {errors.revenu_mensuel_declare && <p className="text-cyan-400 text-xs mt-0.5">{errors.revenu_mensuel_declare}</p>}
               </div>
             )}
-            {/* Live Scoring Visualization (Simplified) */}
+
+            {formData.type_revenu === 'Journalier' && formData.revenu_journalier && (
+              <div className="mt-2 text-xs text-slate-400 bg-slate-700/30 px-2 py-1.5 rounded flex items-center gap-1.5">
+                <TrendingUp size={12} className="text-cyan-400" />
+                <span>{parseFloat(formData.revenu_journalier).toLocaleString()} × 26j = <span className="text-cyan-400 font-semibold">{(parseFloat(formData.revenu_journalier) * 26).toLocaleString()} FCFA/mois</span></span>
+              </div>
+            )}
+
+            {/* Live Scoring */}
             {formData.revenu_mensuel_declare && formData.montant_demande && (
-               <div className="mt-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600">
-                  <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                    <TrendingUp size={16} className="text-cyan-400" />
-                    Analyse Préliminaire (Simulation)
-                  </h4>
-                  
+               <div className="mt-3 p-2 bg-slate-700/30 rounded-lg border border-slate-600">
                   {(() => {
                       const rev = parseFloat(formData.revenu_mensuel_declare) || 0;
-                      const charges = parseFloat(formData.charges_mensuelles) || 0; 
+                      const charges = parseFloat(formData.charges_mensuelles) || 0;
                       const montant = parseFloat(formData.montant_demande) || 0;
                       const revenuNet = rev - charges;
-                      
-                      const echeance = montant / 30; // Estimation journalière sur 30 jours
+                      const echeance = montant / 6; // 6 mois estimation
                       const tauxEndettement = revenuNet > 0 ? (echeance / revenuNet) * 100 : 100;
-                      
                       let scoreColor = 'text-red-400';
                       let scoreText = 'Risqué';
-                      
-                      if (tauxEndettement < 33) { scoreColor = 'text-green-400'; scoreText = 'Excellent'; }
+                      if (tauxEndettement < 33) { scoreColor = 'text-green-400'; scoreText = 'Bon'; }
                       else if (tauxEndettement < 45) { scoreColor = 'text-amber-400'; scoreText = 'Correct'; }
-                      
+
                       return (
-                        <div className="grid grid-cols-2 gap-4 text-xs">
-                           <div>
-                             <span className="text-slate-400 block">Capacité mensuelle:</span>
-                             <span className="text-white font-mono">{revenuNet.toLocaleString()} FCFA</span>
-                           </div>
-                           <div>
-                             <span className="text-slate-400 block">Taux d'endettement (est. 6 mois):</span>
-                             <span className={`font-bold ${scoreColor}`}>{tauxEndettement.toFixed(1)}% ({scoreText})</span>
-                           </div>
+                        <div className="flex justify-between items-center text-xs">
+                           <span className="text-slate-400">Capacité nette: <span className="text-white font-mono">{revenuNet.toLocaleString()}</span></span>
+                           <span className={`font-bold ${scoreColor}`}>Endettement: {tauxEndettement.toFixed(0)}% ({scoreText})</span>
                         </div>
                       );
                   })()}
@@ -858,64 +860,68 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             )}
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-semibold text-slate-300">
-                <FileText size={16} className="inline mr-2" />
-                Description de l'activité *
-              </label>
-              <span className={`text-xs ${
-                formData.description_activite.length >= 10 ? 'text-green-400' : 
-                formData.description_activite.length >= 5 ? 'text-amber-400' : 
-                'text-slate-500'
-              }`}>
-                {formData.description_activite.length} / 10 min.
-              </span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                  <FileText size={14} />
+                  Description de l'activité *
+                </label>
+                <span className={`text-[10px] ${
+                  formData.description_activite.length >= 10 ? 'text-green-400' :
+                  formData.description_activite.length >= 5 ? 'text-amber-400' :
+                  'text-slate-500'
+                }`}>
+                  {formData.description_activite.length}/10
+                </span>
+              </div>
+              <textarea
+                value={formData.description_activite}
+                onChange={(e) => handleChange('description_activite', e.target.value)}
+                rows={2}
+                className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
+                  errors.description_activite ? 'border-cyan-500' : 'border-slate-600'
+                } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                placeholder="Produits, emplacement, clientèle..."
+                data-testid="textarea-description"
+              />
+              {errors.description_activite && <p className="text-cyan-400 text-xs mt-0.5">{errors.description_activite}</p>}
             </div>
-            <textarea
-              value={formData.description_activite}
-              onChange={(e) => handleChange('description_activite', e.target.value)}
-              rows={4}
-              className={`w-full bg-slate-800 text-white px-4 py-3 rounded-lg border ${
-                errors.description_activite ? 'border-blue-500' : 'border-slate-600'
-              } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-              placeholder="Ex: Vente de vêtements au marché Total, clientèle locale, 3 employés"
-              data-testid="textarea-description"
-            />
-            {!formData.description_activite && !errors.description_activite && (
-              <p className="text-slate-400 text-xs mt-1 italic">
-                💡 Mentionnez: produits vendus, emplacement, clientèle type, équipement
-              </p>
-            )}
-            {errors.description_activite && <p className="text-blue-400 text-xs mt-1">{errors.description_activite}</p>}
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                  <DollarSign size={14} />
+                  Charges mensuelles
+                </label>
+                {initialData?.charges_mensuelles && (
+                  <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">Pré-rempli</span>
+                )}
+              </div>
+              <input
+                type="number"
+                min="0"
+                value={formData.charges_mensuelles}
+                onChange={(e) => handleChange('charges_mensuelles', e.target.value)}
+                className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                  initialData?.charges_mensuelles ? 'border-cyan-500/50' : 'border-slate-600'
+                }`}
+                placeholder="50000"
+                data-testid="input-charges"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
-              <DollarSign size={16} className="inline mr-2" />
-              Charges mensuelles (FCFA)
-            </label>
-            <input
-              type="number"
-              min="0"
-              value={formData.charges_mensuelles}
-              onChange={(e) => handleChange('charges_mensuelles', e.target.value)}
-              className="w-full bg-slate-800 text-white px-4 py-3 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              placeholder="50000"
-              data-testid="input-charges"
-            />
-          </div>
-
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <label className="block text-sm font-semibold text-slate-300 mb-3">
-              <Camera size={16} className="inline mr-2" />
+          <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+            <label className="block text-xs font-semibold text-slate-300 mb-2">
+              <Camera size={14} className="inline mr-1" />
               Photos de l'activité
             </label>
-            
-            <div className="flex flex-wrap gap-4">
-              <label className="flex flex-col items-center justify-center w-32 h-32 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition">
-                <Upload size={24} className="text-slate-400 mb-2" />
-                <span className="text-xs text-slate-400">Télécharger</span>
+
+            <div className="flex flex-wrap gap-2">
+              <label className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition">
+                <Upload size={18} className="text-slate-400 mb-1" />
+                <span className="text-[10px] text-slate-400">Upload</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -924,165 +930,117 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   className="hidden"
                 />
               </label>
-              
+
               <button
                 type="button"
                 onClick={() => setIsCameraOpen(true)}
-                className="flex flex-col items-center justify-center w-32 h-32 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition"
+                className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition"
               >
-                <Camera size={24} className="text-slate-400 mb-2" />
-                <span className="text-xs text-slate-400">Prendre photo</span>
+                <Camera size={18} className="text-slate-400 mb-1" />
+                <span className="text-[10px] text-slate-400">Camera</span>
               </button>
-              
+
               {formData.photos_activite.map((photo, index) => (
-                <div key={index} className="relative w-32 h-32">
-                  <img
-                    src={photo}
-                    alt={`Photo ${index + 1}`}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
+                <div key={index} className="relative w-20 h-20">
+                  <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover rounded-lg" />
                   <button
                     type="button"
                     onClick={() => removePhoto(index)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs"
-                  >
-                    ×
-                  </button>
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px]"
+                  >×</button>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <label className="block text-sm font-semibold text-slate-300 mb-3">
-              Autres crédits en cours
-            </label>
-            
-            <div className="grid md:grid-cols-4 gap-2 mb-3">
-              <input
-                type="text"
-                value={autreCredit.organisme}
-                onChange={(e) => setAutreCredit({ ...autreCredit, organisme: e.target.value })}
-                placeholder="Organisme"
-                className="bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"
-              />
-              <input
-                type="number"
-                value={autreCredit.montant}
-                onChange={(e) => setAutreCredit({ ...autreCredit, montant: e.target.value })}
-                placeholder="Montant"
-                className="bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"
-              />
-              <input
-                type="text"
-                value={autreCredit.echeance}
-                onChange={(e) => setAutreCredit({ ...autreCredit, echeance: e.target.value })}
-                placeholder="Échéance mensuelle"
-                className="bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"
-              />
-              <button
-                type="button"
-                onClick={ajouterAutreCredit}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition"
-              >
-                Ajouter
-              </button>
-            </div>
-            
-            {formData.autres_credits.length > 0 && (
-              <div className="space-y-2">
-                {formData.autres_credits.map((credit, index) => (
-                  <div key={index} className="flex items-center justify-between bg-slate-700/50 p-2 rounded-lg">
-                    <span className="text-white text-sm">
-                      {credit.organisme} - {parseInt(credit.montant).toLocaleString()} FCFA ({credit.echeance}/mois)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => retirerAutreCredit(index)}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Autres crédits */}
+            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+              <label className="block text-xs font-semibold text-slate-300 mb-2">Autres crédits en cours</label>
+
+              <div className="flex gap-1.5 mb-2">
+                <input
+                  type="text"
+                  value={autreCredit.organisme}
+                  onChange={(e) => setAutreCredit({ ...autreCredit, organisme: e.target.value })}
+                  placeholder="Organisme"
+                  className="flex-1 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
+                />
+                <input
+                  type="number"
+                  value={autreCredit.montant}
+                  onChange={(e) => setAutreCredit({ ...autreCredit, montant: e.target.value })}
+                  placeholder="Montant"
+                  className="w-20 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
+                />
+                <button type="button" onClick={ajouterAutreCredit} className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1.5 rounded text-xs">+</button>
               </div>
-            )}
+
+              {formData.autres_credits.length > 0 && (
+                <div className="space-y-1">
+                  {formData.autres_credits.map((credit, index) => (
+                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1 rounded text-xs">
+                      <span className="text-white">{credit.organisme} - {parseInt(credit.montant).toLocaleString()}</span>
+                      <button type="button" onClick={() => retirerAutreCredit(index)} className="text-red-400 hover:text-red-300 ml-2">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Garanties */}
+            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+              <label className="block text-xs font-semibold text-slate-300 mb-2">Garanties proposées</label>
+
+              <div className="flex gap-1.5 mb-2">
+                <select
+                  value={garantie.type}
+                  onChange={(e) => setGarantie({ ...garantie, type: e.target.value })}
+                  className="flex-1 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
+                >
+                  <option value="">Type</option>
+                  {typesGaranties.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={garantie.description}
+                  onChange={(e) => setGarantie({ ...garantie, description: e.target.value })}
+                  placeholder="Description"
+                  className="flex-1 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600"
+                />
+                <button type="button" onClick={ajouterGarantie} className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1.5 rounded text-xs">+</button>
+              </div>
+
+              {formData.garanties_proposees.length > 0 && (
+                <div className="space-y-1">
+                  {formData.garanties_proposees.map((g, index) => (
+                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1 rounded text-xs">
+                      <span className="text-white">{g.type} - {g.description}</span>
+                      <button type="button" onClick={() => retirerGarantie(index)} className="text-red-400 hover:text-red-300 ml-2">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
-            <label className="block text-sm font-semibold text-slate-300 mb-3">
-              Garanties proposées
-            </label>
-            
-            <div className="grid md:grid-cols-4 gap-2 mb-3">
-              <select
-                value={garantie.type}
-                onChange={(e) => setGarantie({ ...garantie, type: e.target.value })}
-                className="bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"
-              >
-                <option value="">Type de garantie</option>
-                {typesGaranties.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={garantie.description}
-                onChange={(e) => setGarantie({ ...garantie, description: e.target.value })}
-                placeholder="Description"
-                className="bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"
-              />
-              <input
-                type="number"
-                value={garantie.valeur}
-                onChange={(e) => setGarantie({ ...garantie, valeur: e.target.value })}
-                placeholder="Valeur estimée"
-                className="bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600"
-              />
-              <button
-                type="button"
-                onClick={ajouterGarantie}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition"
-              >
-                Ajouter
-              </button>
-            </div>
-            
-            {formData.garanties_proposees.length > 0 && (
-              <div className="space-y-2">
-                {formData.garanties_proposees.map((g, index) => (
-                  <div key={index} className="flex items-center justify-between bg-slate-700/50 p-2 rounded-lg">
-                    <span className="text-white text-sm">
-                      {g.type} - {g.description} ({parseInt(g.valeur || '0').toLocaleString()} FCFA)
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => retirerGarantie(index)}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-4">
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
+              className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium text-sm transition"
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium text-sm transition flex items-center justify-center gap-1.5"
               data-testid="button-submit-enquete"
             >
-              <Save size={20} />
-              Enregistrer l'Enquête
+              <Save size={16} />
+              Enregistrer
             </button>
           </div>
         </form>

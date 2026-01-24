@@ -968,10 +968,20 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           clientId={selectedDemande?.clients?.id}
           clientNom={selectedDemande ? formatClientName(selectedDemande.clients?.nom, selectedDemande.clients?.prenom) : undefined}
           initialData={selectedDemande ? {
+            id: selectedDemande.id,
             client_id: selectedDemande.client_id || selectedDemande.clients?.id,
             montant_demande: selectedDemande.montant_demande?.toString(),
             type_activite: selectedDemande.type_activite,
-            objet_credit: selectedDemande.objet_credit
+            categorie_activite: selectedDemande.categorie_activite,
+            anciennete_activite: selectedDemande.anciennete_activite,
+            objet_credit: selectedDemande.objet_credit,
+            // Revenus pré-remplis depuis la demande
+            revenus_mensuels: selectedDemande.revenus_mensuels || selectedDemande.revenu_mensuel,
+            revenu_mensuel: selectedDemande.revenu_mensuel || selectedDemande.revenus_mensuels,
+            revenu_journalier: selectedDemande.revenu_journalier,
+            type_revenu: selectedDemande.type_revenu,
+            // Charges pré-remplies depuis la demande
+            charges_mensuelles: selectedDemande.charges_mensuelles
           } : undefined}
           onSave={async (data) => {
             await enquetes.createEnquete({ ...data, demande_id: selectedDemande?.id });
