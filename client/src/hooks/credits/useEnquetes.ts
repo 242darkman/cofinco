@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { StatutEnqueteCredit, STATUT_ENQUETE_CREDIT_LABELS } from '@shared/enum/status-constants';
+import { StatutEnquete, StatutEnqueteType } from '@shared/enum/status-constants';
 
-type StatutEnqueteCreditType = typeof StatutEnqueteCredit[keyof typeof StatutEnqueteCredit];
+// Labels for enquête status
+const STATUT_ENQUETE_LABELS: Record<StatutEnqueteType, string> = {
+  [StatutEnquete.PENDING]: 'En attente',
+  [StatutEnquete.IN_PROGRESS]: 'En cours',
+  [StatutEnquete.APPROVED]: 'Approuvé',
+  [StatutEnquete.REJECTED]: 'Rejeté',
+  [StatutEnquete.REDUCED]: 'Réduit'
+};
 
 export interface EnqueteCredit {
   id: string;
@@ -10,7 +17,7 @@ export interface EnqueteCredit {
   credit_id?: string;
   montant_demande: number;
   montant_approuve?: number;
-  statut: StatutEnqueteCreditType;
+  statut: StatutEnqueteType;
   type_activite: string;
   revenus_mensuels?: number;
   charges_mensuelles?: number;
@@ -126,38 +133,38 @@ export function useEnquetes() {
   const isExpanded = (id: string) => expandedEnquetes.has(id);
 
   // Normalize legacy French statuses to English enum values
-  const normalizeStatut = (statut?: string): StatutEnqueteCreditType => {
-    if (!statut) return StatutEnqueteCredit.PENDING;
+  const normalizeStatut = (statut?: string): StatutEnqueteType => {
+    if (!statut) return StatutEnquete.PENDING;
     const normalized = statut.toLowerCase().replace(/[éè]/g, 'e');
 
     // Handle both legacy French and new English values
-    if (normalized === 'pending' || normalized.includes('attente')) return StatutEnqueteCredit.PENDING;
-    if (normalized === 'in_progress' || normalized.includes('cours')) return StatutEnqueteCredit.IN_PROGRESS;
-    if (normalized === 'approved' || normalized.includes('approuve')) return StatutEnqueteCredit.APPROVED;
-    if (normalized === 'rejected' || normalized.includes('rejete')) return StatutEnqueteCredit.REJECTED;
-    if (normalized === 'reduced' || normalized.includes('reduit')) return StatutEnqueteCredit.REDUCED;
+    if (normalized === 'pending' || normalized.includes('attente')) return StatutEnquete.PENDING;
+    if (normalized === 'in_progress' || normalized.includes('cours')) return StatutEnquete.IN_PROGRESS;
+    if (normalized === 'approved' || normalized.includes('approuve')) return StatutEnquete.APPROVED;
+    if (normalized === 'rejected' || normalized.includes('rejete')) return StatutEnquete.REJECTED;
+    if (normalized === 'reduced' || normalized.includes('reduit')) return StatutEnquete.REDUCED;
 
-    return StatutEnqueteCredit.PENDING;
+    return StatutEnquete.PENDING;
   };
 
   const formatStatut = (statut?: string) => {
     const normalized = normalizeStatut(statut);
-    return STATUT_ENQUETE_CREDIT_LABELS[normalized] || 'En attente';
+    return STATUT_ENQUETE_LABELS[normalized] || 'En attente';
   };
 
   const getStatutColor = (statut?: string) => {
     const normalized = normalizeStatut(statut);
-    const colors: Record<StatutEnqueteCreditType, string> = {
-      [StatutEnqueteCredit.PENDING]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      [StatutEnqueteCredit.IN_PROGRESS]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      [StatutEnqueteCredit.APPROVED]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      [StatutEnqueteCredit.REJECTED]: 'bg-red-500/20 text-red-400 border-red-500/30',
-      [StatutEnqueteCredit.REDUCED]: 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+    const colors: Record<StatutEnqueteType, string> = {
+      [StatutEnquete.PENDING]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      [StatutEnquete.IN_PROGRESS]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      [StatutEnquete.APPROVED]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      [StatutEnquete.REJECTED]: 'bg-red-500/20 text-red-400 border-red-500/30',
+      [StatutEnquete.REDUCED]: 'bg-purple-500/20 text-purple-400 border-purple-500/30'
     };
     return colors[normalized];
   };
 
-  const getEnquetesEnAttente = () => enquetes.filter(e => normalizeStatut(e.statut) === StatutEnqueteCredit.PENDING);
+  const getEnquetesEnAttente = () => enquetes.filter(e => normalizeStatut(e.statut) === StatutEnquete.PENDING);
 
   useEffect(() => {
     fetchEnquetes();

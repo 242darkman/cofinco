@@ -1,7 +1,7 @@
 import { useCredits } from '../../hooks/credits/useCredits';
 import { useDemandes } from '../../hooks/credits/useDemandes';
 import { useEnquetes } from '../../hooks/credits/useEnquetes';
-import { StatutCredit, StatutDemande, StatutEnqueteCredit } from '@shared/enum/status-constants';
+import { StatutCredit, StatutDemande, StatutEnquete } from '@shared/enum/status-constants';
 
 export function useCreditStats() {
   const { credits } = useCredits();
@@ -61,10 +61,10 @@ export function useCreditStats() {
     enquetesEnCours: demandes.filter(d => {
       const norm = normalizeDemande(d.statut);
       return norm === StatutDemande.READY_FOR_INVESTIGATION || norm === StatutDemande.UNDER_INVESTIGATION;
-    }).length + enquetes.filter(e => normalizeEnqueteStatut(e.statut) === StatutEnqueteCredit.IN_PROGRESS).length,
+    }).length + enquetes.filter(e => normalizeEnqueteStatut(e.statut) === StatutEnquete.IN_PROGRESS).length,
     enquetesTotal: enquetes.length,
     enquetesApprouvees: enquetes.filter(e =>
-      normalizeEnqueteStatut(e.statut) === StatutEnqueteCredit.APPROVED
+      normalizeEnqueteStatut(e.statut) === StatutEnquete.APPROVED
     ).length,
 
     montantTotalCredits: credits.filter(c => {
