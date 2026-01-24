@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { Button, Card } from '../../ui';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { computeSessionStatus, getSessionStatusLabel } from '../../../lib/format';
 import { SessionCaisse, CaisseTransaction } from '../../../types/finance';
 import { ReportsToolbar, CashJournal, DailySummary, DiscrepancyReport, type ReportType } from './etats';
+import {
+  exportJournalPDF,
+  exportJournalExcel,
+  exportSynthesePDF,
+  exportSyntheseExcel,
+  exportEcartsPDF,
+  exportEcartsExcel,
+} from './etats/exports';
 
 export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   const [sessions, setSessions] = useState<SessionCaisse[]>([]);
@@ -87,138 +92,51 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   // Helpers
   const resolveSessionStatus = (session: SessionCaisse) =>
     session.computedStatus || computeSessionStatus(session);
-  const resolveOpenedAt = (session: SessionCaisse) => session.openedAt || session.opened_at || '';
 
-  // Export PDF
+  // Configuration export commune
+  const exportConfig = {
+    dateDebut,
+    dateFin,
+  };
+
+  // Export PDF - adapté au type de rapport actif
   const exporterPDF = () => {
     try {
-      const doc = new jsPDF();
-
-      // Header
-      doc.setFontSize(22);
-      doc.setTextColor(41, 128, 185);
-      doc.text('COFINCO', 14, 20);
-
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text('Système de Gestion Financière', 14, 25);
-
-      doc.setFontSize(16);
-      doc.setTextColor(0);
-      doc.text('États Financiers - Rapport de Caisse', 14, 40);
-
-      doc.setFontSize(10);
-      doc.text(
-        `Période: ${new Date(dateDebut).toLocaleDateString('fr-FR')} au ${new Date(dateFin).toLocaleDateString('fr-FR')}`,
-        14,
-        48
-      );
-      doc.text(`Généré le: ${new Date().toLocaleString('fr-FR')}`, 14, 53);
-
-      // Data Table
-      const tableColumn = ['Date', 'Solde Initial', 'Entrées', 'Sorties', 'Théorique', 'Réel', 'Écart', 'Statut'];
-      const tableRows = sessions.map((session) => {
-        const diff = Number(session.solde_theorique) - Number(session.solde_initial);
-        const entrees = diff > 0 ? diff : 0;
-        const sorties = diff < 0 ? Math.abs(diff) : 0;
-
-        return [
-          new Date(resolveOpenedAt(session)).toLocaleDateString('fr-FR'),
-          Number(session.solde_initial).toLocaleString('fr-FR'),
-          entrees > 0 ? `+${entrees.toLocaleString('fr-FR')}` : '-',
-          sorties > 0 ? `-${sorties.toLocaleString('fr-FR')}` : '-',
-          Number(session.solde_theorique).toLocaleString('fr-FR'),
-          session.solde_reel ? Number(session.solde_reel).toLocaleString('fr-FR') : '-',
-          Number(session.ecart || 0).toLocaleString('fr-FR'),
-          getSessionStatusLabel(resolveSessionStatus(session) as any),
-        ];
-      });
-
-      // Totals
-      const totalMouvements = sessions.reduce(
-        (acc, s) => {
-          const diff = Number(s.solde_theorique) - Number(s.solde_initial);
-          if (diff > 0) acc.entrees += diff;
-          else acc.sorties += Math.abs(diff);
-          return acc;
-        },
-        { entrees: 0, sorties: 0 }
-      );
-
-      const totalsRow = [
-        'TOTAUX',
-        sessions.reduce((sum, s) => sum + Number(s.solde_initial), 0).toLocaleString('fr-FR'),
-        `+${totalMouvements.entrees.toLocaleString('fr-FR')}`,
-        `-${totalMouvements.sorties.toLocaleString('fr-FR')}`,
-        sessions.reduce((sum, s) => sum + Number(s.solde_theorique), 0).toLocaleString('fr-FR'),
-        sessions.reduce((sum, s) => sum + Number(s.solde_reel || 0), 0).toLocaleString('fr-FR'),
-        sessions.reduce((sum, s) => sum + Number(s.ecart || 0), 0).toLocaleString('fr-FR'),
-        '',
-      ];
-
-      tableRows.push(totalsRow);
-
-      autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 60,
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold', halign: 'center' },
-        columnStyles: {
-          0: { halign: 'center' },
-          1: { halign: 'right' },
-          2: { halign: 'right', textColor: [39, 174, 96] },
-          3: { halign: 'right', textColor: [192, 57, 43] },
-          4: { halign: 'right' },
-          5: { halign: 'right', fontStyle: 'bold' },
-          6: { halign: 'right' },
-          7: { halign: 'center' },
-        },
-        didParseCell: (data: any) => {
-          if (data.row.index === tableRows.length - 1) {
-            data.cell.styles.fontStyle = 'bold';
-            data.cell.styles.fillColor = [240, 240, 240];
-          }
-        },
-      });
-
-      doc.save(`etats_financiers_${new Date().toISOString().slice(0, 10)}.pdf`);
+      switch (typeRapport) {
+        case 'journal':
+          exportJournalPDF(sessions, transactions, exportConfig);
+          break;
+        case 'synthese':
+          exportSynthesePDF(sessions, transactions, exportConfig);
+          break;
+        case 'ecarts':
+          exportEcartsPDF(sessions, exportConfig);
+          break;
+        default:
+          exportJournalPDF(sessions, transactions, exportConfig);
+      }
     } catch (error) {
       console.error('Erreur export PDF:', error);
       alert("Une erreur est survenue lors de l'export PDF.");
     }
   };
 
-  // Export Excel
+  // Export Excel - adapté au type de rapport actif
   const exporterExcel = () => {
     try {
-      const data = sessions.map((session) => {
-        const diff = Number(session.solde_theorique) - Number(session.solde_initial);
-        const entrees = diff > 0 ? diff : 0;
-        const sorties = diff < 0 ? Math.abs(diff) : 0;
-
-        return {
-          Date: new Date(resolveOpenedAt(session)).toLocaleDateString('fr-FR'),
-          'Solde Initial': Number(session.solde_initial),
-          Entrées: entrees,
-          Sorties: sorties,
-          'Solde Théorique': Number(session.solde_theorique),
-          'Solde Réel': session.solde_reel ? Number(session.solde_reel) : 0,
-          Écart: Number(session.ecart || 0),
-          Statut: getSessionStatusLabel(resolveSessionStatus(session) as any),
-        };
-      });
-
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'États Financiers');
-
-      // Auto-width columns
-      const wscols = Object.keys(data[0] || {}).map((key) => ({ wch: Math.max(key.length + 5, 15) }));
-      worksheet['!cols'] = wscols;
-
-      XLSX.writeFile(workbook, `etats_financiers_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      switch (typeRapport) {
+        case 'journal':
+          exportJournalExcel(sessions, transactions, exportConfig);
+          break;
+        case 'synthese':
+          exportSyntheseExcel(sessions, transactions, exportConfig);
+          break;
+        case 'ecarts':
+          exportEcartsExcel(sessions, exportConfig);
+          break;
+        default:
+          exportJournalExcel(sessions, transactions, exportConfig);
+      }
     } catch (error) {
       console.error('Erreur export Excel:', error);
       alert("Une erreur est survenue lors de l'export Excel.");
