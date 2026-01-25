@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, Calendar, ArrowUpDown, X, Download } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 interface Transaction {
   id: number;
@@ -51,7 +52,7 @@ export default function TransactionSearch({
     const csvContent = [
       'Date,Référence,Type,Catégorie,Description,Montant,Statut',
       ...data.map(t => 
-        `${t.date},${t.reference || ''},${t.type},${t.category},"${t.description}",${t.amount},${t.status}`
+        `${t.date},${t.reference || ''},${t.type},${t.category},"${t.description}",${t.amount},${ALL_STATUS_LABELS[t.status] || t.status}`
       )
     ].join('\n');
 
@@ -433,7 +434,7 @@ export default function TransactionSearch({
                     <span className="text-white font-medium">{transaction.description}</span>
                   </div>
                   <span className={`text-xs font-bold px-2 py-1 rounded-full ${getStatusColor(transaction.status)} bg-slate-800`}>
-                       {transaction.status === 'completed' ? 'Succès' : transaction.status}
+                       {ALL_STATUS_LABELS[transaction.status] || transaction.status}
                   </span>
                 </div>
 

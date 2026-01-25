@@ -7,6 +7,7 @@ import StatCard from '../ui/StatCard';
 import Modal from '../ui/Modal';
 import { notificationApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -112,7 +113,7 @@ export default function SecurityAlertsPanel() {
     csvContent += `N°${separator}Date${separator}Type${separator}Sévérité${separator}Statut${separator}Utilisateur${separator}IP\n`;
     
     alerts.forEach((alert, idx) => {
-      csvContent += `${idx + 1}${separator}${new Date(alert.created_at).toLocaleString('fr-FR')}${separator}${getTypeLabel(alert.alert_type)}${separator}${alert.severity}${separator}${alert.status}${separator}${alert.user_email || 'N/A'}${separator}${alert.ip_address || '-'}\n`;
+      csvContent += `${idx + 1}${separator}${new Date(alert.created_at).toLocaleString('fr-FR')}${separator}${getTypeLabel(alert.alert_type)}${separator}${ALL_STATUS_LABELS[alert.severity] || alert.severity}${separator}${ALL_STATUS_LABELS[alert.status] || alert.status}${separator}${alert.user_email || 'N/A'}${separator}${alert.ip_address || '-'}\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -410,7 +411,7 @@ export default function SecurityAlertsPanel() {
                   </div>
                   <div>
                     <div className="text-sm text-slate-400 mb-1">Statut</div>
-                    <div className="text-white capitalize">{selectedAlert.status}</div>
+                    <div className="text-white capitalize">{ALL_STATUS_LABELS[selectedAlert.status] || selectedAlert.status}</div>
                   </div>
                 </div>
               </div>

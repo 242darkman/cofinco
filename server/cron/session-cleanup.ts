@@ -10,6 +10,7 @@
 import * as sessionService from "../services/caisse/session-service";
 import { cleanupOrphanSessions } from "../session-tracker";
 import { getWsInstance } from "../ws-server";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 // Configuration
 const SESSION_TIMEOUT_HOURS = 12; // Fermer les sessions après 12h d'inactivité
@@ -54,6 +55,20 @@ async function runSessionCleanup(): Promise<void> {
         });
         wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
       }
+
+      // Domain event: sessions force closed
+      dispatchDomainEvent({
+        type: "SESSION_FORCE_CLOSED",
+        data: {
+          sessions: closedSessions.map((s) => ({
+            sessionId: s.sessionId,
+            caisseId: s.caisseId,
+            caissierId: s.caissierId,
+            hoursInactive: s.hoursInactive,
+          })),
+        },
+        timestamp: new Date(),
+      });
     } else {
       console.log("[CRON] Aucune session expirée trouvée.");
     }

@@ -10,14 +10,11 @@ import {
   ArrowLeftRight,
   BookOpen,
   FileBarChart,
-  FileSpreadsheet,
   UsersRound,
-  TrendingUp,
   Shield,
   MessageSquare,
   UserCircle,
   Undo2,
-  BarChart3,
   CheckCircle,
   Landmark,
   RefreshCcw,
@@ -46,9 +43,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   // Gestion
   { labelKey: 'menuComptabilite', icon: BookOpen, key: 'comptabilite', section: 'gestion' },
   { labelKey: 'menuRapports', icon: FileBarChart, key: 'rapports', section: 'gestion' },
-  { labelKey: 'menuExcel', icon: FileSpreadsheet, key: 'excel', section: 'gestion' },
   { labelKey: 'menuRH', icon: UsersRound, key: 'rh', section: 'gestion' },
-  { labelKey: 'menuBourse', icon: TrendingUp, key: 'bourse', section: 'gestion' },
 
   // Système
   { labelKey: 'menuAdministrateur', icon: Shield, key: 'administrateur', section: 'admin' },
@@ -62,5 +57,4 @@ export const RESTRICTED_AGENT_MODULES = new Set([
   'administrateur',
   'comptabilite',
   'rh',
-  'bourse'
 ]);

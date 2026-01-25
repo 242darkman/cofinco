@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Button, Badge } from '@/components/ui';
 import { formatMoney } from '../../../lib/format';
+import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { InternalOperationReceipt, InternalOperationReceiptData } from '../../ui/printable';
 import { useReactToPrint } from 'react-to-print';
 
@@ -321,7 +322,7 @@ export default function TransfertInterCoffresDetail({
                   </h2>
                   <div className={`inline-flex items-center gap-2 mt-1 text-sm font-medium ${statutConfig.color}`}>
                     {statutConfig.icon}
-                    <span>{transfert.statut}</span>
+                    <span>{ALL_STATUS_LABELS[transfert.statut] || transfert.statut}</span>
                   </div>
                 </div>
               </div>

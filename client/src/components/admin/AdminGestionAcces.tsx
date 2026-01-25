@@ -16,6 +16,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { SystemRole, getRoleLabel, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
+import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
 interface User {
   id: string;
@@ -260,7 +261,7 @@ export default function AdminGestionAcces() {
         u.prenom || '',
         u.nom || '',
         u.role || '',
-        u.statut || '',
+        ALL_STATUS_LABELS[u.statut || ''] || u.statut || '',
         u.telephone || '',
         new Date(u.created_at).toLocaleDateString(),
         u.active_sessions || 0
@@ -540,7 +541,7 @@ export default function AdminGestionAcces() {
                                     user.statut === StatutUser.SUSPENDED ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                                     'bg-slate-500/10 text-slate-400 border-slate-500/20'
                                 }`}>
-                                {user.statut || 'inconnu'}
+                                {ALL_STATUS_LABELS[user.statut || ''] || user.statut || 'inconnu'}
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-center">

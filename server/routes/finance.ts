@@ -43,7 +43,7 @@ import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
 import { attachAbility, requireAbility, requireDisbursement, hasAbility, Actions, Subjects } from "../authorization";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
-import { sendCreditApprovalNotification } from "../sms-service";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { db } from "../db";
 import { z } from "zod";
 import {
@@ -413,6 +413,22 @@ export function registerFinanceRoutes(app: Express) {
           }
         });
       }
+
+      // Domain event: credit disbursed
+      dispatchDomainEvent({
+        type: "CREDIT_DISBURSED",
+        data: {
+          creditId: credit.id,
+          numeroCredit,
+          clientId: demande.clientId,
+          clientName,
+          montant: montantDecaissement,
+          channel: disbursementChannel,
+          agenceId: compteCourant.agenceId,
+          disbursedByUserId: user?.id,
+        },
+        timestamp: new Date(),
+      });
 
       res.status(201).json({
         success: true,
@@ -856,6 +872,21 @@ export function registerFinanceRoutes(app: Express) {
          });
       }
       
+      // Domain event: credit request created
+      dispatchDomainEvent({
+        type: "CREDIT_REQUEST_CREATED",
+        data: {
+          demandeId: demande.id,
+          numeroDemande: demande.numeroDemande,
+          clientId: parsed.clientId,
+          montantDemande: Number(parsed.montantDemande || 0),
+          agenceId: req.session.user?.agenceId,
+          createdByUserId: req.session.user?.id,
+          createdByName: req.session.user?.nom,
+        },
+        timestamp: new Date(),
+      });
+
       res.json(addSnakeCaseAliasesDeep(demande));
   });
 
@@ -955,18 +986,38 @@ export function registerFinanceRoutes(app: Express) {
                 });
               }
 
-              // Send SMS notification to client (async, non-blocking)
+              // Dispatch domain event for credit approval notification
               const montantNotification = existing.montantApprouve || existing.montantDemande;
               if (existing.clientId && montantNotification) {
-                sendCreditApprovalNotification(
-                  existing.clientId,
-                  existing.id,
-                  Number(montantNotification),
-                  req.user?.id
-                ).catch(err => {
-                  console.error(`[SMS] Failed to send credit approval notification for demande ${existing.id}:`, err);
+                dispatchDomainEvent({
+                  type: "CREDIT_APPROVED",
+                  data: {
+                    demandeId: existing.id,
+                    numeroDemande: existing.numeroDemande,
+                    clientId: existing.clientId,
+                    montantApprouve: Number(montantNotification),
+                    agenceId: req.session.user?.agenceId,
+                    approvedByUserId: req.user?.id,
+                  },
+                  timestamp: new Date(),
                 });
               }
+           }
+
+           // Si rejetée, notifier le client
+           if (updateData.statut === StatutDemande.REJECTED && existing.clientId) {
+              dispatchDomainEvent({
+                type: "CREDIT_REJECTED",
+                data: {
+                  demandeId: existing.id,
+                  numeroDemande: existing.numeroDemande,
+                  clientId: existing.clientId,
+                  motifRejet: updateData.motifRejet,
+                  agenceId: req.session.user?.agenceId,
+                  rejectedByUserId: req.user?.id,
+                },
+                timestamp: new Date(),
+              });
            }
       }
 

@@ -422,6 +422,159 @@ export function registerNotificationsRoutes(app: Express) {
     }
   });
 
+  // ============================================
+  // ADMIN: Notification System Monitoring
+  // ============================================
+
+  // GET /api/notifications/admin/metrics - Queue metrics
+  app.get("/api/notifications/admin/metrics", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
+    try {
+      const { getNotificationMetrics } = await import("../services/notifications/audit/notification-audit");
+      const metrics = await getNotificationMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching notification metrics:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  // GET /api/notifications/admin/outbox - List notification jobs
+  app.get("/api/notifications/admin/outbox", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
+    try {
+      const { status, channel, limit = "50", offset = "0" } = req.query;
+
+      const { notificationJobs } = await import("@shared/schema");
+      const conditions: any[] = [];
+
+      if (status && typeof status === "string") {
+        conditions.push(eq(notificationJobs.status, status as any));
+      }
+      if (channel && typeof channel === "string") {
+        conditions.push(eq(notificationJobs.channel, channel as any));
+      }
+
+      const result = await db
+        .select({
+          id: notificationJobs.id,
+          channel: notificationJobs.channel,
+          templateCode: notificationJobs.templateCode,
+          status: notificationJobs.status,
+          attempts: notificationJobs.attempts,
+          maxAttempts: notificationJobs.maxAttempts,
+          lastError: notificationJobs.lastError,
+          correlationId: notificationJobs.correlationId,
+          createdAt: notificationJobs.createdAt,
+          processedAt: notificationJobs.processedAt,
+        })
+        .from(notificationJobs)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(notificationJobs.createdAt))
+        .limit(parseInt(limit as string))
+        .offset(parseInt(offset as string));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching outbox:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  // GET /api/notifications/admin/failed - Recent failed jobs
+  app.get("/api/notifications/admin/failed", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
+    try {
+      const { getRecentFailedJobs } = await import("../services/notifications/audit/notification-audit");
+      const limit = parseInt((req.query.limit as string) || "20");
+      const jobs = await getRecentFailedJobs(limit);
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error fetching failed jobs:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  // POST /api/notifications/admin/retry-dead-letter - Retry all dead-letter jobs
+  app.post("/api/notifications/admin/retry-dead-letter", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.AUDIT_LOG), async (req, res) => {
+    try {
+      const { retryDeadLetterJobs } = await import("../services/notifications/notification-worker");
+      const count = await retryDeadLetterJobs();
+      res.json({ success: true, retriedCount: count });
+    } catch (error) {
+      console.error("Error retrying dead-letter:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  // GET /api/notifications/admin/settings - Read notification settings
+  app.get("/api/notifications/admin/settings", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
+    try {
+      const { getNotificationSettingsForAgency } = await import("../services/notifications/notification-service");
+      const agenceId = req.query.agenceId as string | undefined;
+      const settings = await getNotificationSettingsForAgency(agenceId);
+      res.json(settings || {});
+    } catch (error) {
+      console.error("Error fetching notification settings:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
+  // PUT /api/notifications/admin/settings - Update notification settings
+  app.put("/api/notifications/admin/settings", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.AUDIT_LOG), async (req, res) => {
+    try {
+      const { notificationSettings } = await import("@shared/schema");
+      const { agenceId, ...settings } = req.body;
+
+      if (agenceId) {
+        // Agency-specific settings
+        const [existing] = await db
+          .select()
+          .from(notificationSettings)
+          .where(eq(notificationSettings.agenceId, agenceId))
+          .limit(1);
+
+        if (existing) {
+          const [updated] = await db
+            .update(notificationSettings)
+            .set({ ...settings, updatedAt: new Date() })
+            .where(eq(notificationSettings.id, existing.id))
+            .returning();
+          return res.json(updated);
+        }
+
+        const [created] = await db
+          .insert(notificationSettings)
+          .values({ agenceId, ...settings })
+          .returning();
+        return res.json(created);
+      }
+
+      // Global settings
+      const { isNull: isNullOp } = await import("drizzle-orm");
+      const [existing] = await db
+        .select()
+        .from(notificationSettings)
+        .where(isNullOp(notificationSettings.agenceId))
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(notificationSettings)
+          .set({ ...settings, updatedAt: new Date() })
+          .where(eq(notificationSettings.id, existing.id))
+          .returning();
+        return res.json(updated);
+      }
+
+      const [created] = await db
+        .insert(notificationSettings)
+        .values(settings)
+        .returning();
+      res.json(created);
+    } catch (error) {
+      console.error("Error updating notification settings:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
   // GET /api/notifications/unread-count
   app.get("/api/notifications/unread-count", requireAuth, async (req, res) => {
     try {

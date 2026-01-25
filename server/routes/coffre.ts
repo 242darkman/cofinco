@@ -12,6 +12,7 @@ import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 export const coffreRouter = Router();
 const service = new TransfertCoffreService();
@@ -63,6 +64,21 @@ coffreRouter.post(
       if (!result.success) {
         return res.status(400).json(result);
       }
+
+      // Domain event: transfer requested
+      const createdTransfert = (result as any).transfert;
+      dispatchDomainEvent({
+        type: "TRANSFER_REQUESTED",
+        data: {
+          transfertId: createdTransfert?.id || req.body.idempotencyKey,
+          reference: createdTransfert?.reference || "",
+          typeTransfert: body.typeTransfert,
+          montant: body.montant,
+          agenceId: body.agenceId!,
+          requestedByUserId: userId,
+        },
+        timestamp: new Date(),
+      });
 
       res.status(201).json(result);
     } catch (e: any) {
@@ -137,6 +153,35 @@ coffreRouter.post(
         return res.status(400).json(result);
       }
 
+      // Domain event: transfer validated or rejected
+      const valTransfert = (result as any).transfert;
+      if (approved) {
+        dispatchDomainEvent({
+          type: "TRANSFER_VALIDATED",
+          data: {
+            transfertId: req.params.id,
+            reference: valTransfert?.reference || "",
+            montant: Number(valTransfert?.montant || 0),
+            agenceId: valTransfert?.agenceId || "",
+            validatedByUserId: userId,
+          },
+          timestamp: new Date(),
+        });
+      } else {
+        dispatchDomainEvent({
+          type: "TRANSFER_REJECTED",
+          data: {
+            transfertId: req.params.id,
+            reference: valTransfert?.reference || "",
+            montant: Number(valTransfert?.montant || 0),
+            reason: reasonRejection,
+            agenceId: valTransfert?.agenceId || "",
+            rejectedByUserId: userId,
+          },
+          timestamp: new Date(),
+        });
+      }
+
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ error: e.message });
@@ -170,6 +215,21 @@ coffreRouter.post(
       if (!result.success) {
         return res.status(400).json(result);
       }
+
+      // Domain event: transfer executed
+      const execTransfert = (result as any).transfert;
+      dispatchDomainEvent({
+        type: "TRANSFER_EXECUTED",
+        data: {
+          transfertId: req.params.id,
+          reference: execTransfert?.reference || "",
+          typeTransfert: execTransfert?.typeTransfert || "",
+          montant: Number(execTransfert?.montant || 0),
+          agenceId: execTransfert?.agenceId || "",
+          executedByUserId: userId,
+        },
+        timestamp: new Date(),
+      });
 
       res.json(result);
     } catch (e: any) {
@@ -234,13 +294,38 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
         solde: Number(c.solde)
     })).sort((a, b) => b.solde - a.solde);
 
-    // 4. History (Last 30 Days)
+    // 4. History - Supports period: "today" | "7d" | "30d" | "1y" (default: "30d")
     // Supports "historyFor" query param to fetch history for specific agencies (comma separated IDs)
     const historyFor = (req.query.historyFor as string)?.split(',').filter(Boolean);
+    const period = (req.query.period as string) || '30d';
 
-    // Fetch all movements involving any coffre in the last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Calculate date range based on period
+    const sinceDate = new Date();
+    let bucketCount: number;
+    let bucketType: 'hour' | 'day' | 'month';
+
+    switch (period) {
+      case 'today':
+        sinceDate.setHours(0, 0, 0, 0);
+        bucketCount = 24;
+        bucketType = 'hour';
+        break;
+      case '7d':
+        sinceDate.setDate(sinceDate.getDate() - 7);
+        bucketCount = 7;
+        bucketType = 'day';
+        break;
+      case '1y':
+        sinceDate.setFullYear(sinceDate.getFullYear() - 1);
+        bucketCount = 12;
+        bucketType = 'month';
+        break;
+      default: // '30d'
+        sinceDate.setDate(sinceDate.getDate() - 30);
+        bucketCount = 30;
+        bucketType = 'day';
+        break;
+    }
 
     // If specific agencies requested, filter coffreIds. Otherwise use all.
     let targetCoffreIds = allCoffres.map(c => c.id);
@@ -262,7 +347,7 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
         .from(schema.mouvementsFinanciers)
         .where(
             and(
-                sql`${schema.mouvementsFinanciers.dateOperation} >= ${thirtyDaysAgo}`,
+                sql`${schema.mouvementsFinanciers.dateOperation} >= ${sinceDate}`,
                 // Check if sourceId OR metadata->destinationId matches any TARGET coffre
                 sql`(${schema.mouvementsFinanciers.sourceId} IN ${targetCoffreIds} OR ${schema.mouvementsFinanciers.metadata}->>'destinationId' IN ${targetCoffreIds})`
             )
@@ -275,25 +360,32 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
             return acc;
         }, {} as Record<string, string>);
 
-        // Net change by date AND agence
-        const dailyAgencyChange: Record<string, Record<string, number>> = {};
+        // Helper to get bucket key from a Date
+        const getBucketKey = (d: Date): string => {
+            if (bucketType === 'hour') return d.toISOString().slice(0, 13); // "2026-01-26T14"
+            if (bucketType === 'month') return d.toISOString().slice(0, 7);  // "2026-01"
+            return d.toISOString().split('T')[0]; // "2026-01-26"
+        };
+
+        // Net change by bucket AND agence
+        const bucketAgencyChange: Record<string, Record<string, number>> = {};
 
         movements.forEach(m => {
-            const dateKey = new Date(m.date!).toISOString().split('T')[0];
+            const bucketKey = getBucketKey(new Date(m.date!));
             const amount = Number(m.montant);
 
-            if (!dailyAgencyChange[dateKey]) dailyAgencyChange[dateKey] = {};
+            if (!bucketAgencyChange[bucketKey]) bucketAgencyChange[bucketKey] = {};
 
             const destId = (m.metadata as any)?.destinationId;
             const srcId = m.sourceId;
 
             if (targetCoffreIds.includes(destId)) {
                 const agId = coffreToAgence[destId];
-                dailyAgencyChange[dateKey][agId] = (dailyAgencyChange[dateKey][agId] || 0) + amount;
+                bucketAgencyChange[bucketKey][agId] = (bucketAgencyChange[bucketKey][agId] || 0) + amount;
             }
             if (targetCoffreIds.includes(srcId as string)) {
                 const agId = coffreToAgence[srcId as string];
-                dailyAgencyChange[dateKey][agId] = (dailyAgencyChange[dateKey][agId] || 0) - amount;
+                bucketAgencyChange[bucketKey][agId] = (bucketAgencyChange[bucketKey][agId] || 0) - amount;
             }
         });
 
@@ -305,28 +397,35 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
                 return acc;
             }, {} as Record<string, number>);
 
-        // Reconstruct
-        const today = new Date();
+        // Reconstruct history going backwards from now
+        const now = new Date();
         const runningBalances = { ...currentBalances };
         const relevantAgIds = Object.keys(currentBalances);
 
-        for (let i = 0; i < 30; i++) {
-            const day = new Date();
-            day.setDate(today.getDate() - i);
-            const dateKey = day.toISOString().split('T')[0];
+        for (let i = 0; i < bucketCount; i++) {
+            const bucketDate = new Date(now);
+            if (bucketType === 'hour') {
+                bucketDate.setHours(now.getHours() - i, 0, 0, 0);
+            } else if (bucketType === 'month') {
+                bucketDate.setMonth(now.getMonth() - i);
+                bucketDate.setDate(1);
+            } else {
+                bucketDate.setDate(now.getDate() - i);
+            }
+            const bucketKey = getBucketKey(bucketDate);
 
             const totalBalance = Object.values(runningBalances).reduce((a, b) => a + b, 0);
 
             history.push({
-                date: dateKey,
-                balance: totalBalance, // backward兼容 : le total pour la sélection
-                ...runningBalances     // Ajoute les balances individuelles (ex: [agId]: 12345)
+                date: bucketType === 'hour' ? bucketDate.toISOString() : bucketKey,
+                balance: totalBalance,
+                ...runningBalances
             });
 
-            // Go back in time: subtract today's net change
-            const dayChanges = dailyAgencyChange[dateKey] || {};
+            // Go back in time: subtract this bucket's net change
+            const changes = bucketAgencyChange[bucketKey] || {};
             relevantAgIds.forEach(id => {
-                runningBalances[id] -= (dayChanges[id] || 0);
+                runningBalances[id] -= (changes[id] || 0);
             });
         }
 

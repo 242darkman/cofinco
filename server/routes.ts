@@ -8,7 +8,6 @@ import { registerSettingsRoutes } from "./routes/settings";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { hrRouter } from "./routes/hr";
 import { registerMobileMoneyRoutes } from "./mobile-money-service";
-import { registerStockMarketRoutes } from "./stock-market-service";
 import { registerMessagesRoutes } from "./routes/messages";
 import { registerConversationsRoutes } from "./routes/conversations";
 import { createServer, type Server } from "http";
@@ -111,7 +110,6 @@ export function registerRoutes(app: Express): Server {
 
   // External Services
   registerMobileMoneyRoutes(app);
-  registerStockMarketRoutes(app);
 
   // System Version Endpoint
   app.get("/api/version", async (req, res) => {

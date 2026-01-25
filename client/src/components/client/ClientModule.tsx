@@ -22,11 +22,10 @@ import EmptyState from '../ui/EmptyState';
 import { toast, handleApiError } from '../../lib/toast';
 import { Pagination } from '../ui/Pagination';
 import { formatClientName, resolveStorageUrl, formatPhoneNumber } from '../../lib/format';
-import { StatutClient } from '@shared/enum/status-constants';
-import { 
-  getStatusLabel, 
-  getStatusColor, 
-  CLIENT_STATUS_LABELS, 
+import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
+import {
+  getStatusLabel,
+  getStatusColor,
   CLIENT_STATUS_COLORS,
   CLIENT_SEGMENT_LABELS,
   CLIENT_SEGMENT_COLORS
@@ -514,7 +513,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       format: (_, item) => (
                         <div className="flex justify-center">
                           <Badge 
-                            value={getStatusLabel(item.statut, CLIENT_STATUS_LABELS)} 
+                            value={getStatusLabel(item.statut, STATUT_CLIENT_LABELS)} 
                             className={getStatusColor(item.statut, CLIENT_STATUS_COLORS)}
                             size="sm"
                           />

@@ -4,6 +4,7 @@ import { fr } from 'date-fns/locale';
 import { Building2, Phone, Mail, MapPin } from 'lucide-react';
 import { formatMoney } from '../../../lib/format';
 import { StatutTransfertCaisse } from '@shared/enum/status-constants';
+import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 
 export interface TransferHistoryData {
   title: string;
@@ -120,7 +121,7 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
                 <span className="font-bold text-slate-700">Filtres appliqués:</span>
                 {data.filters.startDate && <span>Du: {new Date(data.filters.startDate).toLocaleDateString('fr-FR')}</span>}
                 {data.filters.endDate && <span>Au: {new Date(data.filters.endDate).toLocaleDateString('fr-FR')}</span>}
-                {data.filters.status && <span>Statut: {data.filters.status}</span>}
+                {data.filters.status && <span>Statut: {ALL_STATUS_LABELS[data.filters.status!] || data.filters.status}</span>}
              </div>
           )}
 
@@ -155,7 +156,7 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
                         (t.statut === StatutTransfertCaisse.PENDING) ? 'bg-amber-100 text-amber-800 border-amber-200' :
                         'bg-slate-100 text-slate-800 border-slate-200'
                     }`}>
-                        {t.statut}
+                        {ALL_STATUS_LABELS[t.statut] || t.statut}
                     </span>
                   </td>
                   <td className="py-2 px-2 text-right font-bold text-slate-900 font-mono">

@@ -5,6 +5,7 @@ import { DollarSign, Award, MapPin, Phone, Mail, User, Building2, ChevronRight, 
 import { Card, Modal, Button, Skeleton } from '../ui';
 import ClientTags from './ClientTags';
 import { useQuery } from '@tanstack/react-query';
+import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
 interface ClientDetailsProps {
     client: ClientWithIdentity;
@@ -66,7 +67,7 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
                 <AlertTriangle className="text-red-400" size={20} />
             </div>
             <div>
-                <h4 className="text-red-400 font-bold text-sm">Client {client.statut}</h4>
+                <h4 className="text-red-400 font-bold text-sm">Client {ALL_STATUS_LABELS[client.statut!] || client.statut}</h4>
                 <p className="text-red-300/80 text-xs">Les comptes de ce client sont gelés. Les opérations de débit sont bloquées.</p>
             </div>
         </div>

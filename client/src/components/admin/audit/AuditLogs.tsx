@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { auditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 
 interface AuditLog {
   id: string;
@@ -111,7 +112,7 @@ export default function AuditLogs() {
     csvContent += `N°${separator}Date/Heure${separator}Utilisateur${separator}Action${separator}Entité${separator}IP${separator}Statut${separator}Message\n`;
     
     filteredLogs.forEach((log, idx) => {
-      csvContent += `${idx + 1}${separator}${formatLogDate(log)}${separator}${log.user_email || 'Système'}${separator}${log.action}${separator}${log.entity_type || log.resource || 'N/A'}${separator}${log.ip_address || '-'}${separator}${log.status}${separator}${log.error_message || '-'}\n`;
+      csvContent += `${idx + 1}${separator}${formatLogDate(log)}${separator}${log.user_email || 'Système'}${separator}${log.action}${separator}${log.entity_type || log.resource || 'N/A'}${separator}${log.ip_address || '-'}${separator}${ALL_STATUS_LABELS[log.status || ''] || log.status}${separator}${log.error_message || '-'}\n`;
     });
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -402,7 +403,7 @@ export default function AuditLogs() {
                         <div className="flex items-center gap-2">
                           {getStatusIcon(log.status || '' )}
                           <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(log.status || '')}`}>
-                            {log.status}
+                            {ALL_STATUS_LABELS[log.status || ''] || log.status}
                           </span>
                         </div>
                       </td>

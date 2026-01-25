@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Target, TrendingUp, Award, Plus, Check, X, BarChart3, DollarSign } from 'lucide-react';
 import { StatutObjectif, STATUT_OBJECTIF_LABELS } from '@shared/enum/status-constants';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 interface Objectif {
   id: string;
@@ -298,7 +299,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                         ? 'bg-green-500/20 text-green-400'
                         : 'bg-cyan-500/20 text-cyan-400'
                     }`}>
-                      {objectif.statut}
+                      {ALL_STATUS_LABELS[objectif.statut] || objectif.statut}
                     </span>
                   </div>
                   <h4 className="text-lg font-bold text-white mb-1">

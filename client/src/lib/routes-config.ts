@@ -17,12 +17,10 @@ const AgentValidations = lazy(() => import('@/components/agent/AgentValidations'
 const CaisseDashboard = lazy(() => import('@/components/finance/caisse/CaisseDashboard'));
 const CoffreFortDashboard = lazy(() => import('@/components/finance/caisse/CoffreFortDashboard').then(module => ({ default: module.CoffreFortDashboard })));
 const TransfertArgent = lazy(() => import('@/components/finance/transfert/TransfertArgent'));
-const BourseModule = lazy(() => import('@/components/finance/bourse/BourseModule'));
 const ReportGenerator = lazy(() => import('@/components/shared/ReportGenerator'));
 const AdminModuleComplet = lazy(() => import('@/components/admin/AdminModuleComplet'));
 const MessagesModule = lazy(() => import('@/components/shared/MessagesModule'));
 const UserProfile = lazy(() => import('@/components/shared/UserProfile'));
-const ExcelModule = lazy(() => import('@/components/shared/ExcelModule'));
 const CreditRefundsPage = lazy(() => import('@/pages/finance/CreditRefundsPage'));
 const AdminVirementsProgrammes = lazy(() => import('@/components/admin/AdminVirementsProgrammes'));
 const ReconciliationPage = lazy(() => import('@/pages/finance/ReconciliationPage'));
@@ -203,15 +201,6 @@ export const ROUTES: RouteConfig[] = [
     group: 'Gestion',
   },
   {
-    key: 'excel',
-    path: '/excel',
-    component: ExcelModule,
-    requiredModule: 'Comptabilité',
-    label: 'Import/Export',
-    labelKey: 'menuExcel',
-    group: 'Gestion',
-  },
-  {
     key: 'rh',
     path: '/rh',
     component: RessourcesHumaines,
@@ -220,16 +209,6 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuRH',
     group: 'Gestion',
   },
-  {
-    key: 'bourse',
-    path: '/bourse',
-    component: BourseModule,
-    requireAdmin: true,
-    label: 'Bourse',
-    labelKey: 'menuBourse',
-    group: 'Gestion',
-  },
-
   // --- Système ---
   {
     key: 'administrateur',

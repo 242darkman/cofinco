@@ -30,7 +30,7 @@ import AdminMaintenanceMode from './AdminMaintenanceMode';
 import AdminTontinesGestion from './AdminTontinesGestion';
 import AdminGestionAgences from './AdminGestionAgences';
 import AdminGestionZones from './AdminGestionZones';
-import AdminSmsSettings from './AdminSmsSettings';
+import AdminNotificationsMonitor from './AdminNotificationsMonitor';
 import AdminVersionInfo from './AdminVersionInfo';
 import { SystemRole } from '@shared/types/roles';
 import AdminCaisseAccessCodes from './AdminCaisseAccessCodes';
@@ -282,7 +282,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 }).map((tab) => {
                   const Icon = iconMap[tab.icon] || Shield;
                   const isActive = activeTab === tab.id;
-                  const isDisabled = 'disabled' in tab && tab.disabled;
+                  const isDisabled = 'disabled' in tab && !!(tab as any).disabled;
                   
                   return (
                     <button
@@ -354,7 +354,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'codes' && <AdminCaisseAccessCodes onClose={() => setActiveTab('dashboard')} />}
                   {activeTab === 'maintenance' && <AdminMaintenanceMode />}
                   {activeTab === 'settings' && <AdminSystemSettings />}
-                  {activeTab === 'sms' && <AdminSmsSettings />}
+                  {activeTab === 'notifications' && <AdminNotificationsMonitor />}
                   {activeTab === 'updates' && <AdminVersionInfo />}
                   {activeTab === 'regularisation' && <RegularizationDashboard />}
                   {activeTab === 'client-credentials' && <AdminClientCredentials />}

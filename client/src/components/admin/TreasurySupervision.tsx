@@ -60,23 +60,29 @@ interface CustomTooltipProps {
   payload?: any[];
   label?: string;
   agencyMap: Record<string, string>;
+  period?: string;
 }
 
-const CustomTooltip = ({ active, payload, label, agencyMap }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, label, agencyMap, period }: CustomTooltipProps) => {
   if (!active || !payload || !payload.length) return null;
 
-  // Filter out the 'balance' (total) if comparing, or keep it depending on UX preference
-  // User wants: Nord: 15M, Sud: 12M... sorted by amount desc
   const dataPoints = payload
     .filter(p => p.dataKey !== 'balance')
     .sort((a, b) => b.value - a.value);
 
   const total = payload.find(p => p.dataKey === 'balance')?.value;
 
+  const formatTooltipDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (period === 'today') return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' — Aujourd\'hui';
+    if (period === '1y') return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
   return (
     <div className="bg-card border border-border rounded-xl shadow-xl p-4 min-w-[200px] backdrop-blur-sm bg-card/95">
       <p className="text-sm font-semibold mb-3 border-b pb-2 text-foreground">
-        {new Date(label!).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+        {formatTooltipDate(label!)}
       </p>
       <div className="space-y-2.5">
         {dataPoints.map((p, idx) => (
@@ -126,18 +132,27 @@ interface TreasuryStats {
 
 // --- Components ---
 
+type Period = 'today' | '7d' | '30d' | '1y';
+const PERIOD_OPTIONS: { value: Period; label: string }[] = [
+  { value: 'today', label: 'Aujourd\'hui' },
+  { value: '7d', label: '7 jours' },
+  { value: '30d', label: '1 mois' },
+  { value: '1y', label: '1 an' },
+];
+
 export function TreasurySupervision() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
-  
+  const [period, setPeriod] = useState<Period>('30d');
+
   const ITEMS_PER_PAGE = 12;
 
   // 1. Global Data Poll (Real-time every 5s)
   const { data: _globalStats, isLoading: isGlobalLoading, refetch: refetchGlobal } = useQuery<TreasuryStats>({
-    queryKey: ['treasury-supervision'],
+    queryKey: ['treasury-supervision', period],
     queryFn: async (): Promise<TreasuryStats> => {
-      return (await api.get('/coffre/supervision')) as TreasuryStats;
+      return (await api.get(`/coffre/supervision?period=${period}`)) as TreasuryStats;
     },
     refetchInterval: 5000,
     placeholderData: keepPreviousData
@@ -147,10 +162,10 @@ export function TreasurySupervision() {
   // 2. Specific History Poll (for drill-down)
   // Only fetch if agencies are selected
   const { data: agencyHistoryData, isLoading: isHistoryLoading } = useQuery<TreasuryStats>({
-    queryKey: ['treasury-history', selectedAgencies.sort().join(',')], // stable key
+    queryKey: ['treasury-history', selectedAgencies.sort().join(','), period],
     queryFn: async () => {
        const ids = selectedAgencies.join(',');
-       return (await api.get(`/coffre/supervision?historyFor=${ids}`)) as TreasuryStats;
+       return (await api.get(`/coffre/supervision?historyFor=${ids}&period=${period}`)) as TreasuryStats;
     },
     enabled: selectedAgencies.length > 0,
     refetchInterval: 5000
@@ -181,13 +196,15 @@ export function TreasurySupervision() {
     });
   };
 
+  const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || '1 mois';
+
   const getChartTitle = () => {
-     if (selectedAgencies.length === 0) return "Évolution Trésorerie Globale (30 Jours)";
+     if (selectedAgencies.length === 0) return `Évolution Trésorerie Globale`;
      if (selectedAgencies.length === 1) {
          const agence = globalStats?.breakdown.find(a => a.agenceId === selectedAgencies[0]);
          return `Évolution : ${agence?.agenceNom || 'Agence'}`;
      }
-     return "Comparaison Agences (30 Jours)";
+     return `Comparaison Agences`;
   };
 
   // --- Render ---
@@ -312,7 +329,25 @@ export function TreasurySupervision() {
                         </div>
                    )}
               </div>
-              {isLoadingChart && <div className="text-[10px] text-muted-foreground animate-pulse">Mise à jour...</div>}
+              <div className="flex items-center gap-2">
+                {isLoadingChart && <div className="text-[10px] text-muted-foreground animate-pulse mr-2">Mise à jour...</div>}
+                <div className="flex items-center bg-slate-900 rounded-lg border border-slate-800 p-0.5">
+                  {PERIOD_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setPeriod(opt.value)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md text-[11px] font-medium transition-all",
+                        period === opt.value
+                          ? "bg-primary text-white shadow-sm"
+                          : "text-slate-400 hover:text-slate-200"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="h-[320px] w-full">
@@ -334,10 +369,12 @@ export function TreasurySupervision() {
                       ))}
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                    <XAxis 
-                      dataKey="date" 
+                    <XAxis
+                      dataKey="date"
                       tickFormatter={(val) => {
                           const d = new Date(val);
+                          if (period === 'today') return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                          if (period === '1y') return d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
                           return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
                       }}
                       stroke="transparent"
@@ -362,7 +399,8 @@ export function TreasurySupervision() {
                     />
                     <Tooltip 
                       content={
-                        <CustomTooltip 
+                        <CustomTooltip
+                            period={period}
                             agencyMap={globalStats?.breakdown.reduce((acc, a) => {
                                 acc[a.agenceId] = a.agenceNom;
                                 return acc;

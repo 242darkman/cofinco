@@ -343,8 +343,6 @@ const translations: Translations = {
   menuCoffre: { fr: 'Coffre-Fort', en: 'Safe' },
   menuTransfert: { fr: 'Transfert', en: 'Money Transfer' },
   menuVirementsProgrammes: { fr: 'Virements Programmés', en: 'Scheduled Transfers' },
-  menuBourse: { fr: 'Bourse', en: 'Stock Market' },
-  menuExcel: { fr: 'Excel', en: 'Excel' },
   menuRH: { fr: 'RH', en: 'HR' },
   menuComptabilite: { fr: 'Comptabilité', en: 'Accounting' },
   menuRapports: { fr: 'Rapports', en: 'Reports' },

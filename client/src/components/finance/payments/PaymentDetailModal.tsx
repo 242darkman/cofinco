@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, User, Phone, Calendar, Hash, CreditCard, Wallet, Building2, FileText, Clock, CheckCircle2, XCircle, AlertTriangle, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 
@@ -181,7 +182,7 @@ export function PaymentDetailModal({
             <div className="flex items-center justify-between mb-3">
               <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 ${status.bg} ${status.text}`}>
                 <StatusIcon size={12} />
-                {payment.status}
+                {ALL_STATUS_LABELS[payment.status] || payment.status}
               </span>
               <span className="text-xs text-slate-500">
                 {formatDate(payment.createdAt)}

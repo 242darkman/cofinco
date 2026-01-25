@@ -11,7 +11,6 @@ export * from "./coffre";
 export * from "./messages";
 export * from "./conversations";
 export * from "./operations";
-export * from "./bourse";
 export * from "./transferts";
 export * from "./hr";
 export * from "./accounting";
@@ -21,6 +20,7 @@ export * from "./coffres-forts";
 export * from "./agency_migration";
 export * from "./mobile-money";
 export * from "./dossier-credit";
+export * from "./notifications";
 
 // Relations - Need to be defined here or in a separate file to avoid circular dependencies
 // if they were in individual files. OR we can put relations in `relations.ts`.

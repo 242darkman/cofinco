@@ -49,7 +49,7 @@ function logReconciliation(entry: ReconciliationLogEntry): void {
 
 interface BalanceAlert {
   type: "BALANCE_DISCREPANCY";
-  severity: "MINOR" | "MAJOR" | "CRITICAL";
+  severity: "OK" | "MINOR" | "MAJOR" | "CRITICAL";
   entityType: string;
   entityId: string;
   persistedBalance: number;
@@ -72,7 +72,7 @@ async function sendDiscrepancyAlert(result: ReconciliationResult, runId: string)
     persistedBalance: result.persistedBalance,
     calculatedBalance: result.calculatedBalance,
     discrepancy: result.discrepancy,
-    percentage: result.percentage,
+    percentage: result.persistedBalance !== 0 ? Math.abs(result.discrepancy / result.persistedBalance) * 100 : 0,
     timestamp: new Date().toISOString(),
     runId,
   };
@@ -193,7 +193,7 @@ async function runBalanceReconciliation(): Promise<void> {
         type: "RECONCILIATION_COMPLETE",
         payload: {
           runId: report.runId,
-          timestamp: report.timestamp,
+          timestamp: report.completedAt?.toISOString() ?? new Date().toISOString(),
           totalEntities: report.totalEntities,
           summary: report.summary,
           durationMs: Date.now() - startTime,

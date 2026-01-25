@@ -29,6 +29,7 @@ import { hrService } from "../services/hr-service";
 import { users } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { z } from "zod";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 export const hrRouter = Router();
 
@@ -216,6 +217,22 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
       req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
     );
 
+    // Domain event: leave requested
+    dispatchDomainEvent({
+      type: "HR_LEAVE_REQUESTED",
+      data: {
+        congeId: newConge.id,
+        employeId,
+        employeNom: employeNom || "",
+        type,
+        dateDebut,
+        dateFin,
+        daysRequested,
+        agenceId: req.user?.agenceId,
+      },
+      timestamp: new Date(),
+    });
+
     res.status(201).json(successResponse(newConge));
   } catch (error) {
     console.error("Erreur création congé:", error);
@@ -307,6 +324,19 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
       req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
     );
 
+    // Domain event: leave approved
+    dispatchDomainEvent({
+      type: "HR_LEAVE_APPROVED",
+      data: {
+        congeId: updated.id,
+        employeId: updated.employeId,
+        employeNom: updated.employeNom || "",
+        approvedByName: req.user?.nom,
+        agenceId: req.user?.agenceId,
+      },
+      timestamp: new Date(),
+    });
+
     res.json(successResponse(updated));
   } catch (error) {
     console.error("Erreur approbation congé:", error);
@@ -389,6 +419,20 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
       },
       req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
     );
+
+    // Domain event: leave rejected
+    dispatchDomainEvent({
+      type: "HR_LEAVE_REJECTED",
+      data: {
+        congeId: updated.id,
+        employeId: updated.employeId,
+        employeNom: updated.employeNom || "",
+        rejectedByName: req.user?.nom,
+        reason: commentaire,
+        agenceId: req.user?.agenceId,
+      },
+      timestamp: new Date(),
+    });
 
     res.json(successResponse(updated));
   } catch (error) {

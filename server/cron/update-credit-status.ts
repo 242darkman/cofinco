@@ -6,6 +6,7 @@ import {
   CreditTransitionError,
   CreditStatus,
 } from "@shared/machines/credit-workflow";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 /**
  * Cron Job: Update Credit Status to "En retard"
@@ -82,6 +83,18 @@ export async function updateOverdueCredits() {
 
     const duration = Date.now() - startTime;
     console.log(`[CRON] Credit status update completed in ${duration}ms`);
+
+    // Domain event: credits marked as overdue
+    if (validCreditIds.length > 0) {
+      dispatchDomainEvent({
+        type: "CREDIT_OVERDUE",
+        data: {
+          creditIds: validCreditIds,
+          count: validCreditIds.length,
+        },
+        timestamp: new Date(),
+      });
+    }
 
     return {
       success: true,

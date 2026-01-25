@@ -9,6 +9,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 // Safe date format helper
 const safeDateFormat = (dateValue: string | Date | null | undefined, formatStr: string): string => {
@@ -74,7 +75,7 @@ const ReportStatusBadge = ({ statut }: { statut: string }) => {
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${bg} ${text}`}>
       <Icon size={12} />
-      {statut}
+      {ALL_STATUS_LABELS[statut] || statut}
     </span>
   );
 };
@@ -91,7 +92,7 @@ const SeverityBadge = ({ severity }: { severity: string }) => {
 
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${bg} ${text}`}>
-      {severity}
+      {ALL_STATUS_LABELS[severity] || severity}
     </span>
   );
 };

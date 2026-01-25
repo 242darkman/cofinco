@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { SearchInput, Button, SelectField } from '../ui';
-import { StatutClient } from '@shared/enum/status-constants';
-import { CLIENT_STATUS_LABELS } from '@/lib/status-labels';
+import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
 
 export interface ClientFiltersState {
   searchTerm: string;
@@ -92,9 +91,9 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
             onChange={handleStatusChange}
             options={[
               { value: 'all', label: 'Tous les statuts' },
-              { value: StatutClient.ACTIVE, label: CLIENT_STATUS_LABELS.ACTIVE },
-              { value: StatutClient.SUSPENDED, label: CLIENT_STATUS_LABELS.SUSPENDED },
-              { value: StatutClient.INACTIVE, label: CLIENT_STATUS_LABELS.INACTIVE }
+              { value: StatutClient.ACTIVE, label: STATUT_CLIENT_LABELS.ACTIVE },
+              { value: StatutClient.SUSPENDED, label: STATUT_CLIENT_LABELS.SUSPENDED },
+              { value: StatutClient.INACTIVE, label: STATUT_CLIENT_LABELS.INACTIVE }
             ]}
             className="mb-0 [&>select]:h-8 [&>select]:text-xs [&>select]:py-0"
             containerClassName="!mb-0"

@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
 import { coffreApi, sessionCaisseApi } from "@/lib/api-client";
 import { StatutTransfertCoffre, getMouvementCoffreLabel } from "@shared/enum/status-constants";
+import { ALL_STATUS_LABELS } from "@/lib/status-labels";
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { CoffreAdminPanel } from './CoffreAdminPanel';
 import { ProvisionCoffreModal } from './ProvisionCoffreModal';
@@ -539,7 +540,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           return (
             <span className="text-xs text-red-400/60 flex items-center justify-end gap-1.5">
               <Ban size={12} />
-              {row.statut}
+              {ALL_STATUS_LABELS[row.statut] || row.statut}
             </span>
           );
         }
@@ -854,18 +855,16 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
 
     const mouvements = data?.data || [];
     
-    // ... columns definition ...
-
     const columns = [
         {
             key: 'dateOperation',
             label: 'Date',
             format: (_: any, row: any) => (
-                <div className="flex flex-col">
-                    <span className="text-sm text-white font-medium">
-                        {format(new Date(row.dateOperation), "dd MMM yyyy", { locale: fr })}
+                <div className="flex flex-col leading-tight">
+                    <span className="text-[11px] text-white font-medium">
+                        {format(new Date(row.dateOperation), "dd MMM", { locale: fr })}
                     </span>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-[9px] text-slate-500">
                         {format(new Date(row.dateOperation), "HH:mm", { locale: fr })}
                     </span>
                 </div>
@@ -877,13 +876,14 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             format: (_: any, row: any) => {
                 const isCredit = row.sens === 'CREDIT';
                 return (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <Badge 
                             variant={isCredit ? 'success' : 'warning'} 
-                            icon={isCredit ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}
+                            icon={isCredit ? <ArrowDownRight size={10} /> : <ArrowUpRight size={10} />}
+                            className="px-1 py-0 text-[9px] h-4"
                             value={isCredit ? 'Entrée' : 'Sortie'}
                         />
-                        <span className="text-sm text-slate-300">
+                        <span className="text-[10px] text-slate-400 hidden sm:inline truncate max-w-[80px]">
                             {getMouvementCoffreLabel(row.typePaiement || row.metadata?.type || row.sourceModule)}
                         </span>
                     </div>
@@ -894,13 +894,13 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             key: 'description', 
             label: 'Description',
             format: (_: any, row: any) => (
-                <div className="flex flex-col max-w-[300px]">
-                    <span className="text-sm text-white truncate">
+                <div className="flex flex-col max-w-[200px]">
+                    <span className="text-[11px] text-slate-300 truncate leading-tight">
                         {row.metadata?.description || row.metadata?.motif || row.reference}
                     </span>
                      {row.initiator && (
-                        <span className="text-xs text-slate-500">
-                            Par {row.initiator.prenom} {row.initiator.nom}
+                        <span className="text-[9px] text-slate-600 truncate">
+                            {row.initiator.prenom} {row.initiator.nom}
                         </span>
                     )}
                 </div>
@@ -911,7 +911,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             label: 'Montant',
             align: 'right' as const,
             format: (val: any, row: any) => (
-                <span className={`font-bold font-mono ${row.sens === 'CREDIT' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className={`font-bold font-mono text-xs ${row.sens === 'CREDIT' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {row.sens === 'CREDIT' ? '+' : '-'} {Number(val).toLocaleString()} FCFA
                 </span>
             )
@@ -920,38 +920,41 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
 
     if (isLoading) return (
         <div className="grid grid-cols-1 gap-4">
-             <SkeletonCard className="h-96" />
+             <SkeletonCard className="h-64" />
         </div>
     );
 
     return (
         <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-            <div className="p-3 border-b border-slate-800 flex justify-between items-center">
+            <div className="p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/40">
                 <div className="flex items-center gap-2">
-                    <Clock className="text-slate-500" size={16} />
-                    <h3 className="font-bold text-white text-sm">Historique des Mouvements</h3>
+                    <Clock className="text-slate-500" size={14} />
+                    <h3 className="font-bold text-white text-xs">Historique</h3>
                 </div>
                 <Button 
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm" 
                     onClick={() => refetch()}
                     disabled={isRefetching}
-                    className="h-8 text-xs transition-all duration-200"
+                    className="h-6 px-2 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800"
                 >
                     <Loader2 
-                        size={12} 
-                        className={`mr-2 ${isRefetching ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
+                        size={10} 
+                        className={`mr-1 ${isRefetching ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
                     />
-                    {isRefetching ? 'Actualisation...' : 'Actualiser'}
+                    Act.
                 </Button>
             </div>
             
-            <ResponsiveTable 
-                data={mouvements}
-                columns={columns}
-                emptyMessage="Aucun mouvement enregistré."
-                density="compact"
-            />
+            <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                <ResponsiveTable 
+                    data={mouvements}
+                    columns={columns}
+                    emptyMessage="Aucun mouvement."
+                    density="compact"
+                    className="text-[10px]"
+                />
+            </div>
         </Card>
     );
 }

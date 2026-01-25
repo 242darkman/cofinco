@@ -15,6 +15,7 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import { Button, EmptyState } from '../../ui';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import TransactionsList, { TransactionItem } from './TransactionsList';
 import TransactionDetailDrawer, { TransactionDetails } from './TransactionDetailDrawer';
 import { isIncomingOperation } from '@shared/config/caisse-operations';
@@ -290,7 +291,7 @@ export default function TransactionHistoryPage({
         ...filteredTransactions.map(t => {
           const date = new Date(t.created_at || t.date).toLocaleDateString('fr-FR');
           const type = t.type_operation || t.type;
-          return `${date},${t.reference || ''},"${type}","${t.description || ''}",${t.amount},${t.status}`;
+          return `${date},${t.reference || ''},"${type}","${t.description || ''}",${t.amount},${ALL_STATUS_LABELS[t.status] || t.status}`;
         })
       ].join('\n');
 

@@ -46,7 +46,7 @@ export const ADMIN_TABS = [
   { id: 'tontines', label: 'Tontines', icon: 'Users', permission: 'tontines.manage' },
   { id: 'agences', label: 'Agences', icon: 'Building2', permission: 'admin.settings' },
   { id: 'zones', label: 'Zones', icon: 'MapPin', permission: 'admin.settings' },
-  { id: 'sms', label: 'SMS', icon: 'MessageSquare', disabled: true, permission: 'admin.settings' },
+  { id: 'notifications', label: 'Notifications', icon: 'MessageSquare', permission: 'admin.settings' },
   { id: 'updates', label: 'Version', icon: 'Package', permission: 'admin.settings' },
   { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound', permission: 'caisse.manage' },
   { id: 'regularisation', label: 'Régularisation', icon: 'AlertTriangle', permission: 'admin.manage' },

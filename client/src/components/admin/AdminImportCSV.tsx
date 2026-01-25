@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, Download, AlertCircle, Check, FileText, AlertTriangle } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
 interface AdminImportCSVProps {
   onClose: () => void;
@@ -323,7 +324,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                             <td className="px-4 py-2 text-slate-300">{row.prenom || '-'}</td>
                             <td className="px-4 py-2 text-slate-300">{row.nom || '-'}</td>
                             <td className="px-4 py-2 text-slate-300">{row.role}</td>
-                            <td className="px-4 py-2 text-slate-300">{row.statut}</td>
+                            <td className="px-4 py-2 text-slate-300">{ALL_STATUS_LABELS[row.statut] || row.statut}</td>
                           </tr>
                         ))}
                       </tbody>

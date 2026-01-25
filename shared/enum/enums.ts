@@ -651,3 +651,48 @@ export const niveauRisqueEnum = pgEnum("niveau_risque_enum", [
   "MOYEN",
   "ELEVE",
 ]);
+
+// ============================================
+// NOTIFICATION SYSTEM
+// ============================================
+
+export const notificationChannelEnum = pgEnum("notification_channel_enum", [
+  "SMS",
+  "EMAIL",
+  "PUSH",
+  "IN_APP",
+]);
+
+export const notificationJobStatusEnum = pgEnum("notification_job_status_enum", [
+  "QUEUED",
+  "PROCESSING",
+  "SENT",
+  "FAILED",
+  "DEAD_LETTER",
+]);
+
+export const otpPurposeEnum = pgEnum("otp_purpose_enum", [
+  "PASSWORD_RESET",
+  "TRANSFER_VALIDATION",
+  "CREDIT_VALIDATION",
+  "SECURITY_CHANGE",
+  "CAISSE_OPERATION",
+]);
+
+export const otpChannelEnum = pgEnum("otp_channel_enum", [
+  "SMS",
+  "EMAIL",
+]);
+
+export const fallbackPolicyEnum = pgEnum("fallback_policy_enum", [
+  "SMS_ONLY",
+  "EMAIL_ONLY",
+  "SMS_THEN_EMAIL",
+  "EMAIL_THEN_SMS",
+]);
+
+export const emailProviderTypeEnum = pgEnum("email_provider_type_enum", [
+  "SMTP",
+  "RESEND",
+  "SENDGRID",
+]);

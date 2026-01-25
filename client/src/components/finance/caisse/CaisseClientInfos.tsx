@@ -27,7 +27,7 @@ interface Client {
   photoProfile?: string;
   photoUrl?: string;
   photo_url?: string;
-  kycStatus: string;
+  documents?: Array<{ status?: string; [key: string]: any }>;
   segment?: string;
   agence_nom?: string;
   soldeEpargne?: number;
@@ -90,6 +90,15 @@ export default function CaisseClientInfos() {
     },
     enabled: !!selectedClientId
   });
+
+  const computeKycStatus = (documents?: Array<{ status?: string }>) => {
+    if (!documents || documents.length === 0) return 'en_attente';
+    const rejected = documents.some(d => d.status?.toLowerCase() === 'rejected');
+    if (rejected) return 'rejet';
+    const pending = documents.some(d => d.status?.toLowerCase() === 'pending');
+    if (pending) return 'incomplet';
+    return 'verifie';
+  };
 
   const getKycBadge = (status: string = 'en_attente') => {
     const s = status.toLowerCase();
@@ -216,7 +225,8 @@ export default function CaisseClientInfos() {
       return { label: 'Haut', color: 'bg-rose-500', text: 'text-rose-500', border: 'border-rose-500/30', bgBadge: 'bg-rose-500/10' };
   };
 
-  const risk = client ? getRiskLevel(client.kycStatus) : null;
+  const kycStatus = client ? computeKycStatus(client.documents) : 'en_attente';
+  const risk = client ? getRiskLevel(kycStatus) : null;
 
   return (
     <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30 p-2">
@@ -304,7 +314,7 @@ export default function CaisseClientInfos() {
                                         <span className="text-xs text-slate-300">KYC Status</span>
                                     </div>
                                     <div className="transform scale-90 origin-right">
-                                        {getKycBadge(client.kycStatus)}
+                                        {getKycBadge(kycStatus)}
                                     </div>
                                 </div>
                              </div>

@@ -12,6 +12,7 @@ import { z } from "zod";
 import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db";
 import { StatutUser } from "@shared/enum/status-constants";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 /**
  * Récupérer le caissePin d'un utilisateur depuis la table employes.
@@ -813,6 +814,16 @@ export function registerAuthRoutes(app: Express) {
         "success",
         "high"
      );
+
+     // Domain event: password reset
+     dispatchDomainEvent({
+       type: "USER_PASSWORD_RESET",
+       data: {
+         userId: req.params.id,
+         resetByUserId: req.session.user?.id,
+       },
+       timestamp: new Date(),
+     });
 
      res.json({ message: "Password reset" });
   });

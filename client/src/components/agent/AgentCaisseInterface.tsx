@@ -3,6 +3,7 @@ import { DollarSign, CheckCircle, AlertCircle, Search, CreditCard, Banknote, Arr
 import AppShell from '../layout/AppShell';
 import AgentSidebarContent from '../layout/AgentSidebarContent';
 import AgentHeader from '../layout/AgentHeader';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 interface AgentCaisseInterfaceProps {
   agentId: string;
@@ -335,7 +336,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                 <div className="bg-slate-700/30 p-3 rounded-lg">
                   <p className="text-xs text-slate-400">Statut</p>
                   <span className="inline-block mt-1 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold">
-                    {agent?.statut || 'Actif'}
+                    {ALL_STATUS_LABELS[agent?.statut || ''] || agent?.statut || 'Actif'}
                   </span>
                 </div>
                 <div className="bg-slate-700/30 p-3 rounded-lg">

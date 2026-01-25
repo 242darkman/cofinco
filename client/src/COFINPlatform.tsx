@@ -10,7 +10,6 @@ import { useLanguage } from './contexts/LanguageContext';
 const Tontines = lazy(() => import('./components/finance/tontine/Tontines'));
 const Credits = lazy(() => import('./components/finance/credits/Credits'));
 const TransfertArgent = lazy(() => import('./components/finance/transfert/TransfertArgent'));
-const BourseModule = lazy(() => import('./components/finance/bourse/BourseModule'));
 const CreditRequestForm = lazy(() => import('./components/finance/credits/CreditRequestForm'));
 const Epargnes = lazy(() => import('./components/finance/epargne/Epargnes'));
 const CaisseDashboard = lazy(() => import('./components/finance/caisse/CaisseDashboard'));
@@ -37,7 +36,6 @@ const AdminVirementsProgrammes = lazy(() => import('./components/admin/AdminVire
 // Shared modules
 const ReportGenerator = lazy(() => import('./components/shared/ReportGenerator'));
 const MessagesModule = lazy(() => import('./components/shared/MessagesModule'));
-const ExcelModule = lazy(() => import('./components/shared/ExcelModule'));
 const UserProfile = lazy(() => import('./components/shared/UserProfile'));
 const GlobalSearchModal = lazy(() => import('./components/shared/GlobalSearchModal'));
 
@@ -303,12 +301,6 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             <AdminVirementsProgrammes />
           </Suspense>
         );
-      case 'bourse':
-        return (
-          <Suspense fallback={<ModuleLoadingFallback moduleName="Bourse" />}>
-            <BourseModule />
-          </Suspense>
-        );
       case 'rh':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Ressources Humaines" />}>
@@ -343,12 +335,6 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Messages" />}>
             <MessagesModule />
-          </Suspense>
-        );
-      case 'excel':
-        return (
-          <Suspense fallback={<ModuleLoadingFallback moduleName="Excel" />}>
-            <ExcelModule />
           </Suspense>
         );
       case 'agentValidations':

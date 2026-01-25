@@ -16,6 +16,7 @@ import {
     Download
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
+import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { formatMoney, formatDate } from '../../../lib/format';
 import { Button } from '../../ui';
 import { useReactToPrint } from 'react-to-print';
@@ -223,7 +224,7 @@ export default function TransactionDetailsSheet({
                                 : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}
                         `}>
                             {transaction.status === 'Succès' && <CheckCircle size={12} strokeWidth={3} />}
-                            {transaction.status}
+                            {ALL_STATUS_LABELS[transaction.status] || transaction.status}
                         </span>
                     </div>
 

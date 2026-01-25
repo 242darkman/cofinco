@@ -7,6 +7,7 @@ import 'leaflet/dist/leaflet.css';
 import { Navigation, MapPin, Users, Crosshair, Layers, Satellite, Map as MapIcon, Mountain, RefreshCw, LocateFixed, X } from 'lucide-react';
 import useGeolocation from '../../hooks/useGeolocation';
 import { formatClientName } from '../../lib/format';
+import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
 interface Agent {
   id: string;
@@ -360,7 +361,7 @@ export default function SatelliteMap({
                   </div>
                 )}
                 <div className={`text-xs mt-1 ${(agent.statut === StatutUser.ACTIVE) ? 'text-green-500' : 'text-gray-400'}`}>
-                  {agent.statut || StatutUser.ACTIVE}
+                  {ALL_STATUS_LABELS[agent.statut || StatutUser.ACTIVE] || agent.statut || StatutUser.ACTIVE}
                 </div>
               </div>
             </Popup>
@@ -407,7 +408,7 @@ export default function SatelliteMap({
                   (visit.statut === 'COMPLETED') ? 'text-emerald-600' :
                   (visit.statut === 'IN_PROGRESS') ? 'text-orange-600' : 'text-gray-500'
                 }`}>
-                  {visit.statut}
+                  {ALL_STATUS_LABELS[visit.statut] || visit.statut}
                 </div>
               </div>
             </Popup>

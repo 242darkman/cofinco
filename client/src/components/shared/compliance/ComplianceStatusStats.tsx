@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 import Card from '../../ui/Card';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 export default function ComplianceStatusStats() {
   const currentDate = new Date().toLocaleDateString('fr-FR');
@@ -60,7 +61,7 @@ export default function ComplianceStatusStats() {
                 </div>
                 <div>
                   <div className={`font-bold ${stat.color}`}>{stat.label}</div>
-                  <div className="text-sm font-medium text-slate-200">{stat.status}</div>
+                  <div className="text-sm font-medium text-slate-200">{ALL_STATUS_LABELS[stat.status] || stat.status}</div>
                 </div>
               </div>
               <div className="text-xs text-slate-400 border-t border-slate-700/50 pt-2 mt-1">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Plus, CheckCircle, Clock, X } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 interface Incident {
   id: string;
@@ -271,7 +272,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
                     incident.statut === 'En traitement' ? 'bg-cyan-500/20 text-cyan-400' :
                     'bg-blue-500/20 text-blue-400'
                   }`}>
-                    {incident.statut}
+                    {ALL_STATUS_LABELS[incident.statut] || incident.statut}
                   </span>
                 </div>
                 <p className="text-white mb-2">{incident.description}</p>

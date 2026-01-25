@@ -33,6 +33,9 @@ import {
   uiCustomization,
   smsTemplates,
   smsProviderSettings,
+  emailProviderSettings,
+  emailTemplates,
+  notificationSettings,
   dureesSuggerees,
   planComptable,
   journaux,
@@ -870,8 +873,8 @@ async function seedMaintenanceModules(context: SeedContext, dryRun: boolean): Pr
   const moduleNames = MODULES_DATA.map(m => m.name);
 
   // Ajouter PLATFORM si non présent
-  if (!moduleNames.includes('PLATFORM')) {
-    moduleNames.push('PLATFORM');
+  if (!(moduleNames as string[]).includes('PLATFORM')) {
+    (moduleNames as string[]).push('PLATFORM');
   }
 
   for (const moduleName of moduleNames) {
@@ -885,6 +888,250 @@ async function seedMaintenanceModules(context: SeedContext, dryRun: boolean): Pr
   }
 
   return [{ table: 'maintenanceModules', action: 'created', count: moduleNames.length }];
+}
+
+// ============================================================================
+// NOTIFICATION SYSTEM
+// ============================================================================
+
+async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
+  console.log('🔔 Seeding Notification System...');
+  const results: SeedStepResult[] = [];
+
+  if (dryRun) {
+    return [
+      { table: 'emailProviderSettings', action: 'skipped', count: 1, details: 'dry-run' },
+      { table: 'emailTemplates', action: 'skipped', count: 10, details: 'dry-run' },
+      { table: 'notificationSettings', action: 'skipped', count: 1, details: 'dry-run' },
+      { table: 'smsProviderSettings (MTN)', action: 'skipped', count: 1, details: 'dry-run' },
+      { table: 'smsTemplates (new)', action: 'skipped', count: 5, details: 'dry-run' },
+      { table: 'featureFlags (notif)', action: 'skipped', count: 1, details: 'dry-run' },
+    ];
+  }
+
+  // 1. Email Provider Settings (SMTP disabled by default)
+  const [existingEmail] = await db.select().from(emailProviderSettings).limit(1);
+  if (!existingEmail) {
+    await db.insert(emailProviderSettings).values({
+      provider: 'SMTP',
+      providerName: 'SMTP par defaut',
+      host: 'smtp.example.com',
+      port: 587,
+      fromEmail: 'noreply@cofin.co',
+      fromName: 'COFIN&CO-M',
+      isActive: false,
+      isPrimary: true,
+      secure: false,
+    });
+    results.push({ table: 'emailProviderSettings', action: 'created', count: 1 });
+  } else {
+    results.push({ table: 'emailProviderSettings', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // 2. MTN SMS Provider (disabled by default)
+  const [existingMtn] = await db.select().from(smsProviderSettings)
+    .where(eq(smsProviderSettings.providerName, 'mtn'));
+  if (!existingMtn) {
+    await db.insert(smsProviderSettings).values({
+      provider: 'manual',
+      providerName: 'mtn',
+      apiKey: '',
+      apiUrl: 'https://api.mtn.com',
+      senderId: 'COFIN',
+      enabled: false,
+      isPrimary: false,
+      isActive: false,
+      settings: {
+        clientId: '',
+        clientSecret: '',
+        tokenUrl: 'https://api.mtn.com/v1/oauth/access_token/accesstoken?grant_type=client_credentials',
+        smsBaseUrl: 'https://api.mtn.com/v2/messages/sms/outbound',
+      },
+    });
+    results.push({ table: 'smsProviderSettings (MTN)', action: 'created', count: 1 });
+  } else {
+    results.push({ table: 'smsProviderSettings (MTN)', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // 3. Email Templates
+  const EMAIL_TEMPLATES_DATA = [
+    {
+      code: 'OTP_CODE_EMAIL',
+      nom: 'Code OTP par email',
+      subject: 'Votre code de verification - COFIN&CO-M',
+      contenuHtml: '<h2>Bonjour,</h2><p>Votre code de verification est : <strong>{{otpCode}}</strong></p><p>Ce code expire dans <strong>{{expiryMinutes}} minutes</strong>.</p><p>Si vous n\'avez pas demande ce code, ignorez ce message.</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Bonjour, votre code de verification est : {{otpCode}}. Ce code expire dans {{expiryMinutes}} minutes. COFIN&CO-M',
+      placeholders: 'otpCode,expiryMinutes',
+      description: 'Code OTP envoye par email',
+    },
+    {
+      code: 'CREDIT_APPROVED',
+      nom: 'Credit approuve',
+      subject: 'Votre credit a ete approuve - COFIN&CO-M',
+      contenuHtml: '<h2>Felicitations {{clientName}} !</h2><p>Votre demande de credit de <strong>{{amount}} FCFA</strong> a ete approuvee.</p><p>Passez a notre agence pour finaliser le dossier.</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Felicitations {{clientName}} ! Votre demande de credit de {{amount}} FCFA a ete approuvee. Passez a notre agence. COFIN&CO-M',
+      placeholders: 'clientName,amount',
+      description: 'Notification d\'approbation de credit',
+    },
+    {
+      code: 'CREDIT_REJECTED',
+      nom: 'Credit rejete',
+      subject: 'Mise a jour de votre demande de credit - COFIN&CO-M',
+      contenuHtml: '<h2>Bonjour {{clientName}},</h2><p>Nous regrettons de vous informer que votre demande de credit n\'a pas ete retenue.</p><p>Contactez-nous pour plus d\'informations.</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Bonjour {{clientName}}, votre demande de credit n\'a pas ete retenue. Contactez-nous pour plus d\'informations. COFIN&CO-M',
+      placeholders: 'clientName',
+      description: 'Notification de rejet de credit',
+    },
+    {
+      code: 'CREDIT_DISBURSEMENT',
+      nom: 'Decaissement credit',
+      subject: 'Decaissement de votre credit - COFIN&CO-M',
+      contenuHtml: '<h2>Bonjour {{clientName}},</h2><p>Le decaissement de votre credit de <strong>{{amount}} FCFA</strong> a ete effectue.</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Bonjour {{clientName}}, le decaissement de votre credit de {{amount}} FCFA a ete effectue. COFIN&CO-M',
+      placeholders: 'clientName,amount',
+      description: 'Notification de decaissement de credit',
+    },
+    {
+      code: 'PASSWORD_RESET',
+      nom: 'Reinitialisation mot de passe',
+      subject: 'Code de reinitialisation - COFIN&CO-M',
+      contenuHtml: '<h2>Bonjour {{userName}},</h2><p>Votre code de reinitialisation est : <strong>{{otpCode}}</strong></p><p>Ce code expire dans <strong>{{expiryMinutes}} minutes</strong>.</p><p>Si vous n\'avez pas fait cette demande, contactez l\'administrateur.</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Bonjour {{userName}}, votre code de reinitialisation est : {{otpCode}}. Ce code expire dans {{expiryMinutes}} minutes. COFIN&CO-M',
+      placeholders: 'userName,otpCode,expiryMinutes',
+      description: 'Email de reinitialisation de mot de passe',
+    },
+    {
+      code: 'TRANSFER_EXECUTED',
+      nom: 'Transfert execute',
+      subject: 'Transfert effectue - COFIN&CO-M',
+      contenuHtml: '<h2>Bonjour {{clientName}},</h2><p>Un transfert de <strong>{{amount}} FCFA</strong> a ete effectue avec succes.</p><p>Reference : {{reference}}</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Bonjour {{clientName}}, un transfert de {{amount}} FCFA a ete effectue. Reference : {{reference}}. COFIN&CO-M',
+      placeholders: 'clientName,amount,reference',
+      description: 'Notification de transfert execute',
+    },
+    {
+      code: 'HR_LEAVE_STATUS',
+      nom: 'Statut conge',
+      subject: 'Mise a jour de votre demande de conge - COFIN&CO-M',
+      contenuHtml: '<h2>Bonjour {{employeeName}},</h2><p>Votre demande de conge ({{leaveType}}) du {{startDate}} au {{endDate}} a ete <strong>{{status}}</strong>.</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Bonjour {{employeeName}}, votre demande de conge ({{leaveType}}) du {{startDate}} au {{endDate}} a ete {{status}}. COFIN&CO-M',
+      placeholders: 'employeeName,leaveType,startDate,endDate,status',
+      description: 'Notification de statut de conge',
+    },
+    {
+      code: 'WELCOME',
+      nom: 'Bienvenue client',
+      subject: 'Bienvenue chez COFIN&CO-M',
+      contenuHtml: '<h2>Bienvenue {{clientName}} !</h2><p>Votre compte a ete cree avec succes chez COFIN&CO-M.</p><p>Merci de votre confiance.</p><hr><p>COFIN&CO-M - Microfinance</p>',
+      contenuText: 'Bienvenue {{clientName}} ! Votre compte a ete cree avec succes. Merci de votre confiance. COFIN&CO-M',
+      placeholders: 'clientName',
+      description: 'Email de bienvenue client',
+    },
+  ];
+
+  let emailCreated = 0;
+  for (const tpl of EMAIL_TEMPLATES_DATA) {
+    const [existing] = await db.select().from(emailTemplates).where(eq(emailTemplates.code, tpl.code));
+    if (!existing) {
+      await db.insert(emailTemplates).values(tpl);
+      emailCreated++;
+    }
+  }
+  results.push({ table: 'emailTemplates', action: emailCreated > 0 ? 'created' : 'skipped', count: emailCreated, details: `${emailCreated}/${EMAIL_TEMPLATES_DATA.length}` });
+
+  // 4. New SMS Templates (Handlebars syntax)
+  const NEW_SMS_TEMPLATES_DATA = [
+    {
+      code: 'OTP_CODE',
+      nom: 'Code OTP SMS',
+      contenu: 'COFIN&CO-M: Votre code de verification est {{otpCode}}. Expire dans {{expiryMinutes}} min. Ne partagez jamais ce code.',
+      placeholders: 'otpCode,expiryMinutes',
+      description: 'Code OTP envoye par SMS',
+    },
+    {
+      code: 'CREDIT_REJECTED',
+      nom: 'Credit rejete SMS',
+      contenu: 'Bonjour {{clientName}}, votre demande de credit n\'a pas ete retenue. Contactez votre agence. COFIN&CO-M',
+      placeholders: 'clientName',
+      description: 'SMS de rejet de credit',
+    },
+    {
+      code: 'CREDIT_DISBURSEMENT',
+      nom: 'Decaissement credit SMS',
+      contenu: 'Bonjour {{clientName}}, votre credit de {{amount}} FCFA a ete decaisse. COFIN&CO-M',
+      placeholders: 'clientName,amount',
+      description: 'SMS de decaissement de credit',
+    },
+    {
+      code: 'TRANSFER_SCHEDULED',
+      nom: 'Virement programme SMS',
+      contenu: 'Bonjour {{clientName}}, un virement de {{amount}} FCFA est programme pour le {{scheduledDate}}. COFIN&CO-M',
+      placeholders: 'clientName,amount,scheduledDate',
+      description: 'SMS de virement programme',
+    },
+    {
+      code: 'TRANSFER_EXECUTED',
+      nom: 'Transfert execute SMS',
+      contenu: 'Bonjour {{clientName}}, transfert de {{amount}} FCFA effectue. Ref: {{reference}}. COFIN&CO-M',
+      placeholders: 'clientName,amount,reference',
+      description: 'SMS de transfert execute',
+    },
+    {
+      code: 'HR_LEAVE_APPROVED',
+      nom: 'Conge approuve SMS',
+      contenu: 'Bonjour {{employeeName}}, votre conge du {{startDate}} au {{endDate}} a ete approuve. COFIN&CO-M',
+      placeholders: 'employeeName,startDate,endDate',
+      description: 'SMS d\'approbation de conge',
+    },
+  ];
+
+  let smsCreated = 0;
+  for (const tpl of NEW_SMS_TEMPLATES_DATA) {
+    const [existing] = await db.select().from(smsTemplates).where(eq(smsTemplates.code, tpl.code));
+    if (!existing) {
+      await db.insert(smsTemplates).values(tpl);
+      smsCreated++;
+    }
+  }
+  results.push({ table: 'smsTemplates (new)', action: smsCreated > 0 ? 'created' : 'skipped', count: smsCreated, details: `${smsCreated}/${NEW_SMS_TEMPLATES_DATA.length}` });
+
+  // 5. Global Notification Settings
+  const [existingSettings] = await db.select().from(notificationSettings)
+    .where(isNull(notificationSettings.agenceId)).limit(1);
+  if (!existingSettings) {
+    await db.insert(notificationSettings).values({
+      agenceId: null,
+      smsEnabled: true,
+      emailEnabled: false,
+      pushEnabled: true,
+      fallbackPolicy: 'SMS_ONLY',
+      otpChannel: 'SMS',
+      otpMaxPerMinute: 3,
+      otpMaxPerDay: 20,
+      smsQuotaDaily: 1000,
+      emailQuotaDaily: 500,
+    });
+    results.push({ table: 'notificationSettings', action: 'created', count: 1 });
+  } else {
+    results.push({ table: 'notificationSettings', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  // 6. Feature Flag
+  const [existingFlag] = await db.select().from(featureFlags).where(eq(featureFlags.code, 'NOTIFICATIONS_ENABLED'));
+  if (!existingFlag) {
+    await db.insert(featureFlags).values({
+      code: 'NOTIFICATIONS_ENABLED',
+      nom: 'Systeme de notifications unifie',
+      description: 'Active le nouveau systeme de notifications unifie (SMS, email, push, in-app)',
+      enabled: true,
+      rolloutPercentage: 100,
+    });
+    results.push({ table: 'featureFlags (notif)', action: 'created', count: 1 });
+  } else {
+    results.push({ table: 'featureFlags (notif)', action: 'skipped', count: 0, details: 'exists' });
+  }
+
+  return results;
 }
 
 async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
@@ -1035,7 +1282,7 @@ async function validateProdBootstrap(): Promise<ValidationResult[]> {
   const [secSettings] = await db.select().from(securitySettings);
   results.push({
     invariant: 'securitySettings.passwordMinLength >= 8',
-    passed: !!secSettings && secSettings.passwordMinLength >= 8,
+    passed: !!secSettings && (secSettings.passwordMinLength ?? 0) >= 8,
     details: secSettings ? `minLength=${secSettings.passwordMinLength}` : 'NOT FOUND'
   });
 
@@ -1187,6 +1434,10 @@ async function seedProd() {
     // Maintenance Modules
     const maintenanceResults = await seedMaintenanceModules(report.context, DRY_RUN);
     report.steps.push(...maintenanceResults);
+
+    // Notification System
+    const notificationResults = await seedNotificationSystem(report.context, DRY_RUN);
+    report.steps.push(...notificationResults);
 
     // Admin User (only in EMPTY or SEEDED)
     if (report.context !== 'PRODUCTION' || FORCE_RESET) {

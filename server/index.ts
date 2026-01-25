@@ -20,6 +20,7 @@ import {
   additionalSecurityHeaders,
 } from "./middleware/security";
 import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
+import { startNotificationWorker } from "./services/notifications/notification-worker";
 import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
 import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
 import { startScheduledAccountTransfersCron } from "./cron/scheduled-account-transfers";
@@ -166,6 +167,10 @@ app.use((req, res, next) => {
   // Start the outbox worker for reliable real-time event publishing
   startOutboxWorker();
   log('[Outbox] Real-time event worker started');
+
+  // Start the notification delivery worker (SMS/Email queue processor)
+  startNotificationWorker();
+  log('[NotifWorker] Notification delivery worker started');
 
   // Start the caisse session cleanup cron job (closes expired sessions, monitors risky ones)
   startSessionCleanupCron();

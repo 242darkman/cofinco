@@ -10,6 +10,7 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { formatMoney, formatDate } from '../../../lib/format';
+import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { usePagination } from '../../../hooks/usePagination';
 import {
   StatutClient,
@@ -283,7 +284,7 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
               contribution.statut === 'PENDING' ? 'bg-amber-500/20 text-amber-400' :
               'bg-red-500/20 text-red-400'
             }`}>
-              Statut: {contribution.statut}
+              Statut: {ALL_STATUS_LABELS[contribution.statut] || contribution.statut}
             </span>
           </div>
         </div>
@@ -657,7 +658,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${getStatutColor(contribution.statut)}`}
                       >
-                        {contribution.statut}
+                        {ALL_STATUS_LABELS[contribution.statut] || contribution.statut}
                       </span>
                     </div>
 

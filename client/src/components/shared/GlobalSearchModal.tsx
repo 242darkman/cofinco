@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Users, TrendingUp, DollarSign, MapPin, ChevronRight, X, Loader2, CreditCard } from 'lucide-react';
 import { Modal, Card, Badge, Button, IconButton } from '../ui';
+import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 interface SearchResults {
   clients: Array<{ id: string; nom: string; email?: string; telephone?: string; status?: string; type: string }>;
@@ -174,7 +175,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
                         icon={CreditCard}
                         iconBg="bg-emerald-500/10 text-emerald-400"
                         label={credit.clientNom || credit.typeCredit || 'Crédit'}
-                        sublabel={`${credit.montant ? Number(credit.montant).toLocaleString() + ' FCFA' : ''} • ${credit.statut || ''}`}
+                        sublabel={`${credit.montant ? Number(credit.montant).toLocaleString() + ' FCFA' : ''} • ${ALL_STATUS_LABELS[credit.statut || ''] || credit.statut || ''}`}
                         onClick={() => onNavigate('credits', credit.id, 'credit')}
                       />
                     ))}
@@ -194,7 +195,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
                         icon={DollarSign}
                         iconBg="bg-amber-500/10 text-amber-400"
                         label={tontine.nom}
-                        sublabel={tontine.statut}
+                        sublabel={ALL_STATUS_LABELS[tontine.statut || ''] || tontine.statut}
                         onClick={() => onNavigate('tontines', tontine.id, 'tontine')}
                       />
                     ))}

@@ -8,6 +8,7 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, validateDate, VALIDATION_LIMITS } from '../../../lib/validation';
 import { formatMoney, formatDate, getDaysRemaining } from '../../../lib/format';
+import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
 import { StatutObjectif, StatutObjectifType, STATUT_OBJECTIF_LABELS } from '@shared/enum/status-constants';
 
@@ -408,7 +409,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <h3 className="text-xl font-bold text-white">{escapeHtml(objectif.nom)}</h3>
                           <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadgeColor(objectif.statut)}`}>
-                            {objectif.statut}
+                            {ALL_STATUS_LABELS[objectif.statut] || objectif.statut}
                           </span>
                         </div>
                         {objectif.description && (
