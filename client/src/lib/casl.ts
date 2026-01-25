@@ -80,34 +80,63 @@ export function cannot(ability: AppAbility, action: Action, subject: Subject): b
  * Used for backwards compatibility with routes-config
  */
 export const MODULE_TO_SUBJECT: Record<string, Subject> = {
+  // Core modules
   'Dashboard': Subjects.DASHBOARD,
-  'Clients': Subjects.CLIENT,
-  'Crédits': Subjects.CREDIT,
-  'Credits': Subjects.CREDIT,
+  'Clients': Subjects.CLIENTS,
+  'Crédits': Subjects.CREDITS,
+  'Credits': Subjects.CREDITS,
   'Remboursements': Subjects.REMBOURSEMENT,
-  'Comptes': Subjects.COMPTE,
-  'Epargnes': Subjects.COMPTE,
-  'Tontines': Subjects.TONTINE,
+  'Comptes': Subjects.COMPTES,
+  'Epargnes': Subjects.EPARGNES,
+  'Épargnes': Subjects.EPARGNES,
+  'Tontines': Subjects.TONTINES,
   'Comptabilité': Subjects.COMPTABILITE,
   'Comptabilite': Subjects.COMPTABILITE,
   'Caisse': Subjects.CAISSE,
   'Coffre-Fort': Subjects.COFFRE,
   'CoffreFort': Subjects.COFFRE,
-  'Agent Terrain': Subjects.AGENT_TERRAIN,
-  'AgentTerrain': Subjects.AGENT_TERRAIN,
+  'Coffre': Subjects.COFFRE,
+
+  // Agent/Terrain
+  'Agent Terrain': Subjects.TERRAIN,
+  'AgentTerrain': Subjects.TERRAIN,
+  'Terrain': Subjects.TERRAIN,
   'CaisseAgent': Subjects.CAISSE_AGENT,
+
+  // Administration
   'Administration': Subjects.ADMIN,
-  'Rapports': Subjects.RAPPORT,
+  'Admin': Subjects.ADMIN,
+  'RBAC': Subjects.RBAC,
+  'Paramètres': Subjects.SETTINGS,
+  'Settings': Subjects.SETTINGS,
+  'Maintenance': Subjects.MAINTENANCE,
+
+  // Reports & RH
+  'Rapports': Subjects.RAPPORTS,
   'RH': Subjects.RH,
+  'Employés': Subjects.EMPLOYE,
+
+  // Communications
   'Communications': Subjects.COMMUNICATION,
   'Messages': Subjects.MESSAGE,
-  'Audit': Subjects.AUDIT,
+  'Audit': Subjects.AUDIT_LOG,
+
+  // Field operations
   'Incidents': Subjects.INCIDENT,
   'Visites': Subjects.VISITE,
   'Prospection': Subjects.PROSPECTION,
-  'Paiements Agent': Subjects.PAIEMENT,
+  'Paiements Agent': Subjects.PAIEMENT_TERRAIN,
+
+  // Transfers
   'Transferts': Subjects.TRANSFERT,
   'Virements Programmes': Subjects.VIREMENT,
+
+  // New modules
+  'Fidélité': Subjects.LOYALTY,
+  'Loyalty': Subjects.LOYALTY,
+  'Régularisation': Subjects.REGULARISATION,
+  'Départements': Subjects.DEPARTMENT,
+  'Agences': Subjects.AGENCE,
 };
 
 /**

@@ -1,21 +1,36 @@
-import React, { useState } from 'react';
-import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { DemandeConge } from '../../hooks/hr/useConges';
 import { Card, Button, Modal, FormField, SelectField, Badge, StatCard, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole } from '@shared/types/roles';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { StatutConge, STATUT_CONGE_LABELS } from '@shared/enum/status-constants';
+import { useHrRealtime, useHrSyncStatus } from '../../hooks/hr/useHrRealtime';
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '../../lib/queryClient';
+
+interface LeaveBalance {
+  employeId: string;
+  year: number;
+  available: number;
+  balance?: {
+    acquired: number;
+    used: number;
+    pending: number;
+    carryOver: number;
+  };
+}
 
 interface CongesManagerProps {
   demandes: DemandeConge[];
-  onApprove: (id: number) => Promise<void>;
-  onReject: (id: number) => Promise<void>;
-  onCreate: (data: { 
+  onApprove: (id: number, commentaire?: string) => Promise<void>;
+  onReject: (id: number, commentaire: string) => Promise<void>;
+  onCreate: (data: {
     employeId: string;
     employeNom: string;
-    type: string; 
-    dateDebut: string; 
+    type: string;
+    dateDebut: string;
     dateFin: string;
     motif?: string;
   }) => Promise<boolean>;
@@ -25,6 +40,7 @@ interface CongesManagerProps {
     approuves: number;
     refuses: number;
   };
+  currentEmployeId?: string; // For fetching balance
 }
 
 export default function CongesManager({
@@ -32,7 +48,8 @@ export default function CongesManager({
   onApprove,
   onReject,
   onCreate,
-  stats
+  stats,
+  currentEmployeId
 }: CongesManagerProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -43,7 +60,24 @@ export default function CongesManager({
   const { user } = useUserProfile();
   const canApproveActions = canApproveConges || isAdminRole(user?.role);
 
+  // Real-time sync
+  const { syncStatus, refresh } = useHrRealtime({
+    entities: ['conge'],
+    showToasts: true,
+  });
+  const { statusText, statusColor, lastUpdateTime, isConnected } = useHrSyncStatus();
+
+  // Fetch leave balance for current employee
+  const { data: leaveBalance } = useQuery<{ data: LeaveBalance }>({
+    queryKey: ['/api/hr/conges/balance', currentEmployeId],
+    queryFn: () => apiRequest(`/api/hr/conges/balance/${currentEmployeId}`),
+    enabled: !!currentEmployeId,
+    staleTime: 30000,
+  });
+
   const [showForm, setShowForm] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState<number | null>(null);
+  const [rejectComment, setRejectComment] = useState('');
   const [formData, setFormData] = useState({
     employeId: '',
     employeNom: '',
@@ -52,6 +86,7 @@ export default function CongesManager({
     dateFin: '',
     motif: ''
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -62,20 +97,63 @@ export default function CongesManager({
     currentPage * ITEMS_PER_PAGE
   );
 
+  // Calculate requested days
+  const calculateDays = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    let count = 0;
+    const current = new Date(startDate);
+    while (current <= endDate) {
+      const day = current.getDay();
+      if (day !== 0 && day !== 6) count++; // Exclude weekends
+      current.setDate(current.getDate() + 1);
+    }
+    return count;
+  };
+
+  const requestedDays = useMemo(
+    () => calculateDays(formData.dateDebut, formData.dateFin),
+    [formData.dateDebut, formData.dateFin]
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
+    // Client-side validation
+    if (new Date(formData.dateFin) < new Date(formData.dateDebut)) {
+      setFormError('La date de fin doit être postérieure à la date de début');
+      return;
+    }
+
+    // Check balance if creating for current user
+    if (formData.employeId === currentEmployeId && leaveBalance?.data) {
+      if (requestedDays > leaveBalance.data.available) {
+        setFormError(`Solde insuffisant: ${leaveBalance.data.available} jour(s) disponible(s), ${requestedDays} demandé(s)`);
+        return;
+      }
+    }
+
     const success = await onCreate(formData);
     if (success) {
-      setFormData({ 
+      setFormData({
         employeId: '',
         employeNom: '',
-        type: 'Congé Annuel', 
-        dateDebut: '', 
+        type: 'Congé Annuel',
+        dateDebut: '',
         dateFin: '',
         motif: ''
       });
       setShowForm(false);
     }
+  };
+
+  const handleReject = async () => {
+    if (!showRejectModal || !rejectComment.trim()) return;
+    await onReject(showRejectModal, rejectComment);
+    setShowRejectModal(null);
+    setRejectComment('');
   };
 
   const columns = [
@@ -136,7 +214,7 @@ export default function CongesManager({
               <CheckCircle size={16} />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onReject(item.id); }}
+              onClick={(e) => { e.stopPropagation(); setShowRejectModal(item.id); }}
               className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition"
               title="Refuser"
             >
@@ -150,6 +228,50 @@ export default function CongesManager({
 
   return (
     <div className="flex flex-col h-full space-y-2">
+      {/* Sync Status Bar */}
+      <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-slate-800/50 rounded text-xs">
+        <div className="flex items-center gap-2">
+          {isConnected ? (
+            <Wifi size={12} className="text-green-500" />
+          ) : (
+            <WifiOff size={12} className="text-red-500" />
+          )}
+          <span className={statusColor}>{statusText}</span>
+          {lastUpdateTime && (
+            <span className="text-slate-500">· {lastUpdateTime}</span>
+          )}
+        </div>
+        <button
+          onClick={() => refresh('conge')}
+          className={`p-1 hover:bg-slate-700 rounded transition ${syncStatus === 'syncing' ? 'animate-spin' : ''}`}
+          title="Rafraîchir"
+        >
+          <RefreshCw size={12} className="text-slate-400" />
+        </button>
+      </div>
+
+      {/* Leave Balance Card (if available) */}
+      {leaveBalance?.data && (
+        <div className="shrink-0 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-800/50 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-xs font-medium text-slate-400">Votre solde congés {new Date().getFullYear()}</h4>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-bold text-cyan-400">{leaveBalance.data.available}</span>
+                <span className="text-xs text-slate-500">jours disponibles</span>
+              </div>
+            </div>
+            {leaveBalance.data.balance && (
+              <div className="text-right text-xs text-slate-400 space-y-0.5">
+                <div>Acquis: <span className="text-white">{leaveBalance.data.balance.acquired}j</span></div>
+                <div>Utilisés: <span className="text-orange-400">{leaveBalance.data.balance.used}j</span></div>
+                <div>En attente: <span className="text-yellow-400">{leaveBalance.data.balance.pending}j</span></div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards - Compact */}
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard
@@ -218,13 +340,21 @@ export default function CongesManager({
         </div>
       </div>
 
+      {/* Create Leave Request Modal */}
       <Modal
         isOpen={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={() => { setShowForm(false); setFormError(null); }}
         title="Nouvelle Demande de Congé"
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {formError && (
+            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <AlertCircle size={16} />
+              {formError}
+            </div>
+          )}
+
           <FormField
             label="Employé (ID)"
             name="employeId"
@@ -252,7 +382,10 @@ export default function CongesManager({
               { value: 'Congé Annuel', label: 'Congé Annuel' },
               { value: 'Congé Maladie', label: 'Congé Maladie' },
               { value: 'Congé Sans Solde', label: 'Congé Sans Solde' },
-              { value: 'Congé Maternité', label: 'Congé Maternité' }
+              { value: 'Congé Maternité', label: 'Congé Maternité' },
+              { value: 'Congé Paternité', label: 'Congé Paternité' },
+              { value: 'Congé Décès', label: 'Congé Décès' },
+              { value: 'Congé Spécial', label: 'Congé Spécial' }
             ]}
             required
           />
@@ -277,11 +410,34 @@ export default function CongesManager({
             />
           </div>
 
+          {/* Days Preview */}
+          {requestedDays > 0 && (
+            <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+              <span className="text-sm text-slate-400">Jours ouvrés demandés:</span>
+              <span className={`text-lg font-bold ${
+                leaveBalance?.data && requestedDays > leaveBalance.data.available
+                  ? 'text-red-400'
+                  : 'text-cyan-400'
+              }`}>
+                {requestedDays} jour(s)
+              </span>
+            </div>
+          )}
+
+          <FormField
+            label="Motif (optionnel)"
+            name="motif"
+            type="text"
+            value={formData.motif}
+            onChange={(e) => setFormData({ ...formData, motif: e.target.value })}
+            placeholder="Raison de la demande..."
+          />
+
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); setFormError(null); }}
             >
               Annuler
             </Button>
@@ -290,6 +446,44 @@ export default function CongesManager({
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Reject Modal */}
+      <Modal
+        isOpen={showRejectModal !== null}
+        onClose={() => { setShowRejectModal(null); setRejectComment(''); }}
+        title="Refuser la demande de congé"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">
+            Veuillez indiquer le motif du refus. Ce commentaire sera visible par l'employé.
+          </p>
+          <textarea
+            value={rejectComment}
+            onChange={(e) => setRejectComment(e.target.value)}
+            placeholder="Motif du refus..."
+            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-red-500 focus:outline-none resize-none"
+            rows={3}
+            required
+          />
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setShowRejectModal(null); setRejectComment(''); }}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleReject}
+              variant="danger"
+              disabled={!rejectComment.trim()}
+            >
+              Confirmer le refus
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

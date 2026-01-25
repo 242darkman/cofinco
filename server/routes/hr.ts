@@ -9,19 +9,64 @@ import {
   bulletinsPaie,
   horairesTravail,
   presences,
-  employes
+  employes,
+  leaveBalances,
+  payrollConfig,
+  hrAuditLog,
+  LeaveStatus,
+  BulletinStatus,
+  createLeaveRequestSchema,
+  generatePayrollSchema,
 } from "@shared/schema";
 import { normalizeRole } from "@shared/types/roles";
 import { StatutCandidature, StatutConge, StatutUser, StatutVisiteTerrain, StatutArchive } from "@shared/enum/status-constants";
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, count } from "drizzle-orm";
 import { getAuthUser } from "server/middleware";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { storage } from "server/storage";
+import { hrService } from "../services/hr-service";
 import { users } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
+import { z } from "zod";
 
 export const hrRouter = Router();
+
+// ============================================
+// HELPER: Standardized HR WebSocket broadcast
+// ============================================
+interface HrEventPayload {
+  entity: 'employe' | 'conge' | 'presence' | 'paie' | 'bulletin' | 'formation' | 'sanction' | 'avantage' | 'candidature' | 'organigramme';
+  action: 'created' | 'updated' | 'approved' | 'rejected' | 'paid' | 'deleted' | 'assigned' | 'generated' | 'validated';
+  id: string | number;
+  agenceId?: string;
+  employeId?: string;
+  extra?: Record<string, any>;
+}
+
+function broadcastHrUpdate(payload: HrEventPayload, actor?: { id: string; name: string }) {
+  const wsInstance = getWsInstance();
+  if (!wsInstance) return;
+
+  const fullPayload = {
+    ...payload,
+    timestamp: new Date().toISOString(),
+    actor,
+  };
+
+  wsInstance.broadcast({ type: 'HR_UPDATE', payload: fullPayload });
+}
+
+// ============================================
+// HELPER: API Response format
+// ============================================
+function successResponse<T>(data: T, meta?: any) {
+  return { success: true, data, ...(meta && { meta }) };
+}
+
+function errorResponse(code: string, message: string, details?: any) {
+  return { success: false, code, message, ...(details && { details }) };
+}
 
 const normalizeRoleToken = (role?: string | null): string | undefined => {
   if (!role) return undefined;
@@ -93,16 +138,33 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
   try {
     const { employeId, employeNom, type, dateDebut, dateFin, motif } = req.body;
 
+    // Validation basique
     if (!employeId || !type || !dateDebut || !dateFin) {
-      return res.status(400).json({ error: "Champs obligatoires manquants" });
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Champs obligatoires manquants'));
+    }
+
+    // Validation: dates
+    if (new Date(dateFin) < new Date(dateDebut)) {
+      return res.status(400).json(errorResponse(
+        'INVALID_DATES',
+        'La date de fin doit être postérieure ou égale à la date de début'
+      ));
+    }
+
+    // Validation: chevauchement et solde
+    const validation = await hrService.validateLeaveRequest(employeId, dateDebut, dateFin, type);
+    if (!validation.valid) {
+      return res.status(400).json(errorResponse(
+        validation.code || 'VALIDATION_ERROR',
+        validation.error || 'Validation échouée',
+        validation.details
+      ));
     }
 
     // Workflow: Direction (PDG/DG) auto-approves
-    // Check if the requester (or the target employee if created by admin) has role 'direction'
-    // Here we assume creator is the requester usually, or user object has role.
     const userRole = req.user?.role;
     const isDirection = roleIn(userRole, ['direction', 'pdg', 'dg', 'admin']);
-    const initialStatus = isDirection ? StatutConge.APPROVED : StatutConge.PENDING;
+    const initialStatus = isDirection ? LeaveStatus.APPROVED : LeaveStatus.PENDING;
     const approuvePar = isDirection ? req.user?.id : null;
     const dateDecision = isDirection ? new Date() : null;
 
@@ -118,16 +180,46 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
       dateDecision: dateDecision
     }).returning();
 
-    // Broadcast HR Update
-    const wsInstance = getWsInstance();
-    if (wsInstance) {
-        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_new', id: newConge.id } });
+    // Update leave balance (pending days)
+    if (initialStatus === LeaveStatus.PENDING) {
+      await hrService.onLeaveRequested(employeId, dateDebut, dateFin);
+    } else if (initialStatus === LeaveStatus.APPROVED) {
+      // Auto-approved: directly update used days
+      await hrService.onLeaveApproved(newConge.id);
     }
 
-    res.status(201).json(newConge);
+    // Audit log
+    await hrService.logAction(
+      'conge',
+      newConge.id,
+      'created',
+      {
+        userId: req.user?.id,
+        userName: req.user?.nom,
+        userRole: req.user?.role,
+        agenceId: req.user?.agenceId,
+      },
+      null,
+      newConge
+    );
+
+    // Broadcast HR Update
+    const daysRequested = hrService.calculateBusinessDays(dateDebut, dateFin);
+    broadcastHrUpdate(
+      {
+        entity: 'conge',
+        action: 'created',
+        id: newConge.id,
+        employeId,
+        extra: { daysRequested, status: initialStatus },
+      },
+      req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
+    );
+
+    res.status(201).json(successResponse(newConge));
   } catch (error) {
     console.error("Erreur création congé:", error);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
 
@@ -139,45 +231,86 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
-    // RBAC Check - Supports both code-style roles (admin, manager) and display-style roles (Administrateur, Chef d'Agence)
+    // RBAC Check
     const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
     if (!roleIn(userRole, allowedRoles)) {
-        return res.status(403).json({ error: "Non autorisé à approuver" });
+        return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à approuver'));
     }
 
-    // Manager Specific Check
-    // Note: Manager hierarchy check via employes table would require join
-    // For now, managers can approve any request they have access to
+    // Get current state for audit
+    const [currentConge] = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
+    if (!currentConge) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Demande non trouvée'));
+    }
+
+    // Check if already processed
+    if (currentConge.statut !== LeaveStatus.PENDING) {
+      return res.status(400).json(errorResponse(
+        'INVALID_STATUS',
+        `Cette demande a déjà été ${currentConge.statut === LeaveStatus.APPROVED ? 'approuvée' : 'traitée'}`
+      ));
+    }
+
+    // Manager hierarchy check (if manager role)
     if (roleIn(userRole, ['manager'])) {
-        const conge = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
-        if (!conge.length) return res.status(404).json({ error: "Demande non trouvée" });
-        // TODO: Implement proper manager hierarchy via employes.managerId
+      const managerEmploye = await storage.getEmployeByUserId(userId!);
+      if (managerEmploye) {
+        const [targetEmploye] = await db.select().from(employes).where(eq(employes.id, currentConge.employeId));
+        if (targetEmploye && targetEmploye.managerId !== managerEmploye.id) {
+          // Not a direct report - check if admin override
+          if (!roleIn(userRole, ['admin', 'rh', 'direction'])) {
+            return res.status(403).json(errorResponse('FORBIDDEN', 'Vous ne pouvez approuver que les demandes de vos subordonnés directs'));
+          }
+        }
+      }
     }
 
     const [updated] = await db.update(demandesConges)
       .set({
-        statut: StatutConge.APPROVED,
+        statut: LeaveStatus.APPROVED,
         approuvePar: userId,
         dateDecision: new Date(),
-        commentaire: commentaire || null
+        commentaire: commentaire || null,
+        updatedAt: new Date(),
       })
       .where(eq(demandesConges.id, parseInt(id)))
       .returning();
 
-    if (!updated) {
-      return res.status(404).json({ error: "Demande non trouvée" });
-    }
+    // Update leave balance
+    await hrService.onLeaveApproved(updated.id);
+
+    // Audit log
+    await hrService.logAction(
+      'conge',
+      updated.id,
+      'approved',
+      {
+        userId: req.user?.id,
+        userName: req.user?.nom,
+        userRole: req.user?.role,
+        agenceId: req.user?.agenceId,
+      },
+      { statut: currentConge.statut },
+      { statut: updated.statut, approuvePar: userId, commentaire },
+      commentaire
+    );
 
     // Broadcast HR Update
-    const wsInstance = getWsInstance();
-    if (wsInstance) {
-        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_approved', id: updated.id } });
-    }
+    broadcastHrUpdate(
+      {
+        entity: 'conge',
+        action: 'approved',
+        id: updated.id,
+        employeId: updated.employeId,
+        extra: { approvedBy: req.user?.nom },
+      },
+      req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
+    );
 
-    res.json(updated);
+    res.json(successResponse(updated));
   } catch (error) {
     console.error("Erreur approbation congé:", error);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
 
@@ -189,45 +322,110 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
-    // RBAC Check - Supports both code-style roles (admin, manager) and display-style roles (Administrateur, Chef d'Agence)
-    const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
-    if (!roleIn(userRole, allowedRoles)) {
-        return res.status(403).json({ error: "Non autorisé à refuser" });
+    // Commentaire obligatoire pour un rejet
+    if (!commentaire || commentaire.trim().length === 0) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Un commentaire est obligatoire pour rejeter une demande'));
     }
 
-    // Manager Specific Check
-    // Note: Manager hierarchy check via employes table would require join
-    // For now, managers can reject any request they have access to
-    if (roleIn(userRole, ['manager'])) {
-        const conge = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
-        if (!conge.length) return res.status(404).json({ error: "Demande non trouvée" });
-        // TODO: Implement proper manager hierarchy via employes.managerId
+    // RBAC Check
+    const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
+    if (!roleIn(userRole, allowedRoles)) {
+        return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à refuser'));
+    }
+
+    // Get current state for audit
+    const [currentConge] = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
+    if (!currentConge) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Demande non trouvée'));
+    }
+
+    // Check if already processed
+    if (currentConge.statut !== LeaveStatus.PENDING) {
+      return res.status(400).json(errorResponse(
+        'INVALID_STATUS',
+        `Cette demande a déjà été ${currentConge.statut === LeaveStatus.REJECTED ? 'rejetée' : 'traitée'}`
+      ));
     }
 
     const [updated] = await db.update(demandesConges)
       .set({
-        statut: StatutConge.REJECTED,
+        statut: LeaveStatus.REJECTED,
         approuvePar: userId,
         dateDecision: new Date(),
-        commentaire: commentaire || null
+        commentaire: commentaire,
+        updatedAt: new Date(),
       })
       .where(eq(demandesConges.id, parseInt(id)))
       .returning();
 
-    if (!updated) {
-      return res.status(404).json({ error: "Demande non trouvée" });
-    }
+    // Release pending days in leave balance
+    await hrService.onLeaveRejectedOrCancelled(updated.id);
+
+    // Audit log
+    await hrService.logAction(
+      'conge',
+      updated.id,
+      'rejected',
+      {
+        userId: req.user?.id,
+        userName: req.user?.nom,
+        userRole: req.user?.role,
+        agenceId: req.user?.agenceId,
+      },
+      { statut: currentConge.statut },
+      { statut: updated.statut, approuvePar: userId, commentaire },
+      commentaire,
+      'warning'
+    );
 
     // Broadcast HR Update
-    const wsInstance = getWsInstance();
-    if (wsInstance) {
-        wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_rejected', id: updated.id } });
-    }
+    broadcastHrUpdate(
+      {
+        entity: 'conge',
+        action: 'rejected',
+        id: updated.id,
+        employeId: updated.employeId,
+        extra: { rejectedBy: req.user?.nom, reason: commentaire },
+      },
+      req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
+    );
 
-    res.json(updated);
+    res.json(successResponse(updated));
   } catch (error) {
     console.error("Erreur rejet congé:", error);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// GET /api/hr/conges/balance/:employeId - Solde congés d'un employé
+hrRouter.get("/conges/balance/:employeId", getAuthUser, async (req, res) => {
+  try {
+    const { employeId } = req.params;
+    const { year } = req.query;
+
+    const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+
+    // Get all balances for the employee
+    const balances = await hrService.getAllLeaveBalances(employeId);
+
+    // Get current year balance specifically
+    const currentYearBalance = balances.find(b => b.year === targetYear);
+
+    // Calculate available balance
+    const available = currentYearBalance
+      ? (currentYearBalance.acquired || 0) + (currentYearBalance.carryOver || 0) - (currentYearBalance.used || 0) - (currentYearBalance.pending || 0)
+      : 0;
+
+    res.json(successResponse({
+      employeId,
+      year: targetYear,
+      balance: currentYearBalance,
+      available,
+      allBalances: balances,
+    }));
+  } catch (error) {
+    console.error("Erreur récupération solde congés:", error);
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
 
@@ -237,34 +435,53 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
  * ========================================
  */
 
-// GET /api/hr/formations - Liste des formations avec nombre de participants
+// GET /api/hr/formations - Liste des formations avec nombre de participants (FIX N+1)
 hrRouter.get("/formations", getAuthUser, async (req, res) => {
   try {
-    const { statut } = req.query;
+    const { statut, page = '1', limit = '20' } = req.query;
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 20));
+    const offset = (pageNum - 1) * limitNum;
 
-    // Fetch formations with participant count using subquery
-    const baseFormations = statut
-      ? await db.select().from(formations).where(eq(formations.statut, statut as string)).orderBy(desc(formations.dateDebut))
-      : await db.select().from(formations).orderBy(desc(formations.dateDebut));
-
-    // For each formation, count participants
-    const result = await Promise.all(
-      baseFormations.map(async (formation) => {
-        const participantCount = await db.select({ count: sql<number>`count(*)` })
-          .from(formationParticipants)
-          .where(eq(formationParticipants.formationId, formation.id));
-
-        return {
-          ...formation,
-          participants: Number(participantCount[0]?.count || 0)
-        };
+    // FIX N+1: Use LEFT JOIN with GROUP BY instead of N separate queries
+    const baseQuery = db
+      .select({
+        formation: formations,
+        participantCount: sql<number>`COALESCE(COUNT(${formationParticipants.employeId}), 0)::int`.as('participant_count'),
       })
-    );
+      .from(formations)
+      .leftJoin(formationParticipants, eq(formations.id, formationParticipants.formationId))
+      .groupBy(formations.id)
+      .orderBy(desc(formations.dateDebut))
+      .limit(limitNum)
+      .offset(offset);
 
-    res.json(result);
+    // Apply status filter if provided
+    const result = statut
+      ? await baseQuery.where(eq(formations.statut, statut as string))
+      : await baseQuery;
+
+    // Get total count for pagination
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(formations)
+      .where(statut ? eq(formations.statut, statut as string) : sql`1=1`);
+
+    // Format response
+    const formattedResult = result.map(r => ({
+      ...r.formation,
+      participants: r.participantCount,
+    }));
+
+    res.json(successResponse(formattedResult, {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      hasMore: offset + result.length < total,
+    }));
   } catch (error) {
     console.error("Erreur récupération formations:", error);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
 
@@ -594,21 +811,191 @@ hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actio
     try {
         const { mois } = req.body;
         const userId = req.user?.id;
+        const agenceId = req.user?.agenceId;
 
-        if (!mois) return res.status(400).json({ error: "Mois requis (YYYY-MM)" });
-
-        const results = await storage.generateMonthlyPaie(mois, userId);
-        // Broadcast HR Update
-        const wsInstance = getWsInstance();
-        if (wsInstance) {
-            wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'paie_generated', mois } });
+        // Validate input
+        const validation = generatePayrollSchema.safeParse({ mois });
+        if (!validation.success) {
+          return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Format de mois invalide (YYYY-MM attendu)'));
         }
 
-        res.status(201).json({ message: `${results.length} fiches de paie générées`, data: results });
+        // Use the new HR service for payroll generation
+        const results = await hrService.generateMonthlyPayroll(mois, userId!, agenceId || undefined);
+
+        // Audit log
+        await hrService.logAction(
+          'paie',
+          mois,
+          'generated',
+          {
+            userId: req.user?.id,
+            userName: req.user?.nom,
+            userRole: req.user?.role,
+            agenceId: req.user?.agenceId,
+          },
+          null,
+          { generated: results.generated, skipped: results.skipped },
+          undefined,
+          'info'
+        );
+
+        // Broadcast HR Update
+        broadcastHrUpdate(
+          {
+            entity: 'paie',
+            action: 'generated',
+            id: mois,
+            agenceId,
+            extra: { month: mois, count: results.generated, skipped: results.skipped },
+          },
+          req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
+        );
+
+        res.status(201).json(successResponse({
+          message: `${results.generated} fiches de paie générées (${results.skipped} déjà existantes)`,
+          generated: results.generated,
+          skipped: results.skipped,
+          bulletins: results.bulletins,
+        }));
     } catch (error) {
         console.error("Erreur génération paie:", error);
-        res.status(500).json({ error: "Erreur serveur" });
+        res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
     }
+});
+
+// GET /api/hr/paie/config - Configuration de la paie
+hrRouter.get("/paie/config", getAuthUser, async (req, res) => {
+  try {
+    const agenceId = req.user?.agenceId;
+    const config = await hrService.getPayrollConfig(agenceId || undefined);
+
+    if (!config) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Configuration paie non trouvée'));
+    }
+
+    res.json(successResponse(config));
+  } catch (error) {
+    console.error("Erreur récupération config paie:", error);
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// PATCH /api/hr/paie/validate - Valider des bulletins
+hrRouter.patch("/paie/validate", getAuthUser, attachAbility, requireAbility(Actions.APPROVE, Subjects.PAIE), async (req, res) => {
+  try {
+    const { bulletinIds } = req.body;
+
+    if (!bulletinIds || !Array.isArray(bulletinIds) || bulletinIds.length === 0) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Liste de bulletins requise'));
+    }
+
+    // Update bulletins to VALIDATED
+    const updated = await db
+      .update(bulletinsPaie)
+      .set({ statut: BulletinStatus.VALIDATED })
+      .where(
+        and(
+          sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
+          eq(bulletinsPaie.statut, BulletinStatus.DRAFT)
+        )
+      )
+      .returning();
+
+    // Audit log
+    await hrService.logAction(
+      'paie',
+      bulletinIds.join(','),
+      'validated',
+      {
+        userId: req.user?.id,
+        userName: req.user?.nom,
+        userRole: req.user?.role,
+        agenceId: req.user?.agenceId,
+      },
+      { statut: BulletinStatus.DRAFT },
+      { statut: BulletinStatus.VALIDATED, count: updated.length }
+    );
+
+    // Broadcast
+    broadcastHrUpdate(
+      {
+        entity: 'bulletin',
+        action: 'validated',
+        id: bulletinIds.join(','),
+        extra: { count: updated.length },
+      },
+      req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
+    );
+
+    res.json(successResponse({ validated: updated.length, bulletins: updated }));
+  } catch (error) {
+    console.error("Erreur validation paie:", error);
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// PATCH /api/hr/paie/pay - Marquer des bulletins comme payés
+hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
+  try {
+    const { bulletinIds, datePaiement } = req.body;
+
+    if (!bulletinIds || !Array.isArray(bulletinIds) || bulletinIds.length === 0) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Liste de bulletins requise'));
+    }
+
+    const paymentDate = datePaiement ? new Date(datePaiement) : new Date();
+
+    // Update bulletins to PAID
+    const updated = await db
+      .update(bulletinsPaie)
+      .set({
+        statut: BulletinStatus.PAID,
+        datePaiement: paymentDate.toISOString().split('T')[0],
+      })
+      .where(
+        and(
+          sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
+          eq(bulletinsPaie.statut, BulletinStatus.VALIDATED)
+        )
+      )
+      .returning();
+
+    // Calculate total paid
+    const totalPaid = updated.reduce((sum, b) => sum + parseInt(b.salaireNet || '0'), 0);
+
+    // Audit log
+    await hrService.logAction(
+      'paie',
+      bulletinIds.join(','),
+      'paid',
+      {
+        userId: req.user?.id,
+        userName: req.user?.nom,
+        userRole: req.user?.role,
+        agenceId: req.user?.agenceId,
+      },
+      { statut: BulletinStatus.VALIDATED },
+      { statut: BulletinStatus.PAID, count: updated.length, totalPaid, datePaiement: paymentDate },
+      undefined,
+      'critical'
+    );
+
+    // Broadcast
+    broadcastHrUpdate(
+      {
+        entity: 'paie',
+        action: 'paid',
+        id: bulletinIds.join(','),
+        extra: { count: updated.length, total: totalPaid },
+      },
+      req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
+    );
+
+    res.json(successResponse({ paid: updated.length, totalPaid, bulletins: updated }));
+  } catch (error) {
+    console.error("Erreur paiement paie:", error);
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
 });
 
 // GET /api/hr/paie/my - Mes fiches de paie
@@ -717,10 +1104,83 @@ hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
 hrRouter.get("/stats", getAuthUser, async (req, res) => {
   try {
     const stats = await storage.getHrStats();
-    res.json(stats);
+
+    // Add additional stats for the new features
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    // Leave stats
+    const [leaveStats] = await db
+      .select({
+        pending: sql<number>`COUNT(*) FILTER (WHERE statut = 'PENDING')::int`,
+        approved: sql<number>`COUNT(*) FILTER (WHERE statut = 'APPROVED')::int`,
+        rejected: sql<number>`COUNT(*) FILTER (WHERE statut = 'REJECTED')::int`,
+      })
+      .from(demandesConges)
+      .where(
+        sql`EXTRACT(YEAR FROM date_debut) = ${currentYear}`
+      );
+
+    // Payroll stats for current month
+    const [payrollStats] = await db
+      .select({
+        draft: sql<number>`COUNT(*) FILTER (WHERE statut = 'DRAFT')::int`,
+        validated: sql<number>`COUNT(*) FILTER (WHERE statut = 'VALIDATED')::int`,
+        paid: sql<number>`COUNT(*) FILTER (WHERE statut = 'PAID')::int`,
+        totalNet: sql<number>`COALESCE(SUM(salaire_net::numeric) FILTER (WHERE statut = 'PAID'), 0)::int`,
+      })
+      .from(bulletinsPaie)
+      .where(eq(bulletinsPaie.mois, currentMonth));
+
+    res.json(successResponse({
+      ...stats,
+      leaves: leaveStats,
+      payroll: {
+        ...payrollStats,
+        month: currentMonth,
+      },
+    }));
   } catch (error) {
     console.error("Erreur récupération stats RH:", error);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+/**
+ * ========================================
+ * AUDIT LOG RH
+ * ========================================
+ */
+
+// GET /api/hr/audit - Historique des actions RH
+hrRouter.get("/audit", getAuthUser, async (req, res) => {
+  try {
+    const { entityType, entityId, limit = '50', page = '1' } = req.query;
+    const userRole = req.user?.role;
+
+    // Only admins, RH, and direction can view audit logs
+    const allowedRoles = ['admin', 'Administrateur', 'rh', 'direction', 'pdg', 'dg'];
+    if (!roleIn(userRole, allowedRoles)) {
+      return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à consulter l\'audit'));
+    }
+
+    const limitNum = Math.min(100, parseInt(limit as string) || 50);
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const offset = (pageNum - 1) * limitNum;
+
+    const logs = await hrService.getAuditLog(
+      entityType as string | undefined,
+      entityId as string | undefined,
+      limitNum
+    );
+
+    res.json(successResponse(logs, {
+      page: pageNum,
+      limit: limitNum,
+    }));
+  } catch (error) {
+    console.error("Erreur récupération audit RH:", error);
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
 

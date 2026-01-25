@@ -76,15 +76,29 @@ export const Subjects = {
   DECLARATION_TVA: 'DeclarationTVA',
   INVOICE: 'Invoice',
 
-  // Legacy/backward-compatible aliases
-  VISITE: 'Visite',
-  INCIDENT: 'Incident',
+  // HR Module Entities
   CONGE: 'Conge',
   FORMATION: 'Formation',
+  SANCTION: 'Sanction',
+  AVANTAGE: 'Avantage',
+  CANDIDATURE: 'Candidature',
+  BULLETIN_PAIE: 'BulletinPaie',
+  LEAVE_BALANCE: 'LeaveBalance',
+  HR_AUDIT: 'HrAudit',
+
+  // Terrain Module Entities
+  VISITE: 'Visite',
+  INCIDENT: 'Incident',
+
+  // Communication Module Entities
   COMMUNICATION: 'Communication',
   MESSAGE: 'Message',
+
+  // Transfer Module Entities
   TRANSFERT: 'Transfert',
   VIREMENT: 'Virement',
+
+  // Financial Aliases
   ECRITURE: 'Ecriture',
   EPARGNE: 'Epargne',
 } as const;
@@ -223,15 +237,25 @@ export const SUBJECT_LABELS: Record<Subject, string> = {
   [Subjects.MAINTENANCE]: 'Maintenance',
   [Subjects.LOYALTY]: 'Fidélité',
   [Subjects.REGULARISATION]: 'Régularisation',
-  // Legacy/backward-compatible aliases
-  [Subjects.VISITE]: 'Visite',
-  [Subjects.INCIDENT]: 'Incident',
+  // HR Module Entities
   [Subjects.CONGE]: 'Congé',
   [Subjects.FORMATION]: 'Formation',
+  [Subjects.SANCTION]: 'Sanction',
+  [Subjects.AVANTAGE]: 'Avantage',
+  [Subjects.CANDIDATURE]: 'Candidature',
+  [Subjects.BULLETIN_PAIE]: 'Bulletin de paie',
+  [Subjects.LEAVE_BALANCE]: 'Solde congés',
+  [Subjects.HR_AUDIT]: 'Audit RH',
+  // Terrain Module Entities
+  [Subjects.VISITE]: 'Visite',
+  [Subjects.INCIDENT]: 'Incident',
+  // Communication Module Entities
   [Subjects.COMMUNICATION]: 'Communication',
   [Subjects.MESSAGE]: 'Message',
+  // Transfer Module Entities
   [Subjects.TRANSFERT]: 'Transfert',
   [Subjects.VIREMENT]: 'Virement',
+  // Financial Entities
   [Subjects.ECRITURE]: 'Écriture',
   [Subjects.EPARGNE]: 'Épargne',
 };
@@ -246,7 +270,19 @@ export const MODULE_ENTITY_MAP: Record<string, Subject[]> = {
   [Subjects.CAISSE]: [Subjects.CAISSE_SESSION, Subjects.CAISSE_OPERATION, Subjects.CAISSE_AGENT],
   [Subjects.COFFRE]: [Subjects.COFFRE_TRANSFERT],
   [Subjects.COMPTABILITE]: [Subjects.ECRITURE_COMPTABLE, Subjects.JOURNAL],
-  [Subjects.RH]: [Subjects.EMPLOYE],
+  [Subjects.RH]: [
+    Subjects.EMPLOYE,
+    Subjects.CONGE,
+    Subjects.FORMATION,
+    Subjects.SANCTION,
+    Subjects.AVANTAGE,
+    Subjects.CANDIDATURE,
+    Subjects.PAIE,
+    Subjects.BULLETIN_PAIE,
+    Subjects.HORAIRE,
+    Subjects.LEAVE_BALANCE,
+    Subjects.HR_AUDIT,
+  ],
   [Subjects.ADMIN]: [Subjects.USER, Subjects.AGENCE, Subjects.SESSION, Subjects.AUDIT_LOG],
   [Subjects.RBAC]: [Subjects.ROLE, Subjects.PERMISSION],
   [Subjects.TERRAIN]: [Subjects.AGENT_TERRAIN, Subjects.OPERATION_TERRAIN],

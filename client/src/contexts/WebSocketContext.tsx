@@ -369,7 +369,43 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "HR_UPDATE":
          // Invalidate generic HR keys
          queryClient.invalidateQueries({ queryKey: ["/api/hr"] });
-         // Specific keys can be refined if needed (e.g., ["/api/hr/conges"])
+
+         // Dispatch custom event for useHrRealtime hook
+         window.dispatchEvent(new CustomEvent('hr-update', { detail: message.payload }));
+
+         // Invalidate specific keys based on entity
+         const hrEntity = message.payload?.entity;
+         if (hrEntity) {
+           switch (hrEntity) {
+             case 'conge':
+               debounceInvalidate(["/api/hr/conges"]);
+               debounceInvalidate(["/api/hr/conges/balance"]);
+               break;
+             case 'paie':
+             case 'bulletin':
+               debounceInvalidate(["/api/hr/bulletins"]);
+               debounceInvalidate(["/api/hr/paie/my"]);
+               break;
+             case 'formation':
+               debounceInvalidate(["/api/hr/formations"]);
+               break;
+             case 'sanction':
+               debounceInvalidate(["/api/hr/sanctions"]);
+               break;
+             case 'presence':
+               debounceInvalidate(["/api/hr/presence/today"]);
+               break;
+             case 'candidature':
+               debounceInvalidate(["/api/hr/candidatures"]);
+               break;
+             case 'avantage':
+               debounceInvalidate(["/api/hr/avantages"]);
+               break;
+             case 'organigramme':
+               debounceInvalidate(["/api/hr/organigramme"]);
+               break;
+           }
+         }
          break;
 
       case "TONTINE_UPDATE":
