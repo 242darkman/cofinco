@@ -156,19 +156,10 @@ export function useEnquetes() {
 
   const isExpanded = (id: string) => expandedEnquetes.has(id);
 
-  // Normalize legacy French statuses to English enum values
   const normalizeStatut = (statut?: string): StatutEnqueteType => {
     if (!statut) return StatutEnquete.PENDING;
-    const normalized = statut.toLowerCase().replace(/[éè]/g, 'e');
-
-    // Handle both legacy French and new English values
-    if (normalized === 'pending' || normalized.includes('attente')) return StatutEnquete.PENDING;
-    if (normalized === 'in_progress' || normalized.includes('cours')) return StatutEnquete.IN_PROGRESS;
-    if (normalized === 'approved' || normalized.includes('approuve')) return StatutEnquete.APPROVED;
-    if (normalized === 'rejected' || normalized.includes('rejete')) return StatutEnquete.REJECTED;
-    if (normalized === 'reduced' || normalized.includes('reduit')) return StatutEnquete.REDUCED;
-
-    return StatutEnquete.PENDING;
+    const normalized = statut.toUpperCase() as StatutEnqueteType;
+    return Object.values(StatutEnquete).includes(normalized) ? normalized : StatutEnquete.PENDING;
   };
 
   const formatStatut = (statut?: string) => {

@@ -515,6 +515,12 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
+      // Map French UI values to English enum values
+      const typeRevenuMapping: Record<string, string> = {
+        'Journalier': 'DAILY',
+        'Mensuel': 'MONTHLY'
+      };
+
       const payload = {
         clientId: formData.client_id,
         demandeId: formData.demandeId || undefined,
@@ -526,7 +532,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
         typeActivite: formData.type_activite,
         ancienneteActivite: parseInt(formData.anciennete_activite) || 0,
         // Revenus - mapper vers les noms attendus par le backend
-        typeRevenu: formData.type_revenu,
+        typeRevenu: typeRevenuMapping[formData.type_revenu] || formData.type_revenu,
         revenuMensuel: formData.revenu_mensuel_declare || '0',
         revenuJournalier: formData.revenu_journalier || '0',
         joursTravailMois: parseInt(formData.jours_travail_mois) || 26,

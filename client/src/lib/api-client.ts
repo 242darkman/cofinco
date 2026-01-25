@@ -1534,12 +1534,6 @@ export const caisseAccessCodeApi = {
     body: JSON.stringify(data),
   }),
   deactivate: (codeId: string) => request<{ success: boolean }>(`/caisse/access-codes/${codeId}`, { method: 'DELETE' }),
-  // Legacy methods (to be deprecated)
-  create: (data: any) => request<any>('/caisse/access-codes/generate', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  revoke: (codeId: string) => request<any>(`/caisse/access-codes/${codeId}`, { method: 'DELETE' }),
   getPermissions: () => request<any[]>('/caisse/code-permissions'),
   createPermission: (data: any) => request<any>('/caisse/code-permissions', {
     method: 'POST',

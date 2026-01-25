@@ -198,14 +198,8 @@ export function useDemandes() {
     }
   };
 
-  // Normalize status to handle both legacy French and new English values
   const normalizeStatut = (statut?: string): string => {
     if (!statut) return StatutDemande.PENDING_FEES;
-    const s = statut.toLowerCase();
-    // Legacy French -> English
-    if (s === 'en_attente' || s === 'pending') return StatutDemande.PENDING_FEES;
-    if (s === 'approuve' || s === 'approuvee' || s === 'approved') return StatutDemande.APPROVED;
-    if (s === 'rejete' || s === 'rejetee' || s === 'rejected') return StatutDemande.REJECTED;
     return statut.toUpperCase();
   };
 
