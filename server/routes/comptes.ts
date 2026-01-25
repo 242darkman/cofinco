@@ -16,8 +16,9 @@
  */
 
 import type { Express } from "express";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { requireAgenceAccess, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
@@ -186,7 +187,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.COMPTE),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -379,7 +381,8 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes/pending-activation",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.COMPTE),
     requireAgenceIdAccess(),
     async (req, res) => {
         try {
@@ -494,7 +497,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/transferts",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION),
     requireAgenceAccess(),
     async (req, res) => {
       try {
@@ -570,7 +574,8 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes/transferts-programmes/stats",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.COMPTE),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -671,7 +676,8 @@ export function registerComptesRoutes(app: Express) {
   app.get(
     "/api/comptes/transferts-programmes",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.COMPTE),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -789,7 +795,8 @@ export function registerComptesRoutes(app: Express) {
   app.patch(
     "/api/comptes/transferts-programmes/:id",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.EDIT, Subjects.COMPTE),
     requireAgenceIdAccess(),
     async (req, res) => {
       try {
@@ -1038,7 +1045,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/depot",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1127,12 +1135,13 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/depot-initial",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION),
     requireAgenceAccess(),
     async (req, res) => {
         try {
             const data = normalizeKeysDeep(req.body) as any;
-            
+
             // Validation stricte du montant et session
             if (!data.montant || Number(data.montant) <= 0) {
                 return res.status(400).json({ message: "Montant invalide" });
@@ -1195,7 +1204,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/retrait",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER),
+    attachAbility,
+    requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1300,7 +1310,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/bloquer",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.COMPTE),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1351,7 +1362,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/debloquer",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.COMPTE),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1418,7 +1430,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/transfert-agence",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.COMPTE),
     async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body);
@@ -1527,7 +1540,8 @@ export function registerComptesRoutes(app: Express) {
   app.post(
     "/api/comptes/:id/cloturer",
     requireAuth,
-    requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), // Action critique
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.COMPTE),
     async (req, res) => {
       try {
         const user = req.session.user;

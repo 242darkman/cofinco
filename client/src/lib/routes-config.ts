@@ -2,6 +2,8 @@ import { lazy, ComponentType } from 'react';
 import { canAccessModule, MODULE_ACCESS, AppModule } from '@shared/config/rbac';
 import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { authService } from './auth';
+import { Action, Subject, MODULE_TO_SUBJECT, Actions, Subjects } from './casl';
+import type { AppAbility } from './casl';
 
 // Lazy load components
 const Dashboard = lazy(() => import('@/components/dashboard/Dashboard'));
@@ -34,6 +36,9 @@ export interface RouteConfig {
   requiredModule?: AppModule; // Module from MODULE_ACCESS (source unique de vérité)
   requiredRoles?: SystemRole[]; // Override manuel (cas particuliers uniquement)
   requireAdmin?: boolean;
+  // New CASL support
+  requiredAbility?: { action: Action; subject: Subject }; // CASL ability check
+  featureKey?: string; // Feature lock key (module lock)
   label: string;
   labelKey?: string;
   group?: 'Principal' | 'Services Clients' | 'Opérations' | 'Gestion' | 'Système';
@@ -259,6 +264,8 @@ export const ROUTES: RouteConfig[] = [
  * Utilise authService.canAccessModule() qui prend en compte :
  * - Les permissions du rôle (MODULE_ACCESS)
  * - Les permissions personnalisées de l'utilisateur (depuis la BDD)
+ *
+ * V2: Now also supports CASL ability checks via requiredAbility
  */
 export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
   // Admin a accès à tout
@@ -296,6 +303,58 @@ export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
 }
 
 /**
+ * V2: Check route access using CASL ability
+ * This is the preferred method when using CASL
+ *
+ * @param route - The route configuration
+ * @param ability - The CASL ability instance
+ * @returns true if user can access the route
+ */
+export function canAccessRouteWithAbility(route: RouteConfig, ability: AppAbility): boolean {
+  // Check manage all (admin)
+  if (ability.can(Actions.MANAGE, Subjects.ALL)) {
+    return true;
+  }
+
+  // Route réservée admin uniquement
+  if (route.requireAdmin) {
+    return ability.can(Actions.MANAGE, Subjects.ALL);
+  }
+
+  // Priority 1: CASL requiredAbility check
+  if (route.requiredAbility) {
+    return ability.can(route.requiredAbility.action, route.requiredAbility.subject);
+  }
+
+  // Priority 2: Convert requiredModule to CASL subject
+  if (route.requiredModule) {
+    const subject = MODULE_TO_SUBJECT[route.requiredModule];
+    if (subject) {
+      return ability.can(Actions.VIEW, subject);
+    }
+    // Unknown module - fall through to legacy check
+  }
+
+  // Priority 3: Legacy role check (for backwards compatibility)
+  if (route.requiredRoles && route.requiredRoles.length > 0) {
+    const user = authService.getCurrentUser();
+    if (!user) return false;
+    return route.requiredRoles.includes(user.role);
+  }
+
+  // Priority 4: Legacy module check
+  if (route.requiredModule) {
+    if (authService.isAuthenticated()) {
+      return authService.canAccessModule(route.requiredModule);
+    }
+    return false;
+  }
+
+  // Par défaut, accessible à tous (routes publiques comme profil)
+  return true;
+}
+
+/**
  * Obtient les routes accessibles pour un rôle (avec enfants filtrés)
  */
 export function getAccessibleRoutes(userRole: string): RouteConfig[] {
@@ -304,6 +363,18 @@ export function getAccessibleRoutes(userRole: string): RouteConfig[] {
     .map(route => ({
       ...route,
       children: route.children?.filter(child => canAccessRoute(child, userRole)),
+    }));
+}
+
+/**
+ * V2: Get accessible routes using CASL ability
+ */
+export function getAccessibleRoutesWithAbility(ability: AppAbility): RouteConfig[] {
+  return ROUTES
+    .filter(route => canAccessRouteWithAbility(route, ability))
+    .map(route => ({
+      ...route,
+      children: route.children?.filter(child => canAccessRouteWithAbility(child, ability)),
     }));
 }
 

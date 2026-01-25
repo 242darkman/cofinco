@@ -509,7 +509,7 @@ export default function CaisseDashboard({
   const renderContent = () => {
     switch (activeTab) {
       case 'operations':
-        return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} onBack={() => setActiveTab('dashboard')} /></div> : null;
+        return currentSession ? <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseOperations sessionId={currentSession.id} /></div> : null;
       case 'prets-decaissement':
         return currentSession ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">

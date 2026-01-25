@@ -1,11 +1,66 @@
 import type { Express } from "express";
 import { modules, permissions, rolePermissions, userPermissions, userRoles } from "@shared/schema";
 import { SystemRole, getRoleOptions, isAdminRole, normalizeRole } from "@shared/types/roles";
-import { requireAuth, requireRole } from "../auth";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
 import { logAudit } from "../audit";
 import { getWsInstance } from "../ws-server";
+import { getPermissionsForUserV2 } from "../services/permissions-service";
+import {
+  getRbacVersion,
+  getPermissionCatalog,
+  getRolePermissions,
+  toggleRolePermission,
+  bulkUpdateRolePermissions,
+  getUserPermissionOverrides,
+  toggleUserPermissionOverride,
+  resetUserPermissionOverrides,
+  buildRbacUpdatePayload,
+  getUserIdsWithRole,
+} from "../services/rbac-service";
+import { Actions, Subjects, type RbacUpdatePayload } from "@shared/ability";
+
+/**
+ * Broadcast RBAC update event with proper scoping
+ * - Role changes: broadcast to all users with that role
+ * - User changes: broadcast to specific user only
+ * - Global changes: broadcast to all
+ */
+async function broadcastRbacUpdate(payload: RbacUpdatePayload): Promise<void> {
+  const wsInstance = getWsInstance();
+  if (!wsInstance) return;
+
+  // Also include legacy event type for backwards compatibility
+  const legacyPayload = {
+    type: "RBAC_UPDATE" as const,
+    payload: {
+      entity: payload.scope === 'role' ? 'role_permission' :
+              payload.scope === 'user' ? 'user_permission' : 'global',
+      role: payload.role,
+      userId: payload.userId,
+      version: payload.version,
+      ...(payload.changed && { permissions: [payload.changed] })
+    }
+  };
+
+  if (payload.scope === 'user' && payload.userId) {
+    // Send only to the specific user
+    wsInstance.sendToUser(payload.userId, legacyPayload);
+  } else if (payload.scope === 'role' && payload.role) {
+    // Get all users with this role and send to each
+    const userIds = await getUserIdsWithRole(payload.role as SystemRole, payload.agenceId);
+    for (const userId of userIds) {
+      wsInstance.sendToUser(userId, legacyPayload);
+    }
+    // Also broadcast globally for admin dashboards
+    wsInstance.broadcast(legacyPayload);
+  } else {
+    // Global broadcast
+    wsInstance.broadcast(legacyPayload);
+  }
+}
 
 export function registerRbacRoutes(app: Express) {
   // ============================================
@@ -128,7 +183,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Create a new role permission
-  app.post("/api/role-permissions", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/role-permissions", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { role, permission_id, permission_code, granted = true } = req.body;
       const normalizedRole = normalizeRole(role);
@@ -191,13 +246,13 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ 
-            type: "RBAC_UPDATE", 
-            payload: { 
-              entity: 'role_permission', 
-              role: normalizedRole, 
-              permissions: [created] 
-            } 
+          wsInstance.broadcast({
+            type: "RBAC_UPDATE",
+            payload: {
+              entity: 'role_permission',
+              role: normalizedRole,
+              permissions: [created]
+            }
           });
       }
 
@@ -209,7 +264,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Update a role permission
-  app.patch("/api/role-permissions/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.patch("/api/role-permissions/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { id } = req.params;
       const { granted } = req.body;
@@ -237,13 +292,13 @@ export function registerRbacRoutes(app: Express) {
       const wsInstance = getWsInstance();
       if (wsInstance) {
           // Need to fetch role for optimizations
-          wsInstance.broadcast({ 
-            type: "RBAC_UPDATE", 
-            payload: { 
-              entity: 'role_permission', 
+          wsInstance.broadcast({
+            type: "RBAC_UPDATE",
+            payload: {
+              entity: 'role_permission',
               id,
               permissions: [updated]
-            } 
+            }
           });
       }
 
@@ -255,7 +310,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Delete a role permission
-  app.delete("/api/role-permissions/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/role-permissions/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -280,13 +335,13 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ 
-            type: "RBAC_UPDATE", 
-            payload: { 
-              entity: 'role_permission', 
+          wsInstance.broadcast({
+            type: "RBAC_UPDATE",
+            payload: {
+              entity: 'role_permission',
               role: deleted.role,
               permissions: [deleted]
-            } 
+            }
           });
       }
 
@@ -298,7 +353,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Bulk update role permissions (toggle multiple at once)
-  app.put("/api/role-permissions/bulk", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.put("/api/role-permissions/bulk", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { role, permissions: permUpdates } = req.body;
       // permUpdates is an array of { permissionId, granted }
@@ -357,13 +412,13 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ 
-            type: "RBAC_UPDATE", 
-            payload: { 
-              entity: 'role_permission', 
+          wsInstance.broadcast({
+            type: "RBAC_UPDATE",
+            payload: {
+              entity: 'role_permission',
               role: normalizedRole,
               permissions: results
-            } 
+            }
           });
       }
 
@@ -390,120 +445,22 @@ export function registerRbacRoutes(app: Express) {
 
   // Get all permissions for the current logged-in user (role + custom overrides)
   // This is the main endpoint for loading permissions dynamically
+  // V2: Now includes CASL rules for frontend ability building
   app.get("/api/my-permissions", requireAuth, async (req, res) => {
     try {
       const userId = req.session.user?.id;
       const userRole = req.session.user?.role;
+      const agenceIdActive = req.session.user?.agenceId;
 
       if (!userId || !userRole) {
         return res.status(401).json({ message: "Non authentifié" });
       }
 
-      // Administrateur has all permissions
-      if (isAdminRole(userRole)) {
-        // Return all permissions as granted
-        const allPerms = await db.select({
-          id: permissions.id,
-          code: permissions.code,
-          name: permissions.name,
-          moduleName: modules.name,
-        })
-          .from(permissions)
-          .leftJoin(modules, eq(permissions.moduleId, modules.id));
+      // Use the V2 permissions service with CASL support
+      const permissionsData = await getPermissionsForUserV2(userId, userRole, agenceIdActive);
 
-        const permissionsMap: Record<string, string[]> = {};
-        allPerms.forEach(p => {
-          // Parse code like "caisse.view" -> module: "caisse", action: "view"
-          const parts = p.code.split('.');
-          const module = parts[0];
-          const action = parts.slice(1).join('.');
-          if (!permissionsMap[module]) {
-            permissionsMap[module] = [];
-          }
-          if (action) {
-            permissionsMap[module].push(action);
-          }
-        });
-
-        // Add wildcard for admin
-        permissionsMap['*'] = ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export'];
-
-        return res.json({
-          role: userRole,
-          permissions: permissionsMap,
-          isAdmin: true
-        });
-      }
-
-      // Get role-based permissions
-      const rolePerms = await db.select({
-        code: permissions.code,
-        granted: rolePermissions.granted,
-      })
-        .from(rolePermissions)
-        .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-        .where(and(
-          eq(rolePermissions.role, userRole),
-          eq(rolePermissions.granted, true)
-        ));
-
-      // Get user-specific custom permissions (overrides)
-      // Get user-specific custom permissions (granular overrides)
-      // Joined with permissions table to get the code
-      const customPerms = await db.select({
-         code: permissions.code,
-         granted: userPermissions.granted
-      })
-        .from(userPermissions)
-        .leftJoin(permissions, eq(userPermissions.permissionId, permissions.id))
-        .where(eq(userPermissions.userId, userId));
-
-      // Build permissions map from role permissions
-      const permissionsMap: Record<string, string[]> = {};
-
-      rolePerms.forEach(p => {
-        if (p.code) {
-          const parts = p.code.split('.');
-          const module = parts[0];
-          const action = parts.slice(1).join('.');
-          if (!permissionsMap[module]) {
-            permissionsMap[module] = [];
-          }
-          if (action && !permissionsMap[module].includes(action)) {
-            permissionsMap[module].push(action);
-          }
-        }
-      });
-
-      // Apply custom permission overrides
-      customPerms.forEach(cp => {
-         if (!cp.code) return;
-         
-         const parts = cp.code.split('.');
-         const moduleName = parts[0].toLowerCase();
-         // Action is everything after the first dot
-         const action = parts.slice(1).join('.');
-
-         if (!permissionsMap[moduleName]) {
-            permissionsMap[moduleName] = [];
-         }
-
-         const index = permissionsMap[moduleName].indexOf(action);
-         
-         if (cp.granted && index === -1) {
-             // Add permission if granted and not present
-             permissionsMap[moduleName].push(action);
-         } else if (!cp.granted && index !== -1) {
-             // Remove permission if denied and present
-             permissionsMap[moduleName].splice(index, 1);
-         }
-      });
-
-      res.json({
-        role: userRole,
-        permissions: permissionsMap,
-        isAdmin: false
-      });
+      // Return extended response with CASL rules
+      res.json(permissionsData);
     } catch (error) {
       console.error("Get my permissions error:", error);
       res.status(500).json({ message: "Erreur lors de la récupération des permissions" });
@@ -511,7 +468,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Get permissions for a specific user (admin only) - format expected by useUserPermissions hook
-  app.get("/api/user-permissions/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/user-permissions/:userId", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { userId } = req.params;
 
@@ -560,7 +517,7 @@ export function registerRbacRoutes(app: Express) {
       })
         .from(userPermissions)
         .where(eq(userPermissions.userId, userId));
-      
+
       const customPermMap = new Map(customPerms.map(cp => [cp.permissionId, cp]));
 
       // Build response
@@ -601,7 +558,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Toggle a permission for a specific user (admin only)
-  app.post("/api/user-permissions/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/user-permissions/:userId", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { userId } = req.params;
       const { permission_id, granted } = req.body;
@@ -653,13 +610,13 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ 
-            type: "RBAC_UPDATE", 
-            payload: { 
-              entity: 'user_permission', 
+          wsInstance.broadcast({
+            type: "RBAC_UPDATE",
+            payload: {
+              entity: 'user_permission',
               userId,
               permissions: [{ permissionId: permission_id, granted }]
-            } 
+            }
           });
       }
 
@@ -671,7 +628,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Reset all custom permissions for a user (admin only)
-  app.delete("/api/user-permissions/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/user-permissions/:userId", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { userId } = req.params;
 
@@ -691,13 +648,13 @@ export function registerRbacRoutes(app: Express) {
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          wsInstance.broadcast({ 
-            type: "RBAC_UPDATE", 
-            payload: { 
-              entity: 'user_permission', 
+          wsInstance.broadcast({
+            type: "RBAC_UPDATE",
+            payload: {
+              entity: 'user_permission',
               userId,
               type: 'reset'
-            } 
+            }
           });
       }
 
@@ -755,7 +712,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Reseed RBAC tables (admin only) - useful when role_permissions is empty
-  app.post("/api/rbac/reseed", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/rbac/reseed", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       // Import dynamically to avoid circular dependencies
       const { seedRBAC } = await import('../seed-rbac-logic');
@@ -774,13 +731,11 @@ export function registerRbacRoutes(app: Express) {
       );
 
       // Notify all clients to refresh permissions
-      const wsInstance = getWsInstance();
-      if (wsInstance) {
-        wsInstance.broadcast({
-          type: "RBAC_UPDATE",
-          payload: { type: 'reseed' }
-        });
-      }
+      const version = await getRbacVersion();
+      await broadcastRbacUpdate({
+        scope: 'global',
+        version,
+      });
 
       res.json({
         success: true,
@@ -789,6 +744,341 @@ export function registerRbacRoutes(app: Express) {
     } catch (error) {
       console.error("Reseed RBAC error:", error);
       res.status(500).json({ message: "Erreur lors du reseed RBAC" });
+    }
+  });
+
+  // ============================================
+  // NEW STANDARDIZED RBAC API (V2)
+  // ============================================
+
+  /**
+   * GET /api/rbac/catalog
+   * Full permission catalog with modules - for "Vue Globale" UI
+   * Protected: requires rbac.view or admin
+   */
+  app.get("/api/rbac/catalog", requireAuth, attachAbility, async (req, res) => {
+    try {
+      // Check permission (admin or rbac.view)
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.VIEW, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const catalog = await getPermissionCatalog();
+      const version = await getRbacVersion();
+
+      res.json({
+        ...catalog,
+        version,
+      });
+    } catch (error) {
+      console.error("Get RBAC catalog error:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération du catalogue" });
+    }
+  });
+
+  /**
+   * GET /api/rbac/version
+   * Current RBAC version for cache invalidation
+   */
+  app.get("/api/rbac/version", requireAuth, async (req, res) => {
+    try {
+      const version = await getRbacVersion();
+      res.json({ version });
+    } catch (error) {
+      console.error("Get RBAC version error:", error);
+      res.status(500).json({ message: "Erreur" });
+    }
+  });
+
+  /**
+   * GET /api/rbac/roles/:role/permissions
+   * Get all permissions for a specific role - for "Par Rôle" UI
+   * Protected: requires rbac.view or admin
+   */
+  app.get("/api/rbac/roles/:role/permissions", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.VIEW, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { role } = req.params;
+      const normalizedRole = normalizeRole(role);
+
+      if (!normalizedRole) {
+        return res.status(400).json({ message: "Rôle invalide" });
+      }
+
+      const summary = await getRolePermissions(normalizedRole);
+      const version = await getRbacVersion();
+
+      res.json({
+        ...summary,
+        version,
+      });
+    } catch (error) {
+      console.error("Get role permissions error:", error);
+      res.status(500).json({ message: "Erreur lors de la récupération des permissions du rôle" });
+    }
+  });
+
+  /**
+   * PATCH /api/rbac/roles/:role/permissions
+   * Toggle a permission for a role - for "Par Rôle" UI toggle
+   * Protected: requires rbac.manage or admin
+   * Body: { permissionId: string, granted: boolean }
+   */
+  app.patch("/api/rbac/roles/:role/permissions", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { role } = req.params;
+      const { permissionId, granted, permissionCode } = req.body;
+      const normalizedRole = normalizeRole(role);
+
+      if (!normalizedRole) {
+        return res.status(400).json({ message: "Rôle invalide" });
+      }
+
+      // If permissionCode is provided instead of permissionId, resolve it
+      let resolvedPermissionId = permissionId;
+      if (!resolvedPermissionId && permissionCode) {
+        const [perm] = await db.select().from(permissions).where(eq(permissions.code, permissionCode));
+        if (!perm) {
+          return res.status(404).json({ message: "Permission non trouvée" });
+        }
+        resolvedPermissionId = perm.id;
+      }
+
+      if (!resolvedPermissionId) {
+        return res.status(400).json({ message: "permissionId ou permissionCode requis" });
+      }
+
+      // Get permission code for the event
+      const [perm] = await db.select().from(permissions).where(eq(permissions.id, resolvedPermissionId));
+
+      const result = await toggleRolePermission(normalizedRole, resolvedPermissionId, granted);
+
+      await logAudit(
+        req,
+        "TOGGLE_ROLE_PERMISSION",
+        "rbac",
+        resolvedPermissionId,
+        { role: normalizedRole, permissionId: resolvedPermissionId, granted, code: perm?.code },
+        "success",
+        "high"
+      );
+
+      // Broadcast with proper scoping
+      await broadcastRbacUpdate(buildRbacUpdatePayload('role', result.newVersion, {
+        role: normalizedRole,
+        permissionCode: perm?.code,
+        granted,
+        source: 'role_permission',
+      }));
+
+      res.json({
+        success: true,
+        version: result.newVersion,
+        permissionId: resolvedPermissionId,
+        granted,
+      });
+    } catch (error) {
+      console.error("Toggle role permission error:", error);
+      res.status(500).json({ message: "Erreur lors de la modification de la permission" });
+    }
+  });
+
+  /**
+   * PUT /api/rbac/roles/:role/permissions/bulk
+   * Bulk update permissions for a role
+   * Protected: requires rbac.manage or admin
+   * Body: { updates: [{ permissionId: string, granted: boolean }] }
+   */
+  app.put("/api/rbac/roles/:role/permissions/bulk", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { role } = req.params;
+      const { updates } = req.body;
+      const normalizedRole = normalizeRole(role);
+
+      if (!normalizedRole || !Array.isArray(updates)) {
+        return res.status(400).json({ message: "Paramètres invalides" });
+      }
+
+      const result = await bulkUpdateRolePermissions(normalizedRole, updates);
+
+      await logAudit(
+        req,
+        "BULK_UPDATE_ROLE_PERMISSIONS",
+        "rbac",
+        undefined,
+        { role: normalizedRole, count: updates.length },
+        "success",
+        "high"
+      );
+
+      // Broadcast
+      await broadcastRbacUpdate(buildRbacUpdatePayload('role', result.newVersion, {
+        role: normalizedRole,
+      }));
+
+      res.json({
+        success: true,
+        version: result.newVersion,
+        updated: result.updated,
+      });
+    } catch (error) {
+      console.error("Bulk update role permissions error:", error);
+      res.status(500).json({ message: "Erreur lors de la mise à jour des permissions" });
+    }
+  });
+
+  /**
+   * GET /api/rbac/users/:userId/overrides
+   * Get permission overrides for a user - for "Exceptions" UI
+   * Protected: requires rbac.view or admin
+   */
+  app.get("/api/rbac/users/:userId/overrides", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.VIEW, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { userId } = req.params;
+      const overrides = await getUserPermissionOverrides(userId);
+      const version = await getRbacVersion();
+
+      res.json({
+        ...overrides,
+        version,
+      });
+    } catch (error: any) {
+      console.error("Get user overrides error:", error);
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Erreur lors de la récupération des exceptions" });
+    }
+  });
+
+  /**
+   * PATCH /api/rbac/users/:userId/overrides
+   * Toggle a permission override for a user - for "Exceptions" UI toggle
+   * Protected: requires rbac.manage or admin
+   * Body: { permissionId: string, granted: boolean | null }
+   * granted=null means remove override (inherit from role)
+   */
+  app.patch("/api/rbac/users/:userId/overrides", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { userId } = req.params;
+      const { permissionId, granted, permissionCode } = req.body;
+
+      // If permissionCode is provided instead of permissionId, resolve it
+      let resolvedPermissionId = permissionId;
+      if (!resolvedPermissionId && permissionCode) {
+        const [perm] = await db.select().from(permissions).where(eq(permissions.code, permissionCode));
+        if (!perm) {
+          return res.status(404).json({ message: "Permission non trouvée" });
+        }
+        resolvedPermissionId = perm.id;
+      }
+
+      if (!resolvedPermissionId) {
+        return res.status(400).json({ message: "permissionId ou permissionCode requis" });
+      }
+
+      // Get permission code for the event
+      const [perm] = await db.select().from(permissions).where(eq(permissions.id, resolvedPermissionId));
+
+      const result = await toggleUserPermissionOverride(userId, resolvedPermissionId, granted);
+
+      await logAudit(
+        req,
+        "TOGGLE_USER_OVERRIDE",
+        "user_permissions",
+        userId,
+        { permissionId: resolvedPermissionId, granted, code: perm?.code },
+        "success",
+        "high"
+      );
+
+      // Broadcast to the specific user only
+      await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
+        userId,
+        permissionCode: perm?.code,
+        granted: granted ?? false,
+        source: 'user_permission',
+      }));
+
+      res.json({
+        success: true,
+        version: result.newVersion,
+        permissionId: resolvedPermissionId,
+        granted,
+      });
+    } catch (error: any) {
+      console.error("Toggle user override error:", error);
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Erreur lors de la modification de l'exception" });
+    }
+  });
+
+  /**
+   * POST /api/rbac/users/:userId/overrides/reset
+   * Reset all permission overrides for a user - for "Exceptions" UI reset button
+   * Protected: requires rbac.manage or admin
+   */
+  app.post("/api/rbac/users/:userId/overrides/reset", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const ability = (req as any).ability;
+      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+        return res.status(403).json({ message: "Accès non autorisé" });
+      }
+
+      const { userId } = req.params;
+
+      const result = await resetUserPermissionOverrides(userId);
+
+      await logAudit(
+        req,
+        "RESET_USER_OVERRIDES",
+        "user_permissions",
+        userId,
+        { deleted: result.deleted },
+        "success",
+        "high"
+      );
+
+      // Broadcast to the specific user only
+      await broadcastRbacUpdate(buildRbacUpdatePayload('user', result.newVersion, {
+        userId,
+      }));
+
+      res.json({
+        success: true,
+        version: result.newVersion,
+        deleted: result.deleted,
+      });
+    } catch (error) {
+      console.error("Reset user overrides error:", error);
+      res.status(500).json({ message: "Erreur lors de la réinitialisation des exceptions" });
     }
   });
 }

@@ -1,6 +1,6 @@
 {
   "name": "cofinco",
-  "version": "3.54.5",
+  "version": "3.56.0",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -22,6 +22,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.969.0",
     "@aws-sdk/s3-request-presigner": "^3.969.0",
+    "@casl/ability": "^6.8.0",
     "@google-cloud/storage": "^7.18.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",

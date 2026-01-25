@@ -9,8 +9,9 @@ import { db } from "../db";
 import { tachesRegularisation, transfertsInterCoffres, users } from "@shared/schema";
 import { tachesRegularisationCoffreCaisse, transfertsCoffreCaisse } from "@shared/schema/coffre";
 import { and, eq, desc, sql, inArray, isNull, isNotNull, or, gte, lte } from "drizzle-orm";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import {
   StatutTacheRegularisation,
   TypeTacheRegularisation,
@@ -70,7 +71,7 @@ const updatePrioriteSchema = z.object({
  */
 regularisationRouter.get(
   "/",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.REGULARISATION),
   async (req, res) => {
     try {
       const parsed = listQuerySchema.safeParse(req.query);
@@ -267,7 +268,7 @@ regularisationRouter.get(
  */
 regularisationRouter.get(
   "/stats",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.REGULARISATION),
   async (req, res) => {
     try {
       // Stats pour tachesRegularisation
@@ -372,7 +373,7 @@ regularisationRouter.get(
  */
 regularisationRouter.get(
   "/:source/:id",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.REGULARISATION),
   async (req, res) => {
     try {
       const { source, id } = req.params;
@@ -471,7 +472,7 @@ regularisationRouter.get(
  */
 regularisationRouter.post(
   "/:source/:id/resolve",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.REGULARISATION),
   async (req, res) => {
     try {
       const { source, id } = req.params;
@@ -565,7 +566,7 @@ regularisationRouter.post(
  */
 regularisationRouter.post(
   "/:source/:id/assign",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.REGULARISATION),
   async (req, res) => {
     try {
       const { source, id } = req.params;
@@ -638,7 +639,7 @@ regularisationRouter.post(
  */
 regularisationRouter.patch(
   "/:source/:id/priorite",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.REGULARISATION),
   async (req, res) => {
     try {
       const { source, id } = req.params;

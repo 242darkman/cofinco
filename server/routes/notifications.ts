@@ -1,12 +1,13 @@
 import type { Express, Router } from "express";
 import { Router as createRouter } from "express";
-import { requireAuth, requireRole } from "../auth";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { db } from "../db";
 import { notifications, users, clients, comptes, userAgences, agences } from "@shared/schema";
 import { eq, and, or, desc, sql, inArray, isNull, gte } from "drizzle-orm";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
-import { SystemRole } from "@shared/types/roles";
 
 // ============================================
 // NOTIFICATIONS CAISSE - For cashier workflow
@@ -336,7 +337,7 @@ export function registerNotificationsRoutes(app: Express) {
   });
 
   // POST /api/notifications - Create notification (admin/system)
-  app.post("/api/notifications", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/notifications", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.NOTIFICATION), async (req, res) => {
     try {
       const { userId, type, titre, message, lien, priorite, referenceId, referenceType, expiresAt } = req.body;
 

@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { insertSystemSettingsSchema, insertSecuritySettingsSchema, systemSettings, securitySettings } from "@shared/schema";
 import { storage } from "../storage";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
 import { db } from "../db";
@@ -28,7 +29,7 @@ export function registerSettingsRoutes(app: Express) {
     try {
       // Il n'y a qu'une seule entrée de settings, on récupère la première
       const result = await db.query.systemSettings.findFirst();
-      
+
       if (!result) {
         // Return defaults if no settings exist
         return res.json({
@@ -51,7 +52,7 @@ export function registerSettingsRoutes(app: Express) {
           maintenance_mode: false
         });
       }
-      
+
       res.json({
         agence_name: result.agenceName,
         agence_code: result.agenceCode,
@@ -77,10 +78,10 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  app.put("/api/system-settings", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.put("/api/system-settings", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     try {
       const settings = parseWithSchema(insertSystemSettingsSchema, req.body);
-      
+
       await db.insert(systemSettings)
         .values({
           id: 1,
@@ -94,13 +95,13 @@ export function registerSettingsRoutes(app: Express) {
             updatedAt: new Date()
           }
         });
-      
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'settings_changed' } });
       }
-      
+
       res.json({ success: true, message: 'Settings updated successfully' });
     } catch (error: any) {
       console.error("Error updating system settings:", error);
@@ -151,7 +152,7 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  app.post("/api/settings/security", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/settings/security", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     try {
       const parsed = parseWithSchema(insertSecuritySettingsSchema, req.body);
       const [created] = await db.insert(securitySettings).values({
@@ -165,7 +166,7 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
-  app.put("/api/settings/security/:id", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.put("/api/settings/security/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     try {
       const parsed = parseWithSchema(insertSecuritySettingsSchema.partial(), req.body);
       const [updated] = await db.update(securitySettings)
@@ -185,10 +186,10 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // ========== RÉINITIALISATION PLATEFORME (Admin Only) ==========
-  app.post("/api/admin/reset-platform", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/admin/reset-platform", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     try {
       const { confirmation } = req.body;
-      
+
       if (confirmation !== 'REINITIALISER') {
         return res.status(400).json({ message: "Confirmation invalide. Tapez 'REINITIALISER' pour confirmer." });
       }
@@ -199,7 +200,7 @@ export function registerSettingsRoutes(app: Express) {
         'platform_reset',
         'system',
         undefined,
-        { 
+        {
           initiatedBy: req.session.user?.username,
           timestamp: new Date().toISOString()
         },
@@ -254,9 +255,9 @@ export function registerSettingsRoutes(app: Express) {
         DELETE FROM clients;
         -- DELETE FROM employes;
         -- DELETE FROM types_marches;
-        
+
         DELETE FROM users WHERE role != 'ADMIN';
-        
+
         SET session_replication_role = 'origin';
       `);
 
@@ -284,15 +285,15 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // ========== RÉINITIALISATION PAR AGENCE (Admin Only) ==========
-  app.post("/api/admin/reset-agence/:agenceId", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/admin/reset-agence/:agenceId", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     const { agenceId } = req.params;
     const { confirmation } = req.body;
 
     try {
       // Validate confirmation
       if (confirmation !== 'REINITIALISER_AGENCE') {
-        return res.status(400).json({ 
-          message: "Confirmation invalide. Tapez 'REINITIALISER_AGENCE' pour confirmer." 
+        return res.status(400).json({
+          message: "Confirmation invalide. Tapez 'REINITIALISER_AGENCE' pour confirmer."
         });
       }
 
@@ -309,7 +310,7 @@ export function registerSettingsRoutes(app: Express) {
         'agence_reset',
         'agence',
         agenceId,
-        { 
+        {
           initiatedBy: req.session.user?.username,
           agenceName: agencyName,
           timestamp: new Date().toISOString()
@@ -321,7 +322,7 @@ export function registerSettingsRoutes(app: Express) {
       // Perform filtered deletion by agence_id
       // Use session_replication_role to bypass FK constraints temporarily
       await db.execute(sql`SET session_replication_role = 'replica'`);
-      
+
       // Delete child records first (those without direct agence_id but linked via parent)
       await db.execute(sql`
         DELETE FROM contributions_tontine WHERE membre_id IN (
@@ -336,7 +337,7 @@ export function registerSettingsRoutes(app: Express) {
         )
       `);
       await db.execute(sql`DELETE FROM tontines WHERE agence_id = ${agenceId}`);
-      
+
       // Savings-related
       await db.execute(sql`
         DELETE FROM transactions_epargne WHERE compte_epargne_id IN (
@@ -349,7 +350,7 @@ export function registerSettingsRoutes(app: Express) {
         )
       `);
       await db.execute(sql`DELETE FROM comptes_epargne WHERE agence_id = ${agenceId}`);
-      
+
       // Credit-related
       await db.execute(sql`
         DELETE FROM remboursements WHERE credit_id IN (
@@ -362,7 +363,7 @@ export function registerSettingsRoutes(app: Express) {
         )
       `);
       await db.execute(sql`DELETE FROM credits WHERE agence_id = ${agenceId}`);
-      
+
       // Caisse-related
       await db.execute(sql`
         DELETE FROM operations_caisse WHERE session_id IN (
@@ -382,13 +383,13 @@ export function registerSettingsRoutes(app: Express) {
         )
       `);
       await db.execute(sql`DELETE FROM sessions_caisse WHERE agence_id = ${agenceId}`);
-      
+
       // Clients (main data)
       await db.execute(sql`DELETE FROM clients WHERE agence_id = ${agenceId}`);
-      
+
       // Unassign employees from this agency (don't delete them, just remove assignment)
       await db.execute(sql`UPDATE employes SET agence_id = NULL WHERE agence_id = ${agenceId}`);
-      
+
       await db.execute(sql`SET session_replication_role = 'origin'`);
 
       // Notify
@@ -397,9 +398,9 @@ export function registerSettingsRoutes(app: Express) {
           wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'agence_reset', agenceId } });
       }
 
-      res.json({ 
-        success: true, 
-        message: `Agence "${agencyName}" réinitialisée avec succès.` 
+      res.json({
+        success: true,
+        message: `Agence "${agencyName}" réinitialisée avec succès.`
       });
     } catch (error: any) {
       console.error("Agency reset error:", error);

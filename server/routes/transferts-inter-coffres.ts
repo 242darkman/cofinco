@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { TransfertInterCoffresService, CoffresFortsService } from "../services/transfert-inter-coffres";
 import { db } from "../db";
 import {
@@ -91,7 +92,7 @@ transfertsInterCoffresRouter.get("/coffres/agence/:agenceId", async (req, res) =
 });
 
 // PATCH /coffres/:id - Modifier un coffre
-transfertsInterCoffresRouter.patch("/coffres/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+transfertsInterCoffresRouter.patch("/coffres/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.COFFRE), async (req, res) => {
   try {
     const { id } = req.params;
     const schema = z.object({
@@ -117,7 +118,7 @@ transfertsInterCoffresRouter.patch("/coffres/:id", requireRole(SystemRole.ADMIN)
 });
 
 // POST /coffres/:id/approvisionner - Approvisionner un coffre
-transfertsInterCoffresRouter.post("/coffres/:id/approvisionner", requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+transfertsInterCoffresRouter.post("/coffres/:id/approvisionner", attachAbility, requireAbility(Actions.CREATE, Subjects.COFFRE_TRANSFERT), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -606,7 +607,7 @@ transfertsInterCoffresRouter.get("/taches", async (req, res) => {
 });
 
 // POST /taches/:id/resolve - Résoudre une tâche
-transfertsInterCoffresRouter.post("/taches/:id/resolve", requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
+transfertsInterCoffresRouter.post("/taches/:id/resolve", attachAbility, requireAbility(Actions.APPROVE, Subjects.COFFRE_TRANSFERT), async (req, res) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -672,7 +673,7 @@ transfertsInterCoffresRouter.get("/config", async (req, res) => {
 });
 
 // PUT /config - Mettre à jour la configuration
-transfertsInterCoffresRouter.put("/config", requireRole(SystemRole.ADMIN), async (req, res) => {
+transfertsInterCoffresRouter.put("/config", attachAbility, requireAbility(Actions.MANAGE, Subjects.COFFRE), async (req, res) => {
   try {
     const { agenceId } = req.query;
 

@@ -176,35 +176,9 @@ export function validateAgenceAction(bodyAgenceField: string = "agence") {
     next();
   };
 }
-/**
- * Middleware pour vérifier le rôle de l'utilisateur.
- * @param allowedRoles Liste des rôles autorisés
- */
-export function requireRole(allowedRoles: Array<SystemRole | string>) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session.userId || !req.session.user) {
-        return res.status(401).json({ error: 'Non authentifié' });
-    }
 
-    // Ensure req.user is populated
-    req.user = req.session.user;
-
-    // Normalize roles (handle undefined roles as 'agent' or similar if needed)
-    const userRole = normalizeRole(req.user.role);
-    const normalizedAllowedRoles = allowedRoles
-      .map((role) => normalizeRole(role))
-      .filter((role): role is SystemRole => !!role);
-
-    if (!userRole || !normalizedAllowedRoles.includes(userRole)) {
-        if (isAdminRole(req.user.role)) {
-             return next();
-        }
-        return res.status(403).json({ error: 'Accès refusé. Rôle insuffisant.' });
-    }
-
-    next();
-  };
-}
+// NOTE: requireRole has been replaced by requireAbility from server/authorization
+// Use: attachAbility, requireAbility(Actions.X, Subjects.Y) instead
 
 /**
  * Middleware pour le filtrage multi-agences basé sur le header X-Agence-Id.

@@ -14,8 +14,10 @@ import { storage } from "../storage";
 import { getClientTags, addClientTag, removeClientTag, createTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches, getClientStats, createClientApiSchema, updateClientApiSchema, type ClientFull } from "../storage/clients";
 
 
-import { requireAuth, requireRole, hashPassword } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth, hashPassword } from "../auth";
+import { attachAbility, requireAbility, requireAnyAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
+import { SystemRole } from "@shared/types/roles"; // Still needed for role checks in some logic
 import { requireAgenceAccess, validateAgenceAction, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
@@ -288,7 +290,7 @@ export function registerClientRoutes(app: Express) {
    * GET /api/clients/without-credentials
    * Liste les clients sans accès portail (sans username)
    */
-  app.get("/api/clients/without-credentials", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/clients/without-credentials", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
       const allClients = await storage.getAllClients({});
       const clientsWithoutCredentials: any[] = [];
@@ -327,7 +329,7 @@ export function registerClientRoutes(app: Express) {
    * Body: { clientIds?: string[] } - Si vide, traite tous les clients sans credentials
    * Returns: { generated: number, results: { clientId, username, password, error? }[] }
    */
-  app.post("/api/clients/generate-credentials", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/clients/generate-credentials", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
       const { clientIds } = req.body as { clientIds?: string[] };
       const crypto = await import("crypto");
@@ -577,7 +579,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // POST Account (Create)
-  app.post("/api/clients/:id/accounts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), async (req, res) => {
+  app.post("/api/clients/:id/accounts", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.COMPTE), requireAgenceIdAccess(), async (req, res) => {
       try {
         // 1. Verify access to client
         const client = await storage.getClient(req.params.id);
@@ -647,7 +649,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // UPDATE Account (PATCH)
-  app.patch("/api/clients/:clientId/accounts/:accountId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), async (req, res) => {
+  app.patch("/api/clients/:clientId/accounts/:accountId", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.COMPTE), requireAgenceIdAccess(), async (req, res) => {
       try {
         const { clientId, accountId } = req.params;
         
@@ -897,7 +899,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // UPDATE: Vérification accès + interdiction changer agence (roles: admin, chef, caisse, terrain, credit)
-  app.patch("/api/clients/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.AGENT_TERRAIN, SystemRole.GESTIONNAIRE_CREDIT), requireAgenceIdAccess(), async (req, res) => {
+  app.patch("/api/clients/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CLIENT), requireAgenceIdAccess(), async (req, res) => {
       try {
         const existing = await storage.getClient(req.params.id);
         if (!existing) return res.status(404).json({ message: "Client not found" });
@@ -991,7 +993,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // DELETE: Vérification accès (roles: admin, chef only)
-  app.delete("/api/clients/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), async (req, res) => {
+  app.delete("/api/clients/:id", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.CLIENT), requireAgenceIdAccess(), async (req, res) => {
       const existing = await storage.getClient(req.params.id);
       if (!existing) return res.status(404).json({ message: "Client not found" });
 
@@ -1295,7 +1297,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // POST - Créer un client avec un compte utilisateur (pour futur portail client)
-  app.post("/api/clients/with-user", requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
+  app.post("/api/clients/with-user", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.CLIENT), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
     try {
       const { createClientWithUser } = await import("../storage/clients");
 
@@ -1380,7 +1382,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // POST - Créer un profil client pour un utilisateur existant
-  app.post("/api/clients/from-user/:userId", requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
+  app.post("/api/clients/from-user/:userId", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.CLIENT), requireAgenceIdAccess(), validateAgenceIdAction(), async (req, res) => {
     try {
       const { createClientForUser } = await import("../storage/clients");
       const { userId } = req.params;

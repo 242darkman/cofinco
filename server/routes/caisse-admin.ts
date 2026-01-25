@@ -8,8 +8,9 @@ import { z } from "zod";
 import { caisseAdminService } from "../services/caisse-admin-service";
 import { caisseLiquidationService } from "../services/caisse-liquidation-service";
 import { getCaisseHistorique, getCaisseHistoriqueSummary } from "../services/caisse/session-service";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 
 export const caisseAdminRouter = Router();
 
@@ -41,7 +42,7 @@ const executeLiquidationSchema = z.object({
  */
 caisseAdminRouter.post(
   "/sessions/:id/force-close",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
   async (req, res) => {
     try {
       const sessionId = req.params.id;
@@ -97,7 +98,7 @@ caisseAdminRouter.post(
  */
 caisseAdminRouter.get(
   "/:id/liquidation/check",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE),
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
   async (req, res) => {
     try {
       const caisseId = req.params.id;
@@ -133,7 +134,7 @@ caisseAdminRouter.get(
  */
 caisseAdminRouter.post(
   "/:id/liquidation/execute",
-  requireRole(SystemRole.ADMIN),
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
   async (req, res) => {
     try {
       const caisseId = req.params.id;
@@ -215,7 +216,7 @@ const historiqueQuerySchema = z.object({
  */
 caisseAdminRouter.get(
   "/:id/historique",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.SUPERVISEUR),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
   async (req, res) => {
     try {
       const caisseId = req.params.id;
@@ -258,7 +259,7 @@ caisseAdminRouter.get(
  */
 caisseAdminRouter.get(
   "/:id/historique/summary",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.SUPERVISEUR),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
   async (req, res) => {
     try {
       const caisseId = req.params.id;
@@ -292,7 +293,7 @@ caisseAdminRouter.get(
  */
 caisseAdminRouter.get(
   "/digital-summary",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR, SystemRole.CAISSIER),
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
   async (req, res) => {
     try {
       const agenceId = req.query.agenceId as string | undefined;

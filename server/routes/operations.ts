@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema } from "@shared/schema";
 import { storage } from "../storage";
-import { requireAuth, requireRole } from "../auth";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, parsePagination, paginateResponse } from "./utils";
 import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { getWsInstance } from "../ws-server";
@@ -20,7 +22,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create agent terrain (roles: admin, chef)
-  app.post("/api/agents-terrain", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/agents-terrain", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.TERRAIN), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertAgentTerrainSchema.parse(data);
       const agent = await storage.createAgentTerrain(parsed);
@@ -60,7 +62,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create prospection (roles: admin, chef, terrain, superviseur)
-  app.post("/api/prospections", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.AGENT_TERRAIN, SystemRole.SUPERVISEUR), async (req, res) => {
+  app.post("/api/prospections", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.OPERATION_TERRAIN), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertProspectionSchema.parse(data);
       const prospection = await storage.createProspection(parsed);
@@ -89,7 +91,7 @@ export function registerOperationsRoutes(app: Express) {
 
   // Create Paiement Terrain (roles: admin, chef, terrain, superviseur)
   // Now creates a PENDING payment that needs validation
-  app.post("/api/paiements-terrain", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.AGENT_TERRAIN, SystemRole.SUPERVISEUR), async (req, res) => {
+  app.post("/api/paiements-terrain", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.OPERATION_TERRAIN), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user;
@@ -131,7 +133,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Validate Paiement Terrain (roles: admin, chef, superviseur)
-  app.post("/api/paiements-terrain/:id/validate", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
+  app.post("/api/paiements-terrain/:id/validate", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.PAIEMENT_TERRAIN), async (req, res) => {
     try {
       const { id } = req.params;
       const user = req.session.user;
@@ -156,7 +158,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Reject Paiement Terrain
-  app.post("/api/paiements-terrain/:id/reject", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
+  app.post("/api/paiements-terrain/:id/reject", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.PAIEMENT_TERRAIN), async (req, res) => {
     try {
       const { id } = req.params;
       const { reason } = req.body;
@@ -211,7 +213,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // POS Devices
-  app.get("/api/pos-devices", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.get("/api/pos-devices", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.TERRAIN), async (req, res) => {
       try {
         const user = req.session.user;
         const normalizedRole = normalizeRole(user?.role);
@@ -246,7 +248,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create zone (roles: admin, chef)
-  app.post("/api/zones", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/zones", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.TERRAIN), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertZoneSchema.parse(data);
     const zone = await storage.createZone(parsed);
@@ -279,7 +281,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Create/update objectif mensuel (roles: admin, chef, superviseur)
-  app.post("/api/objectifs-mensuels", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
+  app.post("/api/objectifs-mensuels", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.PAIEMENT_TERRAIN), async (req, res) => {
     const data = normalizeKeysDeep(req.body);
     const parsed = insertObjectifMensuelSchema.parse(data);
     const objectif = await storage.createOrUpdateObjectifMensuel(parsed);

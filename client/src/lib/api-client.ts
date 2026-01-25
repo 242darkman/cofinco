@@ -1,6 +1,7 @@
 // API Client for COFIN&CO-M Backend
 // Security-enhanced with automatic 401 detection and session invalidation
 // Multi-agency support with automatic X-Agence-Id header injection
+// Cross-tab logout synchronization via BroadcastChannel
 
 const API_BASE = '/api';
 
@@ -37,6 +38,67 @@ let onUnauthorizedCallback: (() => void) | null = null;
 
 // ID de l'agence actuellement sélectionnée (injecté depuis AgenceContext)
 let currentAgenceId: string | null = null;
+
+// ============================================
+// CROSS-TAB LOGOUT SYNCHRONIZATION
+// ============================================
+
+/**
+ * BroadcastChannel for cross-tab logout synchronization
+ * When one tab logs out, all other tabs are notified and also logout
+ */
+const LOGOUT_CHANNEL_NAME = 'cofinco-auth-channel';
+let logoutChannel: BroadcastChannel | null = null;
+
+// Initialize BroadcastChannel if supported
+if (typeof BroadcastChannel !== 'undefined') {
+  try {
+    logoutChannel = new BroadcastChannel(LOGOUT_CHANNEL_NAME);
+    logoutChannel.onmessage = (event) => {
+      if (event.data?.type === 'LOGOUT') {
+        console.log('[API] Cross-tab logout received, invalidating session');
+        // Trigger local logout without broadcasting (to avoid loop)
+        if (onUnauthorizedCallback) {
+          onUnauthorizedCallback();
+        }
+      } else if (event.data?.type === 'SESSION_INVALID') {
+        console.log('[API] Cross-tab session invalidation received:', event.data.reason);
+        if (onUnauthorizedCallback) {
+          onUnauthorizedCallback();
+        }
+      }
+    };
+    console.log('[API] BroadcastChannel initialized for cross-tab logout sync');
+  } catch (e) {
+    console.warn('[API] BroadcastChannel not available:', e);
+  }
+}
+
+/**
+ * Broadcast logout to all other tabs
+ */
+export function broadcastLogout(): void {
+  if (logoutChannel) {
+    try {
+      logoutChannel.postMessage({ type: 'LOGOUT', timestamp: Date.now() });
+    } catch (e) {
+      console.warn('[API] Failed to broadcast logout:', e);
+    }
+  }
+}
+
+/**
+ * Broadcast session invalidation to all other tabs
+ */
+export function broadcastSessionInvalid(reason: string): void {
+  if (logoutChannel) {
+    try {
+      logoutChannel.postMessage({ type: 'SESSION_INVALID', reason, timestamp: Date.now() });
+    } catch (e) {
+      console.warn('[API] Failed to broadcast session invalidation:', e);
+    }
+  }
+}
 
 /**
  * Configurer le callback d'erreur 401
@@ -101,6 +163,7 @@ function buildQuery(params?: Record<string, unknown>): string {
  * Gestion centralisée des réponses HTTP
  * Détecte les 401 et déclenche la déconnexion automatique
  * Utilise ApiError pour préserver les données structurées des erreurs business
+ * Broadcasts session invalidation to other tabs via BroadcastChannel
  */
 async function handleResponse<T>(response: Response, endpoint: string): Promise<T> {
   // Détection session expirée (401 Unauthorized)
@@ -113,14 +176,26 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
        throw new ApiError(errorData.message || 'Identifiants invalides', 401, errorData);
     }
 
+    // Try to extract reason from response body
+    let reason = 'session_expired';
+    try {
+      const errorData = await response.clone().json();
+      if (errorData.reason) reason = errorData.reason;
+      if (errorData.code === 'SESSION_INVALID') reason = errorData.reason || 'session_invalid';
+    } catch {
+      // Ignore JSON parse errors
+    }
+
     // Pour les autres routes, c'est une expiration de session
     if (!endpoint.includes('/auth/me')) {
-      console.warn('[API] Session expirée - déconnexion automatique');
+      console.warn(`[API] Session expirée - déconnexion automatique (reason: ${reason})`);
+      // Broadcast to other tabs
+      broadcastSessionInvalid(reason);
       if (onUnauthorizedCallback) {
         onUnauthorizedCallback();
       }
     }
-    throw new ApiError('Session expirée - veuillez vous reconnecter', 401);
+    throw new ApiError('Session expirée - veuillez vous reconnecter', 401, { reason });
   }
 
   // Détection compte bloqué/désactivé (403 Forbidden)
@@ -259,6 +334,11 @@ export interface LoginResult {
   permissions?: PermissionsData;
 }
 
+// Session validation response type
+export interface SessionCheckResponse extends AuthUser {
+  sessionValid?: boolean;
+}
+
 // Auth API
 export const authApi = {
   login: async (username: string, password: string): Promise<LoginResult> => {
@@ -271,10 +351,18 @@ export const authApi = {
       permissions: response.permissions
     };
   },
-  logout: () => request<{ message: string }>('/auth/logout', {
-    method: 'POST',
-  }),
-  getMe: () => request<AuthUser>('/auth/me'),
+  /**
+   * Logout and broadcast to other tabs
+   */
+  logout: async () => {
+    const result = await request<{ message: string }>('/auth/logout', {
+      method: 'POST',
+    });
+    // Broadcast logout to other tabs
+    broadcastLogout();
+    return result;
+  },
+  getMe: () => request<SessionCheckResponse>('/auth/me'),
   me: () => request<{ user: AuthUser }>('/auth/me'),
   register: (data: { username: string; password: string; nom: string; prenom?: string; email?: string; role?: string; agence?: string }) =>
     request<AuthUser>('/auth/register', {
@@ -287,6 +375,22 @@ export const authApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  /**
+   * Validate current session - returns true if valid, false if invalid
+   * Used at app boot to check if session is still valid
+   */
+  validateSession: async (): Promise<{ valid: boolean; user?: AuthUser; reason?: string }> => {
+    try {
+      const user = await request<SessionCheckResponse>('/auth/me');
+      return { valid: true, user };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        return { valid: false, reason: error.data?.reason || 'session_invalid' };
+      }
+      // For other errors (network, server down), consider session valid but return error info
+      return { valid: false, reason: 'network_error' };
+    }
+  },
 };
 
 // Generic API

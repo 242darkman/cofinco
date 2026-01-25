@@ -235,23 +235,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 export const ROLES = SystemRole;
 
-export function requireRole(...roles: Array<SystemRole | string>) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.session.userId || !req.session.user) {
-      return res.status(401).json({ error: 'Non authentifié' });
-    }
-    
-    const userRole = normalizeSystemRole(req.session.user.role);
-    const normalizedAllowedRoles = roles
-      .map((role) => normalizeSystemRole(role))
-      .filter((role): role is SystemRole => !!role);
-
-    if (!userRole || !normalizedAllowedRoles.includes(userRole)) {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-    next();
-  };
-}
+// NOTE: requireRole has been replaced by requireAbility from server/authorization
+// Use: attachAbility, requireAbility(Actions.X, Subjects.Y) instead
 
 export async function loginUser(username: string, password: string): Promise<User | null> {
   const user = await storage.getUserByUsername(username);

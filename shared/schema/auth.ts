@@ -233,3 +233,60 @@ export interface UserRoleWithAgence extends UserRole {
     code: string;
   } | null;
 }
+
+// ============================================
+// Agency Feature Locks (Module Lock / Kill Switch)
+// ============================================
+
+/**
+ * Table agencyFeatureLocks - Feature flags per agency
+ *
+ * Allows locking specific modules/features for an agency.
+ * Used by CASL authorization to deny access to locked features.
+ *
+ * Valid feature_keys:
+ * - 'credits' - Crédits module
+ * - 'tontines' - Tontines module
+ * - 'caisse' - Caisse module
+ * - 'comptabilite' - Comptabilité module
+ * - 'epargnes' - Comptes/Épargnes module
+ * - 'coffre' - Coffre-Fort module
+ * - 'terrain' - Agent Terrain module
+ * - 'rh' - RH module
+ * - 'admin' - Administration module
+ * - 'rapports' - Rapports module
+ * - 'transferts' - Transferts module
+ */
+export const agencyFeatureLocks = pgTable("agency_feature_locks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceId: uuid("agence_id").notNull(), // FK to agences.id managed at SQL level
+  featureKey: text("feature_key").notNull(),
+  locked: boolean("locked").notNull().default(true),
+  reason: text("reason"),
+  lockedBy: uuid("locked_by"), // FK to users.id managed at SQL level
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  uniqueAgencyFeature: unique().on(t.agenceId, t.featureKey),
+}));
+
+export const insertAgencyFeatureLockSchema = createInsertSchema(agencyFeatureLocks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAgencyFeatureLock = z.infer<typeof insertAgencyFeatureLockSchema>;
+export type AgencyFeatureLock = typeof agencyFeatureLocks.$inferSelect;
+
+// Feature key enum for type safety
+export const FEATURE_KEYS = [
+  'credits',
+  'tontines',
+  'caisse',
+  'comptabilite',
+  'epargnes',
+  'coffre',
+  'terrain',
+  'rh',
+  'admin',
+  'rapports',
+  'transferts',
+] as const;
+
+export type FeatureKey = (typeof FEATURE_KEYS)[number];

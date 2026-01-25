@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { activeSessions, users, userAgences, agences, userRoles } from '@shared/schema';
 import { SystemRole } from '@shared/types/roles';
-import { eq, and, lt, desc, sql } from 'drizzle-orm';
+import { eq, and, lt, desc, sql, isNull } from 'drizzle-orm';
 
 // Simple user agent parser without external dependencies
 function parseUserAgent(userAgent: string | undefined): {
@@ -235,6 +235,121 @@ export function sessionActivityMiddleware(req: Request, res: Response, next: Nex
   next();
 }
 
+// Check if a session is still valid (exists and is active)
+export async function isSessionValid(sessionId: string): Promise<{ valid: boolean; reason?: string }> {
+  try {
+    const [session] = await db.select({
+      isActive: activeSessions.isActive,
+      expiresAt: activeSessions.expiresAt,
+      userId: activeSessions.userId,
+    })
+    .from(activeSessions)
+    .where(eq(activeSessions.sessionId, sessionId));
+
+    if (!session) {
+      return { valid: false, reason: 'session_not_found' };
+    }
+
+    if (!session.isActive) {
+      return { valid: false, reason: 'session_inactive' };
+    }
+
+    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      return { valid: false, reason: 'session_expired' };
+    }
+
+    // Check if user can still login
+    const [user] = await db.select({
+      canLogin: users.canLogin,
+      statut: users.statut,
+    })
+    .from(users)
+    .where(eq(users.id, session.userId));
+
+    if (!user) {
+      return { valid: false, reason: 'user_not_found' };
+    }
+
+    if (!user.canLogin) {
+      return { valid: false, reason: 'user_login_disabled' };
+    }
+
+    if (user.statut !== 'ACTIVE') {
+      return { valid: false, reason: 'user_inactive' };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    console.error('[SESSION TRACKER] Error checking session validity:', error);
+    // On error, assume invalid for security
+    return { valid: false, reason: 'validation_error' };
+  }
+}
+
+// Mark a session as inactive (soft invalidation)
+export async function markSessionInactive(sessionId: string, reason?: string): Promise<void> {
+  try {
+    await db.update(activeSessions)
+      .set({ isActive: false })
+      .where(eq(activeSessions.sessionId, sessionId));
+    console.log(`[SESSION TRACKER] Marked session ${sessionId} as inactive${reason ? `: ${reason}` : ''}`);
+  } catch (error) {
+    console.error('[SESSION TRACKER] Error marking session inactive:', error);
+  }
+}
+
+// Mark all sessions for a user as inactive
+export async function markUserSessionsInactive(userId: string, reason?: string): Promise<number> {
+  try {
+    const result = await db.update(activeSessions)
+      .set({ isActive: false })
+      .where(and(eq(activeSessions.userId, userId), eq(activeSessions.isActive, true)))
+      .returning();
+
+    console.log(`[SESSION TRACKER] Marked ${result.length} sessions as inactive for user ${userId}${reason ? `: ${reason}` : ''}`);
+    return result.length;
+  } catch (error) {
+    console.error('[SESSION TRACKER] Error marking user sessions inactive:', error);
+    return 0;
+  }
+}
+
+/**
+ * Session Guard Middleware
+ * Validates that the session is still active in the database.
+ * If the session is invalid, destroys it and returns 401.
+ *
+ * Use this middleware after requireAuth for critical routes.
+ */
+export async function sessionGuard(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (!req.session?.userId || !req.sessionID) {
+    res.status(401).json({ message: 'No active session', code: 'SESSION_REQUIRED' });
+    return;
+  }
+
+  const validity = await isSessionValid(req.sessionID);
+
+  if (!validity.valid) {
+    console.log(`[SESSION GUARD] Invalid session ${req.sessionID}: ${validity.reason}`);
+
+    // Destroy the session
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('[SESSION GUARD] Error destroying session:', err);
+      }
+    });
+
+    res.status(401).json({
+      message: 'Session invalidated',
+      code: 'SESSION_INVALID',
+      reason: validity.reason
+    });
+    return;
+  }
+
+  next();
+}
+
 // Schedule periodic cleanup
 let cleanupScheduled = false;
 
@@ -246,13 +361,37 @@ export function scheduleSessionCleanup(): void {
   setInterval(async () => {
     await cleanupExpiredSessions();
     await cleanupOrphanSessions();
+    // Also mark expired sessions as inactive
+    await markExpiredSessionsInactive();
   }, 5 * 60 * 1000);
 
   // Run initial cleanup after 30 seconds
   setTimeout(async () => {
     await cleanupExpiredSessions();
     await cleanupOrphanSessions();
+    await markExpiredSessionsInactive();
   }, 30 * 1000);
 
   console.log('[SESSION TRACKER] Cleanup scheduled every 5 minutes');
+}
+
+// Mark expired sessions as inactive (before deletion)
+async function markExpiredSessionsInactive(): Promise<number> {
+  try {
+    const result = await db.update(activeSessions)
+      .set({ isActive: false })
+      .where(and(
+        lt(activeSessions.expiresAt, new Date()),
+        eq(activeSessions.isActive, true)
+      ))
+      .returning();
+
+    if (result.length > 0) {
+      console.log(`[SESSION TRACKER] Marked ${result.length} expired sessions as inactive`);
+    }
+    return result.length;
+  } catch (error) {
+    console.error('[SESSION TRACKER] Error marking expired sessions inactive:', error);
+    return 0;
+  }
 }

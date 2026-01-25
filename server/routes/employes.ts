@@ -3,11 +3,13 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users, employes, agentsTerrain, userRoles } from "@shared/schema";
-import { SystemRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles"; // Still needed for role enum values
 import { StatutUser } from "@shared/enum/status-constants";
 import { storage } from "../storage";
 import { generateMatricule } from "../storage/employes";
-import { requireAuth, requireRole, hashPassword } from "../auth";
+import { requireAuth, hashPassword } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
 
 // Helper pour accepter string ou number et convertir en number
@@ -247,7 +249,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // POST - Créer un nouvel employé (user + employe)
   // ============================================
-  app.post("/api/employes", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/employes", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
     try {
       const parsed = createEmployeWithUserSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -366,7 +368,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // PUT - Mettre à jour un employé (user + employe)
   // ============================================
-  app.put("/api/employes/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.put("/api/employes/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
     try {
       const employeId = req.params.id;
 
@@ -446,7 +448,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // DELETE - Supprimer un employé (soft delete)
   // ============================================
-  app.delete("/api/employes/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/employes/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
     try {
       const employeId = req.params.id;
 
@@ -489,7 +491,7 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // POST - Créer un employé pour un utilisateur existant
   // ============================================
-  app.post("/api/employes/from-user/:userId", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/employes/from-user/:userId", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
     try {
       const { userId } = req.params;
 

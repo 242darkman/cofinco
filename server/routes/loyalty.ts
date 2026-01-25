@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
-import { requireRole } from "../middleware";
-import { SystemRole } from "@shared/types/roles";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { getWsInstance } from "../ws-server";
 
 const loyaltyRouter = Router();
@@ -32,24 +32,24 @@ loyaltyRouter.get("/:clientId/score", requireAuth, async (req, res) => {
 });
 
 // POST /api/loyalty/:clientId/bonus - Ajouter bonus manuel (admin only)
-loyaltyRouter.post("/:clientId/bonus", requireAuth, requireRole([SystemRole.ADMIN]), async (req, res) => {
+loyaltyRouter.post("/:clientId/bonus", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.LOYALTY), async (req, res) => {
     try {
         const { clientId } = req.params;
         const { points, description } = req.body;
-        
+
         if (!points || !description) {
             return res.status(400).json({ error: "Points et description requis" });
         }
-        
+
         await storage.addLoyaltyPoints(clientId, points, 'BONUS', description);
         await storage.calculateEngagementScore(clientId);
-        
+
         // Notify
         const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "LOYALTY_UPDATE", payload: { type: 'bonus_added', clientId, points } });
         }
-        
+
         res.json({ success: true, message: `${points} points ajoutés` });
     } catch (error) {
         console.error("Erreur ajout bonus:", error);

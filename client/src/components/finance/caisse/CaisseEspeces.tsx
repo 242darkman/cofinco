@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, Coins } from 'lucide-react';
 import { PhysicalConfirmationStep, PhysicalConfirmationData } from '../../auth/PhysicalConfirmationStep';
-import { Card, Button } from '@/components/ui';
+import { Card, Button, Badge } from '@/components/ui';
 import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';

@@ -30,6 +30,14 @@ export const APP_MODULES = [
   'Visites',
   'Prospection',
   'Paiements Agent',
+  // New modules for CASL alignment
+  'RBAC',
+  'Maintenance',
+  'Fidélité',
+  'Régularisation',
+  'Départements',
+  'Employés',
+  'Agences',
 ] as const;
 
 export type AppModule = (typeof APP_MODULES)[number];
@@ -68,7 +76,15 @@ export const MODULE_ACCESS: ModuleAccessConfig = {
     'Visites',
     'Prospection',
     'Paiements Agent',
-    'Virements Programmes'
+    'Virements Programmes',
+    // New modules for CASL
+    'RBAC',
+    'Maintenance',
+    'Fidélité',
+    'Régularisation',
+    'Départements',
+    'Employés',
+    'Agences',
   ],
   [SystemRole.CHEF_AGENCE]: [
     'Dashboard',
@@ -193,7 +209,11 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'visites': ['view'],
     'prospection': ['view'],
     'paiements': ['view'],
-    'virements_programmes': ['view', 'edit']
+    'virements_programmes': ['view', 'edit'],
+    // New modules for CASL
+    'employes': ['view', 'create', 'edit'],
+    'agences': ['view'],
+    'regularisation': ['view', 'create', 'approve'],
   },
   [SystemRole.COMPTABLE]: {
     'clients': ['view'],
@@ -201,7 +221,8 @@ export const ROLE_PERMISSIONS: PermissionConfig = {
     'epargnes': ['view'],
     'comptabilite': ['view', 'create', 'edit', 'export'],
     'rapports': ['view', 'export'],
-    'rh': ['view'] // Pointage uniquement
+    'rh': ['view'], // Pointage uniquement
+    'regularisation': ['view'],
   },
   [SystemRole.GESTIONNAIRE_CREDIT]: {
     'clients': ['view', 'create', 'edit'],
@@ -297,6 +318,14 @@ export const MODULES_DATA: ModuleSeed[] = [
   { name: 'Prospection', description: 'Prospection nouveaux clients', icon: 'UserPlus', category: 'operations', orderIndex: 23 },
   { name: 'Paiements Agent', description: 'Paiements initiés par agents', icon: 'Banknote', category: 'finance', orderIndex: 24 },
   { name: 'Virements Programmes', description: 'Planification des virements internes', icon: 'CalendarClock', category: 'admin', orderIndex: 25 },
+  // New modules for CASL alignment
+  { name: 'RBAC', description: 'Gestion des rôles et permissions', icon: 'Key', category: 'admin', orderIndex: 26 },
+  { name: 'Maintenance', description: 'Outils de maintenance système', icon: 'Wrench', category: 'admin', orderIndex: 27 },
+  { name: 'Fidélité', description: 'Programme de fidélité', icon: 'Award', category: 'operations', orderIndex: 28 },
+  { name: 'Régularisation', description: 'Régularisations comptables', icon: 'Scale', category: 'finance', orderIndex: 29 },
+  { name: 'Départements', description: 'Gestion des départements', icon: 'Building2', category: 'admin', orderIndex: 30 },
+  { name: 'Employés', description: 'Gestion des employés', icon: 'Users', category: 'admin', orderIndex: 31 },
+  { name: 'Agences', description: 'Gestion des agences', icon: 'Building', category: 'admin', orderIndex: 32 },
 ];
 
 /**
@@ -471,6 +500,58 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Modifier configuration', code: 'coffre.config.edit', description: 'Modifier la configuration du coffre' },
     { name: 'Supervision Trésorerie', code: 'coffre.supervision.view', description: 'Vue globale trésorerie' },
   ],
+  // New modules for CASL alignment
+  'RBAC': [
+    { name: 'Voir les rôles', code: 'rbac.view', description: 'Accès à la gestion des rôles' },
+    { name: 'Créer un rôle', code: 'rbac.create', description: 'Créer un nouveau rôle' },
+    { name: 'Modifier un rôle', code: 'rbac.edit', description: 'Modifier un rôle existant' },
+    { name: 'Supprimer un rôle', code: 'rbac.delete', description: 'Supprimer un rôle' },
+    { name: 'Gérer les rôles', code: 'rbac.manage', description: 'Administration complète RBAC' },
+    { name: 'Voir les permissions', code: 'permissions.view', description: 'Voir la liste des permissions' },
+    { name: 'Assigner permissions', code: 'permissions.assign', description: 'Assigner des permissions aux rôles' },
+  ],
+  'Maintenance': [
+    { name: 'Voir maintenance', code: 'maintenance.view', description: 'Accès au module maintenance' },
+    { name: 'Purger données', code: 'maintenance.purge', description: 'Supprimer des données obsolètes' },
+    { name: 'Migrer données', code: 'maintenance.migrate', description: 'Migrer des données' },
+    { name: 'Initialiser données', code: 'maintenance.seed', description: 'Initialiser des données de base' },
+    { name: 'Gérer maintenance', code: 'maintenance.manage', description: 'Administration de la maintenance' },
+  ],
+  'Fidélité': [
+    { name: 'Voir fidélité', code: 'loyalty.view', description: 'Accès au programme de fidélité' },
+    { name: 'Créer récompense', code: 'loyalty.create', description: 'Créer une récompense' },
+    { name: 'Modifier récompense', code: 'loyalty.edit', description: 'Modifier une récompense' },
+    { name: 'Supprimer récompense', code: 'loyalty.delete', description: 'Supprimer une récompense' },
+    { name: 'Gérer fidélité', code: 'loyalty.manage', description: 'Gérer le programme de fidélité' },
+  ],
+  'Régularisation': [
+    { name: 'Voir régularisations', code: 'regularisation.view', description: 'Accès aux régularisations' },
+    { name: 'Créer régularisation', code: 'regularisation.create', description: 'Créer une régularisation' },
+    { name: 'Approuver régularisation', code: 'regularisation.approve', description: 'Approuver une régularisation' },
+    { name: 'Rejeter régularisation', code: 'regularisation.reject', description: 'Rejeter une régularisation' },
+    { name: 'Gérer régularisations', code: 'regularisation.manage', description: 'Administration des régularisations' },
+  ],
+  'Départements': [
+    { name: 'Voir départements', code: 'departments.view', description: 'Accès à la liste des départements' },
+    { name: 'Créer département', code: 'departments.create', description: 'Créer un département' },
+    { name: 'Modifier département', code: 'departments.edit', description: 'Modifier un département' },
+    { name: 'Supprimer département', code: 'departments.delete', description: 'Supprimer un département' },
+    { name: 'Gérer départements', code: 'departments.manage', description: 'Gérer les départements' },
+  ],
+  'Employés': [
+    { name: 'Voir employés', code: 'employes.view', description: 'Accès à la liste des employés' },
+    { name: 'Créer employé', code: 'employes.create', description: 'Créer un employé' },
+    { name: 'Modifier employé', code: 'employes.edit', description: 'Modifier un employé' },
+    { name: 'Supprimer employé', code: 'employes.delete', description: 'Supprimer un employé' },
+    { name: 'Gérer employés', code: 'employes.manage', description: 'Gérer les employés' },
+  ],
+  'Agences': [
+    { name: 'Voir agences', code: 'agences.view', description: 'Accès à la liste des agences' },
+    { name: 'Créer agence', code: 'agences.create', description: 'Créer une agence' },
+    { name: 'Modifier agence', code: 'agences.edit', description: 'Modifier une agence' },
+    { name: 'Supprimer agence', code: 'agences.delete', description: 'Supprimer une agence' },
+    { name: 'Gérer agences', code: 'agences.manage', description: 'Gérer les agences' },
+  ],
 };
 
 /**
@@ -522,6 +603,10 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     // Communications
     'communications.view',
     'messages.view', 'messages.send',
+    // New CASL modules
+    'employes.view', 'employes.create', 'employes.edit',
+    'agences.view',
+    'regularisation.view', 'regularisation.create', 'regularisation.approve',
   ],
   [SystemRole.COMPTABLE]: [
     'dashboard.view',
@@ -531,7 +616,9 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'comptabilite.view', 'comptabilite.create', 'comptabilite.edit', 'comptabilite.export',
     'rapports.view', 'rapports.export',
     'communications.view',
-    'rh.view', 
+    'rh.view',
+    // CASL additions
+    'regularisation.view',
   ],
   [SystemRole.GESTIONNAIRE_CREDIT]: [
     'dashboard.view',

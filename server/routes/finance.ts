@@ -38,8 +38,9 @@ import {
   TypeCompte,
   DureeUnite as DureeUniteEnum,
 } from "@shared/enum/status-constants";
-import { requireAuth, requireRole } from "../auth";
+import { requireAuth } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
+import { attachAbility, requireAbility, requireDisbursement, hasAbility, Actions, Subjects } from "../authorization";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, coerceValueToSchema } from "./utils";
 import { sendCreditApprovalNotification } from "../sms-service";
@@ -76,7 +77,7 @@ export function registerFinanceRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(plans));
   });
 
-  app.post("/api/credit-plans", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/credit-plans", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), requireAgenceAccess(), async (req, res) => {
     const data = normalizeKeysDeep(req.body) as any;
     
     // Validation basique
@@ -87,14 +88,14 @@ export function registerFinanceRoutes(app: Express) {
     res.status(201).json(addSnakeCaseAliasesDeep(plan));
   });
 
-  app.patch("/api/credit-plans/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.patch("/api/credit-plans/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), async (req, res) => {
     const data = normalizeKeysDeep(req.body) as any;
     const plan = await storage.updateCreditPlan(req.params.id, data);
     if (!plan) return res.status(404).json({ message: "Plan non trouvé" });
     res.json(addSnakeCaseAliasesDeep(plan));
   });
 
-  app.delete("/api/credit-plans/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.delete("/api/credit-plans/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), async (req, res) => {
     const success = await storage.deleteCreditPlan(req.params.id);
     if (!success) return res.status(404).json({ message: "Plan non trouvé" });
     res.json({ success: true });
@@ -119,7 +120,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Create credit (roles: admin, chef, credit only)
-  app.post("/api/credits", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/credits", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.CREDIT), requireAgenceAccess(), async (req, res) => {
      try {
        const data = normalizeKeysDeep(req.body) as any;
        
@@ -173,7 +174,9 @@ export function registerFinanceRoutes(app: Express) {
 
   // Décaissement de crédit (crée le crédit + gère le canal de décaissement)
   // Canaux supportés: ACCOUNT (compte courant), CASH (espèces caisse), MOBILE_MONEY
-  app.post("/api/credits/decaissement", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), requireAgenceAccess(), async (req, res) => {
+  // CASL: Requires 'disburse' or channel-specific permission on Credit
+  // Uses requireDisbursement() which handles channel-specific permission checks
+  app.post("/api/credits/decaissement", requireAuth, attachAbility, requireDisbursement(), requireAgenceAccess(), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body) as any;
       const user = req.session.user;
@@ -451,7 +454,7 @@ export function registerFinanceRoutes(app: Express) {
    * GET /api/credits/pending-disbursements
    * Liste les crédits en attente de décaissement physique à la caisse
    */
-  app.get("/api/credits/pending-disbursements", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
+  app.get("/api/credits/pending-disbursements", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CREDIT), requireAgenceAccess(), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       const pendingDisbursements = await storage.getPendingLoanDisbursements(agenceFilter?.agenceId);
@@ -478,7 +481,7 @@ export function registerFinanceRoutes(app: Express) {
    * Exécute le décaissement physique par le caissier
    * C'est ce bouton "Décaisser" qui sort l'argent et active le prêt
    */
-  app.post("/api/credits/:id/caisse-payout", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/credits/:id/caisse-payout", requireAuth, attachAbility, requireAbility(Actions.DISBURSE_CASH, Subjects.CREDIT), requireAgenceAccess(), async (req, res) => {
     try {
       const { id: creditId } = req.params;
       const data = normalizeKeysDeep(req.body) as any;
@@ -583,7 +586,7 @@ export function registerFinanceRoutes(app: Express) {
    * POST /api/credits/:id/cancel-disbursement
    * Annule un décaissement en attente (si le client ne se présente pas)
    */
-  app.post("/api/credits/:id/cancel-disbursement", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/credits/:id/cancel-disbursement", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CREDIT), requireAgenceAccess(), async (req, res) => {
     try {
       const { id: creditId } = req.params;
       const data = normalizeKeysDeep(req.body) as any;
@@ -760,7 +763,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Create demande credit (roles: admin, chef, credit, superviseur, terrain)
-  app.post("/api/demandes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR, SystemRole.AGENT_TERRAIN), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/demandes-credit", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.DEMANDE_CREDIT), requireAgenceAccess(), async (req, res) => {
       const data = normalizeKeysDeep(req.body) as any;
 
       // Auto-generate numeroDemande if not provided
@@ -856,7 +859,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(demande));
   });
 
-  app.patch("/api/demandes-credit/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR), async (req, res) => {
+  app.patch("/api/demandes-credit/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
     try {
       const { id } = req.params;
       const updateData = normalizeKeysDeep(req.body) as any;
@@ -980,7 +983,7 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/demandes-credit/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.delete("/api/demandes-credit/:id", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.DEMANDE_CREDIT), async (req, res) => {
       const success = await storage.deleteDemandeCredit(req.params.id);
       if (!success) return res.status(404).json({ message: "Demande non trouvée" });
       
@@ -992,7 +995,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ success: true });
   });
 
-  app.put("/api/demandes-credit/:id/cancel", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.put("/api/demandes-credit/:id/cancel", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
     try {
       const { motif } = req.body;
       // State Machine guard is in storage.cancelDemandeCredit
@@ -1024,7 +1027,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Reject a credit application from Commission Crédit phase
-  app.post("/api/demandes/:id/reject-from-commission", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.post("/api/demandes/:id/reject-from-commission", requireAuth, attachAbility, requireAbility(Actions.REJECT, Subjects.DEMANDE_CREDIT), async (req, res) => {
     try {
       const { id } = req.params;
       const { motif_rejet } = req.body;
@@ -1116,7 +1119,7 @@ export function registerFinanceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/demandes-credit/:id/payer-frais", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.post("/api/demandes-credit/:id/payer-frais", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION), async (req, res) => {
       try {
           const data = normalizeKeysDeep(req.body) as any;
           const user = req.session.user;
@@ -1185,7 +1188,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Initiate refund for already rejected demande
-  app.post("/api/demandes-credit/:id/initiate-refund", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.post("/api/demandes-credit/:id/initiate-refund", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REMBOURSEMENT), async (req, res) => {
     try {
       const { id } = req.params;
       const data = normalizeKeysDeep(req.body) as { montantRemboursement: number; motif?: string };
@@ -1368,7 +1371,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Recalculer le score d'une demande
-  app.post("/api/demandes-credit/:id/recalculer-score", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.post("/api/demandes-credit/:id/recalculer-score", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.DEMANDE_CREDIT), async (req, res) => {
     try {
       const demande = await storage.getDemandeCredit(req.params.id);
       if (!demande) {
@@ -1523,7 +1526,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Enquetes (roles: admin, chef, credit, superviseur)
-  app.get("/api/enquetes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR, SystemRole.AGENT_TERRAIN), async (req, res) => {
+  app.get("/api/enquetes-credit", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.DEMANDE_CREDIT), async (req, res) => {
       // Return both completed/in-progress enquetes AND demandes ready for investigation
       // Actually, for now, let's just return enquetes. Frontend can merge if needed, 
       // or we can handle it here.
@@ -1532,7 +1535,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enquetes));
   });
 
-  app.post("/api/enquetes-credit", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.SUPERVISEUR, SystemRole.AGENT_TERRAIN), async (req, res) => {
+  app.post("/api/enquetes-credit", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.DEMANDE_CREDIT), async (req, res) => {
       try {
           const data = normalizeKeysDeep(req.body);
           const parsed = insertEnqueteCreditSchema.parse(data);
@@ -1560,7 +1563,7 @@ export function registerFinanceRoutes(app: Express) {
       }
   });
 
-  app.post("/api/enquetes-credit/:id/valider", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.post("/api/enquetes-credit/:id/valider", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.DEMANDE_CREDIT), async (req, res) => {
       const { decision, montant_approuve, commentaire, raison } = req.body;
 
       const enquete = await storage.getEnqueteCredit(req.params.id);
@@ -1621,7 +1624,7 @@ export function registerFinanceRoutes(app: Express) {
 
   // Remboursements (roles: admin, chef, caisse, credit)
   // Now using atomic ledger flow
-  app.post("/api/remboursements", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.post("/api/remboursements", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REMBOURSEMENT), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user;
@@ -1754,7 +1757,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
   });
 
-  app.get("/api/caisses", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/caisses", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
       // Admin only: Get ALL caisses
       const caisses = await storage.getAllCaisses();
       const activeSessions = await storage.getActiveSessions();
@@ -1827,7 +1830,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json(addSnakeCaseAliasesDeep(enrichedCaisses));
   });
 
-  app.post("/api/caisses/:id/assign", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/caisses/:id/assign", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), requireAgenceAccess(), async (req, res) => {
       const { id } = req.params;
       const { userIds } = req.body; // Expect array of user IDs
       
@@ -1839,7 +1842,7 @@ export function registerFinanceRoutes(app: Express) {
       res.json({ success: true });
   });
 
-  app.post("/api/caisses", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), requireAgenceAccess(), async (req, res) => {
+  app.post("/api/caisses", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), requireAgenceAccess(), async (req, res) => {
       const data = normalizeKeysDeep(req.body) as any;
       const user = req.session.user!;
       
@@ -1861,7 +1864,7 @@ export function registerFinanceRoutes(app: Express) {
       res.status(201).json(addSnakeCaseAliasesDeep(caisse));
   });
 
-  app.delete("/api/caisses/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.delete("/api/caisses/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     const { id } = req.params;
     const user = req.session.user!;
 
@@ -1899,7 +1902,7 @@ export function registerFinanceRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(caisses));
   });
 
-  app.get("/api/sessions-caisse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), requireAgenceIdAccess(), async (req, res) => {
+  app.get("/api/sessions-caisse", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE_SESSION), requireAgenceIdAccess(), async (req, res) => {
       // Use requireAgenceIdAccess for more robust agence filtering (uses UUIDs from userAgences)
       const agenceId = req.selectedAgenceId || req.query.agenceId as string;
       const requestedStatut = req.query.statut as string;
@@ -1918,7 +1921,7 @@ export function registerFinanceRoutes(app: Express) {
    * Récupère les sessions en cours de fermeture pour l'agence (supervision)
    * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
    */
-  app.get("/api/sessions-caisse/closing", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
+  app.get("/api/sessions-caisse/closing", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE_SESSION), async (req, res) => {
     const user = req.session.user!;
     const agenceId = (req.query.agenceId as string) || user.agenceId;
 
@@ -1945,7 +1948,7 @@ export function registerFinanceRoutes(app: Express) {
    * Sessions à risque (inactives depuis trop longtemps)
    * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
    */
-  app.get("/api/sessions-caisse/risky", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.get("/api/sessions-caisse/risky", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_SESSION), async (req, res) => {
       try {
           const riskySessions = await sessionService.getRiskySessions();
           res.json(addSnakeCaseAliasesDeep(riskySessions));
@@ -1959,7 +1962,7 @@ export function registerFinanceRoutes(app: Express) {
    * Sessions avec écarts significatifs (monitoring)
    * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
    */
-  app.get("/api/sessions-caisse/ecarts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.get("/api/sessions-caisse/ecarts", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_SESSION), async (req, res) => {
       try {
           const threshold = req.query.threshold ? Number(req.query.threshold) : undefined;
           const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
@@ -1974,7 +1977,7 @@ export function registerFinanceRoutes(app: Express) {
    * Fermer les sessions expirées (route admin pour déclencher manuellement ou via cron)
    * NOTE: This route MUST be defined BEFORE /api/sessions-caisse/:id to avoid route conflict
    */
-  app.post("/api/sessions-caisse/close-expired", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/sessions-caisse/close-expired", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_SESSION), async (req, res) => {
       try {
           const timeoutHours = req.body.timeoutHours ? Number(req.body.timeoutHours) : 12;
           const closedSessions = await sessionService.closeExpiredSessions(timeoutHours);
@@ -2200,7 +2203,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Forcer la fermeture d'une session (admin)
-  app.post("/api/sessions-caisse/:id/force-close", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/sessions-caisse/:id/force-close", requireAuth, attachAbility, requireAbility(Actions.CLOSE_SESSION, Subjects.CAISSE_SESSION), async (req, res) => {
       const { id } = req.params;
       const user = req.session.user!;
 
@@ -2240,7 +2243,7 @@ export function registerFinanceRoutes(app: Express) {
 
   // ============================================================================
 
-  app.get("/api/caisses/status", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.AGENT_TERRAIN), async (req, res) => {
+  app.get("/api/caisses/status", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE), async (req, res) => {
     const agenceId = req.query.agenceId as string;
     const caisses = await storage.getCaissesWithStatus(agenceId);
     res.json(addSnakeCaseAliasesDeep(caisses));
@@ -2288,7 +2291,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Opération caisse (roles: admin, chef, caisse)
-  app.post("/api/operations-caisse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
+  app.post("/api/operations-caisse", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION), async (req, res) => {
       try {
         const data = normalizeKeysDeep(req.body) as any;
         const user = req.session.user!;
@@ -2446,7 +2449,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Update Opération caisse (PATCH)
-  app.patch("/api/operations-caisse/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
+  app.patch("/api/operations-caisse/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CAISSE_OPERATION), async (req, res) => {
       try {
         const { id } = req.params;
         const data = normalizeKeysDeep(req.body) as any;
@@ -2473,7 +2476,7 @@ export function registerFinanceRoutes(app: Express) {
 
   // Update credit (roles: admin, chef, credit)
   // State Machine guard is in storage.updateCredit
-  app.patch("/api/credits/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.patch("/api/credits/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CREDIT), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body);
       const credit = await storage.getCredit(req.params.id);
@@ -2544,7 +2547,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Create facture (roles: admin, chef, comptable)
-  app.post("/api/factures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
+  app.post("/api/factures", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.INVOICE), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertFactureSchema.parse(data);
       const facture = await storage.createFacture(parsed);
@@ -2558,7 +2561,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Initier un transfert
-  app.post("/api/caisse-transferts", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
+  app.post("/api/caisse-transferts", requireAuth, attachAbility, requireAbility(Actions.TRANSFER, Subjects.CAISSE), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body as any) as any;
       
@@ -2618,7 +2621,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Recevoir/Valider un transfert
-  app.patch("/api/caisse-transferts/:id/recevoir", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER), async (req, res) => {
+  app.patch("/api/caisse-transferts/:id/recevoir", requireAuth, attachAbility, requireAbility(Actions.TRANSFER, Subjects.CAISSE), async (req, res) => {
       const { id } = req.params;
       const { sessionId } = req.body; // Session qui reçoit
 
@@ -2673,7 +2676,7 @@ export function registerFinanceRoutes(app: Express) {
   });
   
   // Annuler un transfert
-  app.post("/api/caisse-transferts/:id/annuler", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/caisse-transferts/:id/annuler", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
       const { id } = req.params;
       const transfert = await storage.getCaisseTransfert(id);
 
@@ -2777,7 +2780,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * GET /api/finance/credit-refunds - List refunds with filters
    */
-  app.get("/api/finance/credit-refunds", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess("agenceId"), async (req, res) => {
+  app.get("/api/finance/credit-refunds", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REMBOURSEMENT), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       let query = db.select({
@@ -2821,7 +2824,7 @@ export function registerFinanceRoutes(app: Express) {
    * GET /api/finance/credit-refunds/pending/count - Count pending refunds (SUBMITTED + APPROVED)
    * Used for sidebar badge notification
    */
-  app.get("/api/finance/credit-refunds/pending/count", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT, SystemRole.CAISSIER), requireAgenceAccess("agenceId"), async (req, res) => {
+  app.get("/api/finance/credit-refunds/pending/count", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REMBOURSEMENT), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       const conditions = [
@@ -2862,7 +2865,7 @@ export function registerFinanceRoutes(app: Express) {
    * POST /api/finance/credit-refunds/:id/approve - Approve Refund Request
    * Requires N+1 Validation (Checker must be different from Maker)
    */
-  app.post("/api/finance/credit-refunds/:id/approve", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/finance/credit-refunds/:id/approve", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.REMBOURSEMENT), async (req, res) => {
      try {
        const user = req.session.user!;
        const refund = await storage.getCreditRefundRequest(req.params.id);
@@ -2900,7 +2903,7 @@ export function registerFinanceRoutes(app: Express) {
    * - ACCOUNT: Direct transfer to client's current account (immediate)
    * - CASH/MOBILE_MONEY: Requires caisse validation - sets status to PENDING_CAISSE
    */
-  app.post("/api/finance/credit-refunds/:id/pay", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.GESTIONNAIRE_CREDIT), async (req, res) => {
+  app.post("/api/finance/credit-refunds/:id/pay", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REMBOURSEMENT), async (req, res) => {
     const { method, sessionCaisseId } = req.body; // method: 'CASH' | 'ACCOUNT' | 'MOBILE_MONEY'
     const user = req.session.user!;
 
@@ -3089,7 +3092,7 @@ export function registerFinanceRoutes(app: Express) {
    * This endpoint is called by caisse staff to confirm a PENDING_CAISSE refund.
    * It requires an active caisse session and executes the actual payment.
    */
-  app.post("/api/finance/credit-refunds/:id/validate-caisse", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/finance/credit-refunds/:id/validate-caisse", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.CAISSE_OPERATION), async (req, res) => {
     const { sessionCaisseId } = req.body;
     const user = req.session.user!;
 
@@ -3195,7 +3198,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * GET /api/finance/credit-refunds/pending-caisse - List refunds awaiting caisse validation
    */
-  app.get("/api/finance/credit-refunds/pending-caisse", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess("agenceId"), async (req, res) => {
+  app.get("/api/finance/credit-refunds/pending-caisse", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REMBOURSEMENT), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
@@ -3224,7 +3227,7 @@ export function registerFinanceRoutes(app: Express) {
   /**
    * GET /api/finance/credit-refunds/pending-caisse/count - Count refunds awaiting caisse validation
    */
-  app.get("/api/finance/credit-refunds/pending-caisse/count", requireAuth, requireRole(SystemRole.CAISSIER, SystemRole.CHEF_AGENCE, SystemRole.ADMIN), requireAgenceAccess("agenceId"), async (req, res) => {
+  app.get("/api/finance/credit-refunds/pending-caisse/count", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REMBOURSEMENT), requireAgenceAccess("agenceId"), async (req, res) => {
     try {
        const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
@@ -3249,7 +3252,7 @@ export function registerFinanceRoutes(app: Express) {
   // ==========================================
 
   // LIQUIDATION CAISSE
-  app.post("/api/caisses/:id/liquidate", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/caisses/:id/liquidate", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -3894,7 +3897,7 @@ export function registerFinanceRoutes(app: Express) {
    * POST /api/caisse/access-codes/generate
    * Génère un nouveau code de sécurité (admin/chef d'agence seulement)
    */
-  app.post("/api/caisse/access-codes/generate", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/caisse/access-codes/generate", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       const user = req.session.user!;
       const data = normalizeKeysDeep(req.body) as any;
@@ -3958,7 +3961,7 @@ export function registerFinanceRoutes(app: Express) {
    * GET /api/caisse/access-codes
    * Liste les codes de sécurité actifs pour une agence
    */
-  app.get("/api/caisse/access-codes", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.get("/api/caisse/access-codes", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       const user = req.session.user!;
       const agenceId = (req.query.agenceId as string) || user.agenceId;
@@ -3979,7 +3982,7 @@ export function registerFinanceRoutes(app: Express) {
    * DELETE /api/caisse/access-codes/:id
    * Désactive un code de sécurité
    */
-  app.delete("/api/caisse/access-codes/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.delete("/api/caisse/access-codes/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       await accessControlService.deactivateSecurityCode(req.params.id);
 
@@ -4004,7 +4007,7 @@ export function registerFinanceRoutes(app: Express) {
    * GET /api/caisse/authorizations
    * Liste les autorisations actives pour une agence
    */
-  app.get("/api/caisse/authorizations", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.get("/api/caisse/authorizations", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       const user = req.session.user!;
       const agenceId = (req.query.agenceId as string) || user.agenceId;
@@ -4025,7 +4028,7 @@ export function registerFinanceRoutes(app: Express) {
    * POST /api/caisse/authorizations/:id/revoke
    * Révoque une autorisation active
    */
-  app.post("/api/caisse/authorizations/:id/revoke", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.post("/api/caisse/authorizations/:id/revoke", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       const user = req.session.user!;
       const data = normalizeKeysDeep(req.body) as any;
@@ -4057,7 +4060,7 @@ export function registerFinanceRoutes(app: Express) {
    * PATCH /api/caisses/:id/operating-hours
    * Met à jour les horaires d'ouverture d'une caisse (admin/chef d'agence)
    */
-  app.patch("/api/caisses/:id/operating-hours", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  app.patch("/api/caisses/:id/operating-hours", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       const { id } = req.params;
       const user = req.session.user!;

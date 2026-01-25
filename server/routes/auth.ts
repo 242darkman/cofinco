@@ -2,9 +2,11 @@ import type { Express } from "express";
 import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences, userRoles, employes } from "@shared/schema";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
-import { loginUser, registerUser, requireAuth, requireRole, hashPassword, comparePasswords } from "../auth";
+import { loginUser, registerUser, requireAuth, hashPassword, comparePasswords } from "../auth";
+import { attachAbility, requireAbility, requireResetPassword } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { logAudit, logLoginAttempt, isAccountLocked, validatePassword, getPasswordRequirements, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
-import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions } from "../session-tracker";
+import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions, isSessionValid, markSessionInactive, markUserSessionsInactive, sessionGuard } from "../session-tracker";
 import { getPermissionsForUser } from "../services/permissions-service";
 import { z } from "zod";
 import { eq, and, asc } from "drizzle-orm";
@@ -319,6 +321,23 @@ export function registerAuthRoutes(app: Express) {
   app.get("/api/auth/me", async (req, res) => {
     if (!req.session.user) return res.sendStatus(401);
 
+    // Validate session is still active in database
+    const validity = await isSessionValid(req.sessionID);
+    if (!validity.valid) {
+      console.log(`[AUTH] Session ${req.sessionID} invalid: ${validity.reason}`);
+
+      // Destroy the session
+      req.session.destroy((err) => {
+        if (err) console.error('[AUTH] Error destroying invalid session:', err);
+      });
+
+      return res.status(401).json({
+        message: 'Session expired or invalidated',
+        code: 'SESSION_INVALID',
+        reason: validity.reason
+      });
+    }
+
     // Auto-repair session if agenceId is missing
     if (!req.session.user.agenceId) {
        try {
@@ -385,7 +404,8 @@ export function registerAuthRoutes(app: Express) {
     res.json({
       ...req.session.user,
       ...userData,
-      ...employeData
+      ...employeData,
+      sessionValid: true // Explicit session validity indicator
     });
   });
 
@@ -555,7 +575,7 @@ export function registerAuthRoutes(app: Express) {
     res.json({ message: "Password updated successfully" });
   });
 
-  app.post("/api/auth/register", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/auth/register", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
       const normalizedBody = normalizeUserPayload(req.body);
 
@@ -602,7 +622,7 @@ export function registerAuthRoutes(app: Express) {
 
   // User Management - REMOVED DUPLICATE (see consolidated handler below)
 
-  app.get("/api/users", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/users", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     const allUsers = await storage.getAllUsers();
 
     // Architecture V3: Enrichir chaque utilisateur avec son rôle effectif depuis userRoles
@@ -619,7 +639,7 @@ export function registerAuthRoutes(app: Express) {
     res.json(usersWithRoles);
   });
 
-  app.get("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/users/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -631,7 +651,7 @@ export function registerAuthRoutes(app: Express) {
     });
   });
 
-  app.patch("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.patch("/api/users/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
       const userId = req.params.id;
       const updateData = normalizeUserPayload(req.body);
@@ -720,7 +740,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/users/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/users/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
       const userId = req.params.id;
       const userToDelete = await storage.getUser(userId);
@@ -773,15 +793,17 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  app.post("/api/users/:id/reset-password", requireRole(SystemRole.ADMIN), async (req, res) => {
-     const { password } = req.body; 
+  // Reset password for a user
+  // CASL: Requires 'reset_password' permission on User
+  app.post("/api/users/:id/reset-password", requireAuth, attachAbility, requireResetPassword(), async (req, res) => {
+     const { password } = req.body;
      const passToUse = password || req.body.temporaryPassword;
-     
+
      if (!passToUse) return res.status(400).json({message: "Password required"});
 
      const hashedPassword = await hashPassword(passToUse);
      await db.update(users).set({ password: hashedPassword }).where(eq(users.id, req.params.id));
-     
+
      await logAudit(
         req,
         "RESET_PASSWORD",
@@ -796,13 +818,13 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Audit Logs
-  app.get("/api/audit-logs", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/audit-logs", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
     const logs = await getAuditLogs();
     res.json(logs);
   });
 
   // Audit Logs Statistics
-  app.get("/api/audit-logs/stats", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/audit-logs/stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
     try {
       const stats = await getAuditLogStats();
       res.json(stats);
@@ -813,7 +835,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Manual Purge Audit Logs (admin only)
-  app.post("/api/audit-logs/purge", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/audit-logs/purge", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.AUDIT_LOG), async (req, res) => {
     try {
       const result = await purgeOldAuditLogs();
 
@@ -845,7 +867,7 @@ export function registerAuthRoutes(app: Express) {
   // SESSION MANAGEMENT - Force logout a user
   // ============================================
 
-  app.post("/api/sessions/:userId/terminate", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/sessions/:userId/terminate", requireAuth, attachAbility, requireAbility(Actions.TERMINATE, Subjects.SESSION), async (req, res) => {
     try {
       const { userId } = req.params;
       const adminUser = req.session.user;
@@ -909,7 +931,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Get active sessions (from active_sessions table with real-time tracking)
-  app.get("/api/sessions/active", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/sessions/active", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.SESSION), async (req, res) => {
     try {
       const sessions = await getActiveSessions();
 
@@ -960,7 +982,7 @@ export function registerAuthRoutes(app: Express) {
   // ============================================
 
   // Get all permissions for a user
-  app.get("/api/users/:userId/permissions", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.get("/api/users/:userId/permissions", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PERMISSION), async (req, res) => {
     try {
       const { userId } = req.params;
       
@@ -1029,7 +1051,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Save/Update permissions for a user (batch update - Legacy Adapter)
-  app.put("/api/users/:userId/permissions", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.put("/api/users/:userId/permissions", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PERMISSION), async (req, res) => {
     try {
       const { userId } = req.params;
       const permissionsData: Record<string, {

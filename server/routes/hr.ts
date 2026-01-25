@@ -11,10 +11,12 @@ import {
   presences,
   employes
 } from "@shared/schema";
-import { normalizeRole, SystemRole } from "@shared/types/roles";
+import { normalizeRole } from "@shared/types/roles";
 import { StatutCandidature, StatutConge, StatutUser, StatutVisiteTerrain, StatutArchive } from "@shared/enum/status-constants";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
-import { getAuthUser, requireRole } from "server/middleware";
+import { getAuthUser } from "server/middleware";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { storage } from "server/storage";
 import { users } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
@@ -47,13 +49,13 @@ const roleIn = (role: string | null | undefined, allowed: string[]): boolean => 
 hrRouter.get("/conges", getAuthUser, async (req, res) => {
   try {
     const { statut, employeId, dateDebut, dateFin } = req.query;
-    
+
     let query = db.select().from(demandesConges);
-    
+
     const conditions = [];
     if (statut) conditions.push(eq(demandesConges.statut, statut as string));
     if (employeId) conditions.push(eq(demandesConges.employeId, employeId as string));
-    
+
     // RBAC: An employee can only see their own requests unless Admin/RH/Manager/Direction
     // Note: Manager should ideally see only their subordinates, implemented here for simplicity as "all" for Manager role for now, or filtered via frontend + rigorous check later.
     // Ideally: if role === 'manager', fetch subordinates IDs and filter.
@@ -74,11 +76,11 @@ hrRouter.get("/conges", getAuthUser, async (req, res) => {
 
     if (dateDebut) conditions.push(gte(demandesConges.dateDebut, dateDebut as string));
     if (dateFin) conditions.push(lte(demandesConges.dateFin, dateFin as string));
-    
+
     const result = conditions.length > 0
       ? await query.where(and(...conditions)).orderBy(desc(demandesConges.createdAt))
       : await query.orderBy(desc(demandesConges.createdAt));
-    
+
     res.json(result);
   } catch (error) {
     console.error("Erreur récupération congés:", error);
@@ -90,7 +92,7 @@ hrRouter.get("/conges", getAuthUser, async (req, res) => {
 hrRouter.post("/conges", getAuthUser, async (req, res) => {
   try {
     const { employeId, employeNom, type, dateDebut, dateFin, motif } = req.body;
-    
+
     if (!employeId || !type || !dateDebut || !dateFin) {
       return res.status(400).json({ error: "Champs obligatoires manquants" });
     }
@@ -103,7 +105,7 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
     const initialStatus = isDirection ? StatutConge.APPROVED : StatutConge.PENDING;
     const approuvePar = isDirection ? req.user?.id : null;
     const dateDecision = isDirection ? new Date() : null;
-    
+
     const [newConge] = await db.insert(demandesConges).values({
       employeId,
       employeNom,
@@ -115,13 +117,13 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
       approuvePar: approuvePar,
       dateDecision: dateDecision
     }).returning();
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_new', id: newConge.id } });
     }
-    
+
     res.status(201).json(newConge);
   } catch (error) {
     console.error("Erreur création congé:", error);
@@ -136,7 +138,7 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     const { commentaire } = req.body;
     const userId = req.user?.id;
     const userRole = req.user?.role;
-    
+
     // RBAC Check - Supports both code-style roles (admin, manager) and display-style roles (Administrateur, Chef d'Agence)
     const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
     if (!roleIn(userRole, allowedRoles)) {
@@ -161,17 +163,17 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
       })
       .where(eq(demandesConges.id, parseInt(id)))
       .returning();
-    
+
     if (!updated) {
       return res.status(404).json({ error: "Demande non trouvée" });
     }
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'conge_approved', id: updated.id } });
     }
-    
+
     res.json(updated);
   } catch (error) {
     console.error("Erreur approbation congé:", error);
@@ -186,7 +188,7 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
     const { commentaire } = req.body;
     const userId = req.user?.id;
     const userRole = req.user?.role;
-    
+
     // RBAC Check - Supports both code-style roles (admin, manager) and display-style roles (Administrateur, Chef d'Agence)
     const allowedRoles = ['admin', 'Administrateur', 'rh', 'manager', "Chef d'Agence", 'direction', 'pdg', 'dg'];
     if (!roleIn(userRole, allowedRoles)) {
@@ -211,11 +213,11 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
       })
       .where(eq(demandesConges.id, parseInt(id)))
       .returning();
-    
+
     if (!updated) {
       return res.status(404).json({ error: "Demande non trouvée" });
     }
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
@@ -239,26 +241,26 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
 hrRouter.get("/formations", getAuthUser, async (req, res) => {
   try {
     const { statut } = req.query;
-    
+
     // Fetch formations with participant count using subquery
     const baseFormations = statut
       ? await db.select().from(formations).where(eq(formations.statut, statut as string)).orderBy(desc(formations.dateDebut))
       : await db.select().from(formations).orderBy(desc(formations.dateDebut));
-    
+
     // For each formation, count participants
     const result = await Promise.all(
       baseFormations.map(async (formation) => {
         const participantCount = await db.select({ count: sql<number>`count(*)` })
           .from(formationParticipants)
           .where(eq(formationParticipants.formationId, formation.id));
-        
+
         return {
           ...formation,
           participants: Number(participantCount[0]?.count || 0)
         };
       })
     );
-    
+
     res.json(result);
   } catch (error) {
     console.error("Erreur récupération formations:", error);
@@ -270,11 +272,11 @@ hrRouter.get("/formations", getAuthUser, async (req, res) => {
 hrRouter.post("/formations", getAuthUser, async (req, res) => {
   try {
     const { titre, formateur, dateDebut, duree, lieu, description, capaciteMax } = req.body;
-    
+
     if (!titre || !formateur || !dateDebut || !duree) {
       return res.status(400).json({ error: "Champs obligatoires manquants" });
     }
-    
+
     const [newFormation] = await db.insert(formations).values({
       titre,
       formateur,
@@ -285,7 +287,7 @@ hrRouter.post("/formations", getAuthUser, async (req, res) => {
       capaciteMax,
       statut: StatutVisiteTerrain.PLANNED
     }).returning();
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
@@ -303,11 +305,11 @@ hrRouter.post("/formations", getAuthUser, async (req, res) => {
 hrRouter.get("/formations/:id/participants", getAuthUser, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const participants = await db.select()
       .from(formationParticipants)
       .where(eq(formationParticipants.formationId, parseInt(id)));
-    
+
     res.json(participants);
   } catch (error) {
     console.error("Erreur récupération participants:", error);
@@ -320,17 +322,17 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { employeId, employeNom } = req.body;
-    
+
     if (!employeId || !employeNom) {
       return res.status(400).json({ error: "employeId et employeNom requis" });
     }
-    
+
     await db.insert(formationParticipants).values({
       formationId: parseInt(id),
       employeId,
       employeNom
     });
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
@@ -348,13 +350,13 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
 hrRouter.delete("/formations/:id/participants/:employeId", getAuthUser, async (req, res) => {
   try {
     const { id, employeId } = req.params;
-    
+
     await db.delete(formationParticipants)
       .where(and(
         eq(formationParticipants.formationId, parseInt(id)),
         eq(formationParticipants.employeId, employeId)
       ));
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
@@ -373,20 +375,20 @@ hrRouter.patch("/formations/:id", getAuthUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { statut } = req.body;
-    
+
     if (![StatutVisiteTerrain.PLANNED, StatutVisiteTerrain.IN_PROGRESS, StatutVisiteTerrain.COMPLETED, StatutVisiteTerrain.CANCELLED].includes(statut as any)) {
       return res.status(400).json({ error: "Statut invalide" });
     }
-    
+
     const [updated] = await db.update(formations)
       .set({ statut })
       .where(eq(formations.id, parseInt(id)))
       .returning();
-    
+
     if (!updated) {
       return res.status(404).json({ error: "Formation non trouvée" });
     }
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
@@ -410,9 +412,9 @@ hrRouter.patch("/formations/:id", getAuthUser, async (req, res) => {
 hrRouter.get("/sanctions", getAuthUser, async (req, res) => {
   try {
     const { employeId, gravite } = req.query;
-    
+
     let baseQuery = db.select().from(sanctions);
-    
+
     let result;
     if (employeId) {
       result = await baseQuery.where(eq(sanctions.employeId, employeId as string)).orderBy(desc(sanctions.date));
@@ -421,7 +423,7 @@ hrRouter.get("/sanctions", getAuthUser, async (req, res) => {
     } else {
       result = await baseQuery.orderBy(desc(sanctions.date));
     }
-    
+
     res.json(result);
   } catch (error) {
     console.error("Erreur récupération sanctions:", error);
@@ -434,11 +436,11 @@ hrRouter.post("/sanctions", getAuthUser, async (req, res) => {
   try {
     const { employeId, employeNom, type, motif, date, gravite } = req.body;
     const userId = req.user?.id;
-    
+
     if (!employeId || !type || !motif || !date || !gravite) {
       return res.status(400).json({ error: "Champs obligatoires manquants" });
     }
-    
+
     const [newSanction] = await db.insert(sanctions).values({
       employeId,
       employeNom,
@@ -448,13 +450,13 @@ hrRouter.post("/sanctions", getAuthUser, async (req, res) => {
       gravite,
       emetteurId: userId
     }).returning();
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'sanction_new', id: newSanction.id } });
     }
-    
+
     res.status(201).json(newSanction);
   } catch (error) {
     console.error("Erreur création sanction:", error);
@@ -472,11 +474,11 @@ hrRouter.post("/sanctions", getAuthUser, async (req, res) => {
 hrRouter.get("/candidatures", getAuthUser, async (req, res) => {
   try {
     const { statut } = req.query;
-    
+
     const result = statut
       ? await db.select().from(candidatures).where(eq(candidatures.statut, statut as string)).orderBy(desc(candidatures.datePostulation))
       : await db.select().from(candidatures).orderBy(desc(candidatures.datePostulation));
-    
+
     res.json(result);
   } catch (error) {
     console.error("Erreur récupération candidatures:", error);
@@ -488,11 +490,11 @@ hrRouter.get("/candidatures", getAuthUser, async (req, res) => {
 hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
   try {
     const { nom, prenom, email, telephone, posteVise, experience, formation: formationCand } = req.body;
-    
+
     if (!nom || !prenom || !email || !posteVise) {
       return res.status(400).json({ error: "Champs obligatoires manquants" });
     }
-    
+
     const [newCandidature] = await db.insert(candidatures).values({
       nom,
       prenom,
@@ -503,13 +505,13 @@ hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
       formation: formationCand,
       statut: StatutCandidature.PENDING
     }).returning();
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'candidature_new', id: newCandidature.id } });
     }
-    
+
     res.status(201).json(newCandidature);
   } catch (error) {
     console.error("Erreur création candidature:", error);
@@ -522,7 +524,7 @@ hrRouter.patch("/candidatures/:id", getAuthUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { statut, notes, dateEntretien } = req.body;
-    
+
     const updates: any = {};
     if (statut) {
       const validStatuts = Object.values(StatutCandidature);
@@ -533,16 +535,16 @@ hrRouter.patch("/candidatures/:id", getAuthUser, async (req, res) => {
     }
     if (notes !== undefined) updates.notes = notes;
     if (dateEntretien !== undefined) updates.dateEntretien = dateEntretien;
-    
+
     const [updated] = await db.update(candidatures)
       .set(updates)
       .where(eq(candidatures.id, parseInt(id)))
       .returning();
-    
+
     if (!updated) {
       return res.status(404).json({ error: "Candidature non trouvée" });
     }
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
@@ -566,20 +568,20 @@ hrRouter.patch("/candidatures/:id", getAuthUser, async (req, res) => {
 hrRouter.get("/bulletins", getAuthUser, async (req, res) => {
   try {
     const { employeId, mois, annee } = req.query;
-    
+
     let query = db.select().from(bulletinsPaie);
-    
+
     const conditions = [];
     if (employeId) conditions.push(eq(bulletinsPaie.employeId, employeId as string));
     if (mois && annee) {
       const moisFormat = `${annee}-${String(mois).padStart(2, '0')}`;
       conditions.push(eq(bulletinsPaie.mois, moisFormat));
     }
-    
+
     const result = conditions.length > 0
       ? await query.where(and(...conditions)).orderBy(desc(bulletinsPaie.mois))
       : await query.orderBy(desc(bulletinsPaie.mois));
-    
+
     res.json(result);
   } catch (error) {
     console.error("Erreur récupération bulletins:", error);
@@ -588,11 +590,11 @@ hrRouter.get("/bulletins", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/paie/generate - Générer les fiches de paie pour un mois
-hrRouter.post("/paie/generate", getAuthUser, requireRole([SystemRole.ADMIN]), async (req, res) => {
+hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actions.GENERATE, Subjects.PAIE), async (req, res) => {
     try {
         const { mois } = req.body;
         const userId = req.user?.id;
-        
+
         if (!mois) return res.status(400).json({ error: "Mois requis (YYYY-MM)" });
 
         const results = await storage.generateMonthlyPaie(mois, userId);
@@ -651,13 +653,13 @@ hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
       pdfUrl,
       pdfHash
     } = req.body;
-    
+
     const userId = req.user?.id;
-    
+
     if (!employeId || !mois || !salaireBase || !salaireBrut || !salaireNet) {
       return res.status(400).json({ error: "Champs obligatoires manquants" });
     }
-    
+
     // Vérifier si bulletin existe déjà pour ce mois
     const existing = await db.select()
       .from(bulletinsPaie)
@@ -665,11 +667,11 @@ hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
         eq(bulletinsPaie.employeId, employeId),
         eq(bulletinsPaie.mois, mois)
       ));
-    
+
     if (existing.length > 0) {
       return res.status(409).json({ error: "Bulletin déjà existant pour ce mois" });
     }
-    
+
     const [newBulletin] = await db.insert(bulletinsPaie).values({
       employeId,
       employeNom,
@@ -691,7 +693,7 @@ hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
       genereParId: userId,
       statut: StatutArchive.VALIDATED // Directement validé si archivé manuellement
     }).returning();
-    
+
     // Broadcast HR Update
     const wsInstance = getWsInstance();
     if (wsInstance) {
@@ -758,7 +760,7 @@ hrRouter.post("/avantages/assign", getAuthUser, async (req, res) => {
         if (!employeId || !avantageId || !montant) {
             return res.status(400).json({ error: "Champs manquants" });
         }
-        
+
         // Check permissions later
         const result = await storage.assignAvantage({
             employeId,
@@ -802,13 +804,13 @@ hrRouter.post("/presence/checkin", getAuthUser, async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
-        
+
         // Résoudre l'employeId à partir du userId
         const employe = await storage.getEmployeByUserId(userId);
         if (!employe) {
             return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
         }
-        
+
         const result = await storage.checkIn(employe.id);
         res.json(result);
     } catch (error) {
@@ -828,16 +830,16 @@ hrRouter.post("/presence/checkout", getAuthUser, async (req, res) => {
         if (!employe) {
             return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
         }
-        
+
         const result = await storage.checkOut(employe.id);
         if (!result) return res.status(404).json({ error: "Aucun pointage d'arrivée trouvé pour aujourd'hui" });
-        
+
         // WebSocket: Notify presence update
         const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId: employe.id } });
         }
-        
+
         res.json(result);
     } catch (error) {
         console.error("Erreur pointage départ:", error);
@@ -856,16 +858,16 @@ hrRouter.post("/presence/start-break", getAuthUser, async (req, res) => {
         if (!employe) {
             return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
         }
-        
+
         const result = await storage.startBreak(employe.id);
         if (!result) return res.status(404).json({ error: "Aucun pointage d'arrivée trouvé" });
-        
+
         // WebSocket: Notify presence update
         const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId: employe.id } });
         }
-        
+
         res.json(result);
     } catch (error) {
         console.error("Erreur début pause:", error);
@@ -884,16 +886,16 @@ hrRouter.post("/presence/end-break", getAuthUser, async (req, res) => {
         if (!employe) {
             return res.status(404).json({ error: "Profil employé non trouvé pour cet utilisateur" });
         }
-        
+
         const result = await storage.endBreak(employe.id);
         if (!result) return res.status(404).json({ error: "Aucune pause en cours" });
-        
+
         // WebSocket: Notify presence update
         const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId: employe.id } });
         }
-        
+
         res.json(result);
     } catch (error) {
         console.error("Erreur fin pause:", error);
@@ -906,7 +908,7 @@ hrRouter.get("/presence/by-status/:status", getAuthUser, async (req, res) => {
     try {
         const { status } = req.params;
         const today = new Date().toISOString().split('T')[0];
-        
+
         const presencesList = await db.select({
             presence: presences,
             user: users
@@ -918,7 +920,7 @@ hrRouter.get("/presence/by-status/:status", getAuthUser, async (req, res) => {
             eq(presences.date, today),
             eq(presences.statut, status)
         ));
-        
+
         res.json(presencesList.map(p => ({
             ...p.user,
             heureArrivee: p.presence.heureArrivee,
@@ -969,13 +971,13 @@ hrRouter.get("/horaires/:employeId", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/horaires - Créer un horaire
-hrRouter.post("/horaires", getAuthUser, requireRole([SystemRole.ADMIN]), async (req, res) => {
+hrRouter.post("/horaires", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.HORAIRE), async (req, res) => {
     try {
         const { employeId, jourSemaine, heureDebut, heureFin, pauseMinutes } = req.body;
         if (!employeId || jourSemaine === undefined || !heureDebut || !heureFin) {
             return res.status(400).json({ error: "Champs manquants" });
         }
-        
+
         const [horaire] = await db.insert(horairesTravail).values({
             employeId,
             jourSemaine,
@@ -983,7 +985,7 @@ hrRouter.post("/horaires", getAuthUser, requireRole([SystemRole.ADMIN]), async (
             heureFin,
             pauseMinutes: pauseMinutes || 60
         }).returning();
-        
+
         res.status(201).json(horaire);
     } catch (error) {
         console.error("Erreur création horaire:", error);
@@ -992,7 +994,7 @@ hrRouter.post("/horaires", getAuthUser, requireRole([SystemRole.ADMIN]), async (
 });
 
 // DELETE /api/hr/horaires/:id - Supprimer un horaire
-hrRouter.delete("/horaires/:id", getAuthUser, requireRole([SystemRole.ADMIN]), async (req, res) => {
+hrRouter.delete("/horaires/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.HORAIRE), async (req, res) => {
     try {
         const { id } = req.params;
         await db.update(horairesTravail)

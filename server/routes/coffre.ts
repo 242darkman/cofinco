@@ -9,7 +9,9 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { storage } from "../storage";
 
-import { requireAuth, requireRole } from "../auth";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 
 export const coffreRouter = Router();
 const service = new TransfertCoffreService();
@@ -37,7 +39,7 @@ coffreRouter.post(
       });
 
       const body = validationSchema.parse(req.body);
-      
+
       // Inférence de l'agenceId si manquant
       if (!body.agenceId) {
         const [caisse] = await db.select().from(schema.caisses).where(eq(schema.caisses.id, body.caisseId));
@@ -84,7 +86,7 @@ coffreRouter.post(
       });
 
       const body = validationSchema.parse(req.body);
-      
+
       // Verify Admin Role (or at least Manager)
       const userRole = (req as any).user?.role;
       const normalizedRole = normalizeRole(userRole);
@@ -207,7 +209,7 @@ coffreRouter.post(
 );
 
 // 5. SUPERVISION TREASURY (Super-Admin)
-coffreRouter.get("/supervision", requireRole(SystemRole.ADMIN), async (req, res) => {
+coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, Subjects.COFFRE), async (req, res) => {
   try {
     // 1. Get all safes with Agency Info
     const allCoffres = await db.select({
@@ -223,7 +225,7 @@ coffreRouter.get("/supervision", requireRole(SystemRole.ADMIN), async (req, res)
 
     // 2. Calculate Global Stats
     const totalSolde = allCoffres.reduce((acc, c) => acc + Number(c.solde), 0);
-    
+
     // 3. Breakdown by Agency
     const breakdown = allCoffres.map(c => ({
         agenceId: c.agenceId,
@@ -235,20 +237,20 @@ coffreRouter.get("/supervision", requireRole(SystemRole.ADMIN), async (req, res)
     // 4. History (Last 30 Days)
     // Supports "historyFor" query param to fetch history for specific agencies (comma separated IDs)
     const historyFor = (req.query.historyFor as string)?.split(',').filter(Boolean);
-    
+
     // Fetch all movements involving any coffre in the last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     // If specific agencies requested, filter coffreIds. Otherwise use all.
     let targetCoffreIds = allCoffres.map(c => c.id);
     if (historyFor && historyFor.length > 0) {
        targetCoffreIds = allCoffres.filter(c => historyFor.includes(c.agenceId!)).map(c => c.id);
     }
-    
+
     // Safety check: if no coffres, return empty history
     let history: any[] = [];
-    
+
     if (targetCoffreIds.length > 0) {
         const movements = await db.select({
             date: schema.mouvementsFinanciers.dateOperation,
@@ -275,11 +277,11 @@ coffreRouter.get("/supervision", requireRole(SystemRole.ADMIN), async (req, res)
 
         // Net change by date AND agence
         const dailyAgencyChange: Record<string, Record<string, number>> = {};
-        
+
         movements.forEach(m => {
             const dateKey = new Date(m.date!).toISOString().split('T')[0];
             const amount = Number(m.montant);
-            
+
             if (!dailyAgencyChange[dateKey]) dailyAgencyChange[dateKey] = {};
 
             const destId = (m.metadata as any)?.destinationId;
@@ -288,7 +290,7 @@ coffreRouter.get("/supervision", requireRole(SystemRole.ADMIN), async (req, res)
             if (targetCoffreIds.includes(destId)) {
                 const agId = coffreToAgence[destId];
                 dailyAgencyChange[dateKey][agId] = (dailyAgencyChange[dateKey][agId] || 0) + amount;
-            } 
+            }
             if (targetCoffreIds.includes(srcId as string)) {
                 const agId = coffreToAgence[srcId as string];
                 dailyAgencyChange[dateKey][agId] = (dailyAgencyChange[dateKey][agId] || 0) - amount;
@@ -307,27 +309,27 @@ coffreRouter.get("/supervision", requireRole(SystemRole.ADMIN), async (req, res)
         const today = new Date();
         const runningBalances = { ...currentBalances };
         const relevantAgIds = Object.keys(currentBalances);
-        
+
         for (let i = 0; i < 30; i++) {
             const day = new Date();
             day.setDate(today.getDate() - i);
             const dateKey = day.toISOString().split('T')[0];
-            
+
             const totalBalance = Object.values(runningBalances).reduce((a, b) => a + b, 0);
-            
+
             history.push({
                 date: dateKey,
                 balance: totalBalance, // backward兼容 : le total pour la sélection
                 ...runningBalances     // Ajoute les balances individuelles (ex: [agId]: 12345)
             });
-            
+
             // Go back in time: subtract today's net change
             const dayChanges = dailyAgencyChange[dateKey] || {};
             relevantAgIds.forEach(id => {
                 runningBalances[id] -= (dayChanges[id] || 0);
             });
         }
-        
+
         history.reverse();
     }
 
@@ -351,7 +353,7 @@ coffreRouter.get("/transferts", async (req, res) => {
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    
+
     const result = await service.listTransferts({
       agenceId,
       statut: req.query.statut as string,
@@ -371,9 +373,9 @@ coffreRouter.get("/transferts/:id", async (req, res) => {
   try {
     const details = await service.getTransfertDetails(req.params.id);
     if (!details) return res.status(404).json({ error: "Not found" });
-    
+
     const audits = await service.getTransfertAuditLogs(req.params.id);
-    
+
     res.json({ ...details, audits });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -406,7 +408,7 @@ coffreRouter.get("/mouvements", async (req, res) => {
     //    OR typePaiement == 'Approvisionnement coffre' (External Provisioning)
     //    OR typePaiement == 'Versement coffre' (Manual Deposits specific to safe?)
     // )
-    
+
     const conditions = and(
         eq(schema.mouvementsFinanciers.agenceId, agenceId),
         sql`(${schema.mouvementsFinanciers.metadata}->>'coffreId' = ${coffre.id}
@@ -423,7 +425,7 @@ coffreRouter.get("/mouvements", async (req, res) => {
     const [countResult] = await db.select({ count: sql<number>`count(*)` })
         .from(schema.mouvementsFinanciers)
         .where(conditions);
-    
+
     const movements = await db.select()
         .from(schema.mouvementsFinanciers)
         .where(conditions)
@@ -474,7 +476,7 @@ coffreRouter.get("/stats", async (req, res) => {
       const [coffreSiege] = await db.select()
         .from(schema.coffresForts)
         .where(eq(schema.coffresForts.ownerType, "SIEGE"));
-      
+
       if (coffreSiege) {
         return res.json({ solde: Number(coffreSiege.solde), coffreId: coffreSiege.id, code: coffreSiege.code });
       }
@@ -502,10 +504,10 @@ coffreRouter.get("/config", async (req, res) => {
     if (!config) {
       // Configuration par défaut si non trouvée ? Ou 404
       // Pour l'instant, on retourne null ou une config par défaut
-      return res.json({ 
+      return res.json({
         seuilDoubleValidation: "1000000",
         separationInitiateurValideur: true,
-        actif: true 
+        actif: true
       });
     }
 
@@ -548,7 +550,7 @@ coffreRouter.put("/config", async (req, res) => {
     });
 
     const body = schema.parse(req.body);
-    
+
     // Vérification ROLE ADMIN
     const userRole = (req as any).user?.role;
     if (!isAdminRole(userRole)) {
@@ -600,7 +602,8 @@ import { sessionOpeningService } from "../services/caisse/session-opening-servic
  */
 coffreRouter.get(
   "/pending-opening-requests",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  attachAbility,
+  requireAbility(Actions.CREATE, Subjects.COFFRE_TRANSFERT),
   async (req, res) => {
     try {
       const user = (req as any).user;
@@ -624,7 +627,8 @@ coffreRouter.get(
  */
 coffreRouter.post(
   "/transferts/:id/validate-opening",
-  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR),
+  attachAbility,
+  requireAbility(Actions.CREATE, Subjects.COFFRE_TRANSFERT),
   async (req, res) => {
     try {
       const { id } = req.params;

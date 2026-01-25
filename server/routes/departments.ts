@@ -3,8 +3,9 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { departments, jobPositions } from "@shared/schema";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 
 // Schémas de validation
 const createDepartmentSchema = z.object({
@@ -71,7 +72,7 @@ export function registerDepartmentsRoutes(app: Express) {
   });
 
   // POST - Créer un département
-  app.post("/api/departments", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/departments", attachAbility, requireAbility(Actions.MANAGE, Subjects.DEPARTMENT), async (req, res) => {
     try {
       const parsed = createDepartmentSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -87,7 +88,7 @@ export function registerDepartmentsRoutes(app: Express) {
   });
 
   // PUT - Mettre à jour un département
-  app.put("/api/departments/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.put("/api/departments/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.DEPARTMENT), async (req, res) => {
     try {
       const id = req.params.id;
 
@@ -113,7 +114,7 @@ export function registerDepartmentsRoutes(app: Express) {
   });
 
   // DELETE - Supprimer un département
-  app.delete("/api/departments/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/departments/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.DEPARTMENT), async (req, res) => {
     try {
       const id = req.params.id;
 
@@ -219,7 +220,7 @@ export function registerDepartmentsRoutes(app: Express) {
   });
 
   // POST - Créer un poste
-  app.post("/api/job-positions", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/job-positions", attachAbility, requireAbility(Actions.MANAGE, Subjects.DEPARTMENT), async (req, res) => {
     try {
       const parsed = createJobPositionSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -241,7 +242,7 @@ export function registerDepartmentsRoutes(app: Express) {
   });
 
   // PUT - Mettre à jour un poste
-  app.put("/api/job-positions/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.put("/api/job-positions/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.DEPARTMENT), async (req, res) => {
     try {
       const id = req.params.id;
 
@@ -275,7 +276,7 @@ export function registerDepartmentsRoutes(app: Express) {
   });
 
   // DELETE - Supprimer un poste
-  app.delete("/api/job-positions/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/job-positions/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.DEPARTMENT), async (req, res) => {
     try {
       const id = req.params.id;
 

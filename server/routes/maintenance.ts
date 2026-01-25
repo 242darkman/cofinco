@@ -2,8 +2,9 @@ import { Router } from "express";
 import { db } from "../db";
 import { maintenanceModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
 import { z } from "zod";
 
@@ -33,7 +34,7 @@ const toggleModuleSchema = z.object({
   updated_at: z.string().optional()
 });
 
-maintenanceRouter.patch("/:moduleId", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+maintenanceRouter.patch("/:moduleId", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.MAINTENANCE), async (req, res) => {
   try {
     const { moduleId } = req.params;
     const Validation = toggleModuleSchema.safeParse(req.body);
@@ -45,7 +46,7 @@ maintenanceRouter.patch("/:moduleId", requireAuth, requireRole(SystemRole.ADMIN)
     const data = Validation.data;
 
     const existingModule = await db.select().from(maintenanceModules).where(eq(maintenanceModules.id, moduleId)).limit(1);
-    
+
     if (existingModule.length === 0) {
       return res.status(404).json({ message: "Module non trouvé" });
     }
@@ -66,7 +67,7 @@ maintenanceRouter.patch("/:moduleId", requireAuth, requireRole(SystemRole.ADMIN)
     const [updatedModule] = await db.update(maintenanceModules)
       .set({
         isLocked: data.is_locked,
-        lockedBy: validUserId, 
+        lockedBy: validUserId,
         lockedAt: data.is_locked ? new Date() : null,
         reason: data.reason,
         updatedAt: new Date()
@@ -90,13 +91,13 @@ maintenanceRouter.patch("/:moduleId", requireAuth, requireRole(SystemRole.ADMIN)
       const { getWsInstance } = await import("../ws-server");
       const wsInstance = getWsInstance();
       if (wsInstance) {
-        wsInstance.broadcast({ 
-          type: "MAINTENANCE_UPDATE", 
-          payload: { 
-            moduleId, 
+        wsInstance.broadcast({
+          type: "MAINTENANCE_UPDATE",
+          payload: {
+            moduleId,
             isLocked: data.is_locked,
-            moduleName: updatedModule.moduleName 
-          } 
+            moduleName: updatedModule.moduleName
+          }
         });
       }
     } catch (wsError) {
@@ -120,7 +121,7 @@ const platformLockSchema = z.object({
   reason: z.string().nullable().optional()
 });
 
-maintenanceRouter.patch("/:moduleId/platform", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+maintenanceRouter.patch("/:moduleId/platform", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.MAINTENANCE), async (req, res) => {
   try {
     const { moduleId } = req.params; // Should be the ID of the PLATFORM module
     const Validation = platformLockSchema.safeParse(req.body);
@@ -172,14 +173,14 @@ maintenanceRouter.patch("/:moduleId/platform", requireAuth, requireRole(SystemRo
       const { getWsInstance } = await import("../ws-server");
       const wsInstance = getWsInstance();
       if (wsInstance) {
-        wsInstance.broadcast({ 
-          type: "MAINTENANCE_UPDATE", 
-          payload: { 
-            moduleId, 
+        wsInstance.broadcast({
+          type: "MAINTENANCE_UPDATE",
+          payload: {
+            moduleId,
             isLocked: isLocking,
             moduleName: 'PLATFORM',
             isPlatform: true
-          } 
+          }
         });
       }
     } catch (wsError) {
@@ -197,7 +198,7 @@ maintenanceRouter.patch("/:moduleId/platform", requireAuth, requireRole(SystemRo
 // ============================================
 // POST - Seed/Init Default Modules (Internal/Dev)
 // ============================================
-maintenanceRouter.post("/seed", requireAuth, requireRole(SystemRole.ADMIN), async (req, res) => {
+maintenanceRouter.post("/seed", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.MAINTENANCE), async (req, res) => {
   try {
     const defaultModules = [
       'PLATFORM',
@@ -215,7 +216,7 @@ maintenanceRouter.post("/seed", requireAuth, requireRole(SystemRole.ADMIN), asyn
     for (const name of defaultModules) {
         // Updated to use the new conflict handling available in newer Drizzle or just standard check
         const existing = await db.select().from(maintenanceModules).where(eq(maintenanceModules.moduleName, name)).limit(1);
-        
+
         if (existing.length === 0) {
             const [inserted] = await db.insert(maintenanceModules).values({
                 moduleName: name,
@@ -224,7 +225,7 @@ maintenanceRouter.post("/seed", requireAuth, requireRole(SystemRole.ADMIN), asyn
             results.push(inserted);
         }
     }
-    
+
     res.json({ message: "Modules initialized", created: results });
 
   } catch (error) {

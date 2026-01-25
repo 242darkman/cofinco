@@ -2,8 +2,9 @@ import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { insertCompteSchema, insertEcritureSchema, insertJournalSchema, insertDeclarationTvaSchema } from "@shared/schema";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
 import accountingPostingService from "../services/accounting-posting-service";
@@ -14,23 +15,23 @@ import { eq, and, desc, asc } from "drizzle-orm";
 export function registerAccountingRoutes(app: Express) {
 
   // 1. Plan Comptable (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/comptes", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
+  app.get("/api/comptabilite/comptes", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const comptes = await storage.getAllComptes();
     res.json(addSnakeCaseAliasesDeep(comptes));
   });
 
-  app.get("/api/comptabilite/plan-ohada", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
+  app.get("/api/comptabilite/plan-ohada", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     // Alias for same endpoint if needed by legacy calls
     const comptes = await storage.getAllComptes();
     res.json(addSnakeCaseAliasesDeep(comptes));
   });
 
   // Create compte (roles: admin, comptable)
-  app.post("/api/comptabilite/comptes", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
+  app.post("/api/comptabilite/comptes", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req, res) => {
     try {
       const data = insertCompteSchema.parse(normalizeKeysDeep(req.body));
       const compte = await storage.createCompte(data);
-      
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -44,13 +45,13 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 2. Journaux (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/journaux", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
+  app.get("/api/comptabilite/journaux", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const journaux = await storage.getAllJournaux();
     res.json(addSnakeCaseAliasesDeep(journaux));
   });
 
   // Create journal (roles: admin, comptable)
-  app.post("/api/comptabilite/journaux", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
+  app.post("/api/comptabilite/journaux", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req, res) => {
     try {
       const data = insertJournalSchema.parse(normalizeKeysDeep(req.body));
       const journal = await storage.createJournal(data);
@@ -68,7 +69,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 3. Ecritures (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/ecritures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
+  app.get("/api/comptabilite/ecritures", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
     const filter = {
       journalId: req.query.journalId as string,
       dateDebut: req.query.dateDebut as string,
@@ -79,17 +80,17 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // Create écriture (roles: admin, comptable)
-  app.post("/api/comptabilite/ecritures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
+  app.post("/api/comptabilite/ecritures", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req, res) => {
     try {
       const body = normalizeKeysDeep(req.body) as any;
       // Validate Header
       const headerData = insertEcritureSchema.parse(body);
-      
+
       // Validate Lines
       const lignesData = z.array(z.any()).parse(body.lignes);
-      
+
       const ecriture = await storage.createEcriture(headerData, lignesData);
-      
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -104,7 +105,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 4. Grand Livre (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/grand-livre/:compteId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
+  app.get("/api/comptabilite/grand-livre/:compteId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
     const { compteId } = req.params;
     const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
@@ -114,17 +115,17 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 5. TVA (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/declarations-tva", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
+  app.get("/api/comptabilite/declarations-tva", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const declarations = await storage.getDeclarationsTva();
     res.json(addSnakeCaseAliasesDeep(declarations));
   });
 
   // Create déclaration TVA (roles: admin, comptable)
-  app.post("/api/comptabilite/declarations-tva", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req, res) => {
+  app.post("/api/comptabilite/declarations-tva", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req, res) => {
     try {
       const data = insertDeclarationTvaSchema.parse(normalizeKeysDeep(req.body));
       const declaration = await storage.createDeclarationTva(data);
-      
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -138,7 +139,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 6. Balance (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/balance", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
+  app.get("/api/comptabilite/balance", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
     const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
     const balance = await storage.getBalance(dateDebut, dateFin);
@@ -146,20 +147,20 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 7. Stats Journaux (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/journaux-stats", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (_req, res) => {
+  app.get("/api/comptabilite/journaux-stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const stats = await storage.getJournauxStats();
     res.json(addSnakeCaseAliasesDeep(stats));
   });
 
   // 8. Bilan Synthetique (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/bilan-synthetique", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
+  app.get("/api/comptabilite/bilan-synthetique", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
     const bilan = await storage.getBilan(dateFin);
     res.json(bilan);
   });
 
   // 9. Tableau de Trésorerie (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/tableau-tresorerie", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
+  app.get("/api/comptabilite/tableau-tresorerie", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
     const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
 
@@ -206,7 +207,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 10. TAFIRE (Tableau Financier des Ressources et Emplois) (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/tafire", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req, res) => {
+  app.get("/api/comptabilite/tafire", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
     const exercice = parseInt(req.query.exercice as string) || new Date().getFullYear();
     const dateDebut = `${exercice}-01-01`;
     const dateFin = `${exercice}-12-31`;
@@ -262,7 +263,7 @@ export function registerAccountingRoutes(app: Express) {
   // ============================================================================
 
   // 11. Grand Livre V2 - With Running Balance (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/v2/grand-livre/:compteId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.get("/api/comptabilite/v2/grand-livre/:compteId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { compteId } = req.params;
       const agenceId = (req as any).user?.agenceId;
@@ -293,7 +294,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 12. Balance V2 - Enhanced Trial Balance (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/v2/balance", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.get("/api/comptabilite/v2/balance", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const agenceId = (req as any).user?.agenceId;
 
@@ -320,7 +321,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 13. Periods Management (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/periods", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.get("/api/comptabilite/periods", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const agenceId = (req as any).user?.agenceId;
 
@@ -344,7 +345,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 14. Close Period (roles: admin, comptable)
-  app.post("/api/comptabilite/periods/close", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.post("/api/comptabilite/periods/close", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const agenceId = (req as any).user?.agenceId;
       const userId = (req as any).user?.id;
@@ -381,7 +382,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 15. Reverse Entry (Extourne) (roles: admin, comptable)
-  app.post("/api/comptabilite/entries/:ecritureId/reverse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.post("/api/comptabilite/entries/:ecritureId/reverse", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { ecritureId } = req.params;
       const agenceId = (req as any).user?.agenceId;
@@ -425,7 +426,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 16. Get Entry Details with Lines (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/entries/:ecritureId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.get("/api/comptabilite/entries/:ecritureId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { ecritureId } = req.params;
 
@@ -483,7 +484,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 17. Check if Source is Posted (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/posting-status/:sourceType/:sourceId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.get("/api/comptabilite/posting-status/:sourceType/:sourceId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { sourceType, sourceId } = req.params;
       const agenceId = (req as any).user?.agenceId;
@@ -527,7 +528,7 @@ export function registerAccountingRoutes(app: Express) {
   });
 
   // 18. Get Posted Entries by Source Type (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/entries-by-source/:sourceType", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.get("/api/comptabilite/entries-by-source/:sourceType", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { sourceType } = req.params;
       const agenceId = (req as any).user?.agenceId;
@@ -572,7 +573,7 @@ export function registerAccountingRoutes(app: Express) {
 
   // 19. Manual Post Entry (roles: admin, comptable)
   // For manual accounting entries (not auto-posted from business transactions)
-  app.post("/api/comptabilite/v2/ecritures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+  app.post("/api/comptabilite/v2/ecritures", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: Request, res: Response) => {
     try {
       const agenceId = (req as any).user?.agenceId;
       const userId = (req as any).user?.id;

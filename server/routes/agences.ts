@@ -4,8 +4,9 @@ import { agences, userAgences, users, coffresForts, comptesLiaison, userRoles } 
 import { employes } from "../../shared/schema/employes";
 import { clients } from "../../shared/schema/clients";
 import { eq, and, ilike, or, desc, asc, sql, ne } from "drizzle-orm";
-import { requireAuth, requireRole } from "../auth";
-import { SystemRole } from "@shared/types/roles";
+import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
 import { CoffresFortsService } from "../services/transfert-inter-coffres";
 import {
@@ -133,7 +134,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences - Créer une agence (avec coffre-fort atomique)
-  app.post("/api/agences", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/agences", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const data = req.body;
       const userId = (req as any).session?.userId;
@@ -236,7 +237,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // PATCH /api/agences/:id - Modifier une agence
-  app.patch("/api/agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.patch("/api/agences/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const data = req.body;
@@ -286,7 +287,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // DELETE /api/agences/:id - Supprimer une agence
-  app.delete("/api/agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/agences/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -415,7 +416,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/users/:userId/agences - Affecter un utilisateur à une agence
-  app.post("/api/users/:userId/agences", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/users/:userId/agences", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { userId } = req.params;
       const { agenceId, isPrimary = false, role } = req.body;
@@ -527,7 +528,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // PATCH /api/user-agences/:id - Modifier une affectation
-  app.patch("/api/user-agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.patch("/api/user-agences/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const { isPrimary, role, actif } = req.body;
@@ -606,7 +607,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // DELETE /api/user-agences/:id - Supprimer une affectation
-  app.delete("/api/user-agences/:id", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.delete("/api/user-agences/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const adminUserId = (req as any).session?.userId;
@@ -680,7 +681,7 @@ export function registerAgencesRoutes(app: Express) {
   // ============================================
 
   // POST /api/agences/:id/migrations - Créer une nouvelle migration
-  app.post("/api/agences/:id/migrations", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/agences/:id/migrations", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const {
@@ -728,7 +729,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/dry-run - Simulation de migration
-  app.post("/api/agences/migrations/:id/dry-run", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/agences/migrations/:id/dry-run", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
 
@@ -745,7 +746,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/submit - Soumettre pour exécution
-  app.post("/api/agences/migrations/:id/submit", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/agences/migrations/:id/submit", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -767,7 +768,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/execute - Exécuter immédiatement
-  app.post("/api/agences/migrations/:id/execute", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/agences/migrations/:id/execute", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const userId = (req as any).session?.userId;
@@ -805,7 +806,7 @@ export function registerAgencesRoutes(app: Express) {
   });
 
   // POST /api/agences/migrations/:id/cancel - Annuler une migration
-  app.post("/api/agences/migrations/:id/cancel", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/agences/migrations/:id/cancel", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const { reason } = req.body;
@@ -940,7 +941,7 @@ export function registerAgencesRoutes(app: Express) {
   // ============================================
 
   // POST /api/agences/:id/migrate - Ancienne route (redirige vers la nouvelle)
-  app.post("/api/agences/:id/migrate", requireRole(SystemRole.ADMIN), async (req, res) => {
+  app.post("/api/agences/:id/migrate", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
       const { targetAgenceClients, targetAgenceEmployes, targetAgenceCoffre } = req.body;

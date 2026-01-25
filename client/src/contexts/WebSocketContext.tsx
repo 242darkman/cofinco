@@ -394,12 +394,18 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "RBAC_UPDATE":
+         // Invalidate all RBAC-related queries
          queryClient.invalidateQueries({ queryKey: ["/api/permissions"] });
          queryClient.invalidateQueries({ queryKey: ["/api/role-permissions"] });
          queryClient.invalidateQueries({ queryKey: ["/api/my-permissions"] });
          queryClient.invalidateQueries({ queryKey: ["/api/user-permissions"] });
          queryClient.invalidateQueries({ queryKey: ["/api/rbac"] });
-         queryClient.invalidateQueries({ queryKey: ["/api/rbac"] });
+
+         // Dispatch new format event (rbac:update with RbacUpdatePayload)
+         // This is the primary event for the new RBAC system
+         window.dispatchEvent(new CustomEvent('rbac:update', { detail: message.payload }));
+
+         // Also dispatch legacy event for backwards compatibility
          window.dispatchEvent(new CustomEvent('rbac-update', { detail: message.payload }));
          break;
 

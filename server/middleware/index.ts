@@ -9,10 +9,13 @@ export {
   getAuthUser,
   requireAgenceAccess,
   validateAgenceAction,
-  requireRole,
   requireAgenceIdAccess,
   validateAgenceIdAction,
 } from "../middleware";
+
+// NOTE: requireRole has been removed - use requireAbility from server/authorization instead
+// Import: import { attachAbility, requireAbility } from "../authorization"
+// Usage: attachAbility, requireAbility(Actions.X, Subjects.Y)
 
 // Database Context (RLS)
 export {
