@@ -17,6 +17,8 @@ const CaisseDashboard = lazy(() => import('./components/finance/caisse/CaisseDas
 const CoffreFortDashboard = lazy(() => import('./components/finance/caisse/CoffreFortDashboard').then(m => ({ default: m.CoffreFortDashboard })));
 const ComptabiliteSageOHADA = lazy(() => import('./components/finance/accounting/ComptabiliteSageOHADA'));
 const CreditRefundsPage = lazy(() => import('./pages/finance/CreditRefundsPage'));
+const TresoreriePage = lazy(() => import('./pages/finance/TresoreriePage'));
+const ReconciliationPage = lazy(() => import('./pages/finance/ReconciliationPage'));
 
 // Client module
 const ClientModule = lazy(() => import('./components/client/ClientModule'));
@@ -353,6 +355,18 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Validations" />}>
             <AgentValidations />
+          </Suspense>
+        );
+      case 'tresorerie':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Trésorerie" />}>
+            <TresoreriePage />
+          </Suspense>
+        );
+      case 'reconciliation':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Réconciliation MM" />}>
+            <ReconciliationPage />
           </Suspense>
         );
       default:

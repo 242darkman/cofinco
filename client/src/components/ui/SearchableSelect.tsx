@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronDown, Search, X, Check } from 'lucide-react';
+import { ChevronDown, Search, X, Check, AlertCircle } from 'lucide-react';
 import { resolveStorageUrl } from '../../lib/format';
 
 /** Génère les initiales à partir d'un label (ex: "MALONGA Herve" -> "MH") */
@@ -166,174 +166,161 @@ export default function SearchableSelect({
         </label>
       )}
 
-      {/* Trigger Button */}
+      {/* Main Container - Acts as both Trigger and Input */}
       <div
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => {
+           if (!disabled && !isOpen) {
+             setIsOpen(true);
+             setTimeout(() => searchInputRef.current?.focus(), 0);
+           }
+        }}
         className={`
-          flex items-center gap-3
-          w-full h-full min-h-[2.75rem] px-4
-          border rounded-xl
+          relative flex items-center
+          w-full h-full min-h-[3rem]
+          border rounded-xl px-2
           text-sm sm:text-base
-          cursor-pointer
           transition-all duration-200
           ${variant === 'dark'
-            ? 'bg-slate-900 border-slate-700 text-white hover:border-slate-500'
-            : 'bg-input-bg border-input-border text-input-text hover:border-input-focus'
+            ? 'bg-slate-900 border-slate-700 text-white'
+            : 'bg-input-bg border-input-border text-input-text'
           }
-          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-          ${error
-            ? 'border-red-500/50 ring-1 ring-red-500/30'
-            : isOpen
-              ? variant === 'dark'
-                ? 'border-indigo-500 ring-2 ring-indigo-500/30'
-                : 'border-input-focus ring-2 ring-input-focus/30'
-              : ''
-          }
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-slate-500'}
+          ${isOpen ? 'ring-2 ring-indigo-500/30 border-indigo-500 rounded-b-none border-b-0 z-50' : ''}
+          ${error ? 'border-red-500/50 ring-1 ring-red-500/30' : ''}
         `}
       >
-        {/* Avatar when selected */}
-        {showAvatarInTrigger && selectedOption && (
-          <OptionAvatar image={selectedOption.image} label={selectedOption.label} />
-        )}
+          {/* Left Icon / Avatar */}
+           <div className="shrink-0 mr-3 pl-1">
+             {showAvatarInTrigger && selectedOption ? (
+                <OptionAvatar image={selectedOption.image} label={selectedOption.label} />
+             ) : (
+                <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${isOpen ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
+                   <Search size={14} />
+                </div>
+             )}
+           </div>
 
-        {/* Placeholder icon when not selected */}
-        {showAvatarInTrigger && !selectedOption && (
-          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0">
-            <Search size={14} className="text-slate-500" />
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
-          {selectedOption ? (
-            <div>
-              <div className="font-medium truncate">{selectedOption.label}</div>
-              {selectedOption.subLabel && (
-                <div className="text-xs text-slate-500 truncate">{selectedOption.subLabel}</div>
+           {/* Content Area: Either Display Value or Search Input */}
+           <div className="flex-1 min-w-0 py-2">
+              {isOpen ? (
+                 <input
+                    ref={searchInputRef}
+                    autoFocus
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                       setSearchQuery(e.target.value);
+                       if (onSearchChange) onSearchChange(e.target.value);
+                    }}
+                    placeholder="Tapez pour rechercher..."
+                    className="w-full bg-transparent border-none p-0 text-white placeholder:text-slate-500 focus:ring-0 focus:outline-none text-sm font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                 />
+              ) : selectedOption ? (
+                <div>
+                  <div className="font-medium truncate leading-tight">{selectedOption.label}</div>
+                  {selectedOption.subLabel && <div className="text-xs text-slate-500 truncate">{selectedOption.subLabel}</div>}
+                </div>
+              ) : (
+                 <span className="text-slate-500 block py-1">{placeholder}</span>
               )}
-            </div>
-          ) : (
-            <span className="text-slate-500">{placeholder}</span>
-          )}
-        </div>
+           </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {selectedOption && !disabled && (
-            <div
-              onClick={handleClear}
-              className="p-1.5 hover:bg-slate-700/50 rounded-full text-slate-400 hover:text-white transition-colors"
-            >
-              <X size={14} />
-            </div>
-          )}
-          <ChevronDown size={18} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </div>
+           {/* Right Actions */}
+           <div className="flex items-center gap-2 pl-2 pr-1">
+              {(selectedOption || (isOpen && searchQuery)) && (
+                 <div
+                   onClick={(e) => {
+                      e.stopPropagation();
+                      if (isOpen) {
+                          setSearchQuery('');
+                          if (onSearchChange) onSearchChange('');
+                          searchInputRef.current?.focus();
+                      } else {
+                          handleClear(e);
+                      }
+                   }}
+                   className="p-1.5 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors cursor-pointer"
+                 >
+                   <X size={14} />
+                 </div>
+              )}
+              <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+           </div>
       </div>
 
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-
-          {/* Search Input */}
-          <div className="p-3 border-b border-slate-800 bg-slate-900/95 sticky top-0 backdrop-blur-sm">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input
-                ref={searchInputRef}
-                autoFocus
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  if (onSearchChange) onSearchChange(e.target.value);
-                }}
-                placeholder="Rechercher par nom ou téléphone..."
-                className="w-full h-10 pl-10 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder-slate-500"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-
-          {/* Options List */}
-          <div className="max-h-72 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+       {/* Dropdown Menu - Seamlessly attached */}
+       {isOpen && (
+        <div className="absolute left-0 right-0 top-full z-[100] w-full bg-slate-900 border border-t-0 border-indigo-500 rounded-b-xl shadow-2xl overflow-hidden -mt-px ring-2 ring-t-0 ring-indigo-500/30">
+          <div className="max-h-64 overflow-y-auto overflow-x-hidden custom-scrollbar">
             {isLoading ? (
-              <div className="p-6 flex items-center justify-center gap-3 text-slate-500">
-                <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm font-medium">Recherche en cours...</span>
+              <div className="p-8 flex flex-col items-center justify-center gap-3 text-slate-500">
+                <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-xs font-medium uppercase tracking-wider">Chargement...</span>
               </div>
             ) : filteredOptions.length > 0 ? (
-              filteredOptions.map((option) => (
-                <div
-                  key={option.value}
-                  onClick={() => handleSelect(option)}
-                  className={`
-                    w-full px-4 py-3 flex items-center gap-3
-                    cursor-pointer transition-all duration-150
-                    ${option.disabled
-                      ? 'bg-slate-900/40 opacity-50 cursor-not-allowed'
-                      : 'hover:bg-slate-800'
-                    }
-                    ${String(value) === String(option.value)
-                      ? 'bg-indigo-600/20 border-l-2 border-indigo-500'
-                      : 'border-l-2 border-transparent'
-                    }
-                  `}
-                >
-                  {/* Optional Image/Avatar */}
-                  <OptionAvatar image={option.image} label={option.label} disabled={option.disabled} />
-
-                  <div className="flex-1 min-w-0">
-                    <div className={`font-medium truncate flex items-center gap-2 ${option.disabled ? 'text-slate-500' : 'text-white'}`}>
-                        {option.label}
-                        {option.disabled && (
-                            <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-bold uppercase tracking-wider">
-                                {option.disabledReason || 'Inéligible'}
-                            </span>
-                        )}
-                    </div>
-                    {option.subLabel && (
-                      <div className={`text-xs truncate ${option.disabled ? 'text-slate-600' : 'text-slate-400'}`}>
-                        {option.subLabel}
+               <div className="py-1">
+                 {filteredOptions.map((option) => (
+                    <div
+                      key={option.value}
+                      onClick={() => handleSelect(option)}
+                      className={`
+                        w-full px-4 py-2.5 flex items-center gap-3
+                        cursor-pointer transition-colors border-l-2
+                        ${option.disabled ? 'opacity-50 cursor-not-allowed bg-slate-900/50 border-transparent' : 'hover:bg-slate-800/80'}
+                        ${String(value) === String(option.value)
+                          ? 'bg-indigo-500/10 border-indigo-500'
+                          : 'border-transparent'
+                        }
+                      `}
+                    >
+                      <OptionAvatar image={option.image} label={option.label} disabled={option.disabled} />
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-medium truncate flex items-center gap-2 ${option.disabled ? 'text-slate-500' : 'text-slate-200'}`}>
+                            {option.label}
+                            {option.disabled && (
+                                <Badge value={option.disabledReason || "Indisponible"} variant="danger" className="text-[9px] py-0 px-1.5 h-4" />
+                            )}
+                        </div>
+                        {option.subLabel && <div className="text-xs text-slate-500 truncate">{option.subLabel}</div>}
                       </div>
-                    )}
-                  </div>
-
-                  {String(value) === String(option.value) && (
-                    <Check size={16} className="text-indigo-400 flex-shrink-0" />
-                  )}
-                </div>
-              ))
+                      {String(value) === String(option.value) && (
+                        <Check size={14} className="text-indigo-400" />
+                      )}
+                    </div>
+                 ))}
+               </div>
             ) : (
-              <div className="p-8 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center">
-                  <Search size={28} className="text-slate-600" />
-                </div>
-                <p className="text-sm text-slate-400 font-medium mb-1">
-                  {searchQuery.trim() === ''
-                    ? "Commencez votre recherche"
-                    : "Aucun résultat trouvé"
-                  }
-                </p>
-                <p className="text-xs text-slate-500">
-                  {searchQuery.trim() === ''
-                    ? "Tapez un nom ou un numéro de téléphone"
-                    : "Vérifiez l'orthographe ou essayez d'autres mots-clés"
-                  }
-                </p>
+              <div className="p-6 text-center">
+                 <p className="text-sm text-slate-400 mb-1">Aucun résultat</p>
+                 <p className="text-xs text-slate-600">"{searchQuery}"</p>
               </div>
             )}
-          </div>
+           </div>
+           
+           {/* Footer Hint */}
+           <div className="bg-slate-950/50 py-1.5 px-3 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between items-center">
+               <span>{filteredOptions.length} résultats</span>
+               {searchQuery && <span>Entrée pour valider</span>}
+           </div>
         </div>
       )}
 
       {/* Errors */}
       {error && (
-        <p className="mt-1.5 text-xs sm:text-sm text-status-danger flex items-center gap-1">
-          <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
+        <p className="mt-1.5 text-xs text-status-danger flex items-center gap-1 animate-in slide-in-from-top-1">
+          <AlertCircle size={12} />
           {error}
         </p>
       )}
     </div>
   );
+}
+
+// Add simple Badge component if not imported, or replace usage.
+// Assuming Badge is not available in scope here based on imports (Lucide icons imported).
+// Replacing Badge usage with simple span for safety.
+function Badge({ value, variant, className }: { value: string, variant?: string, className?: string }) {
+    const colors = variant === 'danger' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-slate-700 text-slate-300';
+    return <span className={`inline-flex items-center rounded-full border font-bold uppercase tracking-wider ${colors} ${className}`}>{value}</span>
 }

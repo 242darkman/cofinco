@@ -6,53 +6,98 @@ import { comptabiliteApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 
 interface BalanceCompte {
-  numero_compte: string;
+  compteId: string;
+  numeroCompte: string;
   intitule: string;
-  type_compte: string;
-  total_debit: number;
-  total_credit: number;
-  solde_debiteur: number;
-  solde_crediteur: number;
+  classe: number;
+  typeCompte: string;
+  sensNormal: string;
+  totalDebit: number;
+  totalCredit: number;
+  soldeDebiteur: number;
+  soldeCrediteur: number;
+  // Legacy format aliases
+  numero_compte?: string;
+  type_compte?: string;
+  total_debit?: number;
+  total_credit?: number;
+  solde_debiteur?: number;
+  solde_crediteur?: number;
+}
+
+interface BalanceTotals {
+  totalDebits: number;
+  totalCredits: number;
+  totalSoldeDebiteur: number;
+  totalSoldeCrediteur: number;
+  isBalanced: boolean;
 }
 
 export default function BalanceGenerale() {
   const [balance, setBalance] = useState<BalanceCompte[]>([]);
+  const [totalsFromApi, setTotalsFromApi] = useState<BalanceTotals | null>(null);
   const [loading, setLoading] = useState(false);
-  const [dateDebut, setDateDebut] = useState('2024-01-01');
+  const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);
   const [filtreClasse, setFiltreClasse] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
 
   const fetchBalance = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await comptabiliteApi.getBalance({ dateDebut, dateFin });
-      setBalance(data || []);
+      // Use V2 API with enhanced response
+      const data = await comptabiliteApi.getBalanceV2({
+        dateDebut,
+        dateFin,
+        classe: filtreClasse !== 'all' ? parseInt(filtreClasse) : undefined
+      });
+
+      // Normalize data format
+      const normalizedEntries = data.entries.map(e => ({
+        ...e,
+        // Add legacy aliases for compatibility
+        numero_compte: e.numeroCompte,
+        type_compte: e.typeCompte,
+        total_debit: e.totalDebit,
+        total_credit: e.totalCredit,
+        solde_debiteur: e.soldeDebiteur,
+        solde_crediteur: e.soldeCrediteur
+      }));
+
+      setBalance(normalizedEntries);
+      setTotalsFromApi(data.totals);
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du chargement de la balance'));
       setBalance([]);
+      setTotalsFromApi(null);
     } finally {
       setLoading(false);
     }
-  }, [dateDebut, dateFin]);
+  }, [dateDebut, dateFin, filtreClasse]);
 
   useEffect(() => {
     fetchBalance();
   }, [fetchBalance]);
 
-  const filteredBalance = filtreClasse === 'all'
-    ? balance
-    : balance.filter(c => c.numero_compte.startsWith(filtreClasse));
+  // Balance is already filtered by classe on the server if specified
+  const filteredBalance = balance;
 
-  const totaux = filteredBalance.reduce((acc, compte) => ({
-    debit: acc.debit + compte.total_debit,
-    credit: acc.credit + compte.total_credit,
-    solde_debiteur: acc.solde_debiteur + compte.solde_debiteur,
-    solde_crediteur: acc.solde_crediteur + compte.solde_crediteur
+  // Use totals from API or calculate locally
+  const totaux = totalsFromApi ? {
+    debit: totalsFromApi.totalDebits,
+    credit: totalsFromApi.totalCredits,
+    solde_debiteur: totalsFromApi.totalSoldeDebiteur,
+    solde_crediteur: totalsFromApi.totalSoldeCrediteur
+  } : filteredBalance.reduce((acc, compte) => ({
+    debit: acc.debit + (compte.totalDebit || compte.total_debit || 0),
+    credit: acc.credit + (compte.totalCredit || compte.total_credit || 0),
+    solde_debiteur: acc.solde_debiteur + (compte.soldeDebiteur || compte.solde_debiteur || 0),
+    solde_crediteur: acc.solde_crediteur + (compte.soldeCrediteur || compte.solde_crediteur || 0)
   }), { debit: 0, credit: 0, solde_debiteur: 0, solde_crediteur: 0 });
 
-  const isEquilibre = Math.abs(totaux.debit - totaux.credit) < 0.01 &&
-                      Math.abs(totaux.solde_debiteur - totaux.solde_crediteur) < 0.01;
+  const isEquilibre = totalsFromApi?.isBalanced ?? (
+    Math.abs(totaux.debit - totaux.credit) < 0.01 &&
+    Math.abs(totaux.solde_debiteur - totaux.solde_crediteur) < 0.01
+  );
 
   const formatMontant = (montant: number) => {
     return montant.toLocaleString('fr-FR') + ' FCFA';
@@ -67,28 +112,28 @@ export default function BalanceGenerale() {
 
   const handleExportExcel = useCallback(() => {
     if (filteredBalance.length === 0) {
-      toast.warning('Aucune donnée à exporter');
+      toast.warning('Aucune donnee a exporter');
       return;
     }
     try {
       const data = filteredBalance.map(compte => ({
-        'N° Compte': compte.numero_compte,
-        'Intitulé': compte.intitule,
-        'Type': compte.type_compte,
-        'Total Débit': compte.total_debit,
-        'Total Crédit': compte.total_credit,
-        'Solde Débiteur': compte.solde_debiteur,
-        'Solde Créditeur': compte.solde_crediteur
+        'N Compte': compte.numeroCompte || compte.numero_compte || '',
+        'Intitule': compte.intitule,
+        'Type': compte.typeCompte || compte.type_compte || '',
+        'Total Debit': compte.totalDebit ?? compte.total_debit ?? 0,
+        'Total Credit': compte.totalCredit ?? compte.total_credit ?? 0,
+        'Solde Debiteur': compte.soldeDebiteur ?? compte.solde_debiteur ?? 0,
+        'Solde Crediteur': compte.soldeCrediteur ?? compte.solde_crediteur ?? 0
       }));
 
       data.push({
-        'N° Compte': 'TOTAUX',
-        'Intitulé': '',
+        'N Compte': 'TOTAUX',
+        'Intitule': '',
         'Type': '',
-        'Total Débit': totaux.debit,
-        'Total Crédit': totaux.credit,
-        'Solde Débiteur': totaux.solde_debiteur,
-        'Solde Créditeur': totaux.solde_crediteur
+        'Total Debit': totaux.debit,
+        'Total Credit': totaux.credit,
+        'Solde Debiteur': totaux.solde_debiteur,
+        'Solde Crediteur': totaux.solde_crediteur
       });
 
       const ws = XLSX.utils.json_to_sheet(data);
@@ -139,14 +184,21 @@ export default function BalanceGenerale() {
       const maxRows = Math.min(filteredBalance.length, 20);
 
       filteredBalance.slice(0, maxRows).forEach((compte) => {
+        const numCompte = compte.numeroCompte || compte.numero_compte || '';
+        const typeCompte = compte.typeCompte || compte.type_compte || '';
+        const totalDebit = compte.totalDebit ?? compte.total_debit ?? 0;
+        const totalCredit = compte.totalCredit ?? compte.total_credit ?? 0;
+        const soldeDebiteur = compte.soldeDebiteur ?? compte.solde_debiteur ?? 0;
+        const soldeCrediteur = compte.soldeCrediteur ?? compte.solde_crediteur ?? 0;
+
         doc.setFontSize(9);
-        doc.text(compte.numero_compte, 25, y);
-        doc.text(compte.intitule.substring(0, 40), 60, y);
-        doc.text(compte.type_compte, 140, y);
-        doc.text(compte.total_debit.toLocaleString('fr-FR'), 175, y);
-        doc.text(compte.total_credit.toLocaleString('fr-FR'), 205, y);
-        doc.text(compte.solde_debiteur.toLocaleString('fr-FR'), 235, y);
-        doc.text(compte.solde_crediteur.toLocaleString('fr-FR'), 260, y);
+        doc.text(numCompte, 25, y);
+        doc.text((compte.intitule || '').substring(0, 40), 60, y);
+        doc.text(typeCompte, 140, y);
+        doc.text(totalDebit.toLocaleString('fr-FR'), 175, y);
+        doc.text(totalCredit.toLocaleString('fr-FR'), 205, y);
+        doc.text(soldeDebiteur.toLocaleString('fr-FR'), 235, y);
+        doc.text(soldeCrediteur.toLocaleString('fr-FR'), 260, y);
         y += 8;
       });
 
@@ -370,37 +422,46 @@ export default function BalanceGenerale() {
                       </td>
                     </tr>
                   ) : (
-                    filteredBalance.map((compte) => (
-                      <tr key={compte.numero_compte} className="hover:bg-slate-700/30 transition-colors">
-                        <td className="px-3 py-2">
-                          <span className="text-cyan-400 font-mono text-xs font-medium">{compte.numero_compte}</span>
-                        </td>
-                        <td className="px-3 py-2 text-white text-xs truncate max-w-[200px]">{compte.intitule}</td>
-                        <td className="px-3 py-2 hidden md:table-cell">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            compte.type_compte === 'Actif' ? 'bg-green-500/20 text-green-400' :
-                            compte.type_compte === 'Passif' ? 'bg-blue-500/20 text-blue-400' :
-                            compte.type_compte === 'Charge' ? 'bg-red-500/20 text-red-400' :
-                            compte.type_compte === 'Produit' ? 'bg-purple-500/20 text-purple-400' :
-                            'bg-slate-500/20 text-slate-400'
-                          }`}>
-                            {compte.type_compte}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-right text-white text-xs font-mono">
-                          {compte.total_debit > 0 ? compte.total_debit.toLocaleString() : '-'}
-                        </td>
-                        <td className="px-3 py-2 text-right text-white text-xs font-mono">
-                          {compte.total_credit > 0 ? compte.total_credit.toLocaleString() : '-'}
-                        </td>
-                        <td className="px-3 py-2 text-right text-green-400 text-xs font-mono font-medium hidden lg:table-cell">
-                          {compte.solde_debiteur > 0 ? compte.solde_debiteur.toLocaleString() : '-'}
-                        </td>
-                        <td className="px-3 py-2 text-right text-cyan-400 text-xs font-mono font-medium hidden lg:table-cell">
-                          {compte.solde_crediteur > 0 ? compte.solde_crediteur.toLocaleString() : '-'}
-                        </td>
-                      </tr>
-                    ))
+                    filteredBalance.map((compte) => {
+                      const numCompte = compte.numeroCompte || compte.numero_compte || '';
+                      const typeCompte = compte.typeCompte || compte.type_compte || '';
+                      const totalDebit = compte.totalDebit ?? compte.total_debit ?? 0;
+                      const totalCredit = compte.totalCredit ?? compte.total_credit ?? 0;
+                      const soldeDebiteur = compte.soldeDebiteur ?? compte.solde_debiteur ?? 0;
+                      const soldeCrediteur = compte.soldeCrediteur ?? compte.solde_crediteur ?? 0;
+
+                      return (
+                        <tr key={compte.compteId || numCompte} className="hover:bg-slate-700/30 transition-colors">
+                          <td className="px-3 py-2">
+                            <span className="text-cyan-400 font-mono text-xs font-medium">{numCompte}</span>
+                          </td>
+                          <td className="px-3 py-2 text-white text-xs truncate max-w-[200px]">{compte.intitule}</td>
+                          <td className="px-3 py-2 hidden md:table-cell">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                              typeCompte === 'Actif' ? 'bg-green-500/20 text-green-400' :
+                              typeCompte === 'Passif' ? 'bg-blue-500/20 text-blue-400' :
+                              typeCompte === 'Charge' ? 'bg-red-500/20 text-red-400' :
+                              typeCompte === 'Produit' ? 'bg-purple-500/20 text-purple-400' :
+                              'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {typeCompte}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right text-white text-xs font-mono">
+                            {totalDebit > 0 ? totalDebit.toLocaleString() : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right text-white text-xs font-mono">
+                            {totalCredit > 0 ? totalCredit.toLocaleString() : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right text-green-400 text-xs font-mono font-medium hidden lg:table-cell">
+                            {soldeDebiteur > 0 ? soldeDebiteur.toLocaleString() : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right text-cyan-400 text-xs font-mono font-medium hidden lg:table-cell">
+                            {soldeCrediteur > 0 ? soldeCrediteur.toLocaleString() : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
                 <tfoot className="bg-slate-700">

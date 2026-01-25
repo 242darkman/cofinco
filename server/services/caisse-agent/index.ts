@@ -8,6 +8,8 @@
 export { CaisseAgentService, caisseAgentService } from "./caisse-agent-service";
 export { OperationService, operationService } from "./operation-service";
 export { ApprovalService, approvalService } from "./approval-service";
+export { RemiseSettlementService, remiseSettlementService } from "./remise-settlement-service";
+export { agentMmPaymentService } from "./agent-mm-payment-service";
 
 // Re-export des types utiles
 export type {

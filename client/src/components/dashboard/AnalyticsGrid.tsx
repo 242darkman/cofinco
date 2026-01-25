@@ -20,28 +20,28 @@ export default function AnalyticsGrid({ stats }: AnalyticsGridProps) {
   // API returns: { name: "Crédit", value: 30, color: "#10b981" } which matches expectations
   
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
        {/* Area Chart - Growth */}
-       <div className="xl:col-span-2 min-h-[350px]">
+       <div className="lg:col-span-2 min-h-[250px]">
          <Suspense fallback={
-           <Card variant="default" className="h-[350px] flex items-center justify-center bg-slate-900 border-slate-800">
+           <Card variant="default" className="h-[250px] flex items-center justify-center bg-slate-900 border-slate-800">
              <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" />
            </Card>
          }>
-           <BalanceHistoryChart height={350} />
+           <BalanceHistoryChart height={250} />
          </Suspense>
        </div>
 
        {/* Donut Chart - Distribution */}
-       <div className="min-h-[350px]">
+       <div className="min-h-[250px]">
          <Suspense fallback={
-           <Card variant="default" className="h-[350px] flex items-center justify-center bg-slate-900 border-slate-800">
+           <Card variant="default" className="h-[250px] flex items-center justify-center bg-slate-900 border-slate-800">
              <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
            </Card>
          }>
            <PortfolioDistributionChart 
              data={productSplit} 
-             height={350}
+             height={250}
            />
          </Suspense>
        </div>

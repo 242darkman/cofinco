@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, User, CreditCard, Coins, Users, CheckCircle, XCircle, Loader, ArrowLeft, ArrowUpRight, ArrowDownLeft, Wallet, ShieldCheck, Banknote } from 'lucide-react';
-import { Card, Button, SearchInput, Badge, FormField, SelectField } from '../../ui';
-import { clientSearchApi, clientApi, creditApi, tontineApi, operationCaisseApi, systemSettingsApi, factureApi, validationOtpApi, compteEpargneApi } from '../../../lib/api-client';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Search, CreditCard, Users, CheckCircle, Loader, ArrowLeft, ArrowUpRight, ArrowDownLeft, Wallet, ShieldCheck } from 'lucide-react';
+import { Card, Button } from '../../ui';
+import { clientSearchApi, clientApi, creditApi, tontineApi, operationCaisseApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney, parseMoney } from '../../../lib/format';
-import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
-import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
+import { sanitizeInput } from '../../../lib/sanitize';
+import { TypeOperationCaisse } from '@shared/enum/status-constants';
 import ConfirmDialog from '../../ui/ConfirmDialog';
-import { SkeletonCard } from '../../ui/Skeleton';
 import { ReceiptData, ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
@@ -24,37 +23,6 @@ interface Client {
   solde_epargne?: number;
   phone?: string;
   photo_url?: string;
-}
-
-interface Credit {
-  id: string;
-  montant: number;
-  solde_restant: number;
-  montant_total_du?: number;
-  taux_interet: number;
-  date_debut: string;
-  date_fin: string;
-  status: string;
-  type_credit?: string;
-  numero_credit?: string;
-}
-
-interface Tontine {
-  id: string;
-  nom: string;
-  montant_contribution: number;
-  frequence: string;
-  date_prochaine_reunion?: string;
-  nombre_membres_actuel: number;
-  status: string;
-}
-
-interface CompteEpargne {
-    id: string;
-    numeroCompte: string;
-    typeCompte: string;
-    solde: string;
-    statut: string;
 }
 
 type DirectionOperation = 'Dépôt' | 'Retrait';
@@ -80,11 +48,9 @@ const resolveTontineStatus = (amount: number, miseParTour: number) => {
 
 interface CaisseOperationsProps {
   sessionId?: string;
-  onBack?: () => void;
 }
 
-export default function CaisseOperations({ sessionId, onBack }: CaisseOperationsProps) {
-  const queryClient = useQueryClient();
+export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
 
   // Global State
   const [successMessage, setSuccessMessage] = useState('');
@@ -114,26 +80,26 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   } = usePrinter();
   
   // Real-time Data fetching with React Query
-  const { data: selectedClient, isLoading: loadingClient } = useQuery({
+  const { data: selectedClient } = useQuery({
     queryKey: ['client', selectedClientId],
     queryFn: () => selectedClientId ? clientApi.getById(selectedClientId) : null,
     enabled: !!selectedClientId,
     initialData: selectedClientInitialData
   });
 
-  const { data: clientComptes = [], isLoading: loadingComptes } = useQuery({
+  const { data: clientComptes = [] } = useQuery({
     queryKey: ['comptes-epargne', selectedClientId],
     queryFn: () => selectedClientId ? compteEpargneApi.getByClient(selectedClientId) : [],
     enabled: !!selectedClientId
   });
 
-  const { data: credits = [], isLoading: loadingCredits } = useQuery({
+  const { data: credits = [] } = useQuery({
     queryKey: ['credits', selectedClientId],
     queryFn: () => selectedClientId ? creditApi.getAll({ clientId: selectedClientId, statut: 'Approuvé,En cours,Actif' }) : [],
     enabled: !!selectedClientId
   });
 
-  const { data: rawTontines = [], isLoading: loadingTontines } = useQuery({
+  const { data: rawTontines = [] } = useQuery({
     queryKey: ['tontines', selectedClientId],
     queryFn: () => selectedClientId ? tontineApi.getByClient(selectedClientId) : [],
     enabled: !!selectedClientId
@@ -144,7 +110,6 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     return rawTontines?.map((m: any) => m.tontine || m) || [];
   }, [rawTontines]);
 
-  const isDataLoading = loadingClient || loadingComptes || loadingCredits || loadingTontines;
   const [loading, setLoading] = useState(false); // Submission loading state
 
 
@@ -225,32 +190,49 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
     const loadingId = toast.loading(`Traitement du ${direction.toLowerCase()}...`);
 
     try {
-      // Determine Type Operation String
+      // Determine Type Operation String using standardized enum values
       let typeOperationStr = '';
       if (selectedDestination?.type === 'Compte') {
-          typeOperationStr = direction === 'Dépôt' ? 'Versement' : 'Retrait';
+          const subType = selectedDestination.subType?.toLowerCase() || '';
+          if (subType.includes('epargne') || subType.includes('épargne')) {
+              typeOperationStr = direction === 'Dépôt'
+                  ? TypeOperationCaisse.DEPOSIT_SAVINGS
+                  : TypeOperationCaisse.WITHDRAWAL_SAVINGS;
+          } else if (subType.includes('courant')) {
+              typeOperationStr = direction === 'Dépôt'
+                  ? TypeOperationCaisse.DEPOSIT_CURRENT
+                  : TypeOperationCaisse.WITHDRAWAL_CURRENT;
+          } else if (subType.includes('bloqu')) {
+              typeOperationStr = direction === 'Dépôt'
+                  ? TypeOperationCaisse.DEPOSIT_BLOCKED
+                  : TypeOperationCaisse.WITHDRAWAL_BLOCKED;
+          } else {
+              // Default to savings for unknown account types
+              typeOperationStr = direction === 'Dépôt'
+                  ? TypeOperationCaisse.DEPOSIT_SAVINGS
+                  : TypeOperationCaisse.WITHDRAWAL_SAVINGS;
+          }
       } else if (selectedDestination?.type === 'Credit') {
-          typeOperationStr = 'Remboursement Crédit';
+          typeOperationStr = TypeOperationCaisse.LOAN_REPAYMENT;
       } else if (selectedDestination?.type === 'Tontine') {
-          typeOperationStr = 'Cotisation Tontine';
+          typeOperationStr = TypeOperationCaisse.TONTINE_CONTRIBUTION;
       }
 
       const operationPayload = {
         session_id: sessionId,
         client_id: selectedClient!.id,
-        nom_client: `${selectedClient!.nom} ${selectedClient!.prenom}`,
-        telephone_client: selectedClient!.telephone,
-        type: typeOperationStr,
-        montant: montant, 
-        statut_otp: 'Non requis', // OTP désactivé
+        type_operation: typeOperationStr,
+        montant: montant,
+        description: `${direction} - ${selectedDestination?.label || ''}`,
         // Optional links
         compte_id: selectedDestination?.type === 'Compte' ? selectedDestination.id : undefined,
-        credit_id: selectedDestination?.type === 'Credit' ? selectedDestination.id : undefined,
-        tontine_id: selectedDestination?.type === 'Tontine' ? selectedDestination.id : undefined,
-        
-        details_operation: {
-           destination_label: selectedDestination?.label,
-           direction: direction
+        metadata: {
+          nom_client: `${selectedClient!.nom} ${selectedClient!.prenom}`,
+          telephone_client: selectedClient!.telephone,
+          destination_label: selectedDestination?.label,
+          direction: direction,
+          credit_id: selectedDestination?.type === 'Credit' ? selectedDestination.id : undefined,
+          tontine_id: selectedDestination?.type === 'Tontine' ? selectedDestination.id : undefined
         }
       };
 
@@ -285,10 +267,10 @@ export default function CaisseOperations({ sessionId, onBack }: CaisseOperations
   const processDependentOperations = async (typeOp: string) => {
     // Credit Payments & Tontine Contributions logic
     // Note: Account updates are handled by backend finance.ts automatically now
-    if (typeOp === 'Remboursement Crédit' && selectedDestination?.type === 'Credit') {
+    if (typeOp === TypeOperationCaisse.LOAN_REPAYMENT && selectedDestination?.type === 'Credit') {
         await creditApi.addPayment(selectedDestination.id, { montant: parseFloat(montant), client_id: selectedClient?.id });
     }
-    if (typeOp === 'Cotisation Tontine' && selectedDestination?.type === 'Tontine') {
+    if (typeOp === TypeOperationCaisse.TONTINE_CONTRIBUTION && selectedDestination?.type === 'Tontine') {
         await tontineApi.addContribution(selectedDestination.id, { membre_id: selectedClient?.id, montant: parseFloat(montant) });
     }
     // TODO: Create Facture logic here if needed or keep existing logic

@@ -195,278 +195,275 @@ export default function CaisseClientInfos() {
   const risk = client ? getRiskLevel(client.kycStatus) : null;
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto p-4">
-      
-      {/* 1. Bar de Recherche (Top) - Autocomplete Style */}
-      <div className="relative group max-w-2xl mx-auto">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-6 w-6 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
-        </div>
-        <input 
-          type="text" 
-          placeholder="Rechercher un client (Nom, Compte, Téléphone)..." 
-          className="block w-full pl-14 pr-4 py-4 bg-slate-900 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all shadow-lg"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
-          autoFocus
-        />
-        <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
-            <span className="text-xs text-slate-600 bg-slate-800 px-2 py-1 rounded border border-slate-700">ENTER</span>
-        </div>
-      </div>
-
-      {client ? (
-        <div className="animate-in fade-in slide-in-from-bottom-6 duration-500 space-y-6">
-          
-          {/* Main Cockpit Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            
-            {/* COL 1: Identité Client (3 cols) */}
-            <Card className="lg:col-span-3 bg-slate-900 border-slate-800 h-full relative overflow-hidden flex flex-col items-center p-6 text-center">
-                {/* Risk Indicator Strip */}
-                <div className={`absolute top-0 w-full h-1 ${risk?.color}`} />
-                
-                {/* Avatar with Status Dot */}
-                <div className="relative mb-4">
-                    <div className="w-28 h-28 rounded-full bg-slate-800 border-4 border-slate-800 shadow-2xl overflow-hidden">
-                        {client.photoProfile || client.photo_url ? (
-                            <img src={client.photoProfile || client.photo_url} alt="Client" className="w-full h-full object-cover" />
-                        ) : (
-                            <User className="w-full h-full p-6 text-slate-600" />
-                        )}
+    <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30 p-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
+        
+        {/* LEFT COL: Search, Profile & Limits (4 cols) */}
+        <div className="lg:col-span-4 flex flex-col gap-3 h-full overflow-hidden">
+            {/* 1. Search Section */}
+            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10">
+                        <Search className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                     </div>
-                    {/* Status Dot */}
-                    <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-slate-900 ${risk?.color}`}></div>
+                    <h3 className="font-semibold text-sm text-slate-200">Recherche Client</h3>
                 </div>
-
-                <h2 className="text-2xl font-bold text-white mb-1">{formatClientName(client.nom, client.prenom)}</h2>
-                
-                {/* Risk Badge */}
-                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-6 ${risk?.bgBadge} ${risk?.text} border ${risk?.border}`}>
-                    Risque {risk?.label}
-                </div>
-
-                {/* ID & Contact Copyable */}
-                <div className="w-full space-y-3">
-                    <button 
-                        onClick={() => copyToClipboard(client.telephone, 'Téléphone')}
-                        className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-slate-700 hover:bg-slate-950 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-slate-900 text-slate-400 group-hover:text-cyan-400 transition-colors">
-                                <Phone size={16} />
-                            </div>
-                            <span className="font-mono text-slate-300 group-hover:text-white transition-colors">{client.telephone}</span>
-                        </div>
-                        <Copy size={14} className="text-slate-600 group-hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-all" />
-                    </button>
-
-                    <button 
-                        onClick={() => copyToClipboard(client.id, 'ID Client')}
-                        className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-slate-700 hover:bg-slate-950 transition-all group"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-slate-900 text-slate-400 group-hover:text-cyan-400 transition-colors">
-                                <Shield size={16} />
-                            </div>
-                            <span className="font-mono text-slate-300 text-xs truncate group-hover:text-white transition-colors max-w-[120px]">{client.id}</span>
-                        </div>
-                        <Copy size={14} className="text-slate-600 group-hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-all" />
-                    </button>
-                    
-                    {getKycBadge(client.kycStatus || client.kyc_status)}
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-3 w-3 text-slate-500" />
+                    </div>
+                    <input 
+                        type="text" 
+                        placeholder="Nom, compte ou téléphone..." 
+                        className="block w-full pl-9 pr-12 py-2 bg-slate-950/50 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500 transition-all font-medium"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
+                    />
+                     <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+                        <span className="text-[9px] text-slate-600 bg-slate-800 px-1 py-0.5 rounded border border-slate-700">RET</span>
+                    </div>
                 </div>
             </Card>
 
+            {/* 2. Client Profile Card */}
+             <div className="flex-1 min-h-0 overflow-y-auto space-y-3 custom-scrollbar">
+                {client ? (
+                    <>
+                        <Card className="bg-slate-900/80 border border-slate-800 p-4 relative overflow-hidden group">
+                             {/* Risk Strip */}
+                             <div className={`absolute top-0 left-0 w-1 h-full ${risk?.color}`} />
+                             
+                             <div className="flex items-start gap-4 mb-4">
+                                <div className="relative">
+                                    <div className="w-14 h-14 rounded-full bg-slate-800 border border-slate-700 overflow-hidden">
+                                        {client.photoProfile || client.photo_url ? (
+                                            <img src={client.photoProfile || client.photo_url} alt="Client" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User className="w-full h-full p-3 text-slate-500" />
+                                        )}
+                                    </div>
+                                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900 ${risk?.color}`} />
+                                </div>
+                                <div className="flex-1 min-w-0 pt-1">
+                                    <h2 className="text-base font-bold text-white truncate leading-tight mb-1">
+                                        {formatClientName(client.nom, client.prenom)}
+                                    </h2>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="neutral" className="text-[10px] h-5 bg-slate-800 border-slate-700" value={client.id} />
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${risk?.bgBadge} ${risk?.text}`}>
+                                            {risk?.label}
+                                        </span>
+                                    </div>
+                                </div>
+                             </div>
 
-            {/* COL 2: Transaction Central (6 cols) */}
-            <Card className="lg:col-span-6 bg-slate-800/50 border-slate-700/50 h-full p-8 flex flex-col justify-between relative shadow-2xl">
-                <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
-                    <Wallet size={120} />
-                </div>
+                             <div className="space-y-2">
+                                <button 
+                                    onClick={() => copyToClipboard(client.telephone, 'Téléphone')}
+                                    className="w-full flex items-center justify-between p-2 rounded-md bg-slate-950/30 border border-slate-800 hover:border-slate-700 transition-all group/btn"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Phone size={12} className="text-slate-500 group-hover/btn:text-emerald-400" />
+                                        <span className="font-mono text-xs text-slate-300">{client.telephone}</span>
+                                    </div>
+                                    <Copy size={10} className="text-slate-600 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+                                </button>
+                                <div className="flex items-center justify-between p-2 rounded-md bg-slate-950/30 border border-slate-800">
+                                    <div className="flex items-center gap-2">
+                                        <Shield size={12} className="text-slate-500" />
+                                        <span className="text-xs text-slate-300">KYC Status</span>
+                                    </div>
+                                    <div className="transform scale-90 origin-right">
+                                        {getKycBadge(client.kycStatus)}
+                                    </div>
+                                </div>
+                             </div>
+                        </Card>
 
-                <div className="space-y-2 mb-10">
-                    <p className="text-slate-400 font-medium uppercase tracking-widest text-sm">Solde Disponible</p>
-                    <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight leading-none">
-                        {new Intl.NumberFormat('fr-FR').format(balance)} <span className="text-2xl text-slate-500 font-normal">FCFA</span>
-                    </h1>
-                </div>
+                        {/* 3. Limits Card */}
+                        <Card className="bg-slate-900/80 border border-slate-800 p-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-white text-xs flex items-center gap-2">
+                                    <Shield size={14} className="text-emerald-400" />
+                                    Limites de Retrait
+                                </h3>
+                                {canEditLimits && (
+                                     <button 
+                                        onClick={() => {
+                                            if (!limits) return;
+                                            setEditLimits({
+                                                daily: limits.daily.limit,
+                                                weekly: limits.weekly.limit,
+                                                monthly: limits.monthly.limit
+                                            });
+                                            setShowEditLimitsModal(true);
+                                        }}
+                                        className="text-[10px] text-slate-500 hover:text-white flex items-center gap-1 transition-colors"
+                                     >
+                                         <MoreHorizontal size={12} /> Modifier
+                                     </button>
+                                )}
+                            </div>
 
-                <div className="space-y-4">
-                     {/* Action Buttons Grid */}
-                    <div className="grid grid-cols-2 gap-4">
+                            {limits ? (
+                                <div className="space-y-4">
+                                    {/* Daily Hero */}
+                                    <div>
+                                        <div className="flex justify-between items-end mb-1">
+                                            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Journalier</span>
+                                            <span className="text-sm font-bold text-white font-mono">
+                                                {new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(limits.daily.remaining)}
+                                            </span>
+                                        </div>
+                                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mb-1">
+                                             <div 
+                                                className={`h-full rounded-full transition-all duration-500 ${
+                                                    (limits.daily.used / limits.daily.limit) > 0.8 ? 'bg-rose-500' : 
+                                                    (limits.daily.used / limits.daily.limit) > 0.5 ? 'bg-amber-500' : 'bg-emerald-500'
+                                                }`}
+                                                style={{ width: `${Math.min(1, limits.daily.used / limits.daily.limit) * 100}%` }}
+                                             />
+                                        </div>
+                                        <div className="flex justify-between text-[8px] text-slate-500">
+                                            <span>0</span>
+                                            <span>{new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(limits.daily.limit)}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Secondary Limits */}
+                                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/50">
+                                        <div>
+                                            <p className="text-[9px] text-slate-500 mb-1">Hebdo</p>
+                                            <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                <div className="h-full bg-blue-500/70" style={{ width: `${Math.min(1, limits.weekly.used / limits.weekly.limit) * 100}%` }} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] text-slate-500 mb-1">Mensuel</p>
+                                            <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                <div className="h-full bg-purple-500/70" style={{ width: `${Math.min(1, limits.monthly.used / limits.monthly.limit) * 100}%` }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500 italic text-center py-2">Aucune limite configurée</p>
+                            )}
+                        </Card>
+                    </>
+                ) : (
+                    <div className="h-64 rounded-xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-3 p-6">
+                        <User size={32} className="opacity-20" />
+                        <p className="text-xs text-center font-medium">Recherchez un client<br/>pour voir son profil</p>
+                    </div>
+                )}
+             </div>
+        </div>
+
+        {/* RIGHT COL: Cockpit & Activity (8 cols) */}
+        <div className="lg:col-span-8 h-full flex flex-col gap-4">
+            {/* 1. Finance Cockpit Card */}
+            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 relative overflow-hidden shrink-0">
+                 {!client ? (
+                     <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                         <span className="text-slate-500 text-sm border border-slate-800 bg-slate-900 px-4 py-2 rounded-full shadow-lg">En attente de client...</span>
+                     </div>
+                 ) : null}
+
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 relative z-0">
+                     <div>
+                         <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                             <Wallet size={14} className="text-emerald-500" />
+                             Solde Disponible
+                         </p>
+                         <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none">
+                            {new Intl.NumberFormat('fr-FR').format(balance)}
+                            <span className="text-2xl text-slate-600 font-medium ml-2">FCFA</span>
+                         </h1>
+                     </div>
+                     <div className="flex gap-3 w-full md:w-auto">
                         <button
                             onClick={() => openTransactionModal('Dépôt')}
-                            className="h-20 flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xl font-bold transition-all shadow-lg hover:shadow-emerald-500/20 group"
+                            className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
-                            <div className="bg-white/20 p-2 rounded-lg group-hover:scale-110 transition-transform">
-                                <ArrowDownToLine size={24} />
-                            </div>
-                            DÉPÔT
+                            <ArrowDownToLine size={18} /> DÉPÔT
                         </button>
                         <button
                             onClick={() => openTransactionModal('Retrait')}
-                            className="h-20 flex items-center justify-center gap-3 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white rounded-xl text-xl font-bold transition-all shadow-lg hover:shadow-rose-500/20 group"
+                            className="flex-1 md:flex-none h-12 px-6 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold shadow-lg shadow-rose-900/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
-                            <div className="bg-white/20 p-2 rounded-lg group-hover:scale-110 transition-transform">
-                                <ArrowUpFromLine size={24} />
-                            </div>
-                            RETRAIT
+                            <ArrowUpFromLine size={18} /> RETRAIT
                         </button>
-                    </div>
-                    
-                    <button className="w-full py-2 text-slate-400 hover:text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-800 rounded-lg transition-colors">
-                        <History size={14} /> Voir l'historique complet des transactions
-                    </button>
-                </div>
+                     </div>
+                 </div>
             </Card>
 
-
-            {/* COL 3: Conformité & Limites (3 cols) */}
-            <Card className="lg:col-span-3 bg-slate-900 border-slate-800 h-full p-6 flex flex-col relative">
-                <div className="flex items-center gap-2 mb-6">
-                    <Shield className="text-slate-400" size={18} />
-                    <h3 className="font-bold text-white">Limites de Retrait</h3>
+            {/* 2. Activity Feed (Fills remaining height) */}
+            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 flex-1 flex flex-col overflow-hidden min-h-0">
+                <div className="p-4 border-b border-slate-800 bg-slate-950/30 flex justify-between items-center shrink-0">
+                    <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                        <History size={16} className="text-slate-400" />
+                        Activité Récente
+                    </h3>
+                    <div className="flex items-center gap-2">
+                         <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono uppercase">Live Feed</span>
+                    </div>
                 </div>
 
-                {limits ? (
-                    <div className="space-y-8 flex-1">
-                        {/* Daily Limit - Hero */}
-                        <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Disponible Aujourd'hui</p>
-                            <div className="text-3xl font-bold text-white mb-3 font-mono">
-                                {new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(limits.daily.remaining)}
+                <div className="flex-1 overflow-y-auto p-0">
+                    {client && recentTransactions ? (
+                        recentTransactions.length > 0 ? (
+                            <div className="divide-y divide-slate-800/50">
+                                {recentTransactions.map((t: any, i: number) => (
+                                    <div key={t.id || i} className="p-4 hover:bg-white/5 transition-colors flex items-center justify-between group">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                                t.sens === 'CREDIT' || t.type === 'depot' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                                            }`}>
+                                                {t.sens === 'CREDIT' || t.type === 'depot' ? <ArrowDownToLine size={18} /> : <ArrowUpFromLine size={18} />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-200">
+                                                    {t.type_transaction || t.type || 'Opération'}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    {new Date(t.created_at || t.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className={`font-mono font-bold ${
+                                                t.sens === 'CREDIT' || t.type === 'depot' ? 'text-emerald-400' : 'text-slate-300'
+                                            }`}>
+                                                {t.sens === 'CREDIT' || t.type === 'depot' ? '+' : '-'}{new Intl.NumberFormat('fr-FR').format(t.montant)}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500 truncate max-w-[150px]">
+                                                {t.description || '...'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] text-slate-400">
-                                    <span>0</span>
-                                    <span>{new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(limits.daily.limit)}</span>
-                                </div>
-                                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                                     <div 
-                                        className={`h-full rounded-full transition-all duration-500 ${
-                                            (limits.daily.used / limits.daily.limit) > 0.8 ? 'bg-rose-500' : 
-                                            (limits.daily.used / limits.daily.limit) > 0.5 ? 'bg-amber-500' : 'bg-emerald-500'
-                                        }`}
-                                        style={{ width: `${(limits.daily.used / limits.daily.limit) * 100}%` }}
-                                     />
-                                </div>
-                                <p className="text-right text-[10px] text-slate-500 mt-1">
-                                    {Math.round((limits.daily.used / limits.daily.limit) * 100)}% utilisé
-                                </p>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                                <History size={24} className="opacity-20" />
+                                <p className="text-xs">Aucune activité récente</p>
                             </div>
-                        </div>
-
-                        {/* Other Limits Compact */}
-                        <div className="space-y-4 pt-4 border-t border-slate-800">
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs text-slate-400">Hebdo</span>
-                                    <span className="text-xs font-bold text-white">{new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(limits.weekly.remaining)}</span>
-                                </div>
-                                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-blue-500 rounded-full" 
-                                        style={{ width: `${(limits.weekly.used / limits.weekly.limit) * 100}%` }}
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs text-slate-400">Mensuel</span>
-                                    <span className="text-xs font-bold text-white">{new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(limits.monthly.remaining)}</span>
-                                </div>
-                                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-purple-500 rounded-full" 
-                                        style={{ width: `${(limits.monthly.used / limits.monthly.limit) * 100}%` }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-                        Aucune limite configurée
-                    </div>
-                )}
-                 {canEditLimits && limits && (
-                     <Button 
-                       size="sm" 
-                       variant="outline" 
-                       fullWidth 
-                       icon={MoreHorizontal}
-                       className="mt-6 border-slate-700 hover:bg-slate-800"
-                       onClick={() => {
-                         setEditLimits({
-                           daily: limits.daily.limit,
-                           weekly: limits.weekly.limit,
-                           monthly: limits.monthly.limit
-                         });
-                         setShowEditLimitsModal(true);
-                       }}
-                     >
-                       Modifier
-                     </Button>
-                   )}
+                        )
+                    ) : (
+                         <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                             <p className="text-xs">Sélectionnez un client pour voir l'historique</p>
+                         </div>
+                    )}
+                </div>
             </Card>
-
-          </div>
-
-          {/* Flash Activity Feed (Bottom) */}
-          <Card className="bg-slate-900 border-slate-800 p-0 overflow-hidden">
-              <div className="px-6 py-3 bg-slate-950/50 border-b border-slate-800 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
-                      <Clock size={16} className="text-cyan-500" /> Activité Récente (24h)
-                  </h4>
-                  <Badge variant="neutral" value="Temps réel" className="animate-pulse" />
-              </div>
-              <div className="divide-y divide-slate-800">
-                  {recentTransactions?.length ? (
-                      recentTransactions.map((t: any, i: number) => (
-                          <div key={t.id || i} className="px-6 py-3 flex items-center justify-between hover:bg-slate-800/50 transition-colors">
-                              <div className="flex items-center gap-4">
-                                  <span className="text-xs font-mono text-slate-500">
-                                      {new Date(t.created_at || t.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                  </span>
-                                  <Badge 
-                                    variant={t.sens === 'CREDIT' || t.type === 'depot' ? 'success' : 'danger'} 
-                                    value={t.type_transaction || t.type || 'Transaction'} 
-                                    size="sm" 
-                                  />
-                                  <span className="text-sm text-slate-300">
-                                     {t.description || 'Opération caisse'}
-                                  </span>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                  <span className={`font-mono font-bold ${t.sens === 'CREDIT' || t.type === 'depot' ? 'text-emerald-400' : 'text-slate-400'}`}>
-                                      {t.sens === 'CREDIT' || t.type === 'depot' ? '+' : '-'}{new Intl.NumberFormat('fr-FR').format(t.montant)} FCFA
-                                  </span>
-                              </div>
-                          </div>
-                      ))
-                  ) : (
-                      <div className="px-6 py-4 text-center text-slate-500 text-sm italic">
-                          Aucune activité récente aujourd'hui
-                      </div>
-                  )}
-              </div>
-          </Card>
-
         </div>
-      ) : (
-        /* Empty State (Centered) */
-        <div className="flex flex-col items-center justify-center h-[60vh] text-slate-600">
-             <div className="w-32 h-32 bg-slate-900/50 rounded-full flex items-center justify-center mb-6 ring-4 ring-slate-800 shadow-2xl">
-                 <Search size={48} className="text-slate-700" />
-             </div>
-             <h2 className="text-2xl font-bold text-slate-400 mb-2">Prêt pour une opération</h2>
-             <p className="max-w-md text-center text-slate-500">Scannez un badge client ou recherchez par nom/compte pour activer le cockpit caisse.</p>
-        </div>
-      )}
-
+      </div>
       {/* Transaction Modal (Reused Logic) */}
       {showTransactionModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm p-4">

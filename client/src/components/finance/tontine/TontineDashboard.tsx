@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Shuffle, Gift, RefreshCw } from 'lucide-react';
-import { Card, ProgressBar, Button } from '../../ui';
+import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Play, Gift, RefreshCw, ChevronDown, ChevronUp, Lock, Clock } from 'lucide-react';
+import { Card, ProgressBar, Button, Badge } from '../../ui';
 import { toast } from '../../../lib/toast';
 import { tontineApi } from '../../../lib/api-client';
 import { StatutClient, StatutContributionTontine } from '@shared/enum/status-constants';
+import { cn } from '../../../lib/utils';
 
 interface TontineDashboardProps {
   tontineId: string;
@@ -12,16 +13,14 @@ interface TontineDashboardProps {
   tourActuel: number;
 }
 
-interface Stats {
-  totalContributions: number;
-  totalDistributions: number;
-  membresActifs: number;
-  membresEnRetard: number;
-  tauxParticipation: number;
-  prochainBeneficiaire: string | null;
-  contributionsTourActuel: number;
-  contributionsAttendues: number;
-}
+// Status configurations (using Badge variants: success, warning, danger, info, neutral, primary, outline)
+const turnStatusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary' | 'outline' }> = {
+  SCHEDULED: { label: 'Planifié', variant: 'neutral' },
+  READY: { label: 'En attente', variant: 'warning' },
+  PARTIAL_PAID: { label: 'Partiel', variant: 'warning' },
+  PAID_OUT: { label: 'Distribué', variant: 'success' },
+  SKIPPED: { label: 'Sauté', variant: 'danger' },
+};
 
 export default function TontineDashboard({
   tontineId,
@@ -36,131 +35,43 @@ export default function TontineDashboard({
   const totalMembres = toNumber(nombreMembres);
   const currentTour = toNumber(tourActuel);
   const contributionAmount = toNumber(montantContribution);
-  const [stats, setStats] = useState<Stats>({
-    totalContributions: 0,
-    totalDistributions: 0,
-    membresActifs: 0,
-    membresEnRetard: 0,
-    tauxParticipation: 0,
-    prochainBeneficiaire: null,
-    contributionsTourActuel: 0,
-    contributionsAttendues: 0
-  });
+
   const [loading, setLoading] = useState(false);
+  const [generatingCycle, setGeneratingCycle] = useState(false);
+  const [showAllTurns, setShowAllTurns] = useState(false);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [tirageEnCours, setTirageEnCours] = useState(false);
-  const [eligiblesBenefice, setEligiblesBenefice] = useState<any[]>([]);
+
+  // Dashboard data from V2 API
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [turns, setTurns] = useState<any[]>([]);
+  const [membres, setMembres] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchStats();
-    fetchRecentActivity();
-    fetchEligiblesBenefice();
+    fetchDashboard();
   }, [tontineId, tourActuel]);
 
-  const fetchEligiblesBenefice = async () => {
-    if (!tontineId) return;
-    try {
-      const data = await tontineApi.getEligiblesBenefice(tontineId);
-      setEligiblesBenefice(data || []);
-    } catch (error) {
-      console.error('Erreur chargement éligibles:', error);
-    }
-  };
-
-  const fetchProchainBeneficiaire = async () => {
-    if (!tontineId) return null;
-    try {
-      const data = await tontineApi.getProchainBeneficiaire(tontineId);
-      return data?.client?.nom || null;
-    } catch (error) {
-      console.error('Erreur chargement prochain bénéficiaire:', error);
-    }
-    return null;
-  };
-
-  const handleTirage = useCallback(async () => {
-    if (!tontineId) return;
-    setTirageEnCours(true);
-    try {
-      const data = await tontineApi.tirageBeneficiaire(tontineId);
-      const beneficiaireNom = data?.client?.nom || 'Membre sélectionné';
-
-      toast.success(`Tirage effectué ! ${beneficiaireNom} est le prochain bénéficiaire`);
-
-      // Refresh stats et éligibles
-      setStats(prev => ({ ...prev, prochainBeneficiaire: beneficiaireNom }));
-      fetchEligiblesBenefice();
-      fetchStats();
-    } catch (error: any) {
-      toast.error(error.message || 'Erreur lors du tirage');
-    } finally {
-      setTirageEnCours(false);
-    }
-  }, [tontineId]);
-
-  const fetchStats = async () => {
+  const fetchDashboard = async () => {
     if (!tontineId) return;
     setLoading(true);
     try {
-      const [contribData, membresData] = await Promise.all([
-        tontineApi.getContributions(tontineId),
-        tontineApi.getMembres(tontineId)
+      // Fetch dashboard, members and contributions in parallel
+      const [dashData, membresData, contribData] = await Promise.all([
+        tontineApi.getDashboard(tontineId).catch(() => null),
+        tontineApi.getMembres(tontineId),
+        tontineApi.getContributions(tontineId)
       ]);
 
-      const totalContributions = contribData?.reduce((sum: number, c: any) => sum + (Number(c.montant) || 0), 0) || 0;
-      const totalDistributions = 0;
-      const membresActifs = membresData?.filter((m: any) => (m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE)).length || 0;
+      setDashboard(dashData);
+      setMembres(membresData || []);
 
-      const contributionsTourActuel = contribData?.filter((c: any) => c.tour_numero === currentTour).length || 0;
-      const contributionsAttendues = membresActifs;
+      // Fetch turns if we have a cycle
+      if (dashData?.currentCycle?.id) {
+        const turnsData = await tontineApi.getTurns(tontineId, dashData.currentCycle.id);
+        setTurns(turnsData || []);
+      }
 
-      const tauxParticipation = contributionsAttendues > 0
-        ? (contributionsTourActuel / contributionsAttendues) * 100
-        : 0;
-
-      // Calculer les retards: membres qui n'ont pas cotisé pour le tour actuel
-      const membresAyantCotiseTourActuel = new Set(
-        contribData?.filter((c: any) => c.tour_numero === currentTour && c.statut === StatutContributionTontine.VALIDATED)
-          .map((c: any) => c.clientId || c.client_id)
-      );
-      const membresEnRetard = membresData?.filter(
-        (m: any) => {
-          const isActif = m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE;
-          const clientId = m.client_id || m.clientId;
-          return isActif && !membresAyantCotiseTourActuel.has(clientId);
-        }
-      ).length || 0;
-
-      const prochainBeneficiaireCandidate = membresData?.find((m: any) => {
-        const isActif = m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE;
-        const aRecuBenefice = m.a_recu_benefice || m.aRecuBenefice;
-        return isActif && !aRecuBenefice;
-      });
-      const prochainBeneficiaire = prochainBeneficiaireCandidate?.client?.nom || null;
-
-      setStats({
-        totalContributions,
-        totalDistributions,
-        membresActifs,
-        membresEnRetard,
-        tauxParticipation,
-        prochainBeneficiaire,
-        contributionsTourActuel,
-        contributionsAttendues
-      });
-    } catch (error) {
-      console.error('Erreur chargement stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchRecentActivity = async () => {
-    if (!tontineId) return;
-    try {
-      const contribData = await tontineApi.getContributions(tontineId);
-
-      const combined = (contribData || [])
+      // Build recent activity
+      const activities = (contribData || [])
         .slice(0, 8)
         .map((c: any) => ({
           type: 'contribution',
@@ -169,272 +80,304 @@ export default function TontineDashboard({
           nom: c.client?.nom || c.tontine_membres?.clients?.nom || 'Inconnu'
         }))
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setRecentActivity(activities);
 
-      setRecentActivity(combined);
     } catch (error) {
-      console.error('Erreur activité récente:', error);
+      console.error('Erreur chargement dashboard:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const soldeNet = stats.totalContributions - stats.totalDistributions;
-  const progressionTour = stats.contributionsAttendues > 0
-    ? (stats.contributionsTourActuel / stats.contributionsAttendues) * 100
-    : 0;
-  
-  const montantMoyen = stats.membresActifs > 0 
-    ? Math.round(stats.totalContributions / stats.membresActifs) 
-    : 0;
+  const handleGenerateCycle = useCallback(async () => {
+    if (!tontineId) return;
+    setGeneratingCycle(true);
+    try {
+      const result = await tontineApi.generateCycle(tontineId);
+      toast.success(`Cycle généré avec ${result.turnsCreated} tours`);
+      fetchDashboard();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la génération du cycle');
+    } finally {
+      setGeneratingCycle(false);
+    }
+  }, [tontineId]);
+
+  // Compute stats
+  const stats = dashboard?.stats || {};
+  const currentCycle = dashboard?.currentCycle;
+  const nextTurn = dashboard?.nextTurn;
+
+  const membresActifs = membres.filter((m: any) =>
+    m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE
+  ).length;
+
+  const potCollecte = Number(stats.potCollecte || 0);
+  const potDistribue = Number(stats.potDistribue || 0);
+  const soldeNet = potCollecte - potDistribue;
+
+  // Cycle progress
+  const completedTurns = turns.filter((t: any) => t.status === 'PAID_OUT').length;
+  const totalTurns = turns.length;
+  const progressPercent = totalTurns > 0 ? (completedTurns / totalTurns) * 100 : 0;
+
+  // Visible turns (first 5 or all)
+  const visibleTurns = showAllTurns ? turns : turns.slice(0, 5);
 
   if (loading) {
-    return <div className="text-center py-12 text-slate-400">Chargement du dashboard...</div>;
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-slate-800/50 rounded-lg" />)}
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
+      {/* Stats principales */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-green-400 text-xs sm:text-sm font-semibold truncate">Total Contributions</div>
-            <TrendingUp className="text-green-400 shrink-0" size={18} />
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-green-400 text-xs font-semibold">Pot Collecté</span>
+            <TrendingUp className="text-green-400" size={16} />
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-white mb-1 truncate">
-            {stats.totalContributions.toLocaleString()} <span className="text-xs sm:text-sm font-normal text-slate-400">FCFA</span>
-          </div>
-          <div className="text-[10px] sm:text-xs text-green-400/80 font-medium">
-            <span className="bg-green-500/20 px-1.5 py-0.5 rounded text-[10px] mr-1">+{stats.contributionsTourActuel}</span>
-            sur ce tour
+          <div className="text-xl font-bold text-white truncate">
+            {potCollecte.toLocaleString()}
+            <span className="text-xs font-normal text-slate-400 ml-1">FCFA</span>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-emerald-400 text-xs sm:text-sm font-semibold truncate">Total Distribué</div>
-            <DollarSign className="text-emerald-400 shrink-0" size={18} />
+        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-emerald-400 text-xs font-semibold">Distribué</span>
+            <DollarSign className="text-emerald-400" size={16} />
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-white mb-1 truncate">
-            {stats.totalDistributions.toLocaleString()} <span className="text-xs sm:text-sm font-normal text-slate-400">FCFA</span>
+          <div className="text-xl font-bold text-white truncate">
+            {potDistribue.toLocaleString()}
+            <span className="text-xs font-normal text-slate-400 ml-1">FCFA</span>
           </div>
-          <div className="text-[10px] sm:text-xs text-emerald-400/80 font-medium truncate">
+          <div className="text-[10px] text-emerald-400/80 mt-1">
             Solde: {soldeNet.toLocaleString()} FCFA
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-blue-400 text-xs sm:text-sm font-semibold truncate">Membres Actifs</div>
-            <Users className="text-blue-400 shrink-0" size={18} />
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-blue-400 text-xs font-semibold">Membres</span>
+            <Users className="text-blue-400" size={16} />
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-white mb-1">
-            {stats.membresActifs}<span className="text-slate-500 text-sm">/{totalMembres}</span>
-          </div>
-          <div className="text-[10px] sm:text-xs text-blue-400/80 font-medium">
-            {totalMembres > 0 ? ((stats.membresActifs / totalMembres) * 100).toFixed(0) : 0}% participation
+          <div className="text-xl font-bold text-white">
+            {membresActifs}<span className="text-slate-500 text-sm">/{totalMembres}</span>
           </div>
         </Card>
 
-        <Card className={`bg-gradient-to-br ${
-          stats.membresEnRetard > 0
-            ? 'from-red-500/10 to-red-600/5 border-red-500/20'
-            : 'from-green-500/10 to-green-600/5 border-green-500/20'
-        }`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className={`text-xs sm:text-sm font-semibold truncate ${
-              stats.membresEnRetard > 0 ? 'text-red-400' : 'text-green-400'
-            }`}>
-              Retards
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-purple-400 text-xs font-semibold">Cycle</span>
+            <Calendar className="text-purple-400" size={16} />
+          </div>
+          {currentCycle ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold text-white">#{currentCycle.cycleNumber || currentCycle.cycle_number}</span>
+              <Badge variant="success" className="text-[10px]" value="Actif" />
             </div>
-            {stats.membresEnRetard > 0 ? (
-              <AlertTriangle className="text-red-400 shrink-0" size={18} />
-            ) : (
-              <CheckCircle className="text-green-400 shrink-0" size={18} />
-            )}
-          </div>
-          <div className={`text-xl sm:text-2xl font-bold ${
-            stats.membresEnRetard > 0 ? 'text-red-400' : 'text-green-400'
-          } mb-1`}>
-            {stats.membresEnRetard} <span className="text-sm font-normal opacity-70">membres</span>
-          </div>
-          <div className={`text-[10px] sm:text-xs font-medium truncate ${
-            stats.membresEnRetard > 0 ? 'text-red-400/80' : 'text-green-400/80'
-          }`}>
-            {stats.membresEnRetard === 0 ? 'Tout est à jour' : 'Action requise'}
-          </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateCycle}
+              disabled={generatingCycle}
+              className="w-full text-xs"
+              icon={generatingCycle ? RefreshCw : Play}
+            >
+              {generatingCycle ? 'Génération...' : 'Démarrer'}
+            </Button>
+          )}
         </Card>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <div className="flex items-center gap-2 mb-4">
-             <Calendar size={18} className="text-cyan-400" />
-             <h3 className="text-base sm:text-lg font-bold text-white">Tour Actuel #{tourActuel}</h3>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2 text-xs sm:text-sm">
-                <span className="text-slate-400">Progression</span>
-                <span className="text-white font-medium">
-                  {stats.contributionsTourActuel}/{stats.contributionsAttendues}
-                </span>
-              </div>
-              <ProgressBar 
-                value={Math.min(progressionTour, 100)} 
-                color={progressionTour === 100 ? 'success' : 'primary'} 
-                size="md" 
-                animate
-              />
-            </div>
-
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-slate-400 uppercase tracking-wider font-semibold text-[10px]">Prochain Bénéficiaire</div>
-                {eligiblesBenefice.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={handleTirage}
-                    disabled={tirageEnCours}
-                    className="text-cyan-400 hover:text-cyan-300 text-[10px] px-2 py-1"
-                    icon={tirageEnCours ? RefreshCw : Shuffle}
-                  >
-                    {tirageEnCours ? 'Tirage...' : 'Tirer'}
-                  </Button>
-                )}
-              </div>
-              {stats.prochainBeneficiaire ? (
-                <div className="text-white font-bold text-base flex items-center gap-2">
-                  <Gift size={16} className="text-emerald-400" />
-                  {stats.prochainBeneficiaire}
-                </div>
-              ) : eligiblesBenefice.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="text-slate-400 text-xs">
-                    {eligiblesBenefice.length} membre(s) éligible(s)
+      {/* Prochain bénéficiaire + Progression */}
+      {currentCycle && (
+        <div className="grid md:grid-cols-2 gap-3">
+          {/* Prochain tour */}
+          {nextTurn && (
+            <Card className="p-3 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-cyan-500/30">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                    Prochain Bénéficiaire
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {eligiblesBenefice.slice(0, 5).map((m, i) => (
-                      <span key={i} className="text-[10px] bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-300">
-                        {m.client?.nom}
-                      </span>
-                    ))}
-                    {eligiblesBenefice.length > 5 && (
-                      <span className="text-[10px] bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-400">
-                        +{eligiblesBenefice.length - 5}
-                      </span>
-                    )}
+                  <div className="text-white font-bold flex items-center gap-2">
+                    <Gift size={16} className="text-emerald-400" />
+                    Tour #{nextTurn.turnNumber || nextTurn.turn_number}
+                  </div>
+                  <div className="text-slate-400 text-xs mt-0.5">
+                    {nextTurn.dueDate || nextTurn.due_date ? new Date(nextTurn.dueDate || nextTurn.due_date).toLocaleDateString('fr-FR', {
+                      day: 'numeric', month: 'short'
+                    }) : '-'}
                   </div>
                 </div>
-              ) : (
-                <div className="text-green-400 italic text-xs flex items-center gap-1">
-                  <CheckCircle size={12} />
-                  Tous ont reçu le bénéfice
+                <div className="text-right">
+                  <div className="text-white font-bold">
+                    {Number(nextTurn.amountExpected || nextTurn.amount_expected || 0).toLocaleString()} FCFA
+                  </div>
+                  {(nextTurn.isLocked || nextTurn.is_locked) && (
+                    <div className="flex items-center gap-1 text-amber-400 text-[10px] mt-1 justify-end">
+                      <Lock size={10} />
+                      <span>Verrouillé</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            </Card>
+          )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-slate-800/50 rounded-lg p-2.5 border border-slate-700/50">
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Attendu</div>
-                <div className="text-slate-300 font-bold text-xs sm:text-sm">
-                  {(montantContribution * stats.contributionsAttendues).toLocaleString()} FCFA
-                </div>
-              </div>
-              <div className="bg-slate-800/50 rounded-lg p-2.5 border border-slate-700/50">
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Collecté</div>
-                <div className="text-green-400 font-bold text-xs sm:text-sm">
-                  {(montantContribution * stats.contributionsTourActuel).toLocaleString()} FCFA
-                </div>
-              </div>
+          {/* Progression */}
+          <Card className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Progression</span>
+              <span className="text-white text-sm font-medium">{completedTurns}/{totalTurns}</span>
             </div>
-          </div>
-        </Card>
+            <ProgressBar
+              value={progressPercent}
+              color={progressPercent === 100 ? 'success' : 'primary'}
+              size="md"
+              animate
+            />
+            <div className="flex justify-between mt-2 text-[10px] text-slate-500">
+              <span>{Math.round(progressPercent)}% complété</span>
+              <span>{totalTurns - completedTurns} restants</span>
+            </div>
+          </Card>
+        </div>
+      )}
 
-        <Card>
-          <div className="flex items-center gap-2 mb-4">
-             <Activity size={18} className="text-cyan-400" />
-             <h3 className="text-base sm:text-lg font-bold text-white">Activité Récente</h3>
+      {/* Liste des tours (compact) */}
+      {turns.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="p-3 border-b border-slate-700/50 flex items-center justify-between">
+            <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+              <Calendar size={14} className="text-cyan-400" />
+              Calendrier des Tours
+            </h3>
+            {turns.length > 5 && (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setShowAllTurns(!showAllTurns)}
+                icon={showAllTurns ? ChevronUp : ChevronDown}
+              >
+                {showAllTurns ? 'Réduire' : `Voir tous (${totalTurns})`}
+              </Button>
+            )}
           </div>
-          <div className="space-y-1 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
-            {recentActivity.length === 0 ? (
-              <div className="text-center py-8 flex flex-col items-center gap-3">
-                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
-                    <Activity className="text-slate-600" size={18} />
-                 </div>
-                 <div className="text-slate-500 text-xs">Aucune activité</div>
-              </div>
-            ) : (
-              recentActivity.map((activity, index) => (
+          <div className="divide-y divide-slate-700/30 max-h-[250px] overflow-y-auto">
+            {visibleTurns.map((turn: any, idx: number) => {
+              const status = turn.status || 'SCHEDULED';
+              const statusCfg = turnStatusConfig[status] || turnStatusConfig.SCHEDULED;
+              const isNext = nextTurn?.id === turn.id;
+              const turnNum = turn.turnNumber || turn.turn_number;
+              const dueDate = turn.dueDate || turn.due_date;
+              const amountExpected = Number(turn.amountExpected || turn.amount_expected || 0);
+              const isLocked = turn.isLocked || turn.is_locked;
+
+              return (
                 <div
-                  key={index}
-                  className="group flex items-center gap-2 sm:gap-3 p-2.5 bg-slate-800/30 rounded-lg hover:bg-slate-800 transition border border-transparent hover:border-slate-700"
+                  key={turn.id || idx}
+                  className={cn(
+                    'flex items-center justify-between px-3 py-2 hover:bg-slate-800/30 transition',
+                    isNext && 'bg-cyan-500/5 border-l-2 border-cyan-500'
+                  )}
                 >
-                  <div className={`p-1.5 rounded-lg ${
-                    activity.type === 'contribution'
-                      ? 'bg-green-500/10 text-green-400'
-                      : 'bg-emerald-500/10 text-emerald-400'
-                  }`}>
-                    {activity.type === 'contribution' ? (
-                      <TrendingUp size={14} />
-                    ) : (
-                      <ArrowRight size={14} />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-slate-200 text-xs sm:text-sm font-medium truncate group-hover:text-white transition-colors">
-                      {activity.nom}
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold',
+                      status === 'PAID_OUT' ? 'bg-green-500/20 text-green-400' :
+                      status === 'READY' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-slate-700/50 text-slate-400'
+                    )}>
+                      {turnNum}
                     </div>
-                    <div className="text-[10px] text-slate-500">
-                      {activity.type === 'contribution' ? 'Contribution' : 'Distribution'}
+                    <div>
+                      <div className="text-white text-xs font-medium">
+                        {turn.beneficiaryMemberName || turn.beneficiary_member_name || `Tour ${turnNum}`}
+                      </div>
+                      <div className="text-slate-500 text-[10px]">
+                        {dueDate ? new Date(dueDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '-'}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="text-right">
-                    <div className={`text-xs sm:text-sm font-bold ${
-                      activity.type === 'contribution' ? 'text-green-400' : 'text-emerald-400'
-                    }`}>
-                      {activity.montant.toLocaleString()}
-                    </div>
-                    <div className="text-[10px] text-slate-500">
-                      {new Date(activity.date).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short'
-                      })}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    {isLocked && <Lock size={10} className="text-slate-500" />}
+                    <Badge variant={statusCfg.variant} className="text-[9px] px-1.5" value={statusCfg.label} />
+                    <span className="text-slate-400 text-[10px] font-medium min-w-[60px] text-right">
+                      {amountExpected.toLocaleString()}
+                    </span>
                   </div>
                 </div>
-              ))
-            )}
+              );
+            })}
           </div>
         </Card>
-      </div>
+      )}
 
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-slate-800/40 border-slate-700/50 p-3 flex flex-col justify-between h-full">
-          <div className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 truncate">Participation</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl sm:text-2xl font-bold text-cyan-400">{stats.tauxParticipation.toFixed(0)}</span>
-            <span className="text-sm font-medium text-cyan-500/70">%</span>
-          </div>
-        </Card>
+      {/* Activité récente (compact) */}
+      <Card>
+        <div className="p-3 border-b border-slate-700/50">
+          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+            <Activity size={14} className="text-cyan-400" />
+            Activité Récente
+          </h3>
+        </div>
+        <div className="divide-y divide-slate-700/30 max-h-[200px] overflow-y-auto">
+          {recentActivity.length === 0 ? (
+            <div className="text-center py-6 text-slate-500 text-xs">Aucune activité</div>
+          ) : (
+            recentActivity.map((activity, index) => (
+              <div key={index} className="flex items-center justify-between px-3 py-2 hover:bg-slate-800/30 transition">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1 rounded ${
+                    activity.type === 'contribution' ? 'bg-green-500/10 text-green-400' : 'bg-emerald-500/10 text-emerald-400'
+                  }`}>
+                    {activity.type === 'contribution' ? <TrendingUp size={12} /> : <ArrowRight size={12} />}
+                  </div>
+                  <span className="text-white text-xs truncate max-w-[120px]">{activity.nom}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold ${
+                    activity.type === 'contribution' ? 'text-green-400' : 'text-emerald-400'
+                  }`}>
+                    {activity.montant.toLocaleString()}
+                  </span>
+                  <span className="text-slate-500 text-[10px]">
+                    {new Date(activity.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
 
-        <Card className="bg-slate-800/40 border-slate-700/50 p-3 flex flex-col justify-between h-full">
-          <div className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 truncate">Moyenne</div>
-          <div>
-            <div className="text-xl sm:text-2xl font-bold text-green-400 leading-none">
-              {montantMoyen.toLocaleString()}
-            </div>
-            <div className="text-[10px] font-medium text-slate-500 mt-1">FCFA / membre</div>
-          </div>
+      {/* Action: générer cycle si pas de cycle */}
+      {!currentCycle && !loading && (
+        <Card className="p-4 text-center">
+          <Calendar className="mx-auto text-slate-500 mb-3" size={32} />
+          <h3 className="text-white font-semibold mb-1">Aucun cycle actif</h3>
+          <p className="text-slate-400 text-xs mb-3">
+            Générez un cycle pour planifier les tours de distribution
+          </p>
+          <Button
+            onClick={handleGenerateCycle}
+            disabled={generatingCycle}
+            icon={generatingCycle ? RefreshCw : Play}
+          >
+            {generatingCycle ? 'Génération...' : 'Générer un cycle'}
+          </Button>
         </Card>
-
-        <Card className="bg-slate-800/40 border-slate-700/50 p-3 flex flex-col justify-between h-full">
-          <div className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 truncate">Tours Restants</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl sm:text-2xl font-bold text-emerald-400">{Math.max(0, totalMembres - currentTour + 1)}</span>
-            <span className="text-[10px] font-medium text-emerald-500/70 uppercase">Tours</span>
-          </div>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }

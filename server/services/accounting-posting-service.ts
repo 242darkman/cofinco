@@ -1,0 +1,1126 @@
+/**
+ * Accounting Posting Service
+ *
+ * This is the central posting engine for the SYSCOHADA-compliant accounting module.
+ * It handles:
+ * - Creating GL entries with idempotency (no double-posting)
+ * - Period validation (cannot post to closed periods)
+ * - Balance validation (debit must equal credit)
+ * - Automatic posting from business transactions using accounting rules
+ * - Reversal (extourne) functionality
+ * - Piece number generation (concurrent-safe)
+ */
+
+import { db } from "../db";
+import { eq, and, sql, isNull, or, desc, asc, gte, lte } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
+import {
+  ecritures,
+  lignesEcritures,
+  journaux,
+  planComptable,
+  glPostingLinks,
+  glPeriods,
+  glSequences,
+  accountingRules,
+  exercices,
+  type PostEntryRequest,
+  type PostEntryResult,
+  type PostEntryLine,
+  type AccountingRule,
+  type GrandLivreEntry,
+  type GrandLivreResponse,
+  type BalanceEntry,
+  type BalanceResponse,
+  EntryStatus,
+  PeriodStatus,
+} from "@shared/schema";
+import { mouvementsFinanciers, type MouvementFinancier } from "@shared/schema/finance";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface PostFromMouvementRequest {
+  mouvement: MouvementFinancier;
+  agenceId: string;
+  userId?: string;
+  additionalMetadata?: Record<string, any>;
+}
+
+export interface ReverseEntryRequest {
+  ecritureId: string;
+  reason: string;
+  userId?: string;
+  agenceId: string;
+}
+
+export interface ReverseEntryResult {
+  originalEcritureId: string;
+  reversalEcritureId: string;
+  numeroPiece: string;
+}
+
+export interface ClosePeriodRequest {
+  agenceId: string;
+  year: number;
+  month: number;
+  userId: string;
+  notes?: string;
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Get the next piece number for a journal (concurrent-safe)
+ */
+async function getNextPieceNumber(
+  tx: PgTransaction<any, any, any>,
+  agenceId: string,
+  journalCode: string,
+  year: number
+): Promise<string> {
+  // Use raw SQL to call the database function for concurrent-safe sequence
+  const result = await tx.execute(
+    sql`SELECT get_next_piece_number(${agenceId}::uuid, ${journalCode}, ${year}) as piece_number`
+  );
+
+  const pieceNumber = (result.rows[0] as any)?.piece_number;
+  if (!pieceNumber) {
+    // Fallback: manual increment if function doesn't exist
+    const [seq] = await tx
+      .insert(glSequences)
+      .values({
+        agenceId,
+        journalCode,
+        year,
+        lastNumber: 1,
+      })
+      .onConflictDoUpdate({
+        target: [glSequences.agenceId, glSequences.journalCode, glSequences.year],
+        set: {
+          lastNumber: sql`${glSequences.lastNumber} + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    const num = seq?.lastNumber || 1;
+    return `${journalCode}-${year}-${String(num).padStart(6, "0")}`;
+  }
+
+  return pieceNumber;
+}
+
+/**
+ * Get or create the current exercice (fiscal year)
+ */
+async function getOrCreateExercice(
+  tx: PgTransaction<any, any, any>,
+  agenceId: string,
+  date: Date
+): Promise<string> {
+  const year = date.getFullYear();
+  const code = year.toString();
+
+  // Try to find existing
+  const [existing] = await tx
+    .select()
+    .from(exercices)
+    .where(
+      and(
+        eq(exercices.code, code),
+        or(eq(exercices.agenceId, agenceId), isNull(exercices.agenceId))
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Create new exercice
+  const [created] = await tx
+    .insert(exercices)
+    .values({
+      code,
+      dateDebut: `${year}-01-01`,
+      dateFin: `${year}-12-31`,
+      statut: "OPEN",
+      description: `Exercice ${year}`,
+      agenceId,
+    })
+    .returning();
+
+  return created.id;
+}
+
+/**
+ * Get or create the period for a date
+ */
+async function getOrCreatePeriod(
+  tx: PgTransaction<any, any, any>,
+  agenceId: string,
+  date: Date,
+  exerciceId: string
+): Promise<{ periodId: string; isClosed: boolean }> {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1; // 1-12
+
+  // Month names in French
+  const monthNames = [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+  ];
+
+  // Calculate period dates
+  const dateDebut = new Date(year, month - 1, 1);
+  const dateFin = new Date(year, month, 0); // Last day of month
+
+  // Try to find existing
+  const [existing] = await tx
+    .select()
+    .from(glPeriods)
+    .where(
+      and(
+        eq(glPeriods.agenceId, agenceId),
+        eq(glPeriods.year, year),
+        eq(glPeriods.month, month)
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    const isClosed = existing.statut === PeriodStatus.CLOSED || existing.statut === PeriodStatus.LOCKED;
+    return { periodId: existing.id, isClosed };
+  }
+
+  // Create new period
+  const [created] = await tx
+    .insert(glPeriods)
+    .values({
+      agenceId,
+      exerciceId,
+      year,
+      month,
+      name: `${monthNames[month - 1]} ${year}`,
+      dateDebut: dateDebut.toISOString().split("T")[0],
+      dateFin: dateFin.toISOString().split("T")[0],
+      statut: PeriodStatus.OPEN,
+    })
+    .returning();
+
+  return { periodId: created.id, isClosed: false };
+}
+
+/**
+ * Check if a source has already been posted (idempotency)
+ */
+async function checkIdempotency(
+  tx: PgTransaction<any, any, any>,
+  agenceId: string,
+  sourceType: string,
+  sourceId: string
+): Promise<string | null> {
+  const [existing] = await tx
+    .select({ ecritureId: glPostingLinks.ecritureId })
+    .from(glPostingLinks)
+    .where(
+      and(
+        eq(glPostingLinks.agenceId, agenceId),
+        eq(glPostingLinks.sourceType, sourceType),
+        eq(glPostingLinks.sourceId, sourceId)
+      )
+    )
+    .limit(1);
+
+  return existing?.ecritureId || null;
+}
+
+/**
+ * Find matching accounting rule for a business event
+ */
+async function findMatchingRule(
+  tx: PgTransaction<any, any, any>,
+  agenceId: string,
+  sourceType: string,
+  eventType: string,
+  paymentMethod?: string,
+  provider?: string
+): Promise<AccountingRule | null> {
+  // Build conditions for rule matching
+  // Rules are matched by: sourceType, eventType, paymentMethod (optional), provider (optional)
+  // More specific rules (with paymentMethod/provider) have higher priority
+
+  const rules = await tx
+    .select()
+    .from(accountingRules)
+    .where(
+      and(
+        eq(accountingRules.active, true),
+        eq(accountingRules.sourceType, sourceType),
+        eq(accountingRules.eventType, eventType),
+        or(isNull(accountingRules.agenceId), eq(accountingRules.agenceId, agenceId))
+      )
+    )
+    .orderBy(asc(accountingRules.priority));
+
+  // Filter rules by paymentMethod and provider
+  for (const rule of rules) {
+    // Check payment method match
+    if (rule.paymentMethod && paymentMethod && rule.paymentMethod !== paymentMethod) {
+      continue;
+    }
+    // Check provider match
+    if (rule.provider && provider && rule.provider !== provider) {
+      continue;
+    }
+    // If rule has specific paymentMethod/provider but we don't have it, skip
+    if (rule.paymentMethod && !paymentMethod) {
+      continue;
+    }
+    if (rule.provider && !provider) {
+      continue;
+    }
+
+    return rule;
+  }
+
+  // If no specific match, try to find a rule without paymentMethod/provider constraints
+  for (const rule of rules) {
+    if (!rule.paymentMethod && !rule.provider) {
+      return rule;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get account ID by account number
+ */
+async function getAccountByNumber(
+  tx: PgTransaction<any, any, any>,
+  numeroCompte: string,
+  agenceId?: string
+): Promise<{ id: string; numeroCompte: string; intitule: string } | null> {
+  const [account] = await tx
+    .select({
+      id: planComptable.id,
+      numeroCompte: planComptable.numeroCompte,
+      intitule: planComptable.intitule,
+    })
+    .from(planComptable)
+    .where(
+      and(
+        eq(planComptable.numeroCompte, numeroCompte),
+        eq(planComptable.actif, true),
+        or(isNull(planComptable.agenceId), agenceId ? eq(planComptable.agenceId, agenceId) : sql`true`)
+      )
+    )
+    .limit(1);
+
+  return account || null;
+}
+
+/**
+ * Get journal by code
+ */
+async function getJournalByCode(
+  tx: PgTransaction<any, any, any>,
+  journalCode: string,
+  agenceId?: string
+): Promise<{ id: string; code: string; intitule: string } | null> {
+  const [journal] = await tx
+    .select({
+      id: journaux.id,
+      code: journaux.code,
+      intitule: journaux.intitule,
+    })
+    .from(journaux)
+    .where(
+      and(
+        eq(journaux.code, journalCode),
+        eq(journaux.actif, true),
+        or(isNull(journaux.agenceId), agenceId ? eq(journaux.agenceId, agenceId) : sql`true`)
+      )
+    )
+    .limit(1);
+
+  return journal || null;
+}
+
+// ============================================================================
+// MAIN POSTING FUNCTIONS
+// ============================================================================
+
+/**
+ * Post an accounting entry
+ *
+ * This is the core function that creates a GL entry with full validation:
+ * - Idempotency check (no double-posting)
+ * - Period validation (cannot post to closed period)
+ * - Balance validation (debit = credit)
+ * - Atomic transaction
+ */
+export async function postEntry(request: PostEntryRequest): Promise<PostEntryResult> {
+  return await db.transaction(async (tx) => {
+    const { agenceId, sourceType, sourceId, journalCode, entryDate, description, lines, metadata, mouvementId, userId } = request;
+
+    // 1. Check idempotency
+    const existingEcritureId = await checkIdempotency(tx, agenceId, sourceType, sourceId);
+    if (existingEcritureId) {
+      // Already posted, return existing entry info
+      const [existing] = await tx
+        .select()
+        .from(ecritures)
+        .where(eq(ecritures.id, existingEcritureId))
+        .limit(1);
+
+      if (existing) {
+        const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+        const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+        return {
+          ecritureId: existing.id,
+          numeroPiece: existing.numeroPiece,
+          totalDebit,
+          totalCredit,
+          lineCount: lines.length,
+        };
+      }
+    }
+
+    // 2. Validate balance
+    const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+    const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      throw new Error(`Entry is not balanced: Debit=${totalDebit}, Credit=${totalCredit}`);
+    }
+
+    // 3. Get journal
+    const journal = await getJournalByCode(tx, journalCode, agenceId);
+    if (!journal) {
+      throw new Error(`Journal not found: ${journalCode}`);
+    }
+
+    // 4. Get or create exercice
+    const exerciceId = await getOrCreateExercice(tx, agenceId, entryDate);
+
+    // 5. Check period is open
+    const { periodId, isClosed } = await getOrCreatePeriod(tx, agenceId, entryDate, exerciceId);
+    if (isClosed) {
+      throw new Error(`Period is closed for date: ${entryDate.toISOString().split("T")[0]}. Use reversal (extourne) instead.`);
+    }
+
+    // 6. Generate piece number
+    const year = entryDate.getFullYear();
+    const numeroPiece = await getNextPieceNumber(tx, agenceId, journalCode, year);
+
+    // 7. Create ecriture (entry header)
+    const [ecriture] = await tx
+      .insert(ecritures)
+      .values({
+        exerciceId,
+        journalId: journal.id,
+        dateEcriture: entryDate.toISOString().split("T")[0],
+        numeroPiece,
+        libelle: description,
+        statut: EntryStatus.POSTED,
+        sourceType,
+        sourceId,
+        mouvementId,
+        metadata: metadata || {},
+        agenceId,
+        createdBy: userId,
+        validatedBy: userId,
+        validatedAt: new Date(),
+      })
+      .returning();
+
+    // 8. Create lignes (entry lines)
+    for (const line of lines) {
+      // Skip zero lines
+      if (line.debit === 0 && line.credit === 0) continue;
+
+      await tx.insert(lignesEcritures).values({
+        ecritureId: ecriture.id,
+        compteId: line.compteId,
+        numeroCompte: line.numeroCompte,
+        libelle: line.libelle || description,
+        debit: line.debit.toString(),
+        credit: line.credit.toString(),
+        refExterne: line.refExterne,
+      });
+    }
+
+    // 9. Create idempotency link
+    await tx.insert(glPostingLinks).values({
+      agenceId,
+      sourceType,
+      sourceId,
+      ecritureId: ecriture.id,
+    });
+
+    // 10. Update period statistics
+    await tx
+      .update(glPeriods)
+      .set({
+        totalDebits: sql`${glPeriods.totalDebits} + ${totalDebit}`,
+        totalCredits: sql`${glPeriods.totalCredits} + ${totalCredit}`,
+        entryCount: sql`${glPeriods.entryCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(glPeriods.id, periodId));
+
+    console.log(`[AccountingPosting] Posted entry ${numeroPiece} from ${sourceType}:${sourceId}`);
+
+    return {
+      ecritureId: ecriture.id,
+      numeroPiece,
+      totalDebit,
+      totalCredit,
+      lineCount: lines.length,
+    };
+  });
+}
+
+/**
+ * Post an entry automatically from a mouvement financier
+ * Uses accounting rules to determine the correct accounts
+ */
+export async function postFromMouvement(request: PostFromMouvementRequest): Promise<PostEntryResult | null> {
+  const { mouvement, agenceId, userId, additionalMetadata } = request;
+
+  return await db.transaction(async (tx) => {
+    // 1. Check idempotency using mouvement ID
+    const existingEcritureId = await checkIdempotency(tx, agenceId, "MOUVEMENT", mouvement.id);
+    if (existingEcritureId) {
+      console.log(`[AccountingPosting] Mouvement ${mouvement.id} already posted`);
+      return null; // Already posted
+    }
+
+    // 2. Find matching accounting rule
+    const rule = await findMatchingRule(
+      tx,
+      agenceId,
+      "MOUVEMENT",
+      mouvement.typePaiement || "UNKNOWN",
+      mouvement.methodePaiement || undefined,
+      additionalMetadata?.provider || undefined
+    );
+
+    if (!rule) {
+      console.warn(`[AccountingPosting] No rule found for: sourceModule=${mouvement.sourceModule}, typePaiement=${mouvement.typePaiement}, methodePaiement=${mouvement.methodePaiement}`);
+      return null;
+    }
+
+    // 3. Get accounts
+    const debitAccount = await getAccountByNumber(tx, rule.debitAccount, agenceId);
+    const creditAccount = await getAccountByNumber(tx, rule.creditAccount, agenceId);
+
+    if (!debitAccount) {
+      console.error(`[AccountingPosting] Debit account not found: ${rule.debitAccount}`);
+      return null;
+    }
+    if (!creditAccount) {
+      console.error(`[AccountingPosting] Credit account not found: ${rule.creditAccount}`);
+      return null;
+    }
+
+    // 4. Get journal
+    const journal = await getJournalByCode(tx, rule.journalCode, agenceId);
+    if (!journal) {
+      console.error(`[AccountingPosting] Journal not found: ${rule.journalCode}`);
+      return null;
+    }
+
+    // 5. Build description from template
+    const amount = parseFloat(mouvement.montant);
+    let description = rule.descriptionTemplate || rule.name;
+    description = description
+      .replace("{clientName}", additionalMetadata?.clientName || "Client")
+      .replace("{creditNumber}", additionalMetadata?.creditNumber || mouvement.creditId || "")
+      .replace("{tontineName}", additionalMetadata?.tontineName || "Tontine")
+      .replace("{reference}", mouvement.reference || "");
+
+    // 6. Build entry lines
+    const lines: PostEntryLine[] = [
+      {
+        compteId: debitAccount.id,
+        numeroCompte: debitAccount.numeroCompte,
+        libelle: description,
+        debit: amount,
+        credit: 0,
+        refExterne: mouvement.reference,
+      },
+      {
+        compteId: creditAccount.id,
+        numeroCompte: creditAccount.numeroCompte,
+        libelle: description,
+        debit: 0,
+        credit: amount,
+        refExterne: mouvement.reference,
+      },
+    ];
+
+    // 7. Post the entry
+    const entryDate = mouvement.dateOperation ? new Date(mouvement.dateOperation) : new Date();
+
+    // Call postEntry directly within the same transaction context
+    // We need to replicate the logic here to stay in the same transaction
+    const exerciceId = await getOrCreateExercice(tx, agenceId, entryDate);
+    const { periodId, isClosed } = await getOrCreatePeriod(tx, agenceId, entryDate, exerciceId);
+
+    if (isClosed) {
+      console.warn(`[AccountingPosting] Period closed for mouvement ${mouvement.id}, skipping`);
+      return null;
+    }
+
+    const year = entryDate.getFullYear();
+    const numeroPiece = await getNextPieceNumber(tx, agenceId, rule.journalCode, year);
+
+    // Build metadata
+    const metadata = {
+      ...additionalMetadata,
+      mouvementReference: mouvement.reference,
+      sourceModule: mouvement.sourceModule,
+      typePaiement: mouvement.typePaiement,
+      methodePaiement: mouvement.methodePaiement,
+      clientId: mouvement.clientId,
+      compteId: mouvement.compteId,
+      creditId: mouvement.creditId,
+      tontineId: mouvement.tontineId,
+      ruleCode: rule.code,
+      ruleName: rule.name,
+    };
+
+    // Create ecriture
+    const [ecriture] = await tx
+      .insert(ecritures)
+      .values({
+        exerciceId,
+        journalId: journal.id,
+        dateEcriture: entryDate.toISOString().split("T")[0],
+        numeroPiece,
+        libelle: description,
+        statut: EntryStatus.POSTED,
+        sourceType: "MOUVEMENT",
+        sourceId: mouvement.id,
+        mouvementId: mouvement.id,
+        metadata,
+        agenceId,
+        createdBy: userId,
+        validatedBy: userId,
+        validatedAt: new Date(),
+      })
+      .returning();
+
+    // Create lines
+    for (const line of lines) {
+      if (line.debit === 0 && line.credit === 0) continue;
+
+      await tx.insert(lignesEcritures).values({
+        ecritureId: ecriture.id,
+        compteId: line.compteId,
+        numeroCompte: line.numeroCompte,
+        libelle: line.libelle,
+        debit: line.debit.toString(),
+        credit: line.credit.toString(),
+        refExterne: line.refExterne,
+      });
+    }
+
+    // Create idempotency link
+    await tx.insert(glPostingLinks).values({
+      agenceId,
+      sourceType: "MOUVEMENT",
+      sourceId: mouvement.id,
+      ecritureId: ecriture.id,
+    });
+
+    // Update period stats
+    await tx
+      .update(glPeriods)
+      .set({
+        totalDebits: sql`${glPeriods.totalDebits} + ${amount}`,
+        totalCredits: sql`${glPeriods.totalCredits} + ${amount}`,
+        entryCount: sql`${glPeriods.entryCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(glPeriods.id, periodId));
+
+    console.log(`[AccountingPosting] Auto-posted mouvement ${mouvement.id} as ${numeroPiece} using rule ${rule.code}`);
+
+    return {
+      ecritureId: ecriture.id,
+      numeroPiece,
+      totalDebit: amount,
+      totalCredit: amount,
+      lineCount: 2,
+    };
+  });
+}
+
+/**
+ * Reverse (extourne) an existing entry
+ * Creates a new entry that cancels out the original
+ */
+export async function reverseEntry(request: ReverseEntryRequest): Promise<ReverseEntryResult> {
+  const { ecritureId, reason, userId, agenceId } = request;
+
+  return await db.transaction(async (tx) => {
+    // 1. Get the original entry
+    const [original] = await tx
+      .select()
+      .from(ecritures)
+      .where(eq(ecritures.id, ecritureId))
+      .limit(1);
+
+    if (!original) {
+      throw new Error(`Entry not found: ${ecritureId}`);
+    }
+
+    if (original.statut === EntryStatus.REVERSED) {
+      throw new Error(`Entry already reversed: ${ecritureId}`);
+    }
+
+    // 2. Get original lines
+    const originalLines = await tx
+      .select()
+      .from(lignesEcritures)
+      .where(eq(lignesEcritures.ecritureId, ecritureId));
+
+    if (originalLines.length === 0) {
+      throw new Error(`No lines found for entry: ${ecritureId}`);
+    }
+
+    // 3. Get exercice and period for reversal date (today)
+    const reversalDate = new Date();
+    const exerciceId = await getOrCreateExercice(tx, agenceId, reversalDate);
+    const { periodId, isClosed } = await getOrCreatePeriod(tx, agenceId, reversalDate, exerciceId);
+
+    if (isClosed) {
+      throw new Error(`Current period is closed. Cannot create reversal.`);
+    }
+
+    // 4. Generate piece number for reversal (use OD journal for reversals)
+    const year = reversalDate.getFullYear();
+    const numeroPiece = await getNextPieceNumber(tx, agenceId, "OD", year);
+
+    // 5. Get OD journal
+    const journal = await getJournalByCode(tx, "OD", agenceId);
+    if (!journal) {
+      throw new Error("OD (Opérations Diverses) journal not found");
+    }
+
+    // 6. Create reversal entry
+    const [reversal] = await tx
+      .insert(ecritures)
+      .values({
+        exerciceId,
+        journalId: journal.id,
+        dateEcriture: reversalDate.toISOString().split("T")[0],
+        numeroPiece,
+        libelle: `EXTOURNE: ${original.libelle}`,
+        statut: EntryStatus.POSTED,
+        reversalOfId: ecritureId,
+        reversalReason: reason,
+        sourceType: "REVERSAL",
+        sourceId: ecritureId,
+        metadata: {
+          originalPiece: original.numeroPiece,
+          originalDate: original.dateEcriture,
+          reversalReason: reason,
+        },
+        agenceId,
+        createdBy: userId,
+        validatedBy: userId,
+        validatedAt: new Date(),
+      })
+      .returning();
+
+    // 7. Create reversed lines (swap debit/credit)
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    for (const line of originalLines) {
+      const debit = parseFloat(line.credit); // Swap: original credit becomes debit
+      const credit = parseFloat(line.debit); // Swap: original debit becomes credit
+
+      totalDebit += debit;
+      totalCredit += credit;
+
+      await tx.insert(lignesEcritures).values({
+        ecritureId: reversal.id,
+        compteId: line.compteId,
+        numeroCompte: line.numeroCompte,
+        libelle: `EXTOURNE: ${line.libelle || ""}`,
+        debit: debit.toString(),
+        credit: credit.toString(),
+        refExterne: `REV-${line.refExterne || ""}`,
+      });
+    }
+
+    // 8. Mark original as reversed
+    await tx
+      .update(ecritures)
+      .set({
+        statut: EntryStatus.REVERSED,
+        reversedById: reversal.id,
+      })
+      .where(eq(ecritures.id, ecritureId));
+
+    // 9. Update period stats
+    await tx
+      .update(glPeriods)
+      .set({
+        totalDebits: sql`${glPeriods.totalDebits} + ${totalDebit}`,
+        totalCredits: sql`${glPeriods.totalCredits} + ${totalCredit}`,
+        entryCount: sql`${glPeriods.entryCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(glPeriods.id, periodId));
+
+    console.log(`[AccountingPosting] Reversed entry ${original.numeroPiece} with ${numeroPiece}`);
+
+    return {
+      originalEcritureId: ecritureId,
+      reversalEcritureId: reversal.id,
+      numeroPiece,
+    };
+  });
+}
+
+/**
+ * Close a period
+ */
+export async function closePeriod(request: ClosePeriodRequest): Promise<void> {
+  const { agenceId, year, month, userId, notes } = request;
+
+  await db.transaction(async (tx) => {
+    // 1. Get the period
+    const [period] = await tx
+      .select()
+      .from(glPeriods)
+      .where(
+        and(
+          eq(glPeriods.agenceId, agenceId),
+          eq(glPeriods.year, year),
+          eq(glPeriods.month, month)
+        )
+      )
+      .for("update")
+      .limit(1);
+
+    if (!period) {
+      throw new Error(`Period not found: ${month}/${year}`);
+    }
+
+    if (period.statut === PeriodStatus.CLOSED || period.statut === PeriodStatus.LOCKED) {
+      throw new Error(`Period already closed: ${month}/${year}`);
+    }
+
+    // 2. Calculate final totals
+    const totals = await tx
+      .select({
+        totalDebit: sql<string>`COALESCE(SUM(${lignesEcritures.debit}), 0)`,
+        totalCredit: sql<string>`COALESCE(SUM(${lignesEcritures.credit}), 0)`,
+        count: sql<number>`COUNT(DISTINCT ${ecritures.id})`,
+      })
+      .from(lignesEcritures)
+      .innerJoin(ecritures, eq(lignesEcritures.ecritureId, ecritures.id))
+      .where(
+        and(
+          eq(ecritures.agenceId, agenceId),
+          eq(ecritures.statut, EntryStatus.POSTED),
+          gte(ecritures.dateEcriture, period.dateDebut),
+          lte(ecritures.dateEcriture, period.dateFin)
+        )
+      );
+
+    const totalDebit = parseFloat(totals[0]?.totalDebit || "0");
+    const totalCredit = parseFloat(totals[0]?.totalCredit || "0");
+    const entryCount = totals[0]?.count || 0;
+
+    // 3. Close the period
+    await tx
+      .update(glPeriods)
+      .set({
+        statut: PeriodStatus.CLOSED,
+        closedAt: new Date(),
+        closedBy: userId,
+        closureNotes: notes,
+        totalDebits: totalDebit.toString(),
+        totalCredits: totalCredit.toString(),
+        entryCount,
+        updatedAt: new Date(),
+      })
+      .where(eq(glPeriods.id, period.id));
+
+    console.log(`[AccountingPosting] Closed period ${month}/${year} with ${entryCount} entries`);
+  });
+}
+
+// ============================================================================
+// GRAND LIVRE (General Ledger) QUERIES
+// ============================================================================
+
+/**
+ * Get Grand Livre for an account with running balance
+ */
+export async function getGrandLivre(
+  compteId: string,
+  agenceId: string,
+  dateDebut: string,
+  dateFin: string,
+  page: number = 1,
+  pageSize: number = 50
+): Promise<GrandLivreResponse> {
+  // 1. Get account info
+  const [compte] = await db
+    .select()
+    .from(planComptable)
+    .where(eq(planComptable.id, compteId))
+    .limit(1);
+
+  if (!compte) {
+    throw new Error(`Account not found: ${compteId}`);
+  }
+
+  // 2. Get opening balance (sum of all entries before dateDebut)
+  const openingResult = await db
+    .select({
+      totalDebit: sql<string>`COALESCE(SUM(${lignesEcritures.debit}), 0)`,
+      totalCredit: sql<string>`COALESCE(SUM(${lignesEcritures.credit}), 0)`,
+    })
+    .from(lignesEcritures)
+    .innerJoin(ecritures, eq(lignesEcritures.ecritureId, ecritures.id))
+    .where(
+      and(
+        eq(lignesEcritures.compteId, compteId),
+        eq(ecritures.statut, EntryStatus.POSTED),
+        sql`${ecritures.dateEcriture} < ${dateDebut}`,
+        or(eq(ecritures.agenceId, agenceId), isNull(ecritures.agenceId))
+      )
+    );
+
+  const openingDebit = parseFloat(openingResult[0]?.totalDebit || "0");
+  const openingCredit = parseFloat(openingResult[0]?.totalCredit || "0");
+  const soldeOuverture = openingDebit - openingCredit;
+
+  // 3. Get total count for pagination
+  const countResult = await db
+    .select({
+      count: sql<number>`COUNT(*)`,
+    })
+    .from(lignesEcritures)
+    .innerJoin(ecritures, eq(lignesEcritures.ecritureId, ecritures.id))
+    .where(
+      and(
+        eq(lignesEcritures.compteId, compteId),
+        eq(ecritures.statut, EntryStatus.POSTED),
+        gte(ecritures.dateEcriture, dateDebut),
+        lte(ecritures.dateEcriture, dateFin),
+        or(eq(ecritures.agenceId, agenceId), isNull(ecritures.agenceId))
+      )
+    );
+
+  const total = countResult[0]?.count || 0;
+  const totalPages = Math.ceil(total / pageSize);
+  const offset = (page - 1) * pageSize;
+
+  // 4. Get entries with running balance using window function
+  const entries = await db
+    .select({
+      id: lignesEcritures.id,
+      dateEcriture: ecritures.dateEcriture,
+      numeroPiece: ecritures.numeroPiece,
+      journalCode: journaux.code,
+      journalIntitule: journaux.intitule,
+      ecritureLibelle: ecritures.libelle,
+      ligneLibelle: lignesEcritures.libelle,
+      debit: lignesEcritures.debit,
+      credit: lignesEcritures.credit,
+      sourceType: ecritures.sourceType,
+      sourceId: ecritures.sourceId,
+      refExterne: lignesEcritures.refExterne,
+    })
+    .from(lignesEcritures)
+    .innerJoin(ecritures, eq(lignesEcritures.ecritureId, ecritures.id))
+    .innerJoin(journaux, eq(ecritures.journalId, journaux.id))
+    .where(
+      and(
+        eq(lignesEcritures.compteId, compteId),
+        eq(ecritures.statut, EntryStatus.POSTED),
+        gte(ecritures.dateEcriture, dateDebut),
+        lte(ecritures.dateEcriture, dateFin),
+        or(eq(ecritures.agenceId, agenceId), isNull(ecritures.agenceId))
+      )
+    )
+    .orderBy(asc(ecritures.dateEcriture), asc(ecritures.numeroPiece))
+    .limit(pageSize)
+    .offset(offset);
+
+  // 5. Calculate running balance and totals
+  let runningBalance = soldeOuverture;
+  let totalDebits = 0;
+  let totalCredits = 0;
+
+  const formattedEntries: GrandLivreEntry[] = entries.map((entry) => {
+    const debit = parseFloat(entry.debit);
+    const credit = parseFloat(entry.credit);
+
+    totalDebits += debit;
+    totalCredits += credit;
+    runningBalance += debit - credit;
+
+    return {
+      id: entry.id,
+      dateEcriture: entry.dateEcriture,
+      numeroPiece: entry.numeroPiece,
+      journalCode: entry.journalCode,
+      journalIntitule: entry.journalIntitule,
+      ecritureLibelle: entry.ecritureLibelle,
+      ligneLibelle: entry.ligneLibelle || "",
+      debit,
+      credit,
+      soldeProgressif: runningBalance,
+      sourceType: entry.sourceType || undefined,
+      sourceId: entry.sourceId || undefined,
+      refExterne: entry.refExterne || undefined,
+    };
+  });
+
+  return {
+    compteId: compte.id,
+    numeroCompte: compte.numeroCompte,
+    intitule: compte.intitule,
+    classe: compte.classe,
+    typeCompte: compte.typeCompte,
+    sensNormal: compte.sensNormal || "",
+    soldeOuverture,
+    totalDebits,
+    totalCredits,
+    soldeFinal: soldeOuverture + totalDebits - totalCredits,
+    entries: formattedEntries,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
+  };
+}
+
+/**
+ * Get Balance Générale (Trial Balance)
+ */
+export async function getBalance(
+  agenceId: string,
+  dateDebut: string,
+  dateFin: string,
+  classeFilter?: number
+): Promise<BalanceResponse> {
+  // Build conditions
+  const conditions = [
+    eq(ecritures.statut, EntryStatus.POSTED),
+    gte(ecritures.dateEcriture, dateDebut),
+    lte(ecritures.dateEcriture, dateFin),
+    or(eq(ecritures.agenceId, agenceId), isNull(ecritures.agenceId)),
+  ];
+
+  if (classeFilter) {
+    conditions.push(eq(planComptable.classe, classeFilter));
+  }
+
+  // Query with aggregation
+  const results = await db
+    .select({
+      compteId: planComptable.id,
+      numeroCompte: planComptable.numeroCompte,
+      intitule: planComptable.intitule,
+      classe: planComptable.classe,
+      typeCompte: planComptable.typeCompte,
+      sensNormal: planComptable.sensNormal,
+      totalDebit: sql<string>`COALESCE(SUM(${lignesEcritures.debit}), 0)`,
+      totalCredit: sql<string>`COALESCE(SUM(${lignesEcritures.credit}), 0)`,
+    })
+    .from(planComptable)
+    .leftJoin(lignesEcritures, eq(planComptable.id, lignesEcritures.compteId))
+    .leftJoin(ecritures, and(
+      eq(lignesEcritures.ecritureId, ecritures.id),
+      ...conditions
+    ))
+    .where(eq(planComptable.actif, true))
+    .groupBy(
+      planComptable.id,
+      planComptable.numeroCompte,
+      planComptable.intitule,
+      planComptable.classe,
+      planComptable.typeCompte,
+      planComptable.sensNormal
+    )
+    .orderBy(asc(planComptable.numeroCompte));
+
+  // Format entries and calculate totals
+  let totalDebits = 0;
+  let totalCredits = 0;
+  let totalSoldeDebiteur = 0;
+  let totalSoldeCrediteur = 0;
+
+  const entries: BalanceEntry[] = results
+    .filter(r => parseFloat(r.totalDebit) !== 0 || parseFloat(r.totalCredit) !== 0)
+    .map((r) => {
+      const debit = parseFloat(r.totalDebit);
+      const credit = parseFloat(r.totalCredit);
+      const soldeDebiteur = debit > credit ? debit - credit : 0;
+      const soldeCrediteur = credit > debit ? credit - debit : 0;
+
+      totalDebits += debit;
+      totalCredits += credit;
+      totalSoldeDebiteur += soldeDebiteur;
+      totalSoldeCrediteur += soldeCrediteur;
+
+      return {
+        compteId: r.compteId,
+        numeroCompte: r.numeroCompte,
+        intitule: r.intitule,
+        classe: r.classe,
+        typeCompte: r.typeCompte,
+        sensNormal: r.sensNormal || "",
+        totalDebit: debit,
+        totalCredit: credit,
+        soldeDebiteur,
+        soldeCrediteur,
+      };
+    });
+
+  return {
+    entries,
+    totals: {
+      totalDebits,
+      totalCredits,
+      totalSoldeDebiteur,
+      totalSoldeCrediteur,
+      isBalanced: Math.abs(totalSoldeDebiteur - totalSoldeCrediteur) < 0.01,
+    },
+    dateDebut,
+    dateFin,
+  };
+}
+
+// ============================================================================
+// EXPORT DEFAULT
+// ============================================================================
+
+export default {
+  postEntry,
+  postFromMouvement,
+  reverseEntry,
+  closePeriod,
+  getGrandLivre,
+  getBalance,
+};

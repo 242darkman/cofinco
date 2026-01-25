@@ -23,7 +23,7 @@ interface OperationsApprovalListProps {
 }
 
 type FilterType = 'all' | 'COLLECT_CASH' | 'SETTLEMENT_CASH';
-type FilterStatut = typeof StatutOperationTerrain.SUBMITTED | typeof StatutOperationTerrain.APPROVED | typeof StatutOperationTerrain.REJECTED | 'all';
+type FilterStatut = typeof StatutOperationTerrain.SUBMITTED | typeof StatutOperationTerrain.APPROVED | typeof StatutOperationTerrain.PENDING_SETTLEMENT | typeof StatutOperationTerrain.SETTLED | typeof StatutOperationTerrain.REJECTED | 'all';
 
 const formatMoney = (amount: string | number) => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -45,6 +45,10 @@ const getStatutBadge = (statut: string) => {
       return <Badge variant="warning" size="sm" value="En attente" />;
     case StatutOperationTerrain.APPROVED:
       return <Badge variant="success" size="sm" value="Approuvée" />;
+    case StatutOperationTerrain.PENDING_SETTLEMENT:
+      return <Badge variant="info" size="sm" value="En attente de remise" />;
+    case StatutOperationTerrain.SETTLED:
+      return <Badge variant="success" size="sm" value="Remise effectuée" />;
     case StatutOperationTerrain.REJECTED:
       return <Badge variant="danger" size="sm" value="Rejetée" />;
     case StatutOperationTerrain.CANCELLED:
@@ -244,6 +248,8 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                 onChange={(e) => setFilterStatut(e.target.value as FilterStatut)}
                 options={[
                   { value: StatutOperationTerrain.SUBMITTED, label: 'En attente' },
+                  { value: StatutOperationTerrain.PENDING_SETTLEMENT, label: 'En attente de remise' },
+                  { value: StatutOperationTerrain.SETTLED, label: 'Remise effectuée' },
                   { value: StatutOperationTerrain.APPROVED, label: 'Approuvées' },
                   { value: StatutOperationTerrain.REJECTED, label: 'Rejetées' },
                   { value: 'all', label: 'Tous les statuts' },

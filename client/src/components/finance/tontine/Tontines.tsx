@@ -224,49 +224,51 @@ export default function Tontines() {
     // For this rewrite, I'll paste the logic back.
     
     return (
-      <div className="space-y-6">
-        <PageHeader
-          title={selectedTontine.nom}
-          description={selectedTontine.description}
-          actions={
-             <Button
-                variant="ghost"
-                onClick={() => setSelectedTontine(null)}
-                icon={ArrowLeft}
-                className="text-slate-400 hover:text-white"
-              >
-                Retour
-              </Button>
-          }
-        />
+      <div className="flex flex-col h-full overflow-hidden gap-2">
+        <div className="shrink-0 flex flex-col gap-2 p-1">
+          <PageHeader
+            title={selectedTontine.nom}
+            description={selectedTontine.description}
+            actions={
+               <Button
+                  variant="ghost"
+                  onClick={() => setSelectedTontine(null)}
+                  icon={ArrowLeft}
+                  size="sm"
+                  className="text-slate-400 hover:text-white h-8 text-xs"
+                >
+                  Retour
+                </Button>
+            }
+            className="p-0 m-0"
+          />
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-           <StatCard title="Membres" value={`${selectedTontine.nombreMembresActuel || 0}/${selectedTontine.nombreMembresMax || selectedTontine.nombreMembres || 0}`} icon={Users} color="primary" />
-           <StatCard title="Contribution" value={`${(selectedTontine.montantCotisation || 0).toLocaleString()} FCFA`} icon={DollarSign} color="success" />
-           <StatCard title="Total Collecté" value={`${(selectedTontine.totalCollecte || 0).toLocaleString()} FCFA`} icon={TrendingUp} color="warning" />
-           <StatCard title="Tour Actuel" value={selectedTontine.tourActuel || 1} icon={Calendar} color="primary" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+             <StatCard title="Membres" value={`${selectedTontine.nombreMembresActuel || 0}/${selectedTontine.nombreMembresMax || selectedTontine.nombreMembres || 0}`} icon={Users} color="primary" className="p-2" />
+             <StatCard title="Contribution" value={`${(selectedTontine.montantCotisation || 0).toLocaleString()} FCFA`} icon={DollarSign} color="success" className="p-2" />
+             <StatCard title="Total Collecté" value={`${(selectedTontine.totalCollecte || 0).toLocaleString()} FCFA`} icon={TrendingUp} color="warning" className="p-2" />
+             <StatCard title="Tour Actuel" value={selectedTontine.tourActuel || 1} icon={Calendar} color="primary" className="p-2" />
+          </div>
+
+          <TabGroup
+            activeTab={activeTab}
+            onTabChange={(key) => setActiveTab(key as any)}
+            tabs={[
+              { key: 'dashboard', label: 'Dashboard' },
+              { key: 'details', label: 'Détails' },
+              { key: 'membres', label: 'Membres' },
+              { key: 'contributions', label: 'Contributions' },
+              { key: 'distributions', label: 'Distributions' },
+              { key: 'calendar', label: 'Calendrier' },
+              { key: 'alertes', label: 'Alertes' },
+              { key: 'regles', label: 'Règles' },
+            ]}
+            variant="underline"
+            className="mb-0 border-b border-slate-700"
+          />
         </div>
 
-        {/* Tabs */}
-        {/* Tabs */}
-        <TabGroup
-          activeTab={activeTab}
-          onTabChange={(key) => setActiveTab(key as any)}
-          tabs={[
-            { key: 'dashboard', label: 'Dashboard' },
-            { key: 'details', label: 'Détails' },
-            { key: 'membres', label: 'Membres' },
-            { key: 'contributions', label: 'Contributions' },
-            { key: 'distributions', label: 'Distributions' },
-            { key: 'calendar', label: 'Calendrier' },
-            { key: 'alertes', label: 'Alertes' },
-            { key: 'regles', label: 'Règles' },
-          ]}
-          variant="underline"
-          className="mb-6"
-        />
-
-          <div className="min-h-[400px]">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-slate-900/50 border border-slate-800 rounded-lg p-3 custom-scrollbar">
              {activeTab === 'dashboard' && (
                 <TontineDashboard
                   tontineId={selectedTontine.id}
@@ -275,7 +277,6 @@ export default function Tontines() {
                   tourActuel={selectedTontine.tourActuel}
                 />
               )}
-             {/* ... Other tabs content placeholders (using original components) ... */}
               {activeTab === 'details' && (
                  <Card>
                     <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -286,7 +287,6 @@ export default function Tontines() {
                           </div>
                           <div className="text-white font-medium text-sm pl-0.5">{selectedTontine.frequence}</div>
                        </div>
-
                        <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
                           <div className="flex items-center gap-1.5 text-slate-500 mb-1">
                              <Calendar size={14} />
@@ -294,7 +294,6 @@ export default function Tontines() {
                           </div>
                           <div className="text-white font-medium text-sm pl-0.5">{new Date(selectedTontine.dateDebut).toLocaleDateString()}</div>
                        </div>
-
                        <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
                           <div className="flex items-center gap-1.5 text-slate-500 mb-1">
                              <Calendar size={14} />
@@ -302,7 +301,6 @@ export default function Tontines() {
                           </div>
                           <div className="text-white font-medium text-sm pl-0.5">{new Date(selectedTontine.createdAt).toLocaleDateString()}</div>
                        </div>
-
                        <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
                           <div className="flex items-center gap-1.5 text-slate-500 mb-1">
                              <Activity size={14} />
@@ -337,63 +335,93 @@ export default function Tontines() {
               )}
               {activeTab === 'alertes' && <TontineAlertes tontineId={selectedTontine.id} />}
               {activeTab === 'regles' && <TontineRegles tontineId={selectedTontine.id} />}
-          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Gestion des Tontines"
-        description="Groupes d'épargne collective"
-        actions={
-          canCreateTontines ? (
-            <Button
-              onClick={() => {
-                setEditingTontine(null);
-                setShowForm(true);
-              }}
-              icon={Plus}
-              size="sm"
-            >
-              Nouvelle Tontine
-            </Button>
-          ) : (
-            <div className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm flex items-center gap-2">
-              <AlertTriangle size={16} />
-              Permission requise
-            </div>
-          )
-        }
-      />
+    <div className="flex flex-col h-full space-y-2">
+      <div className="shrink-0">
+          <PageHeader
+            title="Gestion des Tontines"
+            description="Groupes d'épargne collective"
+            actions={
+              canCreateTontines ? (
+                <Button
+                  onClick={() => {
+                    setEditingTontine(null);
+                    setShowForm(true);
+                  }}
+                  icon={Plus}
+                  size="sm"
+                  className="h-8 text-xs"
+                >
+                  Nouvelle Tontine
+                </Button>
+              ) : (
+                <div className="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-lg text-xs flex items-center gap-1.5 border border-amber-500/30">
+                  <AlertTriangle size={14} />
+                  Permission requise
+                </div>
+              )
+            }
+            className="mb-2 p-0"
+          />
 
-      {/* Overview Stats Carousel */}
-      <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 no-scrollbar">
-        <div className="flex md:grid md:grid-cols-4 gap-3 min-w-[max-content] md:min-w-0">
-           <div className="w-[160px] md:w-auto">
-            <StatCard title="Total Tontines" value={stats.total} icon={Target} color="primary" subtitle={`${stats.active} actives`} />
-           </div>
-           <div className="w-[160px] md:w-auto">
-            <StatCard title="Membres Actifs" value={stats.membres} icon={Users} color="success" subtitle="Participants" />
-           </div>
-           <div className="w-[200px] md:w-auto">
-            <StatCard title="Volume de Collecte" value={`${stats.volume.toLocaleString()} FCFA`} icon={Coins} color="warning" subtitle="Par tour" />
-           </div>
-           <div className="w-[160px] md:w-auto">
-            <StatCard title="Taux Réussite" value={stats.active > 0 ? `${stats.tauxReussite}%` : '-'} icon={TrendingUp} color="primary" subtitle="Moyenne" />
-           </div>
-        </div>
+          {/* Compact Overview Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+               <StatCard 
+                 title="Total Tontines" 
+                 value={stats.total} 
+                 icon={Target} 
+                 color="primary" 
+                 subtitle={`${stats.active} actives`} 
+                 className="p-3"
+               />
+               <StatCard 
+                 title="Membres Actifs" 
+                 value={stats.membres} 
+                 icon={Users} 
+                 color="success" 
+                 subtitle="Participants" 
+                 className="p-3"
+               />
+               <StatCard 
+                 title="Volume/Tour" 
+                 value={`${stats.volume.toLocaleString()} FCFA`} 
+                 icon={Coins} 
+                 color="warning" 
+                 subtitle="Collecte estimée" 
+                 className="p-3"
+               />
+               <StatCard 
+                 title="Taux Réussite" 
+                 value={stats.active > 0 ? `${stats.tauxReussite}%` : '-'} 
+                 icon={TrendingUp} 
+                 color="primary" 
+                 subtitle="Moyenne" 
+                 className="p-3"
+               />
+          </div>
       </div>
 
-      <ResponsiveTable
-        data={tontines}
-        columns={columns}
-        actions={actions}
-        loading={loading}
-        emptyMessage="Aucune tontine trouvée"
-        onRowClick={(row) => setSelectedTontine(row)}
-      />
+      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+          <div className="flex-1 overflow-hidden">
+              <ResponsiveTable
+                data={tontines}
+                columns={columns}
+                actions={actions}
+                loading={loading}
+                emptyMessage="Aucune tontine trouvée"
+                onRowClick={(row) => setSelectedTontine(row)}
+                density="compact"
+                maxHeight="100%"
+                className="border-0 rounded-none h-full"
+                headerClassName="bg-slate-900 sticky top-0"
+              />
+          </div>
+      </div>
 
       {showForm && (
         <TontineForm

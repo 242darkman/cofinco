@@ -28,6 +28,7 @@ import { SystemRole } from "@shared/types/roles";
 import { startAutomaticRepaymentsCron } from "./cron/automatic-repayments";
 import { startCreditStatusUpdateCron } from "./cron/update-credit-status";
 import { startScheduledMigrationsCron } from "./cron/scheduled-migrations";
+import { startPaymentReconciliationCron } from "./cron/payment-reconciliation";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -180,10 +181,12 @@ app.use((req, res, next) => {
   startAutomaticRepaymentsCron(); // Start Auto Repayments
   startCreditStatusUpdateCron(); // Start Credit Status Update
   startScheduledMigrationsCron(); // Start Agency Migration Scheduler
+  startPaymentReconciliationCron(); // Start Mobile Money Payment Reconciliation
   log('[Cron] Scheduled disbursements job started');
   log('[Cron] Automatic repayments job started');
   log('[Cron] Credit status update job started');
   log('[Cron] Scheduled agency migrations job started');
+  log('[Cron] Payment reconciliation job started');
 
   // Start Account Cleanup Cron
   const { accountCleanup } = await import("./services/account-cleanup");

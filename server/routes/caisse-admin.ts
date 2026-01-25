@@ -275,4 +275,41 @@ caisseAdminRouter.get(
   }
 );
 
+// ============================================================================
+// ROUTES - DIGITAL CAISSES SUMMARY (TRESORERIE)
+// ============================================================================
+
+/**
+ * GET /api/caisses/digital-summary
+ * Récupère un résumé des caisses digitales (MTN et Airtel) pour la trésorerie
+ *
+ * Query params:
+ * - agenceId: (optional) filtrer par agence
+ *
+ * Retourne:
+ * - mtn: { totalSolde, caisseCount, caisses: [...] }
+ * - airtel: { totalSolde, caisseCount, caisses: [...] }
+ */
+caisseAdminRouter.get(
+  "/digital-summary",
+  requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR, SystemRole.CAISSIER),
+  async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string | undefined;
+
+      // Import dynamically to avoid circular dependencies
+      const { getDigitalCaisseSummary } = await import("../services/mobile-money/mm-caisse-service");
+
+      const summary = await getDigitalCaisseSummary(agenceId);
+
+      res.json(summary);
+    } catch (error: any) {
+      console.error("Erreur récupération digital caisses summary:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
 export default caisseAdminRouter;

@@ -21,7 +21,7 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import { toast, handleApiError } from '../../lib/toast';
 import { Pagination } from '../ui/Pagination';
-import { formatClientName, resolveStorageUrl } from '../../lib/format';
+import { formatClientName, resolveStorageUrl, formatPhoneNumber } from '../../lib/format';
 import { StatutClient } from '@shared/enum/status-constants';
 import { 
   getStatusLabel, 
@@ -324,45 +324,46 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   return (
     <div className="space-y-4 pb-20 sm:pb-0">
       {/* Header Mobile-First - Ultra Compact */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex flex-col min-w-0">
-          <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent truncate">
+          <h1 className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent truncate leading-tight">
             Gestion des Clients
           </h1>
-          <p className="text-xs text-slate-500 font-medium truncate">
-            {clients.length === 0 ? 'Aucun client trouvé' : 
-             clients.length === 1 ? '1 client trouvé' : 
-             `${clients.length} clients trouvés`}
+          <p className="text-[10px] text-slate-500 font-medium truncate">
+            {clients.length === 0 ? 'Aucun client' : 
+             clients.length === 1 ? '1 client' : 
+             `${clients.length} clients`}
           </p>
         </div>
 
         {/* Action Bar - Compact */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {canCreateClients && (
             <Button
               variant="primary"
               size="sm"
               icon={Plus}
               onClick={() => { setSelectedClient(null); setShowForm(true); }}
-              className="shadow-lg shadow-blue-500/20"
+              className="shadow-sm shadow-blue-500/20 h-7 text-xs px-2"
             >
-              <span className="hidden sm:inline">Nouveau Client</span>
+              <span className="hidden sm:inline">Nouveau</span>
               <span className="sm:hidden">Nouveau</span>
             </Button>
           )}
 
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-0.5" />
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <IconButton
               icon={activeView === 'list' ? MapPin : activeView === 'map' ? BarChart3 : List}
               variant="secondary"
               size="sm"
               onClick={() => setActiveView(activeView === 'list' ? 'map' : activeView === 'map' ? 'stats' : 'list')}
-              title={activeView === 'list' ? 'Voir carte' : activeView === 'map' ? 'Voir stats' : 'Voir liste'}
-              aria-label={activeView === 'list' ? 'Voir carte' : activeView === 'map' ? 'Voir stats' : 'Voir liste'}
+              title={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
+              aria-label={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
+              className="h-7 w-7"
             />
-            <div className="hidden sm:flex items-center gap-1">
+            <div className="hidden sm:flex items-center gap-0.5">
               <IconButton
                 icon={RefreshCw}
                 variant="secondary"
@@ -370,6 +371,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                 onClick={loadClients}
                 title="Actualiser"
                 aria-label="Actualiser"
+                className="h-7 w-7"
               />
               {canImportClients && (
                 <IconButton
@@ -377,8 +379,9 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                   variant="secondary"
                   size="sm"
                   onClick={() => setShowImport(true)}
-                  title="Importer CSV"
-                  aria-label="Importer CSV"
+                  title="Imp."
+                  aria-label="Importer"
+                  className="h-7 w-7"
                 />
               )}
               {canExportClients && (
@@ -387,8 +390,9 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                   variant="secondary"
                   size="sm"
                   onClick={() => setShowExport(true)}
-                  title="Exporter"
+                  title="Exp."
                   aria-label="Exporter"
+                  className="h-7 w-7"
                 />
               )}
             </div>
@@ -409,17 +413,17 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
       {/* List View */}
       {activeView === 'list' && (
-        <div className="space-y-4">
-          {/* Inline Filters */}
-          <Card variant="default" padding="sm" className="sticky top-[70px] z-20 shadow-md">
+        <div className="space-y-0.5">
+          {/* Inline Filters - No Card, Integrated background */}
+          <div className="bg-slate-900/50 border-x border-t border-slate-800 rounded-t-lg p-2 backdrop-blur-sm">
             <ClientFilters 
               onFilterChange={handleFilterChange}
               initialFilters={searchFilters}
             />
-          </Card>
+          </div>
           
           {/* Table */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden shadow-sm flex flex-col">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-b-lg overflow-hidden shadow-sm flex flex-col -mt-px">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <LoadingSpinner />
@@ -436,25 +440,26 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
               <>
                 <ResponsiveTable
                   data={paginatedClients}
+                  density="compact"
                   columns={[
                     {
                       key: 'nom',
                       label: 'Nom',
                       primary: true,
                       format: (_, item) => (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {getPhotoUrl(item) ? (
                             <img 
                               src={getPhotoUrl(item)} 
                               alt="" 
-                              className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
+                              className="w-6 h-6 rounded-full object-cover border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600 text-xs font-bold text-slate-500 dark:text-slate-400">
+                            <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600 text-[10px] font-bold text-slate-500 dark:text-slate-400">
                               {`${item.prenom?.[0] || ''}${item.nom?.[0] || ''}`.toUpperCase() || '?'}
                             </div>
                           )}
-                          <span className="font-medium text-slate-900 dark:text-slate-100">
+                          <span className="font-medium text-slate-900 dark:text-slate-100 text-xs">
                             {formatClientName(item.nom, item.prenom) || 'Sans nom'}
                           </span>
                         </div>
@@ -467,11 +472,12 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       headerAlign: 'center',
                       align: 'center',
                       format: (_, item) => (
-                        <div className="w-32">
+                        <div className="w-24 mx-auto">
                           <Badge 
                             value={item.agence_nom || item.agence || 'N/A'} 
                             variant="neutral"
-                            className="w-full justify-center text-xs font-medium"
+                            size="sm"
+                            className="w-full justify-center text-[10px] font-medium py-0 h-5"
                           />
                         </div>
                       )
@@ -481,7 +487,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       label: 'Téléphone',
                       hideOnMobile: true,
                       headerAlign: 'center',
-                      align: 'center'
+                      align: 'center',
+                      format: (val) => <span className="text-xs font-mono text-slate-400">{formatPhoneNumber(val)}</span>
                     },
                     {
                       key: 'segment',
@@ -494,6 +501,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                           <Badge 
                             value={getStatusLabel(item.segment?.toUpperCase(), CLIENT_SEGMENT_LABELS)} 
                             className={getStatusColor(item.segment?.toUpperCase(), CLIENT_SEGMENT_COLORS)}
+                            size="sm"
                           />
                         </div>
                       )
@@ -508,19 +516,21 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                           <Badge 
                             value={getStatusLabel(item.statut, CLIENT_STATUS_LABELS)} 
                             className={getStatusColor(item.statut, CLIENT_STATUS_COLORS)}
+                            size="sm"
                           />
                         </div>
                       )
                     }
                   ]}
                   actions={(client) => (
-                    <>
+                    <div className="flex items-center gap-1">
                       <IconButton
                         icon={Eye}
                         variant="ghost"
                         size="sm"
                         onClick={() => handleViewClient(client)}
                         aria-label="Voir"
+                        className="h-6 w-6"
                       />
                       {canEditClients && (
                         <IconButton
@@ -529,9 +539,10 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                           size="sm"
                           onClick={(e) => handleEditClient(client, e)}
                           aria-label="Modifier"
+                          className="h-6 w-6"
                         />
                       )}
-                    </>
+                    </div>
                   )}
                   onRowClick={(client) => handleViewClient(client)}
                   emptyMessage="Aucun client trouvé"

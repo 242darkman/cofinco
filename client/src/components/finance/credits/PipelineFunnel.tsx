@@ -95,37 +95,29 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
   };
 
   return (
-    <div className="w-full grid grid-cols-5 gap-3 mb-6">
+    <div className="w-full grid grid-cols-5 gap-2 mb-4 bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
       {funnelSteps.map((step, index) => (
         <div 
           key={step.id} 
-          className={`relative flex flex-col p-4 bg-slate-800 rounded-xl border transition-colors cursor-default group overflow-hidden ${
-             step.count > 0 ? step.borderColor : 'border-slate-700 hover:border-slate-600'
+          className={`relative flex items-center justify-between p-2 lg:p-3 bg-slate-800/50 rounded-lg border transition-all cursor-default group overflow-hidden ${
+             step.count > 0 ? 'border-slate-700/50 hover:bg-slate-800 hover:border-slate-600' : 'border-transparent opacity-70 hover:opacity-100'
           } ${step.overdue ? 'shadow-[0_0_10px_rgba(249,115,22,0.1)] border-orange-500/50' : ''}`}
         >
-          {/* Connecteur (Chevron) sauf pour le dernier */}
-          {index < funnelSteps.length - 1 && (
-            <div className="absolute -right-5 top-1/2 -translate-y-1/2 z-20 text-slate-600 pointer-events-none">
-              <ChevronRight size={24} strokeWidth={3} />
-            </div>
-          )}
+          {/* Connector arrow visually managed by Grid gap usually, but could be absolute if needed. 
+              In compact mode, simple gap is cleaner. */}
           
-          {/* Icone & Titre */}
-          <div className={`flex items-center gap-2 mb-3 ${step.count > 0 ? 'opacity-100' : 'opacity-60'} transition-opacity`}>
-            {step.overdue ? <AlertTriangle size={16} className="text-orange-500 animate-pulse" /> : <step.icon size={16} className={step.color} />}
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{step.label}</span>
+          <div className="flex flex-col min-w-0">
+             <div className="flex items-center gap-1.5 mb-0.5">
+                {step.overdue ? <AlertTriangle size={12} className="text-orange-500 animate-pulse" /> : <step.icon size={12} className={step.color} />}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate">{step.label}</span>
+             </div>
+             <div className="flex items-baseline gap-2">
+                <span className="text-lg font-bold text-white leading-none">{step.count}</span>
+                {step.amount > 0 && <span className="text-[10px] text-slate-400 font-mono hidden xl:inline-block">{formatAmount(step.amount)}</span>}
+             </div>
           </div>
-          
-          {/* Chiffres Clés */}
-          <div className="mt-auto z-10">
-            <div className="text-2xl font-black text-white leading-none mb-1">{step.count}</div>
-            <div className="text-xs text-slate-400 font-mono font-medium">
-              {formatAmount(step.amount)} <span className="text-[10px] opacity-60">FCFA</span>
-            </div>
-          </div>
-          
-          {/* Barre de progression visuelle en bas de carte */}
-          <div className={`absolute bottom-0 left-0 h-1 w-full ${step.count > 0 ? step.bgColor : 'bg-transparent'}`} />
+
+          <div className={`w-1 h-6 rounded-full opacity-30 ${step.bgColor}`}></div>
         </div>
       ))}
     </div>

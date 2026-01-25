@@ -93,164 +93,169 @@ export default function PaieManager() {
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="flex flex-col h-full space-y-2">
       {/* Tab Navigation for RH */}
       {isRH && (
-        <div className="w-full sm:w-auto">
+        <div className="shrink-0 w-full sm:w-auto mt-0.5">
           <TabGroup 
             tabs={tabs} 
             activeTab={activeTab} 
             onTabChange={setActiveTab} 
             variant="pills"
-            className="mb-4"
+            size="sm"
+            className="mb-1"
           />
         </div>
       )}
 
       {activeTab === 'generate' && isRH ? (
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card variant="default" padding="md" className="relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-3 opacity-10">
-                  <Calculator size={120} />
-               </div>
-               <Card.Header className="relative z-10">
-                  <div className="text-lg font-bold text-white flex items-center gap-2">
-                    <Play className="text-emerald-400" size={20} />
-                    Génération de la Paie
+        <div className="flex-1 overflow-y-auto min-h-0 pl-1 pr-2 pb-2">
+          <div className="grid lg:grid-cols-3 gap-3">
+             {/* Left Column (2/3) */}
+             <div className="lg:col-span-2 space-y-3">
+               {/* Generation Card */}
+               <Card variant="default" padding="sm" className="relative overflow-hidden bg-slate-800/80 border-slate-700">
+                  <div className="absolute top-0 right-0 p-2 opacity-5">
+                     <Calculator size={80} />
                   </div>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Lancez le calcul des salaires pour la période sélectionnée.
-                  </p>
-               </Card.Header>
-               
-               <Card.Content className="relative z-10 pt-4">
-                  <div className="flex flex-col sm:flex-row items-end gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                      <div className="w-full sm:flex-1">
-                          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Période de Paie</label>
-                          <input 
-                              type="month" 
-                              className="w-full px-4 py-3 border rounded-lg bg-slate-900 border-slate-700 text-white focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all font-mono"
-                              value={selectedMonth}
-                              onChange={(e) => setSelectedMonth(e.target.value)}
-                          />
-                      </div>
-                      <Button 
-                          onClick={handleGenerate} 
-                          disabled={isGenerating}
-                          variant="success"
-                          size="lg"
-                          className="w-full sm:w-auto shadow-lg shadow-emerald-500/20"
-                          icon={Play}
-                          isLoading={isGenerating}
-                      >
-                          Lancer le Traitement
-                      </Button>
+                  <div className="relative z-10 flex flex-col md:flex-row items-center gap-4 p-2">
+                     <div className="flex-1 space-y-1">
+                        <h3 className="text-base font-bold text-white flex items-center gap-2">
+                          <Play className="text-emerald-400" size={18} />
+                          Génération de la Paie
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Sélectionnez le mois à traiter
+                        </p>
+                        <input 
+                            type="month" 
+                            className="mt-2 w-full max-w-xs px-3 py-2 border rounded text-sm bg-slate-900 border-slate-700 text-white focus:ring-1 focus:ring-emerald-500/50 outline-none font-mono"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                        />
+                     </div>
+                     <div className="shrink-0">
+                         <Button 
+                             onClick={handleGenerate} 
+                             disabled={isGenerating}
+                             variant="success"
+                             size="sm"
+                             className="shadow-lg shadow-emerald-500/10 h-9"
+                             icon={Play}
+                             isLoading={isGenerating}
+                         >
+                             Lancer le Traitement
+                         </Button>
+                     </div>
                   </div>
-               </Card.Content>
-            </Card>
+               </Card>
 
-            <Card padding="sm">
-                <Card.Header>
-                    <div className="text-base font-bold text-white flex items-center gap-2">
-                        <FileCheck size={18} className="text-blue-400"/>
-                        Derniers Traitements
-                    </div>
-                </Card.Header>
-                <Card.Content>
-                    <div className="space-y-3">
-                        {isRH && allBulletins.length > 0 ? (
-                            Object.entries(
-                                (allBulletins as BulletinPaie[]).reduce((acc: any, b) => {
-                                    acc[b.mois] = (acc[b.mois] || 0) + 1;
-                                    return acc;
-                                }, {})
-                            )
-                            .sort((a: any, b: any) => b[0].localeCompare(a[0]))
-                            .slice(0, 5)
-                            .map(([mois, count]: any) => (
-                                <div key={mois} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg border border-slate-700/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-green-500/20 rounded-lg text-green-400">
-                                            <CheckCircle size={16} />
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-semibold text-white">
-                                                {new Date(mois).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).replace(/^\w/, (c: string) => c.toUpperCase())}
-                                            </div>
-                                            <div className="text-xs text-slate-500">{count} bulletins générés</div>
-                                        </div>
-                                    </div>
-                                    <Badge value="Terminé" variant="success" />
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-center py-6 text-slate-500 text-sm">
-                                Aucun historique disponible.
-                            </div>
-                        )}
-                    </div>
-                </Card.Content>
-            </Card>
-          </div>
+               {/* History Card */}
+               <Card padding="none" className="bg-slate-900/50 border-slate-800 flex flex-col">
+                   <div className="p-3 border-b border-slate-800 flex items-center justify-between">
+                       <div className="text-sm font-bold text-white flex items-center gap-2">
+                           <FileCheck size={16} className="text-blue-400"/>
+                           Derniers Traitements
+                       </div>
+                   </div>
+                   <div className="p-2 space-y-2">
+                       {isRH && allBulletins.length > 0 ? (
+                           Object.entries(
+                               (allBulletins as BulletinPaie[]).reduce((acc: any, b) => {
+                                   acc[b.mois] = (acc[b.mois] || 0) + 1;
+                                   return acc;
+                               }, {})
+                           )
+                           .sort((a: any, b: any) => b[0].localeCompare(a[0]))
+                           .slice(0, 5)
+                           .map(([mois, count]: any) => (
+                               <div key={mois} className="flex items-center justify-between p-2 bg-slate-800/60 rounded border border-slate-700/50">
+                                   <div className="flex items-center gap-2">
+                                       <div className="p-1.5 bg-green-500/10 rounded text-green-400">
+                                           <CheckCircle size={12} />
+                                       </div>
+                                       <div>
+                                           <div className="text-xs font-semibold text-white capitalize">
+                                               {new Date(mois).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                                           </div>
+                                           <div className="text-[10px] text-slate-500">{count} bulletins</div>
+                                       </div>
+                                   </div>
+                                   <Badge value="Terminé" variant="success" size="sm" className="text-[9px] px-1.5 py-0" />
+                               </div>
+                           ))
+                       ) : (
+                           <div className="text-center py-4 text-slate-500 text-xs">
+                               Aucun historique disponible.
+                           </div>
+                       )}
+                   </div>
+               </Card>
+             </div>
 
-          <div className="space-y-6">
-             <Card variant="glass" className="bg-gradient-to-br from-blue-900/40 to-slate-900/40">
-                <Card.Header>
-                    <div className="flex items-center gap-2 font-bold text-blue-400 text-sm uppercase tracking-wide">
-                        <AlertCircle size={16} />
+             {/* Right Column (1/3) */}
+             <div className="space-y-3">
+                <Card variant="glass" className="bg-gradient-to-br from-blue-900/20 to-slate-900/40 border-slate-800" padding="sm">
+                    <div className="flex items-center gap-2 font-bold text-blue-400 text-xs uppercase tracking-wide mb-3">
+                        <AlertCircle size={14} />
                         Règles de Calcul
                     </div>
-                </Card.Header>
-                <Card.Content className="space-y-3">
-                    <div className="flex gap-3 text-sm text-slate-300">
-                        <span className="text-blue-500 font-bold">•</span>
-                        <p>Calcul basé sur le <span className="text-white font-medium">salaire de base</span> profil.</p>
+                    <div className="space-y-2">
+                        <div className="flex gap-2 text-xs text-slate-300">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <p>Basé sur <span className="text-white font-medium">salaire profil</span>.</p>
+                        </div>
+                        <div className="flex gap-2 text-xs text-slate-300">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <p>Déduction <span className="text-white font-medium">IPR & CNSS</span>.</p>
+                        </div>
+                        <div className="flex gap-2 text-xs text-slate-300">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <p>Primes incluses.</p>
+                        </div>
+                        <div className="flex gap-2 text-xs text-slate-300">
+                            <span className="text-blue-500 font-bold">•</span>
+                            <p>Absences déduites.</p>
+                        </div>
                     </div>
-                    <div className="flex gap-3 text-sm text-slate-300">
-                        <span className="text-blue-500 font-bold">•</span>
-                        <p>Déduction automatique <span className="text-white font-medium">IPR & CNSS</span>.</p>
-                    </div>
-                    <div className="flex gap-3 text-sm text-slate-300">
-                        <span className="text-blue-500 font-bold">•</span>
-                        <p>Primes (Transport, Logement) incluses.</p>
-                    </div>
-                    <div className="flex gap-3 text-sm text-slate-300">
-                        <span className="text-blue-500 font-bold">•</span>
-                        <p>Absences non justifiées déduites.</p>
-                    </div>
-                </Card.Content>
-             </Card>
+                </Card>
 
-             <Card className="bg-emerald-900/10 border-emerald-900/30">
-                <div className="p-4 flex items-start gap-3">
-                    <Download className="text-emerald-500 mt-1" size={20} />
-                    <div>
-                        <h4 className="font-bold text-white text-sm">Export Comptable</h4>
-                        <p className="text-xs text-emerald-400/80 mt-1 mb-3">Télécharger le fichier de virement bancaire.</p>
-                        <Button size="sm" variant="outline" onClick={handleExportComptable} className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 h-7 text-xs px-2">Télécharger CSV</Button>
+                <Card className="bg-emerald-900/10 border-emerald-900/20" padding="sm">
+                    <div className="flex items-start gap-2">
+                        <Download className="text-emerald-500 mt-0.5" size={16} />
+                        <div className="flex-1">
+                            <h4 className="font-bold text-white text-xs">Export Comptable</h4>
+                            <p className="text-[10px] text-emerald-400/70 mt-0.5 mb-2">Fichier virement bancaire.</p>
+                            <Button size="sm" variant="outline" onClick={handleExportComptable} className="w-full border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 h-6 text-[10px] px-2">
+                                Télécharger CSV
+                            </Button>
+                        </div>
                     </div>
-                </div>
-             </Card>
+                </Card>
+             </div>
           </div>
         </div>
       ) : (
-        <Card padding="none" className="overflow-hidden bg-transparent sm:bg-slate-800 border-none sm:border border-slate-700">
-            <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center rounded-xl sm:rounded-none mb-3 sm:mb-0 border sm:border-0">
-                <h3 className="font-bold text-white flex items-center gap-2 text-lg">
-                    <FileText size={20} className="text-cyan-400" />
+        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+            <div className="shrink-0 p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                <h3 className="font-bold text-white flex items-center gap-2 text-xs">
+                    <FileText size={14} className="text-cyan-400" />
                     Mes Bulletins
                 </h3>
             </div>
-            <div className="p-0">
+            <div className="flex-1 overflow-hidden">
                 <ResponsiveTable
                     data={myBulletins || []}
                     columns={columns.filter(c => c.key !== 'employeNom')} 
                     emptyMessage="Aucun bulletin de paie disponible."
                     loading={loadingMyBulletins}
+                    maxHeight="100%"
+                    density="compact"
+                    className="border-0 rounded-none h-full"
+                    headerClassName="bg-slate-900 sticky top-0"
                 />
             </div>
-        </Card>
+        </div>
       )}
     </div>
   );

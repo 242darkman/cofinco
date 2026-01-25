@@ -198,6 +198,7 @@ export const STATUT_DEMANDE_LABELS: Record<StatutDemandeType, string> = {
 
 export const StatutTransaction = {
   PENDING: "PENDING",
+  PENDING_SETTLEMENT: "PENDING_SETTLEMENT", // For field payments awaiting REMISE settlement
   POSTED: "POSTED",
   CANCELLED: "CANCELLED",
   REVERSED: "REVERSED",
@@ -351,6 +352,7 @@ export const StatutOperationTerrain = {
   PENDING: "PENDING",
   SUBMITTED: "SUBMITTED",
   APPROVED: "APPROVED",
+  PENDING_SETTLEMENT: "PENDING_SETTLEMENT", // Approved but awaiting REMISE settlement
   REJECTED: "REJECTED",
   SETTLED: "SETTLED",
   CANCELLED: "CANCELLED",
@@ -383,6 +385,17 @@ export const TYPE_OPERATION_TERRAIN_LABELS: Record<TypeOperationTerrainType, str
   [TypeOperationTerrain.DEPOSIT_CURRENT]: "Dépôt Compte Courant",
   [TypeOperationTerrain.ENGAGEMENT_FEE]: "Frais Engagement Crédit",
   [TypeOperationTerrain.MISC_COLLECTION]: "Encaissement Divers",
+};
+
+/** Labels FR pour l'UI des statuts d'opération terrain */
+export const STATUT_OPERATION_TERRAIN_LABELS: Record<StatutOperationTerrainType, string> = {
+  [StatutOperationTerrain.PENDING]: "En attente",
+  [StatutOperationTerrain.SUBMITTED]: "Soumise",
+  [StatutOperationTerrain.APPROVED]: "Approuvée",
+  [StatutOperationTerrain.PENDING_SETTLEMENT]: "En attente de remise",
+  [StatutOperationTerrain.REJECTED]: "Rejetée",
+  [StatutOperationTerrain.SETTLED]: "Remise effectuée",
+  [StatutOperationTerrain.CANCELLED]: "Annulée",
 };
 
 
@@ -1739,4 +1752,161 @@ export const STATUT_SESSION_CAISSE_LABELS: Record<StatutSessionCaisseType, strin
   [StatutSessionCaisse.CLOSING_COUNT]: "Comptage fermeture",
   [StatutSessionCaisse.CLOSING_VALIDATION]: "Validation fermeture",
   [StatutSessionCaisse.CLOSED]: "Fermée",
+};
+
+// ============================================
+// TYPE CAISSE (Physical vs Digital Mobile Money)
+// ============================================
+
+export const TypeCaisse = {
+  PHYSICAL: "PHYSICAL",
+  DIGITAL_MM_MTN: "DIGITAL_MM_MTN",
+  DIGITAL_MM_AIRTEL: "DIGITAL_MM_AIRTEL",
+} as const;
+
+export type TypeCaisseType = (typeof TypeCaisse)[keyof typeof TypeCaisse];
+
+/** Labels FR pour l'UI des types de caisse */
+export const TYPE_CAISSE_LABELS: Record<TypeCaisseType, string> = {
+  [TypeCaisse.PHYSICAL]: "Caisse Physique",
+  [TypeCaisse.DIGITAL_MM_MTN]: "Caisse Mobile Money MTN",
+  [TypeCaisse.DIGITAL_MM_AIRTEL]: "Caisse Mobile Money Airtel",
+};
+
+/** Vérifie si un type de caisse est une caisse digitale Mobile Money */
+export function isDigitalMobileMoneyCaisse(type: string | null | undefined): boolean {
+  return type === TypeCaisse.DIGITAL_MM_MTN || type === TypeCaisse.DIGITAL_MM_AIRTEL;
+}
+
+/** Retourne le provider Mobile Money associé à un type de caisse */
+export function getCaisseProvider(type: string | null | undefined): "MTN" | "AIRTEL" | null {
+  if (type === TypeCaisse.DIGITAL_MM_MTN) return "MTN";
+  if (type === TypeCaisse.DIGITAL_MM_AIRTEL) return "AIRTEL";
+  return null;
+}
+
+/** Retourne le type de caisse pour un provider Mobile Money */
+export function getDigitalCaisseType(provider: "MTN" | "AIRTEL"): TypeCaisseType {
+  return provider === "MTN" ? TypeCaisse.DIGITAL_MM_MTN : TypeCaisse.DIGITAL_MM_AIRTEL;
+}
+
+// ============================================
+// STATUT DOSSIER CREDIT (Loan Application by Field Agent)
+// ============================================
+
+export const StatutDossierCredit = {
+  DRAFT: "DRAFT",
+  SUBMITTED: "SUBMITTED",
+  PENDING_FEES: "PENDING_FEES",
+  READY_FOR_INVESTIGATION: "READY_FOR_INVESTIGATION",
+  UNDER_INVESTIGATION: "UNDER_INVESTIGATION",
+  INVESTIGATION_COMPLETE: "INVESTIGATION_COMPLETE",
+  IN_COMMITTEE: "IN_COMMITTEE",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type StatutDossierCreditType = (typeof StatutDossierCredit)[keyof typeof StatutDossierCredit];
+
+/** Labels FR pour l'UI des statuts de dossier crédit */
+export const STATUT_DOSSIER_CREDIT_LABELS: Record<StatutDossierCreditType, string> = {
+  [StatutDossierCredit.DRAFT]: "Brouillon",
+  [StatutDossierCredit.SUBMITTED]: "Soumis",
+  [StatutDossierCredit.PENDING_FEES]: "En attente des frais",
+  [StatutDossierCredit.READY_FOR_INVESTIGATION]: "Prêt pour enquête",
+  [StatutDossierCredit.UNDER_INVESTIGATION]: "En cours d'enquête",
+  [StatutDossierCredit.INVESTIGATION_COMPLETE]: "Enquête terminée",
+  [StatutDossierCredit.IN_COMMITTEE]: "En comité",
+  [StatutDossierCredit.APPROVED]: "Approuvé",
+  [StatutDossierCredit.REJECTED]: "Rejeté",
+  [StatutDossierCredit.CANCELLED]: "Annulé",
+};
+
+// ============================================
+// STATUT ENQUETE CREDIT (Field Investigation)
+// ============================================
+
+export const StatutEnqueteCredit = {
+  ASSIGNED: "ASSIGNED",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+  REDUCED: "REDUCED",
+} as const;
+
+export type StatutEnqueteCreditType = (typeof StatutEnqueteCredit)[keyof typeof StatutEnqueteCredit];
+
+/** Labels FR pour l'UI des statuts d'enquête crédit */
+export const STATUT_ENQUETE_CREDIT_LABELS: Record<StatutEnqueteCreditType, string> = {
+  [StatutEnqueteCredit.ASSIGNED]: "Assignée",
+  [StatutEnqueteCredit.IN_PROGRESS]: "En cours",
+  [StatutEnqueteCredit.COMPLETED]: "Terminée",
+  [StatutEnqueteCredit.APPROVED]: "Approuvée",
+  [StatutEnqueteCredit.REJECTED]: "Rejetée",
+  [StatutEnqueteCredit.REDUCED]: "Montant réduit",
+};
+
+// ============================================
+// STATUT REMISE TERRAIN (Settlement Status)
+// ============================================
+
+export const StatutRemiseTerrain = {
+  DRAFT: "DRAFT",
+  PENDING: "PENDING",
+  VALIDATED: "VALIDATED",
+  SETTLED: "SETTLED",
+  REJECTED: "REJECTED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type StatutRemiseTerrainType = (typeof StatutRemiseTerrain)[keyof typeof StatutRemiseTerrain];
+
+/** Labels FR pour l'UI des statuts de remise terrain */
+export const STATUT_REMISE_TERRAIN_LABELS: Record<StatutRemiseTerrainType, string> = {
+  [StatutRemiseTerrain.DRAFT]: "Brouillon",
+  [StatutRemiseTerrain.PENDING]: "En attente",
+  [StatutRemiseTerrain.VALIDATED]: "Validée",
+  [StatutRemiseTerrain.SETTLED]: "Soldée",
+  [StatutRemiseTerrain.REJECTED]: "Rejetée",
+  [StatutRemiseTerrain.CANCELLED]: "Annulée",
+};
+
+// ============================================
+// AVIS ENQUETEUR (Investigation Recommendation)
+// ============================================
+
+export const AvisEnqueteur = {
+  FAVORABLE: "FAVORABLE",
+  DEFAVORABLE: "DEFAVORABLE",
+  RESERVE: "RESERVE",
+} as const;
+
+export type AvisEnqueteurType = (typeof AvisEnqueteur)[keyof typeof AvisEnqueteur];
+
+/** Labels FR pour l'UI des avis enquêteur */
+export const AVIS_ENQUETEUR_LABELS: Record<AvisEnqueteurType, string> = {
+  [AvisEnqueteur.FAVORABLE]: "Favorable",
+  [AvisEnqueteur.DEFAVORABLE]: "Défavorable",
+  [AvisEnqueteur.RESERVE]: "Réservé",
+};
+
+// ============================================
+// NIVEAU RISQUE (Risk Level)
+// ============================================
+
+export const NiveauRisque = {
+  FAIBLE: "FAIBLE",
+  MOYEN: "MOYEN",
+  ELEVE: "ELEVE",
+} as const;
+
+export type NiveauRisqueType = (typeof NiveauRisque)[keyof typeof NiveauRisque];
+
+/** Labels FR pour l'UI des niveaux de risque */
+export const NIVEAU_RISQUE_LABELS: Record<NiveauRisqueType, string> = {
+  [NiveauRisque.FAIBLE]: "Faible",
+  [NiveauRisque.MOYEN]: "Moyen",
+  [NiveauRisque.ELEVE]: "Élevé",
 };

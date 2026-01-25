@@ -18,6 +18,8 @@ export * from "./agences";
 export * from "./caisse-agent";
 export * from "./coffres-forts";
 export * from "./agency_migration";
+export * from "./mobile-money";
+export * from "./dossier-credit";
 
 // Relations - Need to be defined here or in a separate file to avoid circular dependencies
 // if they were in individual files. OR we can put relations in `relations.ts`.

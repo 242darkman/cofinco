@@ -491,14 +491,14 @@ export default function TransfertArgent() {
   ];
 
   return (
-    <div className="space-y-6 relative min-h-[600px]" data-testid="module-transfert">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full space-y-2 relative" data-testid="module-transfert">
+      <div className="shrink-0 flex items-center justify-between p-1">
         <div>
-          <h1 className="text-lg font-bold text-white flex items-center gap-2">
-            <Send className="text-emerald-400" size={24} />
+          <h1 className="text-base font-bold text-white flex items-center gap-2">
+            <Send className="text-emerald-400" size={20} />
             Virements
           </h1>
-          <p className="text-slate-400 text-xs mt-1">Transferts internes et vers beneficiaires en temps reel</p>
+          <p className="text-slate-400 text-[10px] mt-0.5">Transferts internes et vers bénéficiaires</p>
         </div>
           <Button
             size="sm"
@@ -506,6 +506,7 @@ export default function TransfertArgent() {
             icon={Calculator}
             onClick={() => setShowCalculator(true)}
             data-testid="button-calculator"
+            className="h-8 text-xs"
           >
             Calculateur
           </Button>
@@ -521,147 +522,134 @@ export default function TransfertArgent() {
         ]}
         variant="pills"
         size="sm"
+        className="mb-4"
       />
 
-      {activeTab === 'send' && <TransactionFlow />}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {activeTab === 'send' && <TransactionFlow />}
 
-      {activeTab === 'history' && (
-        <Card padding="none" className="overflow-hidden bg-transparent sm:bg-slate-800 border-none sm:border border-slate-700">
-          <ResponsiveTable
-            columns={[
-              { key: 'id', label: 'Code', primary: true, format: (v) => <span className="font-mono text-xs">{v}</span> },
-              { key: 'recipient', label: 'Bénéficiaire', hideOnMobile: true },
-              { key: 'amount', label: 'Envoyé', format: (v) => <span className="font-bold text-white">{v.toLocaleString()} XAF</span> },
-              { key: 'status', label: 'Statut', badge: true, format: (v) => <Badge value={v === 'completed' ? 'Terminé' : 'En cours'} variant={v === 'completed' ? 'success' : 'warning'} /> },
-              { key: 'date', label: 'Date', hideOnMobile: true }
-            ]}
-            data={recentTransfers}
-          />
-        </Card>
-      )}
+        {activeTab === 'history' && (
+          <Card padding="none" className="flex-1 overflow-hidden bg-transparent sm:bg-slate-800 border-none sm:border border-slate-700">
+             <div className="h-full overflow-y-auto custom-scrollbar">
+              <ResponsiveTable
+                columns={[
+                  { key: 'id', label: 'Code', primary: true, format: (v) => <span className="font-mono text-xs">{v}</span> },
+                  { key: 'recipient', label: 'Bénéficiaire', hideOnMobile: true },
+                  { key: 'amount', label: 'Envoyé', format: (v) => <span className="font-bold text-white">{v.toLocaleString()} XAF</span> },
+                  { key: 'status', label: 'Statut', format: (v) => <Badge value={v === 'completed' ? 'Terminé' : 'En cours'} variant={v === 'completed' ? 'success' : 'warning'} /> },
+                  { key: 'date', label: 'Date', hideOnMobile: true }
+                ]}
+                data={recentTransfers}
+                density="compact"
+              />
+            </div>
+          </Card>
+        )}
 
-      {activeTab === 'rates' && (
-        <div className="space-y-6">
-          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <TrendingDown className="text-emerald-400" size={20} />
-              Grille Tarifaire Transferts Locaux
-            </h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-2">
-                  <Banknote className="text-emerald-400" size={24} />
+        {activeTab === 'rates' && (
+          <div className="h-full overflow-y-auto custom-scrollbar space-y-6 pr-2">
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
+              <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                <TrendingDown className="text-emerald-400" size={18} />
+                Grille Tarifaire Transferts Locaux
+              </h3>
+              <div className="grid md:grid-cols-3 gap-3">
+                <div className="bg-slate-700/50 rounded-xl p-3">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-1">
+                    <Banknote className="text-emerald-400" size={18} />
+                  </div>
+                  <h4 className="text-white text-sm font-bold">Espèces</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">500 XAF fixe + 0.5%</p>
                 </div>
-                <h4 className="text-white font-bold">Espèces</h4>
-                <p className="text-slate-400 text-sm mt-1">500 XAF fixe + 0.5%</p>
-                <p className="text-emerald-400 text-xs mt-2">Ex: 100,000 XAF → 1,000 XAF de frais</p>
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-1">
+                    <Smartphone className="text-emerald-400" size={18} />
+                  </div>
+                  <h4 className="text-white text-sm font-bold">Mobile Money</h4>
+                  <p className="text-emerald-400 text-xs mt-0.5 font-bold">200 XAF fixe + 0.3%</p>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl p-3">
+                  <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center mb-1">
+                    <Landmark className="text-blue-400" size={18} />
+                  </div>
+                  <h4 className="text-white text-sm font-bold">Virement bancaire</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">1,000 XAF fixe + 0.8%</p>
+                </div>
               </div>
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-2">
-                  <Smartphone className="text-emerald-400" size={24} />
+            </div>
+
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
+              <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                <Globe className="text-blue-400" size={18} />
+                Grille Tarifaire Transferts Internationaux
+              </h3>
+              <div className="grid md:grid-cols-4 gap-3">
+                <div className="bg-slate-700/50 rounded-xl p-3">
+                  <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center mb-1">
+                    <Globe className="text-amber-400" size={18} />
+                  </div>
+                  <h4 className="text-white text-sm font-bold">Afrique</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">2,500 XAF + 1.5%</p>
                 </div>
-                <h4 className="text-white font-bold">Mobile Money</h4>
-                <p className="text-emerald-400 text-sm mt-1 font-bold">200 XAF fixe + 0.3%</p>
-                <p className="text-emerald-300 text-xs mt-2">Meilleur tarif!</p>
+                <div className="bg-slate-700/50 rounded-xl p-3">
+                  <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center mb-1">
+                    <Euro className="text-blue-400" size={18} />
+                  </div>
+                  <h4 className="text-white text-sm font-bold">Europe</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">5,000 XAF + 2.0%</p>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl p-3">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-1">
+                    <DollarSign className="text-emerald-400" size={18} />
+                  </div>
+                  <h4 className="text-white text-sm font-bold">Amérique</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">6,000 XAF + 2.5%</p>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl p-3">
+                  <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center mb-1">
+                    <Earth className="text-purple-400" size={18} />
+                  </div>
+                  <h4 className="text-white text-sm font-bold">Asie & MO</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">7,000 XAF + 3.0%</p>
+                </div>
               </div>
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center mb-2">
-                  <Landmark className="text-blue-400" size={24} />
-                </div>
-                <h4 className="text-white font-bold">Virement bancaire</h4>
-                <p className="text-slate-400 text-sm mt-1">1,000 XAF fixe + 0.8%</p>
-                <p className="text-slate-500 text-xs mt-2">Délai: 1-2 jours ouvrés</p>
+            </div>
+
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
+              <h3 className="text-base font-bold text-emerald-400 mb-3 flex items-center gap-2">
+                <Star size={18} />
+                Comparaison marché
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-emerald-500/30">
+                      <th className="px-2 py-2 text-left text-emerald-300">Service</th>
+                      <th className="px-2 py-2 text-center text-emerald-300">Frais</th>
+                      <th className="px-2 py-2 text-center text-emerald-300">Délai</th>
+                      <th className="px-2 py-2 text-center text-emerald-300">Momo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-emerald-500/10">
+                      <td className="px-2 py-2 text-white font-bold">COFIN</td>
+                      <td className="px-2 py-2 text-center text-emerald-400 font-bold">1.5% - 3%</td>
+                      <td className="px-2 py-2 text-center text-white">Direct</td>
+                      <td className="px-2 py-2 text-center"><CheckCircle2 className="text-emerald-400 mx-auto" size={14} /></td>
+                    </tr>
+                    <tr className="border-t border-slate-700">
+                      <td className="px-2 py-2 text-slate-400">Western Union</td>
+                      <td className="px-2 py-2 text-center text-red-400">5% - 10%</td>
+                      <td className="px-2 py-2 text-center text-slate-400">1-3j</td>
+                      <td className="px-2 py-2 text-center text-slate-500">-</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
-
-          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Globe className="text-blue-400" size={20} />
-              Grille Tarifaire Transferts Internationaux
-            </h3>
-            <div className="grid md:grid-cols-4 gap-4">
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center mb-2">
-                  <Globe className="text-amber-400" size={24} />
-                </div>
-                <h4 className="text-white font-bold">Afrique</h4>
-                <p className="text-slate-400 text-sm mt-1">2,500 XAF + 1.5%</p>
-                <p className="text-cyan-400 text-xs mt-2">CEMAC, UEMOA, RDC...</p>
-              </div>
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center mb-2">
-                  <Euro className="text-blue-400" size={24} />
-                </div>
-                <h4 className="text-white font-bold">Europe</h4>
-                <p className="text-slate-400 text-sm mt-1">5,000 XAF + 2.0%</p>
-                <p className="text-cyan-400 text-xs mt-2">France, Belgique, UK...</p>
-              </div>
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-2">
-                  <DollarSign className="text-emerald-400" size={24} />
-                </div>
-                <h4 className="text-white font-bold">Amérique</h4>
-                <p className="text-slate-400 text-sm mt-1">6,000 XAF + 2.5%</p>
-                <p className="text-cyan-400 text-xs mt-2">USA, Canada</p>
-              </div>
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center mb-2">
-                  <Earth className="text-purple-400" size={24} />
-                </div>
-                <h4 className="text-white font-bold">Asie & Moyen-Orient</h4>
-                <p className="text-slate-400 text-sm mt-1">7,000 XAF + 3.0%</p>
-                <p className="text-cyan-400 text-xs mt-2">Chine, EAU</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6">
-            <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
-              <Star size={20} />
-              Comparaison avec la concurrence
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-emerald-500/30">
-                    <th className="px-4 py-2 text-left text-emerald-300 text-sm">Service</th>
-                    <th className="px-4 py-2 text-center text-emerald-300 text-sm">Frais moyens</th>
-                    <th className="px-4 py-2 text-center text-emerald-300 text-sm">Délai</th>
-                    <th className="px-4 py-2 text-center text-emerald-300 text-sm">Mobile Money</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="bg-emerald-500/10">
-                    <td className="px-4 py-3 text-white font-bold">COFIN Transfer</td>
-                    <td className="px-4 py-3 text-center text-emerald-400 font-bold">1.5% - 3%</td>
-                    <td className="px-4 py-3 text-center text-white">Instantané - 24h</td>
-                    <td className="px-4 py-3 text-center"><CheckCircle2 className="text-emerald-400 mx-auto" size={18} /></td>
-                  </tr>
-                  <tr className="border-t border-slate-700">
-                    <td className="px-4 py-3 text-slate-400">Western Union</td>
-                    <td className="px-4 py-3 text-center text-red-400">5% - 10%</td>
-                    <td className="px-4 py-3 text-center text-slate-400">1-3 jours</td>
-                    <td className="px-4 py-3 text-center text-slate-500">Limité</td>
-                  </tr>
-                  <tr className="border-t border-slate-700">
-                    <td className="px-4 py-3 text-slate-400">MoneyGram</td>
-                    <td className="px-4 py-3 text-center text-red-400">4% - 8%</td>
-                    <td className="px-4 py-3 text-center text-slate-400">1-2 jours</td>
-                    <td className="px-4 py-3 text-center text-slate-500">Limité</td>
-                  </tr>
-                  <tr className="border-t border-slate-700">
-                    <td className="px-4 py-3 text-slate-400">Virement bancaire</td>
-                    <td className="px-4 py-3 text-center text-amber-400">3% - 5%</td>
-                    <td className="px-4 py-3 text-center text-slate-400">3-5 jours</td>
-                    <td className="px-4 py-3 text-center"><X className="text-red-400 mx-auto" size={18} /></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {showCalculator && <TransferCalculator onClose={() => setShowCalculator(false)} />}
       {showNewTransfer && <NewTransferModal type={showNewTransfer} onClose={() => setShowNewTransfer(null)} />}

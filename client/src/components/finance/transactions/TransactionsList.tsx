@@ -49,6 +49,7 @@ export interface TransactionsListProps {
   onViewAll?: () => void;
   maxItems?: number;
   className?: string;
+  compactMode?: boolean;
 }
 
 // --- Helper Functions ---
@@ -127,6 +128,7 @@ const getStatusConfig = (status: string) => {
 interface TransactionRowProps {
   transactions: TransactionItem[];
   onTransactionClick?: (transaction: TransactionItem) => void;
+  compactMode?: boolean;
 }
 
 // --- Row Component for virtualized list ---
@@ -135,6 +137,7 @@ function MobileTransactionRow({
   style,
   transactions,
   onTransactionClick,
+  compactMode,
 }: {
   ariaAttributes: {
     "aria-posinset": number;
@@ -156,21 +159,25 @@ function MobileTransactionRow({
 
   const handleClick = () => onTransactionClick?.(tx);
 
+  const paddingClass = compactMode ? 'p-2' : 'p-4';
+  const iconSizeClass = compactMode ? 'w-9 h-9' : 'w-11 h-11';
+  const iconInnerSize = compactMode ? 16 : 20;
+
   return (
     <div
       style={style}
       onClick={handleClick}
-      className="p-4 active:bg-slate-800/50 transition-colors cursor-pointer border-b border-edge"
+      className={`${paddingClass} active:bg-slate-800/50 transition-colors cursor-pointer border-b border-edge`}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && handleClick()}
     >
       <div className="flex items-start gap-3">
         <div className={`
-          w-11 h-11 rounded-full flex items-center justify-center shrink-0
+          ${iconSizeClass} rounded-full flex items-center justify-center shrink-0
           ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
         `}>
-          {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+          {isCredit ? <ArrowDownLeft size={iconInnerSize} /> : <ArrowUpRight size={iconInnerSize} />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
@@ -213,7 +220,8 @@ export default function TransactionsList({
   headerTitle = 'Transactions Récentes',
   onViewAll,
   maxItems,
-  className = ''
+  className = '',
+  compactMode = false
 }: TransactionsListProps) {
   const displayedTransactions = maxItems ? transactions.slice(0, maxItems) : transactions;
 
@@ -280,18 +288,18 @@ export default function TransactionsList({
     <div className={`bg-surface border border-edge rounded-xl overflow-hidden ${className}`}>
       {/* Header */}
       {showHeader && (
-        <div className="p-4 border-b border-edge flex items-center justify-between">
+        <div className="px-3 py-2 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock size={16} className="text-cyan-400" />
-            <h3 className="text-sm font-bold text-white">{headerTitle}</h3>
+            <Clock size={14} className="text-cyan-400" />
+            <h3 className="text-xs font-bold text-white">{headerTitle}</h3>
           </div>
           {onViewAll && (
             <button
               onClick={onViewAll}
-              className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
+              className="text-[10px] font-medium text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
             >
               Voir tout
-              <ChevronRight size={14} />
+              <ChevronRight size={12} />
             </button>
           )}
         </div>
@@ -301,15 +309,16 @@ export default function TransactionsList({
       <div className="md:hidden">
         {useVirtualization ? (
           <VirtualList<TransactionRowProps>
-            style={{ height: Math.min(displayedTransactions.length * 88, 600), width: '100%' }}
+            style={{ height: Math.min(displayedTransactions.length * (compactMode ? 64 : 88), 600), width: '100%' }}
             rowCount={displayedTransactions.length}
-            rowHeight={88}
+            rowHeight={compactMode ? 64 : 88}
             className="divide-y divide-edge"
             rowComponent={MobileTransactionRow}
             rowProps={useMemo(() => ({
               transactions: displayedTransactions,
               onTransactionClick,
-            }), [displayedTransactions, onTransactionClick])}
+              compactMode
+            }), [displayedTransactions, onTransactionClick, compactMode])}
           />
         ) : (
           <div className="divide-y divide-edge">
@@ -321,21 +330,25 @@ export default function TransactionsList({
               const timeStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
               const dateStr = dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 
+              const paddingClass = compactMode ? 'p-2' : 'p-4';
+              const iconSizeClass = compactMode ? 'w-9 h-9' : 'w-11 h-11';
+              const iconInnerSize = compactMode ? 16 : 20;
+
               return (
                 <div
                   key={tx.id}
                   onClick={() => handleClick(tx)}
-                  className="p-4 active:bg-slate-800/50 transition-colors cursor-pointer"
+                  className={`${paddingClass} active:bg-slate-800/50 transition-colors cursor-pointer`}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && handleClick(tx)}
                 >
                   <div className="flex items-start gap-3">
                     <div className={`
-                      w-11 h-11 rounded-full flex items-center justify-center shrink-0
+                      ${iconSizeClass} rounded-full flex items-center justify-center shrink-0
                       ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
                     `}>
-                      {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+                      {isCredit ? <ArrowDownLeft size={iconInnerSize} /> : <ArrowUpRight size={iconInnerSize} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -370,16 +383,15 @@ export default function TransactionsList({
         )}
       </div>
 
-      {/* Desktop Table View */}
       <div className="hidden md:block">
         <table className="w-full">
           <thead>
-            <tr className="bg-slate-800/30">
-              <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
-              <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
-              <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Référence</th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Montant</th>
-              <th className="text-center py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Statut</th>
+            <tr className="bg-slate-800/30 border-b border-edge">
+              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Date</th>
+              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Type</th>
+              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Référence</th>
+              <th className={`text-right ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Montant</th>
+              <th className={`text-center ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Statut</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-edge">
@@ -397,42 +409,41 @@ export default function TransactionsList({
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && handleClick(tx)}
                 >
-                  <td className="py-3 px-4">
-                    <div>
-                      <span className="text-sm text-white">
-                        {dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </span>
-                      <span className="text-xs text-slate-500 ml-2">
+                  <td className={`${compactMode ? 'py-1' : 'py-2'} px-3`}>
+                    <div className="flex items-center gap-2">
+                       <span className="text-xs text-white">
                         {dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className="text-[10px] text-slate-500 text-nowrap">
+                        {dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
                       </span>
                     </div>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className={`${compactMode ? 'py-1' : 'py-2'} px-3`}>
                     <div className="flex items-center gap-2">
                       <div className={`
-                        w-8 h-8 rounded-full flex items-center justify-center shrink-0
+                        ${compactMode ? 'w-5 h-5' : 'w-6 h-6'} rounded-full flex items-center justify-center shrink-0
                         ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
                       `}>
-                        {isCredit ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                        {isCredit ? <ArrowDownLeft size={compactMode ? 10 : 12} /> : <ArrowUpRight size={compactMode ? 10 : 12} />}
                       </div>
-                      <span className="text-sm text-white group-hover:text-cyan-400 transition-colors">
+                      <span className="text-xs font-medium text-white group-hover:text-cyan-400 transition-colors truncate max-w-[150px] block">
                         {tx.description || tx.type_operation || tx.type}
                       </span>
                     </div>
                   </td>
-                  <td className="py-3 px-4">
-                    <span className="text-sm font-mono text-slate-400">
+                  <td className={`${compactMode ? 'py-1' : 'py-2'} px-3`}>
+                    <span className="text-[10px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors truncate max-w-[120px] block">
                       {tx.reference}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right">
-                    <span className={`text-sm font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <td className={`${compactMode ? 'py-1' : 'py-2'} px-3 text-right`}>
+                    <span className={`text-xs font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
                       {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
-                      <span className="text-slate-500 font-normal ml-1">FCFA</span>
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center">
-                    <Badge value={statusConfig.label} variant={statusConfig.badgeVariant} size="sm" />
+                  <td className={`${compactMode ? 'py-1' : 'py-2'} px-3 text-center`}>
+                    <Badge value={statusConfig.label} variant={statusConfig.badgeVariant} size="sm" className="text-[10px] py-0 px-1.5 h-5" />
                   </td>
                 </tr>
               );

@@ -360,7 +360,6 @@ export async function getAllPaiementsTerrain(): Promise<PaiementTerrain[]> {
     .orderBy(desc(paiementsTerrain.createdAt));
 
   return results.map(row => {
-    // Determine agent name: prefer User (via employe), fallback to legacy
     const agentNom = row.user?.nom || "Inconnu";
     const agentPrenom = row.user?.prenom || "";
 

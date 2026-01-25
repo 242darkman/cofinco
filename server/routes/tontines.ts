@@ -1,8 +1,10 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { insertTontineSchema, insertMembreTontineSchema, insertContributionTontineSchema, insertTontineAlerteSchema,
     insertTontineRegleSchema, insertTontinePenaliteSchema, insertTontineDistributionSchema,
-    insertTontinePlanSchema
+    insertTontinePlanSchema,
+    tontineCycles, tontineTurns, tontineSchedules, tontineDistributionRequests, tontineTurnAudit,
+    TontinePayoutMethod
 } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
@@ -10,6 +12,9 @@ import { SystemRole } from "@shared/types/roles";
 import { requireAgenceAccess } from "../middleware";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { getWsInstance } from "../ws-server";
+import tontineProductionService from "../services/tontine-production-service";
+import { db } from "../db";
+import { eq, and, desc, asc } from "drizzle-orm";
 
 export function registerTontineRoutes(app: Express) {
   app.get("/api/tontines", requireAuth, requireAgenceAccess(), async (req, res) => {
@@ -294,26 +299,47 @@ export function registerTontineRoutes(app: Express) {
     res.json({ success });
   });
 
-  // Prochain bénéficiaire
-  app.get("/api/tontines/:id/prochain-beneficiaire", requireAuth, async (req, res) => {
-    const beneficiaire = await storage.getProchainBeneficiaire(req.params.id);
-    res.json(addSnakeCaseAliasesDeep(beneficiaire));
-  });
+  // ============================================================================
+  // PRODUCTION-READY TONTINE ENDPOINTS
+  // ============================================================================
 
-  // Membres éligibles au bénéfice
-  app.get("/api/tontines/:id/eligibles-benefice", requireAuth, async (req, res) => {
-    const eligibles = await storage.getMembresEligiblesBenefice(req.params.id);
-    res.json(addSnakeCaseAliasesDeep(eligibles));
-  });
+  // --- CYCLES ---
 
-  // Tirage aléatoire du prochain bénéficiaire
-  app.post("/api/tontines/:id/tirage-beneficiaire", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
+  // List cycles for a tontine
+  app.get("/api/tontines/:id/cycles", requireAuth, async (req: Request, res: Response) => {
     try {
-      const beneficiaire = await storage.tirerProchainBeneficiaire(req.params.id);
+      const cycles = await db
+        .select()
+        .from(tontineCycles)
+        .where(eq(tontineCycles.tontineId, req.params.id))
+        .orderBy(desc(tontineCycles.cycleNumber));
 
-      if (!beneficiaire) {
-        return res.status(400).json({ message: "Aucun membre éligible pour le tirage" });
+      res.json(addSnakeCaseAliasesDeep(cycles));
+    } catch (error: any) {
+      console.error("Erreur chargement cycles:", error);
+      res.status(500).json({ message: error.message || "Erreur chargement cycles" });
+    }
+  });
+
+  // Generate a new cycle (with schedules and turns)
+  app.post("/api/tontines/:id/cycles/generate", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const userId = req.session.user?.id;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
       }
+
+      const { startDate, randomSeed } = req.body;
+
+      const result = await tontineProductionService.generateCycle({
+        tontineId: req.params.id,
+        agenceId,
+        userId: userId!,
+        startDate: startDate ? new Date(startDate) : undefined,
+        randomSeed: randomSeed ? parseInt(randomSeed) : undefined,
+      });
 
       // Notify
       const wsInstance = getWsInstance();
@@ -321,142 +347,442 @@ export function registerTontineRoutes(app: Express) {
         wsInstance.broadcast({
           type: "TONTINE_UPDATE",
           payload: {
-            type: 'tirage_effectue',
+            type: 'cycle_generated',
             tontineId: req.params.id,
-            beneficiaire: {
-              id: beneficiaire.id,
-              nom: beneficiaire.client?.nom,
-              tour: beneficiaire.tour
-            }
+            cycleId: result.cycleId,
+            turnsCount: result.turnsCreated,
           }
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(beneficiaire));
+      res.json(addSnakeCaseAliasesDeep(result));
     } catch (error: any) {
-      console.error("Erreur tirage bénéficiaire:", error);
-      res.status(500).json({ message: error.message || "Erreur lors du tirage" });
+      console.error("Erreur génération cycle:", error);
+      res.status(400).json({ message: error.message || "Erreur génération cycle" });
     }
   });
 
-  // ============ DISTRIBUTIONS ============
-
-  // Liste des distributions d'une tontine
-  app.get("/api/tontines/:id/distributions", requireAuth, async (req, res) => {
+  // Get cycle details
+  app.get("/api/tontines/:id/cycles/:cycleId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const distributions = await storage.getDistributionsByTontine(req.params.id);
-      res.json(addSnakeCaseAliasesDeep(distributions));
+      const [cycle] = await db
+        .select()
+        .from(tontineCycles)
+        .where(and(
+          eq(tontineCycles.tontineId, req.params.id),
+          eq(tontineCycles.id, req.params.cycleId)
+        ))
+        .limit(1);
+
+      if (!cycle) {
+        return res.status(404).json({ message: "Cycle non trouvé" });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(cycle));
     } catch (error: any) {
-      console.error("Erreur chargement distributions:", error);
-      res.status(500).json({ message: error.message || "Erreur lors du chargement des distributions" });
+      console.error("Erreur chargement cycle:", error);
+      res.status(500).json({ message: error.message || "Erreur chargement cycle" });
     }
   });
 
-  // Statistiques des distributions
-  app.get("/api/tontines/:id/distributions/stats", requireAuth, async (req, res) => {
+  // Close a cycle
+  app.post("/api/tontines/:id/cycles/:cycleId/close", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req: Request, res: Response) => {
     try {
-      const stats = await storage.getDistributionStats(req.params.id);
-      res.json(addSnakeCaseAliasesDeep(stats));
+      const userId = req.session.user?.id;
+
+      const [updated] = await db
+        .update(tontineCycles)
+        .set({
+          status: 'CLOSED',
+          closedAt: new Date(),
+          closedBy: userId,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(tontineCycles.tontineId, req.params.id),
+          eq(tontineCycles.id, req.params.cycleId)
+        ))
+        .returning();
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: 'cycle_closed', tontineId: req.params.id, cycleId: req.params.cycleId }
+        });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(updated));
     } catch (error: any) {
-      console.error("Erreur chargement stats distributions:", error);
-      res.status(500).json({ message: error.message || "Erreur lors du chargement des statistiques" });
+      console.error("Erreur clôture cycle:", error);
+      res.status(400).json({ message: error.message || "Erreur clôture cycle" });
     }
   });
 
-  // Créer une distribution
-  app.post("/api/tontine-distributions", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req, res) => {
+  // --- TURNS ---
+
+  // List turns for a cycle
+  app.get("/api/tontines/:id/cycles/:cycleId/turns", requireAuth, async (req: Request, res: Response) => {
     try {
-      const data = normalizeKeysDeep(req.body) as Record<string, any>;
+      const turns = await db
+        .select()
+        .from(tontineTurns)
+        .where(and(
+          eq(tontineTurns.tontineId, req.params.id),
+          eq(tontineTurns.cycleId, req.params.cycleId)
+        ))
+        .orderBy(asc(tontineTurns.turnNumber));
 
-      // Validation des champs requis
-      if (!data.tontineId) {
-        return res.status(400).json({ message: "tontineId est requis" });
-      }
-      if (!data.membreId) {
-        return res.status(400).json({ message: "membreId est requis" });
-      }
-      if (!data.montantTotal) {
-        return res.status(400).json({ message: "montantTotal est requis" });
+      res.json(addSnakeCaseAliasesDeep(turns));
+    } catch (error: any) {
+      console.error("Erreur chargement tours:", error);
+      res.status(500).json({ message: error.message || "Erreur chargement tours" });
+    }
+  });
+
+  // Reorder turns
+  app.post("/api/tontines/:id/cycles/:cycleId/turns/reorder", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const userId = req.session.user?.id;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
       }
 
-      const distribution = await storage.createTontineDistribution({
-        tontineId: data.tontineId,
-        membreId: data.membreId,
-        tourNumero: data.tourNumero || 1,
-        montantTotal: String(data.montantTotal),
-        dateDistribution: data.dateDistribution ? new Date(data.dateDistribution) : undefined,
-        modePaiement: data.modePaiement,
-        referencePaiement: data.referencePaiement,
-        notes: data.notes
-      }, req.session.user?.id);
+      const { newOrder, reason } = req.body;
 
-      // Notify via WebSocket
+      if (!newOrder || !Array.isArray(newOrder)) {
+        return res.status(400).json({ message: "newOrder requis (array)" });
+      }
+
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Motif de réorganisation requis" });
+      }
+
+      const result = await tontineProductionService.reorderTurns({
+        tontineId: req.params.id,
+        cycleId: req.params.cycleId,
+        agenceId,
+        userId: userId!,
+        newOrder,
+        reason,
+      });
+
+      // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
         wsInstance.broadcast({
           type: "TONTINE_UPDATE",
           payload: {
-            type: 'distribution_created',
-            tontineId: data.tontineId,
-            distribution: {
-              id: distribution.id,
-              tourNumero: distribution.tourNumero,
-              montantTotal: distribution.montantTotal,
-              beneficiaire: distribution.membre?.client?.nom
-            }
+            type: 'turns_reordered',
+            tontineId: req.params.id,
+            cycleId: req.params.cycleId,
+            affectedTurns: result.affectedTurns,
           }
         });
       }
 
-      res.json(addSnakeCaseAliasesDeep(distribution));
+      res.json(addSnakeCaseAliasesDeep(result));
     } catch (error: any) {
-      console.error("Erreur création distribution:", error);
-      res.status(400).json({ message: error.message || "Erreur lors de la création de la distribution" });
+      console.error("Erreur réorganisation tours:", error);
+      res.status(400).json({ message: error.message || "Erreur réorganisation tours" });
     }
   });
 
-  // Annuler une distribution
-  app.delete("/api/tontine-distributions/:id", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req, res) => {
+  // Get turn audit history
+  app.get("/api/tontines/:id/cycles/:cycleId/audit", requireAuth, async (req: Request, res: Response) => {
     try {
-      // Récupérer la distribution avant suppression pour le broadcast
-      const distribution = await storage.getDistribution(req.params.id);
-      if (!distribution) {
-        return res.status(404).json({ message: "Distribution introuvable" });
+      const audits = await db
+        .select()
+        .from(tontineTurnAudit)
+        .where(and(
+          eq(tontineTurnAudit.tontineId, req.params.id),
+          eq(tontineTurnAudit.cycleId, req.params.cycleId)
+        ))
+        .orderBy(desc(tontineTurnAudit.changedAt));
+
+      res.json(addSnakeCaseAliasesDeep(audits));
+    } catch (error: any) {
+      console.error("Erreur chargement audit:", error);
+      res.status(500).json({ message: error.message || "Erreur chargement audit" });
+    }
+  });
+
+  // --- SCHEDULES ---
+
+  // List schedules for a cycle
+  app.get("/api/tontines/:id/cycles/:cycleId/schedules", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const schedules = await db
+        .select()
+        .from(tontineSchedules)
+        .where(and(
+          eq(tontineSchedules.tontineId, req.params.id),
+          eq(tontineSchedules.cycleId, req.params.cycleId)
+        ))
+        .orderBy(asc(tontineSchedules.periodNumber));
+
+      res.json(addSnakeCaseAliasesDeep(schedules));
+    } catch (error: any) {
+      console.error("Erreur chargement schedules:", error);
+      res.status(500).json({ message: error.message || "Erreur chargement schedules" });
+    }
+  });
+
+  // --- RETIRABLE ---
+
+  // Calculate retirable amount for a member
+  app.get("/api/tontines/:id/retirable/:memberId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await tontineProductionService.calculateRetirable(
+        req.params.id,
+        req.params.memberId
+      );
+
+      res.json(addSnakeCaseAliasesDeep(result));
+    } catch (error: any) {
+      console.error("Erreur calcul retirable:", error);
+      res.status(500).json({ message: error.message || "Erreur calcul retirable" });
+    }
+  });
+
+  // --- DISTRIBUTION REQUESTS (V2) ---
+
+  // List distribution requests for a tontine
+  app.get("/api/tontines/:id/distribution-requests", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { cycleId, status } = req.query;
+
+      let query = db
+        .select()
+        .from(tontineDistributionRequests)
+        .where(eq(tontineDistributionRequests.tontineId, req.params.id));
+
+      const requests = await query.orderBy(desc(tontineDistributionRequests.createdAt));
+
+      // Filter in memory if needed (Drizzle chaining limitations)
+      let filtered = requests;
+      if (cycleId) {
+        filtered = filtered.filter(r => r.cycleId === cycleId);
+      }
+      if (status) {
+        filtered = filtered.filter(r => r.status === status);
       }
 
-      const success = await storage.cancelTontineDistribution(req.params.id);
+      res.json(addSnakeCaseAliasesDeep(filtered));
+    } catch (error: any) {
+      console.error("Erreur chargement distribution requests:", error);
+      res.status(500).json({ message: error.message || "Erreur chargement" });
+    }
+  });
 
-      // Notify via WebSocket
+  // Create a distribution request
+  app.post("/api/tontines/:id/distribution-requests", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR, SystemRole.CAISSIER), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const userId = req.session.user?.id;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const {
+        cycleId,
+        turnId,
+        beneficiaryMemberId,
+        payoutMethod,
+        provider,
+        targetMsisdn,
+        targetWalletAccountId,
+        notes,
+      } = req.body;
+
+      if (!cycleId || !turnId || !beneficiaryMemberId || !payoutMethod) {
+        return res.status(400).json({ message: "cycleId, turnId, beneficiaryMemberId, payoutMethod requis" });
+      }
+
+      const result = await tontineProductionService.createDistributionRequest({
+        tontineId: req.params.id,
+        cycleId,
+        turnId,
+        beneficiaryMemberId,
+        agenceId,
+        userId: userId!,
+        payoutMethod: payoutMethod as TontinePayoutMethod,
+        provider,
+        targetMsisdn,
+        targetWalletAccountId,
+        notes,
+      });
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: {
+            type: 'distribution_request_created',
+            tontineId: req.params.id,
+            requestId: result.requestId,
+            status: result.status,
+          }
+        });
+      }
+
+      res.json(addSnakeCaseAliasesDeep(result));
+    } catch (error: any) {
+      console.error("Erreur création distribution request:", error);
+      res.status(400).json({ message: error.message || "Erreur création" });
+    }
+  });
+
+  // Approve and execute a distribution request
+  app.post("/api/tontines/:id/distribution-requests/:requestId/approve", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const userId = req.session.user?.id;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      // Get active session for cash distributions
+      let sessionCaisseId: string | undefined;
+      const activeSession = await storage.getActiveSessionForUser(userId!);
+      if (activeSession) {
+        sessionCaisseId = activeSession.id;
+      }
+
+      const result = await tontineProductionService.approveDistribution({
+        requestId: req.params.requestId,
+        agenceId,
+        userId: userId!,
+        sessionCaisseId,
+      });
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: {
+            type: 'distribution_approved',
+            tontineId: req.params.id,
+            requestId: result.requestId,
+            status: result.status,
+            amountPaid: result.netAmount,
+          }
+        });
+
+        if (sessionCaisseId) {
+          wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
+        }
+      }
+
+      res.json(addSnakeCaseAliasesDeep(result));
+    } catch (error: any) {
+      console.error("Erreur approbation distribution:", error);
+      res.status(400).json({ message: error.message || "Erreur approbation" });
+    }
+  });
+
+  // Cancel a distribution request
+  app.post("/api/tontines/:id/distribution-requests/:requestId/cancel", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE), async (req: Request, res: Response) => {
+    try {
+      const { reason } = req.body;
+
+      const [updated] = await db
+        .update(tontineDistributionRequests)
+        .set({
+          status: 'CANCELLED',
+          rejectionReason: reason || 'Annulé',
+          updatedAt: new Date(),
+        })
+        .where(eq(tontineDistributionRequests.id, req.params.requestId))
+        .returning();
+
+      // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
         wsInstance.broadcast({
           type: "TONTINE_UPDATE",
           payload: {
             type: 'distribution_cancelled',
-            tontineId: distribution.tontineId,
-            distributionId: req.params.id
+            tontineId: req.params.id,
+            requestId: req.params.requestId,
           }
         });
       }
 
-      res.json({ success, message: "Distribution annulée avec succès" });
+      res.json(addSnakeCaseAliasesDeep(updated));
     } catch (error: any) {
       console.error("Erreur annulation distribution:", error);
-      res.status(400).json({ message: error.message || "Erreur lors de l'annulation de la distribution" });
+      res.status(400).json({ message: error.message || "Erreur annulation" });
     }
   });
 
-  // Récupérer une distribution par ID
-  app.get("/api/tontine-distributions/:id", requireAuth, async (req, res) => {
+  // --- DASHBOARD V2 ---
+
+  // Get tontine dashboard stats (V2 with cycles)
+  app.get("/api/tontines/:id/dashboard", requireAuth, async (req: Request, res: Response) => {
     try {
-      const distribution = await storage.getDistribution(req.params.id);
-      if (!distribution) {
-        return res.status(404).json({ message: "Distribution introuvable" });
+      // Get tontine with stats
+      const tontine = await storage.getTontine(req.params.id);
+      if (!tontine) {
+        return res.status(404).json({ message: "Tontine non trouvée" });
       }
-      res.json(addSnakeCaseAliasesDeep(distribution));
+
+      // Get current cycle
+      let currentCycle = null;
+      if (tontine.currentCycleId) {
+        const [cycle] = await db
+          .select()
+          .from(tontineCycles)
+          .where(eq(tontineCycles.id, tontine.currentCycleId))
+          .limit(1);
+        currentCycle = cycle;
+      }
+
+      // Get next turn
+      let nextTurn = null;
+      if (currentCycle) {
+        const [turn] = await db
+          .select()
+          .from(tontineTurns)
+          .where(and(
+            eq(tontineTurns.cycleId, currentCycle.id),
+            eq(tontineTurns.status, 'SCHEDULED')
+          ))
+          .orderBy(asc(tontineTurns.turnNumber))
+          .limit(1);
+        nextTurn = turn;
+      }
+
+      // Get pending distribution requests
+      const pendingRequests = await db
+        .select()
+        .from(tontineDistributionRequests)
+        .where(and(
+          eq(tontineDistributionRequests.tontineId, req.params.id),
+          eq(tontineDistributionRequests.status, 'SUBMITTED')
+        ));
+
+      res.json(addSnakeCaseAliasesDeep({
+        tontine,
+        currentCycle,
+        nextTurn,
+        pendingDistributions: pendingRequests.length,
+        stats: {
+          potCollecte: currentCycle?.potCollected || tontine.solde || "0",
+          potDistribue: currentCycle?.potDistributed || "0",
+          membresActifs: currentCycle?.membersCount || tontine.membresActuels || 0,
+        },
+      }));
     } catch (error: any) {
-      console.error("Erreur chargement distribution:", error);
-      res.status(500).json({ message: error.message || "Erreur lors du chargement de la distribution" });
+      console.error("Erreur dashboard tontine:", error);
+      res.status(500).json({ message: error.message || "Erreur dashboard" });
     }
   });
 }

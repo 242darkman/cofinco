@@ -60,26 +60,49 @@ export const remisesTerrain = pgTable(
 
     agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id, { onDelete: "restrict" }),
     sessionCaisseId: uuid("session_caisse_id").references(() => sessionsCaisse.id, { onDelete: "set null" }),
+    agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "set null" }),
+    caisseDestinationId: uuid("caisse_destination_id").references(() => caisses.id, { onDelete: "set null" }),
 
     reference: text("reference").notNull(), // ex: REM-2026-000123
+    idempotencyKey: text("idempotency_key"),
     montantDeclare: numeric("montant_declare").notNull(),  // montant remis
     montantCalcule: numeric("montant_calcule").notNull().default("0"), // calculable depuis paiements liés
 
-    statut: text("statut").notNull().default("PENDING"), // ou enum si tu veux (En attente, Validée, Rejetée)
+    // Écart et justification
+    ecart: numeric("ecart").default("0"),
+    motifEcart: text("motif_ecart"),
 
+    statut: text("statut").notNull().default("PENDING"), // DRAFT, PENDING, VALIDATED, SETTLED, REJECTED
+
+    // Dates workflow
     createdAt: timestamp("created_at").notNull().defaultNow(),
     validatedAt: timestamp("validated_at"),
     validatedBy: uuid("validated_by").references(() => users.id, { onDelete: "set null" }),
+    settledAt: timestamp("settled_at"),
+    rejectedAt: timestamp("rejected_at"),
+    rejectedBy: uuid("rejected_by").references(() => users.id, { onDelete: "set null" }),
+    rejectionReason: text("rejection_reason"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
+
+    // Mouvements comptables (créés à la validation)
+    mouvementCaisseId: uuid("mouvement_caisse_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+    mouvementCoffreId: uuid("mouvement_coffre_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    // Détail billetage
+    billetage: json("billetage").$type<Record<string, number>>(),
 
     observations: text("observations"),
   },
   (t) => ({
     uqRef: uniqueIndex("uq_remises_terrain_reference").on(t.reference),
+    uqIdempotency: uniqueIndex("uq_remises_terrain_idempotency")
+      .on(t.idempotencyKey)
+      .where(sql`idempotency_key IS NOT NULL`),
     idxAgentDate: index("idx_remises_terrain_agent_date").on(t.agentId, t.createdAt),
     idxSession: index("idx_remises_terrain_session").on(t.sessionCaisseId),
     idxStatut: index("idx_remises_terrain_statut").on(t.statut),
+    idxAgence: index("idx_remises_terrain_agence").on(t.agenceId),
   }),
 );
 
@@ -216,10 +239,15 @@ export const paiementsTerrain = pgTable(
     validationOTP: text("validation_otp"),
     dateValidation: timestamp("date_validation"),
 
-    // Remise agence (lot)
+    // Remise agence (lot) - legacy fields
     remiseId: uuid("remise_id").references(() => remisesTerrain.id, { onDelete: "set null" }),
     sessionCaisseRemiseId: uuid("session_caisse_remise_id").references(() => sessionsCaisse.id, { onDelete: "set null" }),
     dateRemise: timestamp("date_remise"),
+
+    // Settlement tracking (new workflow)
+    settledRemiseId: uuid("settled_remise_id").references(() => remisesTerrain.id, { onDelete: "set null" }),
+    settledAt: timestamp("settled_at"),
+    postedMouvementClientId: uuid("posted_mouvement_client_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
 
     observations: text("observations"),
     latitude: numeric("latitude"),
@@ -239,6 +267,7 @@ export const paiementsTerrain = pgTable(
 
     idxRemise: index("idx_paiements_terrain_remise").on(t.remiseId),
     idxSessionRemise: index("idx_paiements_terrain_session_remise").on(t.sessionCaisseRemiseId),
+    idxSettled: index("idx_paiements_terrain_settled").on(t.settledRemiseId),
 
     idxMvt: index("idx_paiements_terrain_mouvement").on(t.mouvementId),
     idxCredit: index("idx_paiements_terrain_credit").on(t.creditId),
@@ -256,6 +285,147 @@ export const paiementsTerrain = pgTable(
 export const insertPaiementTerrainSchema = createInsertSchema(paiementsTerrain).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertPaiementTerrain = z.infer<typeof insertPaiementTerrainSchema>;
 export type PaiementTerrain = typeof paiementsTerrain.$inferSelect;
+
+// ============================================================================
+// Remise Items (link table for bordereau de remise)
+// ============================================================================
+
+export const remiseItems = pgTable(
+  "remise_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    remiseId: uuid("remise_id").notNull().references(() => remisesTerrain.id, { onDelete: "cascade" }),
+    paiementTerrainId: uuid("paiement_terrain_id").notNull().references(() => paiementsTerrain.id, { onDelete: "restrict" }),
+    operationTerrainId: uuid("operation_terrain_id"), // Will be linked later
+
+    // Snapshot of payment details at settlement time
+    montant: numeric("montant").notNull(),
+    typePaiement: text("type_paiement").notNull(),
+    clientId: uuid("client_id").references(() => clients.id, { onDelete: "restrict" }),
+
+    // Settlement tracking
+    settledAt: timestamp("settled_at"),
+    mouvementClientId: uuid("mouvement_client_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxRemise: index("idx_remise_items_remise").on(t.remiseId),
+    idxPaiement: index("idx_remise_items_paiement").on(t.paiementTerrainId),
+    uqPaiement: uniqueIndex("uq_remise_items_paiement").on(t.paiementTerrainId),
+    chkMontantPos: sql`CONSTRAINT chk_remise_items_montant_pos CHECK (${t.montant} > 0)`,
+  }),
+);
+
+export const insertRemiseItemSchema = createInsertSchema(remiseItems).omit({ id: true, createdAt: true });
+export type InsertRemiseItem = z.infer<typeof insertRemiseItemSchema>;
+export type RemiseItem = typeof remiseItems.$inferSelect;
+
+// ============================================================================
+// Agent Mobile Money Payments (bypass remise workflow)
+// ============================================================================
+
+export const agentMmPayments = pgTable(
+  "agent_mm_payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Payment intent reference (from mm_payment_intents table)
+    paymentIntentId: uuid("payment_intent_id"), // Will be linked to mm_payment_intents
+
+    // Agent and client
+    agentId: uuid("agent_id").notNull().references(() => agentsTerrain.id, { onDelete: "restrict" }),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "restrict" }),
+    agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "set null" }),
+
+    // Payment details
+    typePaiement: text("type_paiement").notNull(), // CREDIT_REPAYMENT, DEPOSIT_SAVINGS, etc.
+    montant: numeric("montant").notNull(),
+    provider: text("provider").notNull(), // MTN, AIRTEL
+    phone: text("phone").notNull(),
+
+    // External references
+    reference: text("reference").notNull(),
+    externalReference: text("external_reference"),
+    idempotencyKey: text("idempotency_key"),
+
+    // Target financial product
+    creditId: uuid("credit_id").references(() => credits.id, { onDelete: "set null" }),
+    compteId: uuid("compte_id").references(() => comptes.id, { onDelete: "set null" }),
+    tontineId: uuid("tontine_id"),
+
+    // Status tracking
+    statut: text("statut").notNull().default("PENDING"), // PENDING, PROCESSING, SUCCESS, FAILED, CANCELLED
+
+    // Settlement (on SUCCESS)
+    settledAt: timestamp("settled_at"),
+    mouvementClientId: uuid("mouvement_client_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+
+    // Error tracking
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+
+    // Location
+    latitude: numeric("latitude"),
+    longitude: numeric("longitude"),
+
+    // Audit
+    observations: text("observations"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    uqReference: uniqueIndex("uq_agent_mm_payments_reference").on(t.reference),
+    uqIdempotency: uniqueIndex("uq_agent_mm_payments_idempotency")
+      .on(t.idempotencyKey)
+      .where(sql`idempotency_key IS NOT NULL`),
+    idxAgent: index("idx_agent_mm_payments_agent").on(t.agentId),
+    idxClient: index("idx_agent_mm_payments_client").on(t.clientId),
+    idxIntent: index("idx_agent_mm_payments_intent").on(t.paymentIntentId),
+    idxStatut: index("idx_agent_mm_payments_statut").on(t.statut),
+    idxDate: index("idx_agent_mm_payments_date").on(t.createdAt),
+    chkMontantPos: sql`CONSTRAINT chk_agent_mm_payments_montant_pos CHECK (${t.montant} > 0)`,
+  }),
+);
+
+export const insertAgentMmPaymentSchema = createInsertSchema(agentMmPayments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAgentMmPayment = z.infer<typeof insertAgentMmPaymentSchema>;
+export type AgentMmPayment = typeof agentMmPayments.$inferSelect;
+
+// ============================================================================
+// Remise Audit Logs
+// ============================================================================
+
+export const remiseAuditLogs = pgTable(
+  "remise_audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    remiseId: uuid("remise_id").notNull().references(() => remisesTerrain.id, { onDelete: "cascade" }),
+
+    action: text("action").notNull(), // CREATED, SUBMITTED, APPROVED, REJECTED, SETTLED
+    statutAvant: text("statut_avant"),
+    statutApres: text("statut_apres").notNull(),
+
+    details: json("details").$type<Record<string, unknown>>(),
+
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+
+    timestamp: timestamp("timestamp").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxRemise: index("idx_remise_audit_logs_remise").on(t.remiseId),
+    idxTimestamp: index("idx_remise_audit_logs_timestamp").on(t.timestamp),
+  }),
+);
+
+export const insertRemiseAuditLogSchema = createInsertSchema(remiseAuditLogs).omit({ id: true, timestamp: true });
+export type InsertRemiseAuditLog = z.infer<typeof insertRemiseAuditLogSchema>;
+export type RemiseAuditLog = typeof remiseAuditLogs.$inferSelect;
 
 // Agent Location Logs
 export const agentLocationLogs = pgTable("agent_location_logs", {

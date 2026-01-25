@@ -23,6 +23,8 @@ const UserProfile = lazy(() => import('@/components/shared/UserProfile'));
 const ExcelModule = lazy(() => import('@/components/shared/ExcelModule'));
 const CreditRefundsPage = lazy(() => import('@/pages/finance/CreditRefundsPage'));
 const AdminVirementsProgrammes = lazy(() => import('@/components/admin/AdminVirementsProgrammes'));
+const ReconciliationPage = lazy(() => import('@/pages/finance/ReconciliationPage'));
+const TresoreriePage = lazy(() => import('@/pages/finance/TresoreriePage'));
 
 
 export interface RouteConfig {
@@ -146,6 +148,24 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Coffre-Fort',
     label: 'Coffre-Fort',
     labelKey: 'menuCoffre',
+    group: 'Opérations',
+  },
+  {
+    key: 'tresorerie',
+    path: '/finance/tresorerie',
+    component: TresoreriePage,
+    requiredModule: 'Caisse',
+    label: 'Trésorerie',
+    labelKey: 'menuTresorerie',
+    group: 'Opérations',
+  },
+  {
+    key: 'reconciliation',
+    path: '/finance/reconciliation',
+    component: ReconciliationPage,
+    requiredModule: 'Administration',
+    label: 'Réconciliation MM',
+    labelKey: 'menuReconciliation',
     group: 'Opérations',
   },
   {

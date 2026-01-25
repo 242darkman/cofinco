@@ -758,12 +758,72 @@ export const tontineApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  // Gestion des bénéficiaires
-  getProchainBeneficiaire: (tontineId: string) => request<any>(`/tontines/${tontineId}/prochain-beneficiaire`),
-  getEligiblesBenefice: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/eligibles-benefice`),
-  tirageBeneficiaire: (tontineId: string) => request<any>(`/tontines/${tontineId}/tirage-beneficiaire`, {
+
+  // ============================================================================
+  // V2 PRODUCTION-READY ENDPOINTS
+  // ============================================================================
+
+  // Cycles
+  getCycles: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/cycles`),
+  getCycle: (tontineId: string, cycleId: string) => request<any>(`/tontines/${tontineId}/cycles/${cycleId}`),
+  generateCycle: (tontineId: string, data?: { startDate?: string; randomSeed?: number }) =>
+    request<any>(`/tontines/${tontineId}/cycles/generate`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  closeCycle: (tontineId: string, cycleId: string) =>
+    request<any>(`/tontines/${tontineId}/cycles/${cycleId}/close`, { method: 'POST' }),
+
+  // Turns
+  getTurns: (tontineId: string, cycleId: string) =>
+    request<any[]>(`/tontines/${tontineId}/cycles/${cycleId}/turns`),
+  reorderTurns: (tontineId: string, cycleId: string, data: { newOrder: Array<{ turnNumber: number; memberId: string }>; reason: string }) =>
+    request<any>(`/tontines/${tontineId}/cycles/${cycleId}/turns/reorder`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getTurnAudit: (tontineId: string, cycleId: string) =>
+    request<any[]>(`/tontines/${tontineId}/cycles/${cycleId}/audit`),
+
+  // Schedules
+  getSchedules: (tontineId: string, cycleId: string) =>
+    request<any[]>(`/tontines/${tontineId}/cycles/${cycleId}/schedules`),
+
+  // Retirable (calcul du montant retirable)
+  getRetirable: (tontineId: string, memberId: string) =>
+    request<any>(`/tontines/${tontineId}/retirable/${memberId}`),
+
+  // Distribution Requests (V2 workflow)
+  getDistributionRequests: (tontineId: string, params?: { cycleId?: string; status?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.cycleId) queryParams.append('cycleId', params.cycleId);
+    if (params?.status) queryParams.append('status', params.status);
+    const query = queryParams.toString();
+    return request<any[]>(`/tontines/${tontineId}/distribution-requests${query ? `?${query}` : ''}`);
+  },
+  createDistributionRequest: (tontineId: string, data: {
+    cycleId: string;
+    turnId: string;
+    beneficiaryMemberId: string;
+    payoutMethod: 'CASH' | 'MOBILE_MONEY' | 'WALLET';
+    provider?: string;
+    targetMsisdn?: string;
+    targetWalletAccountId?: string;
+    notes?: string;
+  }) => request<any>(`/tontines/${tontineId}/distribution-requests`, {
     method: 'POST',
+    body: JSON.stringify(data),
   }),
+  approveDistribution: (tontineId: string, requestId: string) =>
+    request<any>(`/tontines/${tontineId}/distribution-requests/${requestId}/approve`, { method: 'POST' }),
+  cancelDistribution: (tontineId: string, requestId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/distribution-requests/${requestId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  // Dashboard
+  getDashboard: (tontineId: string) => request<any>(`/tontines/${tontineId}/dashboard`),
 };
 
 // Tontine Plans API
@@ -1036,20 +1096,6 @@ export const contributionTontineApi = {
   }),
 };
 
-// Distributions Tontine API
-export const distributionTontineApi = {
-  getByTontine: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/distributions`),
-  getStats: (tontineId: string) => request<any>(`/tontines/${tontineId}/distributions/stats`),
-  getById: (id: string) => request<any>(`/tontine-distributions/${id}`),
-  create: (data: any) => request<any>('/tontine-distributions', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  cancel: (id: string) => request<any>(`/tontine-distributions/${id}`, {
-    method: 'DELETE',
-  }),
-};
-
 // Alertes Tontine API
 export const alerteTontineApi = {
   getByTontine: (tontineId: string, params?: { statut?: string }) => {
@@ -1124,14 +1170,6 @@ export const tontinePenaliteApi = {
   getByTontine: (tontineId: string) => penaliteTontineApi.getByTontine(tontineId),
   create: (data: any) => penaliteTontineApi.create(data),
   update: (id: string, data: any) => penaliteTontineApi.update(id, data),
-};
-
-export const tontineDistributionApi = {
-  getByTontine: (tontineId: string) => distributionTontineApi.getByTontine(tontineId),
-  getStats: (tontineId: string) => distributionTontineApi.getStats(tontineId),
-  getById: (id: string) => distributionTontineApi.getById(id),
-  create: (data: any) => distributionTontineApi.create(data),
-  cancel: (id: string) => distributionTontineApi.cancel(id),
 };
 
 // Échéances Crédit API
@@ -1393,13 +1431,131 @@ export const comptabiliteApi = {
     body: JSON.stringify(data),
   }),
 
-  // Grand Livre
+  // Grand Livre (legacy)
   getGrandLivre: (compteId: string, params: { dateDebut: string; dateFin: string }) =>
     request<any[]>(`/comptabilite/grand-livre/${compteId}?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}`),
 
-  // Balance Générale
+  // Grand Livre V2 (with running balance and pagination)
+  getGrandLivreV2: (compteId: string, params: { dateDebut: string; dateFin: string; page?: number; pageSize?: number }) =>
+    request<{
+      compteId: string;
+      numeroCompte: string;
+      intitule: string;
+      classe: number;
+      typeCompte: string;
+      sensNormal: string;
+      soldeOuverture: number;
+      totalDebits: number;
+      totalCredits: number;
+      soldeFinal: number;
+      entries: Array<{
+        id: string;
+        dateEcriture: string;
+        numeroPiece: string;
+        journalCode: string;
+        journalIntitule: string;
+        ecritureLibelle: string;
+        ligneLibelle: string;
+        debit: number;
+        credit: number;
+        soldeProgressif: number;
+        sourceType?: string;
+        sourceId?: string;
+        refExterne?: string;
+      }>;
+      pagination: {
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(`/comptabilite/v2/grand-livre/${compteId}?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}&page=${params.page || 1}&pageSize=${params.pageSize || 50}`),
+
+  // Balance Générale (legacy)
   getBalance: (params: { dateDebut: string; dateFin: string }) =>
     request<any[]>(`/comptabilite/balance?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}`),
+
+  // Balance V2 (enhanced with totals)
+  getBalanceV2: (params: { dateDebut: string; dateFin: string; classe?: number }) =>
+    request<{
+      entries: Array<{
+        compteId: string;
+        numeroCompte: string;
+        intitule: string;
+        classe: number;
+        typeCompte: string;
+        sensNormal: string;
+        totalDebit: number;
+        totalCredit: number;
+        soldeDebiteur: number;
+        soldeCrediteur: number;
+      }>;
+      totals: {
+        totalDebits: number;
+        totalCredits: number;
+        totalSoldeDebiteur: number;
+        totalSoldeCrediteur: number;
+        isBalanced: boolean;
+      };
+      dateDebut: string;
+      dateFin: string;
+    }>(`/comptabilite/v2/balance?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}${params.classe ? `&classe=${params.classe}` : ''}`),
+
+  // Périodes
+  getPeriods: (year?: number) =>
+    request<any[]>(`/comptabilite/periods${year ? `?year=${year}` : ''}`),
+
+  closePeriod: (data: { year: number; month: number; notes?: string }) =>
+    request<{ success: boolean; message: string }>('/comptabilite/periods/close', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Extourne (reversal)
+  reverseEntry: (ecritureId: string, reason: string) =>
+    request<{ originalEcritureId: string; reversalEcritureId: string; numeroPiece: string }>(
+      `/comptabilite/entries/${ecritureId}/reverse`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }
+    ),
+
+  // Entry details
+  getEntryDetails: (ecritureId: string) =>
+    request<any>(`/comptabilite/entries/${ecritureId}`),
+
+  // Check posting status
+  getPostingStatus: (sourceType: string, sourceId: string) =>
+    request<{ posted: boolean; ecritureId?: string; numeroPiece?: string; statut?: string; dateEcriture?: string }>(
+      `/comptabilite/posting-status/${sourceType}/${sourceId}`
+    ),
+
+  // Get entries by source type
+  getEntriesBySource: (sourceType: string, params?: { page?: number; pageSize?: number }) =>
+    request<any[]>(`/comptabilite/entries-by-source/${sourceType}?page=${params?.page || 1}&pageSize=${params?.pageSize || 50}`),
+
+  // Create manual entry (v2)
+  createEntryV2: (data: {
+    journalCode: string;
+    dateEcriture: string;
+    libelle: string;
+    lignes: Array<{
+      numeroCompte?: string;
+      compteId?: string;
+      libelle?: string;
+      debit?: number;
+      credit?: number;
+      refExterne?: string;
+    }>;
+  }) =>
+    request<{ success: boolean; ecritureId: string; numeroPiece: string; totalDebit: number; totalCredit: number }>(
+      '/comptabilite/v2/ecritures',
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    ),
 };
 
 // Users API

@@ -141,6 +141,7 @@ export const typeTransactionEpargneEnum = pgEnum("type_transaction_epargne_enum"
 
 export const statutTransactionEnum = pgEnum("statut_transaction_enum", [
   "PENDING",
+  "PENDING_SETTLEMENT", // For field payments awaiting REMISE settlement
   "POSTED",
   "CANCELLED",
   "REVERSED",
@@ -224,6 +225,7 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "DECAISSEMENT_PROGRAMME",
   "COMPTE",
   "COFFRE",
+  "MOBILE_MONEY",
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -329,6 +331,7 @@ export const typeOperationTerrainEnum = pgEnum("type_operation_terrain_enum", [
 export const statutOperationTerrainEnum = pgEnum("statut_operation_terrain_enum", [
   "SUBMITTED",
   "APPROVED",
+  "PENDING_SETTLEMENT", // Approved but awaiting REMISE settlement
   "REJECTED",
   "CANCELLED",
   "SETTLED",
@@ -547,4 +550,91 @@ export const statutRefundRequestEnum = pgEnum("statut_refund_request_enum", [
   "PENDING_CAISSE",  // En attente de validation caisse (espèces/mobile money)
   "PAID",
   "CANCELLED",
+]);
+
+// ============================================
+// MOBILE MONEY PAYMENTS
+// ============================================
+
+export const mobileMoneyProviderEnum = pgEnum("mobile_money_provider_enum", [
+  "MTN",
+  "AIRTEL",
+]);
+
+export const typePaymentIntentEnum = pgEnum("type_payment_intent_enum", [
+  "COLLECTION",  // Argent entrant (dépôt, remboursement)
+  "PAYOUT",      // Argent sortant (décaissement, retrait)
+]);
+
+export const statutPaymentIntentEnum = pgEnum("statut_payment_intent_enum", [
+  "CREATED",     // Intent créé localement
+  "PENDING",     // Envoyé au provider, en attente confirmation
+  "SUCCESS",     // Provider a confirmé le succès
+  "FAILED",      // Provider a confirmé l'échec
+  "EXPIRED",     // Timeout - pas de réponse dans le délai
+  "CANCELLED",   // Annulé manuellement avant completion
+  "REVERSED",    // Paiement réussi mais annulé/remboursé
+]);
+
+// ============================================
+// DOSSIER CREDIT (Loan Application by Field Agent)
+// ============================================
+
+export const statutDossierCreditEnum = pgEnum("statut_dossier_credit_enum", [
+  "DRAFT",
+  "SUBMITTED",
+  "PENDING_FEES",
+  "READY_FOR_INVESTIGATION",
+  "UNDER_INVESTIGATION",
+  "INVESTIGATION_COMPLETE",
+  "IN_COMMITTEE",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
+]);
+
+// ============================================
+// ENQUETE CREDIT (Field Investigation for Loan)
+// ============================================
+
+export const statutEnqueteCreditAgentEnum = pgEnum("statut_enquete_credit_agent_enum", [
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "APPROVED",
+  "REJECTED",
+  "REDUCED",
+]);
+
+// ============================================
+// REMISE TERRAIN (Settlement Status)
+// ============================================
+
+export const statutRemiseTerrainEnum = pgEnum("statut_remise_terrain_enum", [
+  "DRAFT",
+  "PENDING",
+  "VALIDATED",
+  "SETTLED",
+  "REJECTED",
+  "CANCELLED",
+]);
+
+// ============================================
+// AVIS ENQUETEUR (Investigation Recommendation)
+// ============================================
+
+export const avisEnqueteurEnum = pgEnum("avis_enqueteur_enum", [
+  "FAVORABLE",
+  "DEFAVORABLE",
+  "RESERVE",
+]);
+
+// ============================================
+// NIVEAU RISQUE (Risk Level)
+// ============================================
+
+export const niveauRisqueEnum = pgEnum("niveau_risque_enum", [
+  "FAIBLE",
+  "MOYEN",
+  "ELEVE",
 ]);

@@ -19,6 +19,8 @@ import {
   Undo2,
   BarChart3,
   CheckCircle,
+  Landmark,
+  RefreshCcw,
 } from 'lucide-react';
 import { MenuItem } from '../types/layout';
 
@@ -50,7 +52,8 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
 
   // Système
   { labelKey: 'menuAdministrateur', icon: Shield, key: 'administrateur', section: 'admin' },
-  { labelKey: 'menuTresorerieSupervision', icon: BarChart3, key: 'tresorerie', section: 'admin' },
+  { labelKey: 'menuTresorerie', icon: Landmark, key: 'tresorerie', section: 'admin' },
+  { labelKey: 'menuReconciliation', icon: RefreshCcw, key: 'reconciliation', section: 'admin' },
   { labelKey: 'menuMessages', icon: MessageSquare, key: 'messages', section: 'admin' },
   { labelKey: 'menuProfil', icon: UserCircle, key: 'profil', section: 'admin' },
 ];

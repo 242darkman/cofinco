@@ -29,12 +29,12 @@ type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes'
 
 // Helper to get static configuration
 const getTabConfig = () => [
-  { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
+  { key: 'dashboard', label: 'Synthèse', icon: BarChart3 },
   { key: 'credits', label: 'Crédits', icon: CreditCard },
   { key: 'demandes', label: 'À traiter', icon: FileText, badgeColors: 'bg-blue-100 text-blue-800' }, // New demands, rejected, cancelled
   { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck, badgeColors: 'bg-yellow-100 text-yellow-800' }, // Only "A enquêter" (ready for investigation)
   { key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeColors: 'bg-red-100 text-red-800' }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
-  { key: 'commission', label: "Comité d'Approbation", icon: Users, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
+  { key: 'commission', label: "Comité", icon: Users, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
   { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw, badgeColors: 'bg-gray-100 text-gray-800' }, // Credit reevaluation workflow
   { key: 'remboursements', label: 'Remboursements', icon: TrendingUp },
   { key: 'archives', label: 'Archives', icon: XCircle, badgeColors: 'bg-slate-100 text-slate-800' } // Cancelled / Rejected
@@ -60,7 +60,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const [demandesPage, setDemandesPage] = useState(1);
   const [demandeToDelete, setDemandeToDelete] = useState<string | null>(null);
   const [demandeToCancel, setDemandeToCancel] = useState<string | null>(null);
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 15;
 
   useEffect(() => {
     if (activeView) {
@@ -432,31 +432,32 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           onTabChange={(key) => setActiveTab(key as TabId)}
           tabs={tabs} 
           variant="pills"
+          size="sm"
         />
       </Card>
 
       {/* Dashboard Tab */}
       {activeTab === 'dashboard' && (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-4 animate-in fade-in duration-500">
           
-          {/* 1. Pipeline Funnel */}
+          {/* 1. Pipeline Funnel (Compact) */}
           <section>
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <TrendingUp className="text-blue-400" />
-              Pipeline Crédit
-            </h3>
+            <div className="flex items-center gap-2 mb-2">
+               <TrendingUp className="text-blue-400" size={16} />
+               <h3 className="text-sm font-bold text-white uppercase tracking-wider">Pipeline Crédit</h3>
+            </div>
             <PipelineFunnel steps={funnelData} />
           </section>
 
           {/* 2. KPIs & Action Lists split */}
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid lg:grid-cols-3 gap-4">
             
             {/* Left Col: Actions Requises (2/3 width) - Smart Feed */}
-            <div className="lg:col-span-2 space-y-6">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <AlertCircle className="text-amber-400" />
-                Actions & Activités
-              </h3>
+            <div className="lg:col-span-2 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="text-amber-400" size={16} />
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Actions & Activités</h3>
+              </div>
               
               <div className="space-y-3">
                 {/* Check if ANY action is required */}
@@ -576,50 +577,45 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               </div>
             </div>
 
-            {/* Right Col: Stats & KPIs - Aligned top */}
-            <div className="space-y-6">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                 <BarChart3 className="text-purple-400" />
-                 Performance
-              </h3>
-              
-              <div className="grid gap-3">
-                 <StatCard
-                    title="Volume Pipeline"
-                    value={formatCompactMoney(kpis.pipelineVolume).replace(' FCFA', '')}
-                    color="primary"
-                    icon={TrendingUp}
-                    subtitle="Potentiel à venir"
-                 />
-                 <StatCard
-                    title="Transformation"
-                    value={`${kpis.transformationRate.toFixed(1)}%`}
-                    color="neutral"
-                    icon={RefreshCw}
-                    subtitle="Dossiers décaissés"
-                 />
-                 <StatCard
-                    title="Délai Moyen"
-                    value={`${kpis.avgDelay}j`}
-                    color="neutral"
-                    icon={Clock}
-                    subtitle="Demande à Décaissement"
-                 />
+            {/* Right Col: Stats & KPIs - Compact & Aligned */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                 <BarChart3 className="text-purple-400" size={16} />
+                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Performance</h3>
               </div>
+              
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                 <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Pipeline</span>
+                    <div className="text-lg font-black text-white">{formatCompactMoney(kpis.pipelineVolume).replace(' FCFA', '')}</div>
+                    <span className="text-[10px] text-slate-400">Potentiel à venir</span>
+                 </div>
 
-              <Card variant="glass" padding="sm">
-                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Volume Global traité</h4>
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                       <span className="text-sm text-slate-400">Total Crédits</span>
-                       <span className="text-white font-bold">{formatMoneyPlain(stats.montantTotalCredits)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                       <span className="text-sm text-slate-400">Actifs</span>
-                       <span className="text-emerald-400 font-bold">{stats.creditsActifs} dossiers</span>
+                 <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Transformation</span>
+                    <div className="text-lg font-black text-white">{kpis.transformationRate.toFixed(1)}%</div>
+                    <span className="text-[10px] text-slate-400">Dossiers décaissés</span>
+                 </div>
+
+                 <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col col-span-2 lg:col-span-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Délai Moyen</span>
+                    <div className="flex items-end justify-between">
+                       <div className="text-lg font-black text-white">{kpis.avgDelay}j</div>
+                       <span className="text-[10px] text-slate-400 text-right">Demande à<br/>Décaissement</span>
                     </div>
                  </div>
-              </Card>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-lg p-3 mt-1">
+                 <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] text-slate-400">Total Crédits</span>
+                    <span className="text-xs font-bold text-white">{formatMoneyPlain(stats.montantTotalCredits)}</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-slate-400">Actifs</span>
+                    <span className="text-xs font-bold text-emerald-400">{stats.creditsActifs} dossiers</span>
+                 </div>
+              </div>
             </div>
 
           </div>
@@ -643,6 +639,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               totalPages: Math.ceil(credits.credits.length / ITEMS_PER_PAGE),
               onPageChange: setCreditsPage
             }}
+            density="compact"
           />
         </Card>
       )}
@@ -667,6 +664,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.INVESTIGATION_COMPLETE, StatutDemande.UNDER_INVESTIGATION] as string[]).includes(d.statut)).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
+            density="compact"
             actions={(item) => (
                <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
                  <Button 
@@ -706,6 +704,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === StatutDemande.APPROVED || d.statut === StatutDemande.APPROVED_AFTER_REEVALUATION).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
+            density="compact"
             actions={(item) => (
                <div className="flex gap-2">
                  <ProtectedFeature requiredPermission={{ module: 'credits', action: 'reject' }}>
@@ -767,6 +766,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deleted_at).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
+            density="compact"
             actions={(item) => (
               <IconButton 
                 icon={Eye} 
@@ -810,6 +810,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deleted_at).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
+            density="compact"
             actions={(item) => (
               <div className="flex gap-1">
                  {item.statut === StatutDemande.PENDING_FEES && (
@@ -902,6 +903,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                   setSelectedDemande(item);
                   setShowEnqueteForm(true);
               }}
+              density="compact"
               actions={(item) => (
                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
                    <Button 

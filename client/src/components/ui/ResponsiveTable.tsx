@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { LucideIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 /**
  * ResponsiveTable Component - COFIN Platform
@@ -51,6 +52,9 @@ export interface ResponsiveTableProps<T> {
     totalPages: number;
     onPageChange: (page: number) => void;
   };
+  density?: 'normal' | 'compact' | 'spacious';
+  className?: string;
+  headerClassName?: string;
 }
 
 function ResponsiveTable<T extends Record<string, any>>({
@@ -63,8 +67,38 @@ function ResponsiveTable<T extends Record<string, any>>({
   mobileBreakpoint = 'lg',
   maxHeight,
   pagination,
+  density = 'normal',
+  className,
+  headerClassName,
 }: ResponsiveTableProps<T>) {
   const primaryColumn = columns.find((col) => col.primary) || columns[0];
+
+  // Density styles
+  const densityStyles = {
+    compact: {
+      cellPadding: 'px-2 py-1.5',
+      headingPadding: 'px-2 py-2',
+      textSize: 'text-xs',
+      iconSize: 12,
+      rowGap: 'gap-1'
+    },
+    normal: {
+      cellPadding: 'px-4 py-3',
+      headingPadding: 'px-4 py-3',
+      textSize: 'text-sm',
+      iconSize: 14,
+      rowGap: 'gap-1.5'
+    },
+    spacious: {
+      cellPadding: 'px-6 py-4',
+      headingPadding: 'px-6 py-4',
+      textSize: 'text-base',
+      iconSize: 16,
+      rowGap: 'gap-2'
+    }
+  };
+
+  const currentDensity = densityStyles[density];
 
   // Get value from nested key (e.g., 'user.name')
   const getValue = (item: T, key: string) => {
@@ -121,7 +155,7 @@ function ResponsiveTable<T extends Record<string, any>>({
     const colorClass = colorMap[value] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
 
     return (
-      <span className={`inline-flex items-center justify-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border transition-all duration-200 ${colorClass} ${className}`}>
+      <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-all duration-200 ${colorClass} ${className}`}>
         {value || '-'}
       </span>
     );
@@ -211,32 +245,32 @@ function ResponsiveTable<T extends Record<string, any>>({
 
       {/* Desktop View (Table) */}
       <div 
-        className={`hidden ${mobileBreakpoint}:block overflow-auto bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700`}
+        className={cn(`hidden ${mobileBreakpoint}:block overflow-auto bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700`, className)}
         style={maxHeight ? { maxHeight } : undefined}
       >
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+        <table className={`w-full ${currentDensity.textSize}`}>
+          <thead className={cn("bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700", headerClassName)}>
             <tr>
               {columns.map((column) => {
                 const align = column.headerAlign || column.align || 'left';
                 return (
                   <th
                     key={column.key as string}
-                    className={`px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 text-xs ${
+                    className={`${currentDensity.headingPadding} font-semibold text-slate-600 dark:text-slate-300 ${
                       align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
                     }`}
                   >
                     <div className={`flex items-center gap-2 ${
                       align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'
                     }`}>
-                      {column.icon && <column.icon size={14} />}
+                      {column.icon && <column.icon size={currentDensity.iconSize} />}
                       {column.label}
                     </div>
                   </th>
                 );
               })}
               {actions && (
-                <th className="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 text-xs">
+                <th className={`${currentDensity.headingPadding} text-left font-semibold text-slate-600 dark:text-slate-300`}>
                   Actions
                 </th>
               )}
@@ -254,7 +288,7 @@ function ResponsiveTable<T extends Record<string, any>>({
                 {columns.map((column) => (
                   <td 
                     key={column.key as string} 
-                    className={`px-4 py-3 ${
+                    className={`${currentDensity.cellPadding} ${
                       column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'
                     }`}
                   >
@@ -268,8 +302,8 @@ function ResponsiveTable<T extends Record<string, any>>({
                   </td>
                 ))}
                 {actions && (
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1.5">{actions(item, index)}</div>
+                  <td className={currentDensity.cellPadding}>
+                    <div className={`flex ${currentDensity.rowGap}`}>{actions(item, index)}</div>
                   </td>
                 )}
               </tr>

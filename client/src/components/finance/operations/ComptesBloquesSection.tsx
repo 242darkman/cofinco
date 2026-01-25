@@ -217,81 +217,97 @@ export default function ComptesBloquesSection() {
 
   return (
     <div className="space-y-4">
-      {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
-        {/* Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            placeholder="Rechercher par client ou n° compte..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition text-sm"
-          />
+      {/* Stats - Compact Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+           <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+            <Lock size={40} />
+          </div>
+          <div>
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Comptes</p>
+            <h3 className="text-xl font-bold text-white mt-0.5">{stats.total}</h3>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5">
+             <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+             <p className="text-[10px] text-blue-400 font-medium">{stats.actifs} actifs</p>
+          </div>
+        </div>
+
+        <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
+             <div className="absolute right-0 top-0 p-3 opacity-5 text-emerald-500">
+               <Lock size={40} />
+             </div>
+             <div>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Montant Bloqué</p>
+                <h3 className="text-xl font-bold text-emerald-500 mt-0.5">{stats.montantTotal.toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+             </div>
+             <div className="mt-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit">
+               Capital Actuel
+             </div>
+        </div>
+
+        <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
+             <div className="absolute right-0 top-0 p-3 opacity-5 text-amber-500">
+               <TrendingUp size={40} />
+             </div>
+             <div>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Intérêts Estimés</p>
+                <h3 className="text-xl font-bold text-amber-500 mt-0.5">{stats.interetsEstimes.toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+             </div>
+             <div className="mt-2 text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full w-fit">
+               À terme
+             </div>
         </div>
         
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={Plus}
-          onClick={() => setShowForm(true)}
-          className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20 hover:border-emerald-500/30 text-xs font-semibold uppercase tracking-wider h-8"
-        >
-          Nouveau Placement
-        </Button>
-      </div>
-
-      {/* Stats Carousel - Tighter Padding */}
-      <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 no-scrollbar">
-        <div className="flex md:grid md:grid-cols-4 gap-2 min-w-[max-content] md:min-w-0">
-          <div className="w-[160px] md:w-auto">
-            <StatCard 
-              title="Total Comptes" 
-              value={stats.total} 
-              icon={Lock} 
-              color="primary"
-              subtitle={`${stats.actifs} actifs`}
-            />
-          </div>
-          <div className="w-[180px] md:w-auto">
-            <StatCard 
-              title="Montant Bloqué" 
-              value={stats.montantTotal.toLocaleString() + ' FCFA'} 
-              icon={Lock} 
-              color="success"
-              subtitle="Montant actuel"
-            />
-          </div>
-          <div className="w-[160px] md:w-auto">
-            <StatCard 
-              title="Intérêts Estimés" 
-              value={stats.interetsEstimes.toLocaleString() + ' FCFA'} 
-              icon={TrendingUp} 
-              color="warning"
-              subtitle="À terme"
-            />
-          </div>
-          <div className="w-[180px] md:w-auto">
-            <StatCard 
-              title="Valeur Future" 
-              value={(stats.montantTotal + stats.interetsEstimes).toLocaleString() + ' FCFA'} 
-              icon={Calendar} 
-              color="primary"
-              subtitle="Capital + Intérêts"
-            />
-          </div>
+        <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
+             <div className="absolute right-0 top-0 p-3 opacity-5 text-indigo-500">
+               <Calendar size={40} />
+             </div>
+             <div>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Valeur Future</p>
+                <h3 className="text-xl font-bold text-indigo-500 mt-0.5">{(stats.montantTotal + stats.interetsEstimes).toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+             </div>
+             <div className="mt-2 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-500/10 px-2 py-0.5 rounded-full w-fit">
+               Capital + Intérêts
+             </div>
         </div>
       </div>
 
-      <ResponsiveTable
-        data={paginatedComptes}
-        columns={columns}
-        actions={actions}
-        loading={loading}
-        emptyMessage={debouncedSearch ? `Aucun résultat pour "${debouncedSearch}"` : "Aucun compte bloqué"}
-        onRowClick={(row) => setSelectedCompteId(row.id)}
-      />
+      {/* Toolbar & Table Container */}
+      <div className="bg-surface-base rounded-lg border border-edge shadow-sm overflow-hidden flex flex-col">
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between p-2 gap-2 border-b border-edge bg-slate-50 dark:bg-slate-900/50">
+           <div className="relative flex-1 w-full sm:max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 pl-8 pr-3 py-1.5 text-xs transition-all"
+              />
+           </div>
+           
+           <Button
+             variant="primary"
+             icon={Plus}
+             onClick={() => setShowForm(true)}
+             className="w-full sm:w-auto h-8 text-xs px-3 shadow-none bg-emerald-600 hover:bg-emerald-500"
+           >
+             Nouveau Placement
+           </Button>
+        </div>
+
+        <ResponsiveTable
+          data={paginatedComptes}
+          columns={columns}
+          actions={actions}
+          loading={loading}
+          density="compact"
+          emptyMessage={debouncedSearch ? `Aucun résultat pour "${debouncedSearch}"` : "Aucun compte bloqué"}
+          onRowClick={(row) => setSelectedCompteId(row.id)}
+        />
+      </div>
 
       {/* Professional Pagination */}
       {filteredComptes.length > ITEMS_PER_PAGE && (

@@ -214,133 +214,149 @@ export default function TransactionFlow() {
   };
 
   return (
-    <Card className="p-4 sm:p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+    <Card className="flex flex-col h-full bg-slate-900 border-slate-800 p-0 overflow-hidden">
+      {/* Header */}
+      <div className="shrink-0 p-4 border-b border-slate-800 bg-slate-900/50">
+          <h2 className="text-base font-bold text-white flex items-center gap-2">
             <ArrowLeftRight size={18} className="text-cyan-400" />
-            Moteur de Transaction Unifie
+            Moteur de Transaction Unifié
           </h2>
-          <p className="text-xs text-slate-400 mt-1">Un seul flux pour virements internes et beneficiaires.</p>
-        </div>
+          <p className="text-xs text-slate-400">Virements internes et bénéficiaires.</p>
       </div>
 
-      <SearchableSelect
-        label="Compte source"
-        name="source_account"
-        options={sourceOptions}
-        value={sourceAccountId}
-        onChange={(value) => setSourceAccountId(String(value))}
-        isLoading={loadingAccounts}
-        placeholder="Selectionner un compte client"
-        helperText="Le compte source doit etre actif et autorise a effectuer des virements."
-      />
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Account Flow */}
+          <div className="space-y-4">
+              <SearchableSelect
+                label="Compte source"
+                name="source_account"
+                options={sourceOptions}
+                value={sourceAccountId}
+                onChange={(value) => setSourceAccountId(String(value))}
+                isLoading={loadingAccounts}
+                placeholder="Sélectionner un compte"
+              />
 
-      {sourceAccount && sourceConfig && !sourceConfig.canTransferOut && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200 flex items-start gap-2">
-          <AlertCircle size={16} className="mt-0.5" />
-          <div>
-            <p className="font-semibold">Fonds bloques. Contactez votre agence pour debloquer.</p>
-            {sourceConfig.canUnlock && (
-              <button
-                type="button"
-                onClick={handleUnlock}
-                disabled={unlocking}
-                className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-amber-100 hover:text-white"
-              >
-                <Lock size={14} />
-                {unlocking ? 'Deblocage...' : 'Debloquer les fonds'}
-              </button>
-            )}
+              {sourceAccount && sourceConfig && !sourceConfig.canTransferOut && (
+                <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200 flex items-start gap-2">
+                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Fonds bloqués.</p>
+                    {sourceConfig.canUnlock && (
+                      <button
+                        type="button"
+                        onClick={handleUnlock}
+                        disabled={unlocking}
+                        className="mt-1 inline-flex items-center gap-1 font-semibold text-amber-100 hover:text-white underline"
+                      >
+                        <Lock size={12} />
+                        {unlocking ? '...' : 'Débloquer'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <TabGroup
+                  activeTab={destinationTab}
+                  onTabChange={(key) => setDestinationTab(key as DestinationTab)}
+                  tabs={[
+                    { key: 'own', label: 'Mes Comptes' },
+                    { key: 'beneficiary', label: 'Bénéficiaire' },
+                  ]}
+                  variant="pills"
+                  size="sm"
+                  className="w-full"
+                />
+
+                {destinationTab === 'own' ? (
+                  <SearchableSelect
+                    label="Compte destinataire"
+                    name="destination_account"
+                    options={destinationOptions}
+                    value={destinationAccountId}
+                    onChange={(value) => setDestinationAccountId(String(value))}
+                    placeholder="Sélectionner un compte"
+                    disabled={!sourceAccount}
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    <FormField
+                      label="N° Compte Bénéficiaire"
+                      name="beneficiary_account"
+                      value={beneficiaryAccountNumber}
+                      onChange={(e) => setBeneficiaryAccountNumber(e.target.value)}
+                      placeholder="Ex: CC-034..."
+                    />
+
+                    <div className="h-5">
+                      {beneficiaryStatus === 'loading' && (
+                        <p className="text-xs text-slate-400">Vérification...</p>
+                      )}
+                      {beneficiaryStatus === 'found' && (
+                        <div className="flex items-center gap-2 text-xs text-emerald-300 font-medium">
+                          <CheckCircle2 size={14} />
+                          <span>{beneficiaryName}</span>
+                        </div>
+                      )}
+                      {beneficiaryStatus === 'not_found' && (
+                        <div className="flex items-center gap-2 text-xs text-red-400">
+                          <AlertCircle size={14} />
+                          <span>Introuvable</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+          </div>
+
+          {/* Right Column: Transaction Details */}
+          <div className="space-y-4 flex flex-col h-full">
+               <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    label="Montant (FCFA)"
+                    name="amount"
+                    type="number"
+                    min="0"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0"
+                    className="font-mono"
+                  />
+                  <SelectField
+                    label="Fréquence"
+                    name="frequency"
+                    value={frequency}
+                    onChange={(e) => setFrequency(e.target.value as Frequency)}
+                    options={frequencyOptions}
+                    disabled={!scheduled}
+                  />
+               </div>
+
+               <div className="flex items-center justify-between rounded border border-slate-700 bg-slate-800/30 px-3 py-2">
+                 <div>
+                   <p className="text-sm font-medium text-white">Virement programmé</p>
+                   <p className="text-[10px] text-slate-400">Planifier une récurrence</p>
+                 </div>
+                 <Switch checked={scheduled} onChange={setScheduled} ariaLabel="Programmer" />
+               </div>
+
+               <div className="pt-2 mt-auto">
+                 <Button
+                   onClick={handleSubmit}
+                   disabled={!canSubmit || submitting}
+                   className="w-full h-10"
+                   variant="primary"
+                 >
+                   {submitting ? 'Traitement...' : 'Lancer le virement'}
+                 </Button>
+               </div>
           </div>
         </div>
-      )}
-
-      <TabGroup
-        activeTab={destinationTab}
-        onTabChange={(key) => setDestinationTab(key as DestinationTab)}
-        tabs={[
-          { key: 'own', label: 'Mes Comptes' },
-          { key: 'beneficiary', label: 'Beneficiaire' },
-        ]}
-        variant="pills"
-        size="sm"
-      />
-
-      {destinationTab === 'own' ? (
-        <SearchableSelect
-          label="Compte destinataire"
-          name="destination_account"
-          options={destinationOptions}
-          value={destinationAccountId}
-          onChange={(value) => setDestinationAccountId(String(value))}
-          placeholder={sourceAccount ? 'Selectionner un compte du client' : 'Selectionner un compte source d abord'}
-          disabled={!sourceAccount}
-        />
-      ) : (
-        <div className="space-y-3">
-          <FormField
-            label="Numero de compte beneficiaire"
-            name="beneficiary_account"
-            value={beneficiaryAccountNumber}
-            onChange={(e) => setBeneficiaryAccountNumber(e.target.value)}
-            placeholder="CC-034..."
-          />
-
-          {beneficiaryStatus === 'loading' && (
-            <p className="text-xs text-slate-400">Verification en cours...</p>
-          )}
-          {beneficiaryStatus === 'found' && (
-            <div className="flex items-center gap-2 text-sm text-emerald-300">
-              <CheckCircle2 size={16} />
-              <span>{beneficiaryName}</span>
-            </div>
-          )}
-          {beneficiaryStatus === 'not_found' && (
-            <div className="flex items-center gap-2 text-sm text-red-400">
-              <AlertCircle size={16} />
-              <span>Compte introuvable</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <FormField
-          label="Montant"
-          name="amount"
-          type="number"
-          min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0"
-        />
-
-        <SelectField
-          label="Frequence"
-          name="frequency"
-          value={frequency}
-          onChange={(e) => setFrequency(e.target.value as Frequency)}
-          options={frequencyOptions}
-          disabled={!scheduled}
-        />
       </div>
-
-      <div className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-white">Virement programme</p>
-          <p className="text-xs text-slate-400">Planifier une execution recurrente.</p>
-        </div>
-        <Switch checked={scheduled} onChange={setScheduled} ariaLabel="Virement programme" />
-      </div>
-
-      <Button
-        onClick={handleSubmit}
-        disabled={!canSubmit || submitting}
-        className="w-full"
-      >
-        {submitting ? 'Traitement...' : 'Lancer le virement'}
-      </Button>
     </Card>
   );
 }

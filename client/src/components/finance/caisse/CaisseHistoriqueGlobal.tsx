@@ -140,219 +140,198 @@ export default function CaisseHistoriqueGlobal({
   const paymentModes = Object.values(MethodePaiement) as MethodePaiementType[];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="rounded-full w-10 h-10 p-0"
-          >
-            <ArrowLeft size={20} />
-          </Button>
-          <div>
-            <h2 className="text-xl font-bold text-white">Historique Global</h2>
-            {caisseName && (
-              <p className="text-sm text-slate-400">{caisseName}</p>
-            )}
+    <div className="flex flex-col h-full space-y-2 font-sans overflow-hidden">
+      {/* 1. Header & Stats (Fixed) */}
+      <div className="shrink-0 space-y-2 p-2 pb-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+                className="rounded-full w-8 h-8 p-0 hover:bg-slate-800 text-slate-400"
+              >
+                <ArrowLeft size={18} />
+              </Button>
+              <div>
+                <h2 className="text-lg font-bold text-white leading-none">Historique Global</h2>
+                {caisseName && (
+                  <p className="text-xs text-slate-500 mt-0.5">{caisseName}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors" size={14} />
+                    <input
+                    type="text"
+                    placeholder="Ref, client..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-48 pl-9 pr-8 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
+                    />
+                     {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
+                            <X size={12} />
+                        </button>
+                    )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className={`h-8 px-3 text-xs ${showFilters ? 'bg-slate-800 text-white' : 'text-slate-400'}`}
+              >
+                <Filter size={14} className="mr-1.5" />
+                Filtres
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isLoading}
+                className="h-8 w-8 p-0"
+              >
+                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+              </Button>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className={showFilters ? 'bg-slate-700' : ''}
-          >
-            <Filter size={16} className="mr-1" />
-            Filtres
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
-          >
-            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-          </Button>
-        </div>
+
+          {/* Compact Stats Grid */}
+          {stats && (
+            <div className="grid grid-cols-4 gap-2">
+               <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between">
+                   <div>
+                       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Opérations</p>
+                       <p className="text-lg font-black text-white leading-none">{stats.totalOperations}</p>
+                   </div>
+                   <Activity size={18} className="text-blue-500 opacity-80" />
+               </div>
+               <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between">
+                   <div>
+                       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Entrées</p>
+                       <p className="text-lg font-black text-emerald-400 leading-none">{formatCompactMoney(stats.totalEntrees)}</p>
+                   </div>
+                   <TrendingDown size={18} className="text-emerald-500 opacity-80" />
+               </div>
+               <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5 flex items-center justify-between">
+                   <div>
+                       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Sorties</p>
+                       <p className="text-lg font-black text-rose-400 leading-none">{formatCompactMoney(stats.totalSorties)}</p>
+                   </div>
+                   <TrendingUp size={18} className="text-rose-500 opacity-80" />
+               </div>
+               <div className={`bg-slate-900/50 border rounded-lg p-2.5 flex items-center justify-between ${stats.soldeNet >= 0 ? 'border-emerald-900/30' : 'border-rose-900/30'}`}>
+                   <div>
+                       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Solde Net</p>
+                       <p className={`text-lg font-black leading-none ${stats.soldeNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                           {stats.soldeNet > 0 ? '+' : ''}{formatCompactMoney(stats.soldeNet)}
+                       </p>
+                   </div>
+                   <FileSpreadsheet size={18} className={stats.soldeNet >= 0 ? 'text-emerald-500 opacity-80' : 'text-rose-500 opacity-80'} />
+               </div>
+            </div>
+          )}
+
+           {/* Collapsible Filters */}
+           {showFilters && (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 grid grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-2">
+                <div>
+                   <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block">Type</label>
+                   <select
+                        value={selectedType}
+                        onChange={(e) => setSelectedType(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-white focus:border-cyan-500 outline-none"
+                    >
+                        <option value="">Tous</option>
+                        {TYPES_OPERATIONS_CAISSE.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block">Mode</label>
+                    <select
+                        value={selectedMode}
+                        onChange={(e) => setSelectedMode(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-white focus:border-cyan-500 outline-none"
+                    >
+                        <option value="">Tous</option>
+                        {paymentModes.map(mode => <option key={mode} value={mode}>{METHODE_PAIEMENT_LABELS[mode] || mode}</option>)}
+                    </select>
+                </div>
+                <div className="col-span-2 flex items-end gap-2">
+                     <div className="flex-1">
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block">Date</label>
+                        <div className="flex gap-2">
+                             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-white" />
+                             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-white" />
+                        </div>
+                     </div>
+                     <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={handleResetFilters} className="h-7 text-xs px-2"><X size={12} /></Button>
+                        <Button variant="primary" size="sm" onClick={handleApplyFilters} className="h-7 text-xs">OK</Button>
+                     </div>
+                </div>
+            </div>
+          )}
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard
-            title="Total Opérations"
-            value={stats.totalOperations}
-            icon={Activity}
-            color="primary"
-          />
-          <StatCard
-            title="Total Entrées"
-            value={stats.totalEntrees}
-            icon={TrendingDown}
-            color="success"
-          />
-          <StatCard
-            title="Total Sorties"
-            value={stats.totalSorties}
-            icon={TrendingUp}
-            color="warning"
-          />
-          <StatCard
-            title="Solde Net"
-            value={stats.soldeNet}
-            icon={FileSpreadsheet}
-            color={stats.soldeNet >= 0 ? 'success' : 'danger'}
-          />
-        </div>
-      )}
-
-      {/* Filtres */}
-      {showFilters && (
-        <Card className="p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Type d'opération */}
-            <div>
-              <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
-                Type d'opération
-              </label>
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
-              >
-                <option value="">Tous les types</option>
-                {TYPES_OPERATIONS_CAISSE.map(op => (
-                  <option key={op.value} value={op.value}>
-                    {op.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Mode de paiement */}
-            <div>
-              <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
-                Mode de paiement
-              </label>
-              <select
-                value={selectedMode}
-                onChange={(e) => setSelectedMode(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
-              >
-                <option value="">Tous les modes</option>
-                {paymentModes.map(mode => (
-                  <option key={mode} value={mode}>
-                    {METHODE_PAIEMENT_LABELS[mode] || mode}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date début */}
-            <div>
-              <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
-                Date début
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
-              />
-            </div>
-
-            {/* Date fin */}
-            <div>
-              <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
-                Date fin
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={handleResetFilters}>
-              <X size={14} className="mr-1" />
-              Réinitialiser
-            </Button>
-            <Button variant="primary" size="sm" onClick={handleApplyFilters}>
-              Appliquer
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Barre de recherche rapide */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-        <input
-          type="text"
-          placeholder="Rechercher par référence, client, description..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
-        />
-        {searchTerm && (
-          <button
-            onClick={() => setSearchTerm('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-          >
-            <X size={16} />
-          </button>
-        )}
+      {/* 2. Scrollable List (Flex-1) */}
+      <div className="flex-1 min-h-0 relative px-2 overflow-hidden mx-2">
+          {error ? (
+             <div className="h-full flex items-center justify-center text-rose-500 text-sm p-4">
+               <span className="bg-rose-950/30 border border-rose-900/50 p-4 rounded-xl">{error.message}</span>
+             </div>
+          ) : (
+            <TransactionsList
+                transactions={transactions}
+                isLoading={isLoading}
+                emptyMessage="Aucune opération trouvée"
+                headerTitle=""
+                maxItems={500} // Let the container handle scroll
+                compactMode={true} // Hint to make rows smaller if supported
+            />
+          )}
       </div>
 
-      {/* Liste des transactions */}
-      <TransactionsList
-        transactions={transactions}
-        isLoading={isLoading}
-        emptyMessage="Aucune opération dans l'historique"
-        headerTitle={`${data?.pagination?.total || 0} opérations`}
-        maxItems={100}
-      />
+      {/* 3. Helper Functions (Inline) */}
+      {/* We need to declare this format helper outside or stick to formatMoney if simple */}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPage(page - 1)}
-            disabled={page === 0}
-          >
-            <ChevronLeft size={16} />
-          </Button>
+      {/* 4. Sticky Pagination (Fixed Bottom) */}
+      <div className="shrink-0 p-2 border-t border-slate-800/50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-between text-xs mx-2 mb-1 rounded-b-xl">
+           <span className="text-slate-500">
+               {data?.pagination?.total ? data.pagination.total : (data?.operations?.length || 0)} opérations
+           </span>
 
-          <span className="text-sm text-slate-400">
-            Page {page + 1} sur {totalPages}
-          </span>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPage(page + 1)}
-            disabled={page >= totalPages - 1}
-          >
-            <ChevronRight size={16} />
-          </Button>
-        </div>
-      )}
-
-      {/* Message d'erreur */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">
-          Erreur lors du chargement de l'historique: {error.message}
-        </div>
-      )}
+           {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-md"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page === 0}
+                >
+                    <ChevronLeft size={14} />
+                </Button>
+                <div className="px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">
+                    {page + 1} / {totalPages}
+                </div>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-md"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page >= totalPages - 1}
+                >
+                    <ChevronRight size={14} />
+                </Button>
+            </div>
+           )}
+      </div>
     </div>
   );
+
+  function formatCompactMoney(amount: number) {
+      return new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(amount);
+  }
 }

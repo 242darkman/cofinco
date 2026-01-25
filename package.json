@@ -10,6 +10,7 @@
     "start": "NODE_ENV=production node --env-file=.env dist/index.cjs",
     "check": "tsc",
     "db:push": "node --env-file=.env node_modules/drizzle-kit/bin.cjs push",
+    "db:migrate-push": "node --env-file=.env --import tsx scripts/migrate-and-push.ts",
     "db:seed:demo": "node --env-file=.env --import tsx server/seed-demo-simple.ts",
     "db:seed:prod": "node --env-file=.env --import tsx server/seed-prod.ts",
     "audit:integrity": "node --env-file=.env --import tsx scripts/audit-integrity.ts",

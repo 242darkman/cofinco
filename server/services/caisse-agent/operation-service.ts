@@ -522,7 +522,9 @@ export class OperationService {
         );
     } else {
       baseQuery = db
-        .select()
+        .select({
+          operation: operationsTerrain,
+        })
         .from(operationsTerrain)
         .where(conditions.length > 0 ? and(...conditions) : undefined);
     }
@@ -552,20 +554,11 @@ export class OperationService {
     }
 
     // Fetch operations
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    const operations = needsAgencyFilter
-      ? await baseQuery
-          .orderBy(desc(operationsTerrain.submittedAt))
-          .limit(filters.limit || 50)
-          .offset(filters.offset || 0)
-          .then(results => results.map(r => r.operation))
-      : await db
-          .select()
-          .from(operationsTerrain)
-          .where(whereClause)
-          .orderBy(desc(operationsTerrain.submittedAt))
-          .limit(filters.limit || 50)
-          .offset(filters.offset || 0);
+    const operations = await baseQuery
+      .orderBy(desc(operationsTerrain.submittedAt))
+      .limit(filters.limit || 50)
+      .offset(filters.offset || 0)
+      .then((results) => results.map((r) => r.operation));
 
     // Enrichir avec les relations (version simplifiée pour la liste)
     // Note: agentsTerrain -> employes -> users pour nom/prenom

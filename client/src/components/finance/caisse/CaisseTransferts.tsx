@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft, ArrowRight, ArrowRightLeft, Plus, CheckCircle, Clock, X, AlertTriangle, Send, Wallet, Printer } from 'lucide-react';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { Button, Card, Badge, Pagination, Modal, StatCard } from '@/components/ui';
+import { Button, Card, Badge, Pagination, Modal, StatCard, ResponsiveTable } from '@/components/ui';
 import { caisseTransfertApi, agenceApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -327,7 +327,96 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
     print(data);
   }, [transferts, session, print]);
 
-  // État de chargement
+
+
+  // Définition des colonnes pour ResponsiveTable
+  const columns = useMemo(() => [
+    { 
+      key: 'reference', 
+      label: 'Référence', 
+      primary: true,
+      mobileClassName: 'font-mono text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded inline-block mb-1'
+    },
+    { 
+      key: 'trajet', 
+      label: 'Trajet',
+      format: (_: any, t: Transfert) => (
+         <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-slate-400 max-w-[100px] truncate" title={t.agence_source_nom || t.agenceSource?.nom}>
+              {t.agence_source_nom || t.agenceSource?.nom || 'Source'}
+            </span>
+            <ArrowRight size={12} className="text-slate-600 shrink-0" />
+            <span className="text-white font-medium max-w-[100px] truncate" title={t.agence_dest_nom || t.agenceDest?.nom}>
+              {t.agence_dest_nom || t.agenceDest?.nom || 'Dest'}
+            </span>
+         </div>
+      ),
+      mobileFormat: (_: any, t: Transfert) => (
+        <div className="flex items-center gap-2 text-sm text-slate-300">
+           <span className="font-medium text-slate-400">{t.agence_source_nom || t.agenceSource?.nom}</span>
+           <ArrowRight size={14} className="text-slate-600" />
+           <span className="font-medium text-white">{t.agence_dest_nom || t.agenceDest?.nom}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'montant', 
+      label: 'Montant', 
+      align: 'right' as const,
+      format: (val: any) => <span className="font-bold text-white">{formatMoney(Number(val))}</span>,
+      mobileFormat: (val: any) => <span className="text-lg font-bold text-white block mt-1">{formatMoney(Number(val))}</span>
+    },
+    { 
+      key: 'infos', 
+      label: 'Date & Initiateur',
+      format: (_: any, t: Transfert) => (
+        <div className="flex flex-col">
+            <span className="text-slate-300">{new Date(t.dateCreation).toLocaleDateString('fr-FR')}</span>
+            <span className="text-[10px] text-slate-500">
+                {t.created_by_nom ? `${t.created_by_nom} ${t.created_by_prenom?.charAt(0)}.` : '-'}
+            </span>
+        </div>
+      ),
+      hideOnMobile: true
+    },
+    { 
+      key: 'statut', 
+      label: 'Statut', 
+      badge: true,
+      align: 'center' as const
+    }
+  ], []);
+
+  // Actions row renderer
+  const renderActions = (t: Transfert) => {
+    if (t.statut !== StatutTransfertCaisse.PENDING) return null;
+
+    return (
+      <div className="flex items-center justify-end gap-2 w-full">
+        {canConfirmTransferts && getDirection(t) === 'IN' && (
+          <Button
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); prepareReception(t); }}
+            className="h-7 text-xs bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 shadow-none border border-emerald-500/20 px-2"
+          >
+            Reçu
+          </Button>
+        )}
+        {canCancelTransferts && getDirection(t) === 'OUT' && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => { e.stopPropagation(); prepareAnnulation(t); }}
+            className="h-7 w-7 p-0 flex items-center justify-center text-slate-400 hover:bg-slate-800 rounded-full"
+          >
+            <X size={14} aria-hidden="true" />
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  // État de chargement (déplacé après les hooks pour éviter l'erreur "Rendered more hooks")
   if (loading && transferts.length === 0) {
     return (
       <div className="space-y-6" role="status" aria-label="Chargement des transferts">
@@ -349,316 +438,102 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="rounded-full hover:bg-slate-800 text-slate-400 h-10 w-10 p-0"
-            aria-label="Retour"
-          >
-            <ArrowLeft size={20} aria-hidden="true" />
-          </Button>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-              Transferts Inter-Caisses
-            </h2>
-            <p className="text-sm text-slate-400">Gérez les flux entre vos agences</p>
+    <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-300 overflow-hidden font-sans">
+      {/* 1. Header & Quick Actions (Fixed) */}
+      <div className="shrink-0 flex items-center justify-between gap-4 p-2 pb-0">
+         <div className="flex items-center gap-3">
+           <Button
+             variant="ghost"
+             size="sm"
+             onClick={onBack}
+             className="rounded-full hover:bg-slate-800 text-slate-400 h-8 w-8 p-0"
+           >
+             <ArrowLeft size={18} />
+           </Button>
+           <div>
+             <h2 className="text-lg font-bold text-white leading-none">Transferts</h2>
+             <p className="text-xs text-slate-500 mt-1">Inter-Agences</p>
+           </div>
+         </div>
+
+         <div className="flex gap-2">
+            {canCreateTransferts && (
+                <Button
+                    size="sm"
+                    onClick={() => setShowForm(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20 h-8 text-xs font-semibold"
+                >
+                    <Plus size={14} className="mr-1.5" />
+                    Nouveau
+                </Button>
+            )}
+             <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrintHistory}
+                className="border-slate-700 hover:bg-slate-800 text-slate-300 h-8 w-8 p-0"
+                disabled={isPrinting || transferts.length === 0}
+                title="Imprimer"
+            >
+                <Printer size={14} />
+            </Button>
+         </div>
+      </div>
+
+      {/* 2. Compact Stats Bar (Fixed) */}
+      <div className="shrink-0 grid grid-cols-4 gap-2 px-2">
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-blue-500/10 text-blue-400"><ArrowRightLeft size={14} /></div>
+              <div>
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Total</div>
+                  <div className="text-sm font-bold text-white leading-none">{stats.total}</div>
+              </div>
           </div>
-        </div>
-
-        {canCreateTransferts && (
-          <Button
-            onClick={() => setShowForm(true)}
-            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20"
-            aria-label="Créer un nouveau transfert"
-          >
-            <Plus size={18} className="mr-2" aria-hidden="true" />
-            Nouveau Transfert
-          </Button>
-        )}
-
-        <Button
-            variant="outline"
-            onClick={handlePrintHistory}
-            className="w-full sm:w-auto border-slate-700 hover:bg-slate-800 text-slate-300"
-            disabled={isPrinting || transferts.length === 0}
-            title="Imprimer l'historique"
-        >
-            <Printer size={18} className="mr-2" />
-            Imprimer
-        </Button>
-      </header>
-
-      {/* Success Message */}
-      {successMsg && (
-        <div
-          className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3 rounded-xl flex items-center gap-3 animate-in slide-in-from-top-2"
-          role="status"
-          aria-live="polite"
-        >
-          <CheckCircle size={18} aria-hidden="true" />
-          <span className="font-medium">{successMsg}</span>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      {/* Stats Cards */}
-      <section aria-label="Statistiques des transferts">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <StatCard
-            title="Total Transferts"
-            value={stats.total}
-            icon={ArrowRightLeft}
-            color="primary"
-            variant="default"
-          />
-
-          <StatCard
-            title="En Attente"
-            value={stats.enAttente}
-            icon={Clock}
-            color="warning"
-            variant="default"
-          />
-
-          <StatCard
-            title="Volume Envoyé"
-            value={formatMoney(stats.volumeEnvoye)}
-            icon={Send}
-            color="primary"
-            variant="default" 
-            className="truncate-none" // Custom class if needed to force no truncate, but defaults are good
-          />
-
-          <StatCard
-            title="Volume Reçu"
-            value={formatMoney(stats.volumeRecu)}
-            icon={Wallet}
-            color="success"
-            variant="default"
-          />
-        </div>
-      </section>
-
-      {/* Responsive List / Table */}
-      <Card className="bg-slate-900/50 border-slate-800 overflow-hidden backdrop-blur-sm">
-        <div className="p-4 border-b border-slate-800">
-          <h3 className="text-lg font-bold text-white">Historique Récent</h3>
-        </div>
-
-        {/* Mobile View: Cards List */}
-        <div className="md:hidden divide-y divide-slate-800">
-          {paginatedTransferts.length === 0 ? (
-            <div className="p-8 text-center text-slate-500" role="status">
-              <ArrowRightLeft size={32} className="mx-auto mb-2 opacity-50" aria-hidden="true" />
-              <p>Aucun transfert</p>
-            </div>
-          ) : (
-            paginatedTransferts.map((t) => (
-              <article 
-                key={t.id} 
-                className="p-4 space-y-3 cursor-pointer hover:bg-slate-800/20 active:bg-slate-800/40 transition-colors"
-                onClick={() => openDetails(t)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="bg-slate-800 px-2 py-1 rounded text-xs font-mono text-slate-400">
-                    {escapeHtml(t.reference)}
-                  </div>
-                  <Badge
-                    value={t.statut}
-                    variant={
-                      (t.statut === StatutTransfertCaisse.VALIDATED) ? 'success' :
-                      (t.statut === StatutTransfertCaisse.PENDING) ? 'warning' :
-                      (t.statut === StatutTransfertCaisse.CANCELLED) ? 'neutral' : 'neutral'
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 text-sm text-slate-300">
-                  <span className="font-medium text-slate-400">
-                    {escapeHtml(t.agence_source_nom || t.agenceSource?.nom || 'Agence Source')}
-                  </span>
-                  <ArrowRight size={14} className="text-slate-600" aria-hidden="true" />
-                  <span className="font-medium text-white">
-                    {escapeHtml(t.agence_dest_nom || t.agenceDest?.nom || 'Agence Dest')}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <p className="text-xl font-bold text-white">
-                    {formatMoney(Number(t.montant))}
-                  </p>
-                  <div className="text-right">
-                    <time className="block text-xs text-slate-500" dateTime={t.dateCreation}>
-                      {new Date(t.dateCreation).toLocaleDateString('fr-FR')}
-                    </time>
-                    {t.created_by_nom && (
-                      <p className="text-xs text-slate-600 truncate max-w-[120px]">
-                        Par: {t.created_by_nom} {t.created_by_prenom?.charAt(0)}.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {(t.statut === StatutTransfertCaisse.PENDING) && (
-                  <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
-                    {canConfirmTransferts && getDirection(t) === 'IN' && (
-                      <Button
-                        size="sm"
-                        onClick={() => prepareReception(t)}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 h-9"
-                        aria-label={`Confirmer la réception de ${formatMoney(Number(t.montant))}`}
-                      >
-                        Confirmer
-                      </Button>
-                    )}
-                    {canCancelTransferts && getDirection(t) === 'OUT' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => prepareAnnulation(t)}
-                        className="flex-1 border-slate-700 hover:bg-slate-800 text-slate-300 h-9"
-                        aria-label={`Annuler le transfert de ${formatMoney(Number(t.montant))}`}
-                      >
-                        Annuler
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </article>
-            ))
-          )}
-        </div>
-
-        {/* Desktop View: Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm text-left" aria-label="Liste des transferts">
-            <thead className="bg-slate-800/50 text-slate-400 font-medium border-b border-slate-700">
-              <tr>
-                <th scope="col" className="px-6 py-4">Référence</th>
-                <th scope="col" className="px-6 py-4">Trajet</th>
-                <th scope="col" className="px-6 py-4 text-right">Montant</th>
-                <th scope="col" className="px-6 py-4">Initié par</th>
-                <th scope="col" className="px-6 py-4">Date</th>
-                <th scope="col" className="px-6 py-4">Statut</th>
-                <th scope="col" className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {paginatedTransferts.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    Aucun transfert enregistré
-                  </td>
-                </tr>
-              ) : (
-                paginatedTransferts.map((t) => (
-                  <tr 
-                    key={t.id} 
-                    className="hover:bg-slate-800/30 transition-colors cursor-pointer"
-                    onClick={() => openDetails(t)}
-                  >
-                    <td className="px-6 py-4 font-mono text-slate-400 text-xs">
-                      {escapeHtml(t.reference)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400">
-                          {escapeHtml(t.agence_source_nom || t.agenceSource?.nom || 'Agence Source')}
-                        </span>
-                        <ArrowRight size={14} className="text-slate-600" aria-hidden="true" />
-                        <span className="text-white font-medium">
-                          {escapeHtml(t.agence_dest_nom || t.agenceDest?.nom || 'Agence Dest')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold text-white">
-                      {formatMoney(Number(t.montant))}
-                    </td>
-                    <td className="px-6 py-4 text-slate-400">
-                      {t.created_by_nom ? (
-                        <span title={t.created_by_username || ''}>
-                          {t.created_by_nom} {t.created_by_prenom}
-                        </span>
-                      ) : (
-                        <span className="italic opacity-50">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-slate-400">
-                      <time dateTime={t.dateCreation}>
-                        {new Date(t.dateCreation).toLocaleDateString('fr-FR')}
-                      </time>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge
-                        value={t.statut}
-                        variant={
-                          (t.statut === StatutTransfertCaisse.VALIDATED) ? 'success' :
-                          (t.statut === StatutTransfertCaisse.PENDING) ? 'warning' : 'neutral'
-                        }
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      {(t.statut === StatutTransfertCaisse.PENDING) ? (
-                        <div className="flex items-center justify-end gap-2">
-                          {canConfirmTransferts && getDirection(t) === 'IN' && (
-                            <Button
-                              size="sm"
-                              onClick={() => prepareReception(t)}
-                              className="h-8 bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 shadow-none border border-emerald-500/20"
-                              aria-label={`Confirmer la réception de ${formatMoney(Number(t.montant))}`}
-                            >
-                              Reçu
-                            </Button>
-                          )}
-                          {canCancelTransferts && getDirection(t) === 'OUT' && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => prepareAnnulation(t)}
-                              className="h-8 w-8 p-0 flex items-center justify-center text-slate-400 hover:bg-slate-800 rounded-full"
-                              aria-label={`Annuler le transfert de ${formatMoney(Number(t.montant))}`}
-                            >
-                              <X size={14} aria-hidden="true" />
-                            </Button>
-                          )}
-                          {/* Fallback if no specific action matches despite being pending (e.g. wrong direction) */}
-                          {(!canConfirmTransferts || getDirection(t) !== 'IN') && (!canCancelTransferts || getDirection(t) !== 'OUT') && (
-                             <span className="text-xs text-slate-600 italic">Aucune action</span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex justify-end">
-                            <span className="text-slate-600">-</span>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination */}
-        {transferts.length > itemsPerPage && (
-          <div className="p-4 border-t border-slate-800">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              itemsPerPage={itemsPerPage}
-              totalItems={transferts.length}
-              canGoPrevious={currentPage > 1}
-              canGoNext={currentPage < totalPages}
-            />
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-amber-500/10 text-amber-400"><Clock size={14} /></div>
+              <div>
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">En Attente</div>
+                  <div className="text-sm font-bold text-white leading-none">{stats.enAttente}</div>
+              </div>
           </div>
-        )}
-      </Card>
+          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-indigo-500/10 text-indigo-400"><Send size={14} /></div>
+              <div>
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Envoyé</div>
+                  <div className="text-sm font-bold text-white leading-none">{formatCompactMoney(stats.volumeEnvoye)}</div>
+              </div>
+          </div>
+           <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-emerald-500/10 text-emerald-400"><Wallet size={14} /></div>
+              <div>
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Reçu</div>
+                  <div className="text-sm font-bold text-white leading-none">{formatCompactMoney(stats.volumeRecu)}</div>
+              </div>
+          </div>
+      </div>
+
+      {/* 3. Responsive Table (Scrollable Flex-1) */}
+      <div className="flex-1 min-h-0 px-2 relative">
+          <div className="h-full border border-slate-800 rounded-xl bg-slate-900/20 overflow-hidden flex flex-col">
+             <ResponsiveTable
+                data={paginatedTransferts}
+                columns={columns}
+                actions={renderActions}
+                onRowClick={openDetails}
+                loading={loading}
+                emptyMessage="Aucun transfert enregistré"
+                density="compact"
+                className="flex-1 overflow-auto"
+                headerClassName="sticky top-0 z-10 bg-slate-900 border-b border-slate-800"
+                pagination={{ // Use ResponsiveTable's pagination if implemented, or we use our own footer
+                    page: currentPage,
+                    totalPages: totalPages,
+                    onPageChange: setCurrentPage
+                }}
+             />
+          </div>
+      </div>
+
 
       {/* Details Modal */}
       <Modal
@@ -962,4 +837,8 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       />
     </div>
   );
+}
+
+function formatCompactMoney(amount: number) {
+  return new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(amount);
 }

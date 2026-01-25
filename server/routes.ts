@@ -34,6 +34,8 @@ import { checkMaintenanceMode } from "./middleware/maintenance";
 import { transfertsInterCoffresRouter } from "./routes/transferts-inter-coffres";
 import storageRouter from "./routes/storage";
 import { regularisationRouter } from "./routes/regularisation";
+import { paymentsRouter } from "./routes/payments";
+import { paymentsTestRouter } from "./routes/payments-test";
 
 export function registerRoutes(app: Express): Server {
   // Apply Maintenance Middleware globally
@@ -49,6 +51,11 @@ export function registerRoutes(app: Express): Server {
 
   // Admin - Regularisation Module (gestion des tâches de régularisation)
   app.use("/api/admin/regularisations", regularisationRouter);
+
+  // Mobile Money Payments & Webhooks
+  app.use("/api/payments", paymentsRouter);
+  app.use("/api/webhooks", paymentsRouter); // Webhooks MTN/Airtel
+  app.use("/api/payments-test", paymentsTestRouter); // Test endpoints (dev only)
 
   // Storage routes (unified)
   app.use("/api/storage", storageRouter);
@@ -100,7 +107,6 @@ export function registerRoutes(app: Express): Server {
   registerMobileMoneyRoutes(app);
   registerStockMarketRoutes(app);
 
-  // Other specific legacy or minor routes can be added here or in another module
   // System Version Endpoint
   app.get("/api/version", async (req, res) => {
     try {

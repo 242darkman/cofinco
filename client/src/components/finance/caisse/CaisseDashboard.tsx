@@ -480,9 +480,9 @@ export default function CaisseDashboard({
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
     { key: 'infos-client', label: 'Info Client', icon: Users, disabled: !isSessionOpen },
     { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen || isClosingWorkflow },
-    { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !mobileMoneyEnabled || !isSessionOpen || isClosingWorkflow },
+    { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !isSessionOpen || isClosingWorkflow },
+    { key: 'prets-decaissement', label: 'Prêts', icon: CreditCard, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
-    { key: 'rapprochement', label: 'Clôture', icon: RefreshCw, disabled: !isSessionOpen },
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'etats', label: 'États', icon: FileText, disabled: !isSessionOpen },
     { key: 'supervision', label: 'Supervision', icon: Shield, disabled: false },
@@ -534,53 +534,55 @@ export default function CaisseDashboard({
         ) : null;
       case 'historique':
         return (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full flex flex-col">
             {/* Toggle between Today and Global History */}
-            <div className="flex items-center justify-between mb-4 px-4 md:px-0">
+            <div className="flex items-center justify-between mb-2 px-2 shrink-0">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setActiveTab('dashboard')}
                   icon={ArrowRightLeft}
-                  className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180"
+                  className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180 text-slate-400 hover:text-white"
                 />
                 <h2 className="text-lg font-bold text-white">Historique</h2>
               </div>
-              <div className="flex bg-slate-800 rounded-lg p-1">
+              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
                 <button
                   onClick={() => setHistoriqueMode('today')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     historiqueMode === 'today'
-                      ? 'bg-cyan-500 text-white'
+                      ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <Clock size={14} className="inline mr-1" />
+                  <Clock size={12} className="inline mr-1 mb-0.5" />
                   Aujourd'hui
                 </button>
                 <button
                   onClick={() => setHistoriqueMode('global')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     historiqueMode === 'global'
-                      ? 'bg-cyan-500 text-white'
+                      ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <History size={14} className="inline mr-1" />
-                  Tout l'historique
+                  <History size={12} className="inline mr-1 mb-0.5" />
+                  Global
                 </button>
               </div>
             </div>
 
             {historiqueMode === 'global' && currentSession?.caisse_id ? (
-              <CaisseHistoriqueGlobal
-                caisseId={currentSession.caisse_id}
-                caisseName={currentSession.caisse_nom}
-                onBack={() => setActiveTab('dashboard')}
-              />
+              <div className="flex-1 min-h-0">
+                  <CaisseHistoriqueGlobal
+                    caisseId={currentSession.caisse_id}
+                    caisseName={currentSession.caisse_nom}
+                    onBack={() => setActiveTab('dashboard')}
+                  />
+              </div>
             ) : (
-              <div className="-mx-4 md:-mx-6 -mb-16">
+              <div className="flex-1 min-h-0 overflow-y-auto px-2">
                 <TransactionHistoryPage
                   transactions={transactions.map(tx => ({
                     id: tx.id,
@@ -607,23 +609,16 @@ export default function CaisseDashboard({
             )}
           </div>
         );
+
       case 'especes':
         return currentSession ? (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
-                    <h2 className="text-lg font-bold text-white">Espèces</h2>
-                 </div>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full">
                  <CaisseEspeces sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); }} />
             </div>
         ) : null;
       case 'mobilemoney':
         return currentSession ? (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
-                    <h2 className="text-lg font-bold text-white">Mobile Money</h2>
-                 </div>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full">
                  <CaisseMobileMoney sessionId={currentSession.id} onTransactionComplete={() => { loadSessionActive(); loadTransactionsJour(); loadCaissesSeparees(); }} />
             </div>
         ) : null;
@@ -636,9 +631,9 @@ export default function CaisseDashboard({
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseRapprochement session={currentSession} onClose={() => { setActiveTab('dashboard'); loadSessionActive(); loadTransactionsJour(); }} soldeTheoriqueCalcule={soldeActuel} /></div>
         ) : null;
       case 'transferts':
-        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => setActiveTab('dashboard')} /></div>;
+        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => setActiveTab('dashboard')} /></div>;
       case 'etats':
-        return <CaisseEtats onBack={() => setActiveTab('dashboard')} />;
+        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 h-full"><CaisseEtats onBack={() => setActiveTab('dashboard')} /></div>;
 
       case 'supervision':
         return (
@@ -880,7 +875,7 @@ export default function CaisseDashboard({
         }
 
         return (
-          <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
+          <div className="space-y-2 animate-in fade-in duration-500 h-full flex flex-col">
       {currentSession && (
         <CaisseQuickActions
           caisseId={currentSession.caisse_id || ''}
@@ -889,17 +884,15 @@ export default function CaisseDashboard({
         />
       )}
       
-      {/* Top Session Stats - Mobile First Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Top Session Stats - Compact View */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <StatCard
              title="Solde de Session" 
              value={soldeActuel}
              icon={Wallet}
              color="primary"
              subtitle={currentSession ? `Initial: ${formattedMoney(toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial))} F` : (availableBalance > 0 ? "Fonds disponibles" : "Session Fermée")}
-             trend={currentSession ? `${transactions.length} Ops` : "Inactif"}
-             trendUp={!!currentSession}
-             className="col-span-2 shadow-xl shadow-cyan-950/20"
+             className="shadow-sm"
           />
           <StatCard
              title="Entrées" 
@@ -908,84 +901,22 @@ export default function CaisseDashboard({
              color="success"
              trend="+0%"
              trendUp={true}
+             className="shadow-sm"
           />
            <StatCard
              title="Sorties" 
              value={totalSorties}
              icon={ArrowUpRight}
-             color="warning" // Warning color for money leaving
+             color="warning" 
              trend="-0%"
              trendUp={false}
+             className="shadow-sm"
           />
       </div>
 
-      {/* Quick Actions - Clean Cards */}
-      <div>
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-1">Modules</h3>
-          <div className="grid grid-cols-3 gap-3">
-             {/* Espèces - Gestion des billets et pièces */}
-             <Card
-                variant="default"
-                padding="sm"
-                className="cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all group"
-                onClick={() => setActiveTab('especes')}
-             >
-                 <div className="flex flex-col items-center gap-2 py-2">
-                     <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
-                         <Wallet size={20} />
-                     </div>
-                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">Espèces</span>
-                 </div>
-             </Card>
-
-             {/* Mobile Money - Si activé */}
-             <Card
-                variant="default"
-                padding="sm"
-                className={`cursor-pointer transition-all group ${!mobileMoneyEnabled ? 'opacity-40 pointer-events-none' : 'hover:border-amber-500/50 hover:bg-amber-500/5'}`}
-                onClick={() => mobileMoneyEnabled && setActiveTab('mobilemoney')}
-             >
-                 <div className="flex flex-col items-center gap-2 py-2">
-                     <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
-                         <Smartphone size={20} />
-                     </div>
-                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">Mobile Money</span>
-                 </div>
-             </Card>
-
-             {/* États & Rapports */}
-             <Card
-                variant="default"
-                padding="sm"
-                className="cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 transition-all group"
-                onClick={() => setActiveTab('etats')}
-             >
-                 <div className="flex flex-col items-center gap-2 py-2">
-                     <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform">
-                         <FileText size={20} />
-                     </div>
-                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">États</span>
-                 </div>
-             </Card>
-
-             {/* Décaissements Prêts */}
-             <Card
-                variant="default"
-                padding="sm"
-                className="cursor-pointer hover:border-orange-500/50 hover:bg-orange-500/5 transition-all group relative"
-                onClick={() => setActiveTab('prets-decaissement')}
-             >
-                 <div className="flex flex-col items-center gap-2 py-2">
-                     <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-400 group-hover:scale-110 transition-transform">
-                         <CreditCard size={20} />
-                     </div>
-                     <span className="text-xs font-medium text-slate-300 group-hover:text-white">Prêts</span>
-                 </div>
-             </Card>
-          </div>
-
-          {/* Pending Activations Alert - Bande d'alerte contextuelle */}
-          {comptesEnAttenteCount > 0 && (
+      {/* Modules Grid Removed - Action Redundancy */}
+      {/* Keeping only pending activation alert if needed */}
+      {comptesEnAttenteCount > 0 && (
             <div
               onClick={() => setShowActivationDrawer(true)}
               className="mt-3 flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 cursor-pointer hover:bg-orange-500/15 transition-all group"
@@ -1003,7 +934,6 @@ export default function CaisseDashboard({
               <ArrowRightLeft size={16} className="text-orange-400/50 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
             </div>
           )}
-      </div>
 
       <PendingActivationDrawer
         open={showActivationDrawer}
@@ -1113,7 +1043,7 @@ export default function CaisseDashboard({
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
+    <div className="h-full bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
         <UniversalPaymentSuccessModal
             isOpen={showHistoryReceipt}
             onClose={() => {
@@ -1124,9 +1054,9 @@ export default function CaisseDashboard({
             data={historyReceiptData}
         />
         
-      <div className="w-full min-h-screen flex flex-col p-4 md:p-6">
+      <div className="w-full h-full flex flex-col p-3 md:p-4 overflow-hidden">
         {/* App Header */}
-        <div className="flex items-center justify-between mb-4 pt-2">
+        <div className="flex items-center justify-between mb-2 pt-1 shrink-0">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 shadow-lg shadow-cyan-500/20 flex items-center justify-center text-white">
                     <Wallet size={20} strokeWidth={2.5} />
@@ -1146,7 +1076,7 @@ export default function CaisseDashboard({
                          )}
                          {currentSession?.statut === 'OPEN' && (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
-                                Session Active
+                                Active
                             </span>
                          )}
                          {currentSession?.statut === 'CLOSING_COUNT' && (
@@ -1303,7 +1233,7 @@ export default function CaisseDashboard({
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 pb-16">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
              {renderContent()}
         </div>
       </div>

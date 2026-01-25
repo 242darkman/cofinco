@@ -24,7 +24,7 @@ import {
   Download,
   Eye,
 } from 'lucide-react';
-import { Button, Card, Badge, Pagination, Modal, StatCard, Tooltip } from '@/components/ui';
+import { Button, Card, Badge, Pagination, Modal, StatCard, Tooltip, ResponsiveTable } from '@/components/ui';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -409,25 +409,55 @@ export default function TransfertInterCoffresModule({
   };
 
   // Loading state
-  if (loading && transferts.length === 0) {
-    return (
-      <div className="space-y-6 p-4 sm:p-6" role="status" aria-label="Chargement">
-        <div className="flex items-center gap-3">
-          <SkeletonCard className="h-10 w-10 rounded-full" />
-          <div>
-            <SkeletonCard className="h-6 w-64 mb-2" />
-            <SkeletonCard className="h-4 w-40" />
-          </div>
+  const tableColumns = useMemo(() => [
+    { 
+      key: 'reference', 
+      label: 'Référence',
+      format: (val: string) => <span className="font-mono text-xs text-slate-400">{val}</span>
+    },
+    { 
+      key: 'parcours', 
+      label: 'Parcours',
+      format: (_: any, row: TransfertInterCoffre) => (
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400">
+            {row.coffreSource?.agenceNom || 'Source'}
+          </span>
+          <ArrowRight size={12} className="text-slate-600" />
+          <span className="text-white font-medium">
+            {row.coffreDestination?.agenceNom || 'Dest'}
+          </span>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => (
-            <SkeletonCard key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
-        <SkeletonCard className="h-96 rounded-xl" />
-      </div>
-    );
-  }
+      )
+    },
+    { 
+      key: 'montant', 
+      label: 'Montant', 
+      align: 'right' as const,
+      format: (val: string) => <span className="font-bold text-white">{formatMoney(parseFloat(val))}</span>
+    },
+    { 
+      key: 'typeTransfert', 
+      label: 'Type', 
+      align: 'center' as const,
+      format: (val: string) => <span className="text-xs text-slate-400">{val.replace(/_/g, ' → ')}</span>
+    },
+    { 
+      key: 'dateTransfert', 
+      label: 'Date', 
+      align: 'center' as const,
+      format: (val: string) => <span className="text-slate-400">{new Date(val).toLocaleDateString('fr-FR')}</span>
+    },
+    { 
+      key: 'statut', 
+      label: 'Statut', 
+      align: 'center' as const,
+      format: (val: string) => <Badge value={val} variant={getStatutBadge(val)} />
+    }
+  ], []);
+
+  // Use ResponsiveTable inside render instead of custom table
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -480,63 +510,71 @@ export default function TransfertInterCoffresModule({
           </div>
         </header>
 
-        {/* Stats Cards */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Statistiques">
-          <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-slate-700/50">
-                <Vault size={20} className="text-slate-300" />
+        {/* Stats Cards - Compact */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Statistiques">
+          <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-slate-700/50">
+                <Vault size={16} className="text-slate-300" />
               </div>
-              <div>
-                <p className="text-xs text-slate-400 uppercase tracking-wide">Solde Coffres</p>
-                <p className="text-lg font-bold text-white">{formatMoney(computedStats.soldeTotalCoffres)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-amber-900/20 to-amber-950/20 border border-amber-700/30 rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/20">
-                <Clock size={20} className="text-amber-400" />
-              </div>
-              <div>
-                <p className="text-xs text-amber-400/80 uppercase tracking-wide">En Attente</p>
-                <p className="text-lg font-bold text-amber-400">{computedStats.enAttente}</p>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide leading-tight">Solde Coffres</span>
+                <span className="text-sm font-bold text-white leading-tight">
+                  {loading ? "..." : formatMoney(computedStats.soldeTotalCoffres)}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-900/20 to-blue-950/20 border border-blue-700/30 rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-blue-500/20">
-                <Truck size={20} className="text-blue-400" />
+          <div className="bg-gradient-to-br from-amber-900/20 to-amber-950/20 border border-amber-700/30 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-500/20">
+                <Clock size={16} className="text-amber-400" />
               </div>
-              <div>
-                <p className="text-xs text-blue-400/80 uppercase tracking-wide">En Transit</p>
-                <p className="text-lg font-bold text-blue-400">{computedStats.enTransit}</p>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-amber-400/80 uppercase tracking-wide leading-tight">En Attente</span>
+                <span className="text-sm font-bold text-amber-400 leading-tight">
+                   {loading ? "..." : computedStats.enAttente}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-emerald-900/20 to-emerald-950/20 border border-emerald-700/30 rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-emerald-500/20">
-                <CheckCircle size={20} className="text-emerald-400" />
+          <div className="bg-gradient-to-br from-blue-900/20 to-blue-950/20 border border-blue-700/30 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-500/20">
+                <Truck size={16} className="text-blue-400" />
               </div>
-              <div>
-                <p className="text-xs text-emerald-400/80 uppercase tracking-wide">Reçus</p>
-                <p className="text-lg font-bold text-emerald-400">{computedStats.recus}</p>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-blue-400/80 uppercase tracking-wide leading-tight">En Transit</span>
+                <span className="text-sm font-bold text-blue-400 leading-tight">
+                   {loading ? "..." : computedStats.enTransit}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-900/20 to-emerald-950/20 border border-emerald-700/30 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-emerald-500/20">
+                <CheckCircle size={16} className="text-emerald-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-emerald-400/80 uppercase tracking-wide leading-tight">Reçus</span>
+                <span className="text-sm font-bold text-emerald-400 leading-tight">
+                   {loading ? "..." : computedStats.recus}
+                </span>
               </div>
             </div>
           </div>
         </section>
 
         {/* Filters */}
-        <section className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4">
-          <div className="flex flex-col sm:flex-row gap-3">
+        <section className="bg-slate-900/50 border border-slate-800 rounded-lg p-3">
+          <div className="flex flex-col sm:flex-row gap-2">
             {/* Search */}
             <div className="relative flex-1">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 type="text"
                 placeholder="Rechercher par référence..."
@@ -545,7 +583,7 @@ export default function TransfertInterCoffresModule({
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all"
               />
             </div>
 
@@ -556,7 +594,7 @@ export default function TransfertInterCoffresModule({
                 setStatutFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all"
+              className="px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all"
             >
               <option value="all">Tous les statuts</option>
               <option value="DRAFT">Brouillon</option>
@@ -579,9 +617,9 @@ export default function TransfertInterCoffresModule({
                   setDateDebutFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:ring-2 focus:ring-cyan-500/30 outline-none"
+                className="px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-cyan-500/30 outline-none"
               />
-              <span className="text-slate-500">→</span>
+              <span className="text-slate-500 text-xs">→</span>
               <input
                 type="date"
                 value={dateFinFilter}
@@ -589,172 +627,36 @@ export default function TransfertInterCoffresModule({
                   setDateFinFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:ring-2 focus:ring-cyan-500/30 outline-none"
+                className="px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-cyan-500/30 outline-none"
               />
             </div>
           </div>
         </section>
 
-        {/* Transfers List */}
-        <section className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
-          {/* Mobile View - Cards */}
-          <div className="lg:hidden divide-y divide-slate-800">
-            {transferts.length === 0 ? (
-              <div className="p-8 text-center">
-                <Vault size={48} className="mx-auto mb-4 text-slate-600" />
-                <p className="text-slate-400">Aucun transfert trouvé</p>
-              </div>
-            ) : (
-              transferts.map((transfert) => (
-                <article
-                  key={transfert.id}
-                  className="p-4 space-y-3 active:bg-slate-800/30 transition-colors"
-                  onClick={() => handleViewDetails(transfert)}
-                >
-                  {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="font-mono text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">
-                      {transfert.reference}
-                    </div>
-                    <Badge value={transfert.statut} variant={getStatutBadge(transfert.statut)} />
-                  </div>
-
-                  {/* Route */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-slate-400 truncate max-w-[120px]">
-                      {transfert.coffreSource?.agenceNom || transfert.coffreSource?.nom || 'Source'}
-                    </span>
-                    <ArrowRight size={14} className="text-slate-600 flex-shrink-0" />
-                    <span className="text-white font-medium truncate max-w-[120px]">
-                      {transfert.coffreDestination?.agenceNom || transfert.coffreDestination?.nom || 'Dest'}
-                    </span>
-                  </div>
-
-                  {/* Amount & Date */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-xl font-bold text-white">
-                      {formatMoney(parseFloat(transfert.montant))}
-                    </p>
-                    <div className="text-right">
-                      <time className="text-xs text-slate-500">
-                        {new Date(transfert.dateTransfert).toLocaleDateString('fr-FR')}
-                      </time>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  {getAvailableActions(transfert).length > 0 && (
-                    <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
-                      {getAvailableActions(transfert).includes('approve_l1') && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApprove(transfert)}
-                          className="flex-1 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30"
-                        >
-                          Approuver N1
-                        </Button>
-                      )}
-                      {getAvailableActions(transfert).includes('approve_l2') && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApprove(transfert)}
-                          className="flex-1 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30"
-                        >
-                          Approuver N2
-                        </Button>
-                      )}
-                      {getAvailableActions(transfert).includes('dispatch') && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleDispatch(transfert)}
-                          className="flex-1 bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 border border-amber-500/30"
-                        >
-                          <Truck size={16} className="mr-1" /> Dispatch
-                        </Button>
-                      )}
-                      {getAvailableActions(transfert).includes('receive') && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleReceive(transfert)}
-                          className="flex-1 bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/30 border border-cyan-500/30"
-                        >
-                          <Package size={16} className="mr-1" /> Réceptionner
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </article>
-              ))
-            )}
-          </div>
-
-          {/* Desktop View - Table */}
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-4 text-left">Référence</th>
-                  <th className="px-6 py-4 text-left">Parcours</th>
-                  <th className="px-6 py-4 text-right">Montant</th>
-                  <th className="px-6 py-4 text-center">Type</th>
-                  <th className="px-6 py-4 text-center">Date</th>
-                  <th className="px-6 py-4 text-center">Statut</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {transferts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-16 text-center text-slate-500">
-                      <Vault size={48} className="mx-auto mb-4 opacity-30" />
-                      Aucun transfert trouvé
-                    </td>
-                  </tr>
-                ) : (
-                  transferts.map((transfert) => (
-                    <tr
-                      key={transfert.id}
-                      className="hover:bg-slate-800/30 cursor-pointer transition-colors"
-                      onClick={() => handleViewDetails(transfert)}
-                    >
-                      <td className="px-6 py-4 font-mono text-xs text-slate-400">
-                        {transfert.reference}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-400">
-                            {transfert.coffreSource?.agenceNom || 'Source'}
-                          </span>
-                          <ArrowRight size={14} className="text-slate-600" />
-                          <span className="text-white font-medium">
-                            {transfert.coffreDestination?.agenceNom || 'Dest'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right font-bold text-white">
-                        {formatMoney(parseFloat(transfert.montant))}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="text-xs text-slate-400">
-                          {transfert.typeTransfert.replace(/_/g, ' → ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-400">
-                        {new Date(transfert.dateTransfert).toLocaleDateString('fr-FR')}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <Badge value={transfert.statut} variant={getStatutBadge(transfert.statut)} />
-                      </td>
-                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex flex-row items-center justify-end gap-3">
+        {/* Transfers List - ResponsiveTable */}
+        <section className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
+             <ResponsiveTable
+                data={transferts}
+                columns={tableColumns}
+                loading={loading && transferts.length === 0}
+                emptyMessage="Aucun transfert trouvé"
+                onRowClick={handleViewDetails}
+                density="compact"
+                pagination={{
+                    page: currentPage,
+                    totalPages: totalPages,
+                    onPageChange: setCurrentPage
+                }}
+                actions={(transfert) => (
+                    <div className="flex flex-row items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                           {/* Bouton secondaire (Voir) - Ghost style */}
                           <Tooltip content="Voir les détails" position="top">
                             <button
-                              onClick={() => handleViewDetails(transfert)}
-                              className="h-10 w-10 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+                              onClick={(e) => { e.stopPropagation(); handleViewDetails(transfert); }}
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
                               aria-label="Voir les détails"
                             >
-                              <Eye size={18} />
+                              <Eye size={16} />
                             </button>
                           </Tooltip>
 
@@ -763,10 +665,10 @@ export default function TransfertInterCoffresModule({
                             <Tooltip content="Approuver au niveau 1" position="top">
                               <Button
                                 size="sm"
-                                onClick={() => handleApprove(transfert)}
-                                className="h-9 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm"
+                                onClick={(e) => { e.stopPropagation(); handleApprove(transfert); }}
+                                className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm"
                               >
-                                <CheckCircle size={14} fill="currentColor" className="mr-1.5" />
+                                <CheckCircle size={12} fill="currentColor" className="mr-1" />
                                 Valider N1
                               </Button>
                             </Tooltip>
@@ -775,10 +677,10 @@ export default function TransfertInterCoffresModule({
                             <Tooltip content="Approuver au niveau 2" position="top">
                               <Button
                                 size="sm"
-                                onClick={() => handleApprove(transfert)}
-                                className="h-9 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-sm"
+                                onClick={(e) => { e.stopPropagation(); handleApprove(transfert); }}
+                                className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-sm"
                               >
-                                <Shield size={14} fill="currentColor" className="mr-1.5" />
+                                <Shield size={12} fill="currentColor" className="mr-1" />
                                 Valider N2
                               </Button>
                             </Tooltip>
@@ -787,10 +689,10 @@ export default function TransfertInterCoffresModule({
                             <Tooltip content="Expédier le transfert" position="top">
                               <Button
                                 size="sm"
-                                onClick={() => handleDispatch(transfert)}
-                                className="h-9 px-4 bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-sm"
+                                onClick={(e) => { e.stopPropagation(); handleDispatch(transfert); }}
+                                className="h-7 px-3 text-xs bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-sm"
                               >
-                                <Truck size={14} fill="currentColor" className="mr-1.5" />
+                                <Truck size={12} fill="currentColor" className="mr-1" />
                                 Expédier
                               </Button>
                             </Tooltip>
@@ -799,37 +701,17 @@ export default function TransfertInterCoffresModule({
                             <Tooltip content="Réceptionner le transfert" position="top">
                               <Button
                                 size="sm"
-                                onClick={() => handleReceive(transfert)}
-                                className="h-9 px-4 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-sm"
+                                onClick={(e) => { e.stopPropagation(); handleReceive(transfert); }}
+                                className="h-7 px-3 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-sm"
                               >
-                                <Package size={14} fill="currentColor" className="mr-1.5" />
+                                <Package size={12} fill="currentColor" className="mr-1" />
                                 Recevoir
                               </Button>
                             </Tooltip>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                    </div>
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="p-4 border-t border-slate-800">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                itemsPerPage={itemsPerPage}
-                totalItems={totalItems}
-                canGoPrevious={currentPage > 1}
-                canGoNext={currentPage < totalPages}
-              />
-            </div>
-          )}
+             />
         </section>
 
         {/* Create Form Modal */}

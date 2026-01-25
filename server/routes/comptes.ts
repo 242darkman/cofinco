@@ -594,7 +594,7 @@ export function registerComptesRoutes(app: Express) {
             totalCount: sql<number>`count(*)`.mapWith(Number),
             activeCount: sql<number>`sum(case when ${virementsProgrammes.actif} = true then 1 else 0 end)`.mapWith(Number),
             pausedCount: sql<number>`sum(case when ${virementsProgrammes.actif} = false then 1 else 0 end)`.mapWith(Number),
-            failedCount: sql<number>`sum(case when ${virementsProgrammes.statutDernier} = 'failed' then 1 else 0 end)`.mapWith(Number),
+            failedCount: sql<number>`sum(case when ${virementsProgrammes.statutDernier} = 'FAILED' then 1 else 0 end)`.mapWith(Number),
             // Weighted volume for ALL active transfers
             currentWeightedVolume: sql<number>`sum(
               case 

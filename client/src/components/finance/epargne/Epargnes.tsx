@@ -23,26 +23,21 @@ import { AccountActivationModal } from '../caisse/AccountActivationModal';
 interface Compte {
   id: string;
   numero_compte: string;
-  numeroCompte?: string;
   type_compte: string;
-  typeCompte?: string;
   solde: number;
-  soldeCourant?: number;
   solde_courant?: number;
   statut: string;
   client_id: string;
-  clientId?: string;
   created_at?: string;
-  createdAt?: string;
   date_ouverture?: string;
   taux_interet?: number;
-  tauxInteret?: number;
   clients: {
     id: string;
     nom: string;
     prenom?: string;
     phone?: string;
     telephone?: string;
+    photo?: string;
   } | null;
 }
 
@@ -234,8 +229,8 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       // Open the dedicated activation modal
       setActivationAccount({
         id: compte.id,
-        numeroCompte: compte.numero_compte || compte.numeroCompte || '',
-        typeCompte: compte.type_compte || compte.typeCompte || '',
+        numeroCompte: compte.numero_compte,
+        typeCompte: compte.type_compte,
         montantInitial: getAccountBalance(compte),
         client: {
           id: compte.clients.id,
@@ -263,131 +258,145 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   ];
 
   return (
-    <div className="space-y-6 pb-20 md:pb-0 font-sans">
+    <div className="space-y-4 pb-20 md:pb-0 font-sans">
 
       {/* Header & Title */}
-      <PageHeader
-        title="Gestion des Comptes"
-        description="Comptes d'épargne et placements"
-        actions={
-          <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>
-            <button
-              onClick={() => setShowAccountForm(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-lg shadow-blue-900/20 flex items-center gap-2 font-medium text-sm"
-            >
-              <Plus size={18} />
-              Nouveau Compte
-            </button>
-          </ProtectedFeature>
-        }
-      />
+      {/* Header & Title - Ultra Compact */}
+      <div className="flex items-center justify-between gap-4 px-1">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">Gestion des Comptes</h1>
+          <p className="text-[10px] text-slate-500 font-medium">Epargnes & Placements</p>
+        </div>
+        
+        <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>
+          <button
+            onClick={() => setShowAccountForm(true)}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-sm shadow-blue-900/20 flex items-center gap-1.5 font-medium text-xs"
+          >
+            <Plus size={14} />
+            Nouveau <span className="hidden sm:inline">Compte</span>
+          </button>
+        </ProtectedFeature>
+      </div>
 
-      {/* 2. KPIs (Simplified) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard 
-          title="Solde Total Encours" 
-          value={stats.soldeTotal.toLocaleString() + ' FCFA'} 
-          icon={DollarSign} 
-          color="success"
-          subtitle="Tous comptes confondus"
-          className="border-emerald-500/20"
-        />
-        <StatCard 
-          title="Nombre de Comptes" 
-          value={stats.totalComptes} 
-          icon={Users} 
-          color="primary"
-          subtitle={`${stats.activeLabel}`}
-        />
-        <div className="bg-surface-base p-4 rounded-xl border border-edge shadow-sm flex flex-col justify-between">
+      {/* 2. KPIs (Simplified & Compact) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Total Solde */}
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+          <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+            <DollarSign size={40} />
+          </div>
+          <div>
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Solde Total</p>
+            <h3 className="text-xl font-bold text-white mt-0.5">{stats.soldeTotal.toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            <p className="text-[10px] text-emerald-400 font-medium">Tous comptes confondus</p>
+          </div>
+        </div>
+
+        {/* Nombre de Comptes */}
+        <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 p-3 opacity-5 text-blue-500">
+            <Users size={40} />
+          </div>
+          <div>
+             <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Comptes {stats.activeLabel}</p>
+             <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{stats.totalComptes}</h3>
+          </div>
+          <div className="mt-2 text-[10px] text-blue-500 font-medium bg-blue-500/10 px-2 py-0.5 rounded-full w-fit">
+            Actifs maintenant
+          </div>
+        </div>
+
+        {/* Flux du jour */}
+        <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm">
             <div className="flex items-start justify-between">
                <div>
-                  <p className="text-content-muted text-xs font-medium uppercase tracking-wider">Flux du jour</p>
-                  <h3 className={`text-2xl font-bold mt-1 ${stats.fluxNet >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {stats.fluxNet >= 0 ? '+' : ''}{stats.fluxNet.toLocaleString('fr-FR')}
-                  </h3>
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Flux du jour</p>
+                  <div className="flex items-baseline gap-2 mt-0.5">
+                    <h3 className={`text-xl font-bold ${stats.fluxNet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                      {stats.fluxNet >= 0 ? '+' : ''}{stats.fluxNet.toLocaleString('fr-FR')}
+                    </h3>
+                    <span className="text-[9px] text-slate-400">Net</span>
+                  </div>
                </div>
-               <div className={`p-2 rounded-lg ${stats.fluxNet >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                  <Activity size={20} />
+               <div className={`p-1.5 rounded-lg ${stats.fluxNet >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                  <Activity size={16} />
                </div>
             </div>
-            <div className="mt-4 h-1 bg-surface-muted rounded-full overflow-hidden">
-               {stats.fluxEntrees + stats.fluxSorties > 0 ? (
-                 <div
-                   className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                   style={{ width: `${(stats.fluxEntrees / (stats.fluxEntrees + stats.fluxSorties)) * 100}%` }}
-                 />
-               ) : (
-                 <div className="h-full bg-slate-600 w-full rounded-full" />
-               )}
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-content-muted">
-               <span className="text-emerald-400">Entrées: +{stats.fluxEntrees.toLocaleString('fr-FR')}</span>
-               <span className="text-red-400">Sorties: -{stats.fluxSorties.toLocaleString('fr-FR')}</span>
+            <div className="mt-2 flex items-center justify-between text-[9px] font-medium">
+               <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 px-1.5 py-0.5 rounded">+{stats.fluxEntrees.toLocaleString('fr-FR')}</span>
+               <span className="text-red-600 dark:text-red-400 bg-red-500/5 px-1.5 py-0.5 rounded">-{stats.fluxSorties.toLocaleString('fr-FR')}</span>
             </div>
         </div>
       </div>
 
-      {/* 3. NAVIGATION PERSISTANTE */}
-      <div className="border-b border-slate-700">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
-              className={`
-                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200
-                ${activeTab === tab.key
-                  ? 'border-emerald-500 text-emerald-400 bg-white/5' // Style Actif
-                  : 'border-transparent text-slate-400 hover:text-white hover:border-slate-700' // Style Inactif
-                }
-              `}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {/* 3. NAVIGATION (Integrated below) */}
+      {/* Removed separate nav block */}
 
-      {/* 4. CONTENU DYNAMIQUE */}
-      <div className="mt-6">
-        {activeTab === TypeCompte.BLOCKED ? (
-          <ComptesBloquesSection />
-        ) : (
-          <>
-            {/* Search Toolbar (Tabs removed) */}
-            <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-surface-base p-2 rounded-2xl border border-edge shadow-sm mb-6">
-               <div className="relative flex-1 group">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={20} />
-                  <input
-                    type="text"
-                    placeholder="Rechercher un client..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-transparent border-none text-content-primary placeholder-slate-500 focus:ring-0 px-10 py-2.5 text-sm font-medium"
-                  />
-               </div>
-
-               <div className="hidden md:flex items-center border-l border-edge pl-4">
-                  <button className="flex items-center gap-2 px-3 py-2 text-sm text-content-secondary hover:text-white hover:bg-surface-muted rounded-lg transition">
-                     <Filter size={16} />
-                     <span>Tous les statuts</span>
+      {/* 4. CONTENU DYNAMIQUE AVEC NAVIGATION PERSISTANTE */}
+      <div className="mt-6 bg-surface-base rounded-lg border border-edge shadow-sm overflow-hidden flex flex-col">
+          
+          {/* Toolbar: Tabs + Search + Filter combined */}
+          <div className="flex flex-col sm:flex-row items-center justify-between p-2 gap-2 border-b border-edge bg-slate-50 dark:bg-slate-900/50">
+              {/* Tabs */}
+              <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1 self-stretch sm:self-auto">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
+                    className={`
+                      flex-1 sm:flex-none px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap
+                      ${activeTab === tab.key
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }
+                    `}
+                  >
+                    {tab.label}
                   </button>
-               </div>
-            </div>
+                ))}
+              </div>
 
-            {/* Account List */}
-            <div className="bg-surface-base rounded-2xl border border-edge overflow-hidden shadow-theme-sm p-4">
-               <AccountsList
+              {/* Search & Filter - Visible only for non-blocked tabs, or adapted */}
+              {activeTab !== TypeCompte.BLOCKED && (
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <input
+                        type="text"
+                        placeholder="Rechercher..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 pl-8 pr-3 py-1.5 text-xs transition-all"
+                      />
+                  </div>
+                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                      <Filter size={12} />
+                      <span className="hidden sm:inline">Tous les statuts</span>
+                  </button>
+                </div>
+              )}
+          </div>
+
+          {/* Content Area */}
+          <div className="">
+            {activeTab === TypeCompte.BLOCKED ? (
+              <div className="p-4">
+                 <ComptesBloquesSection />
+              </div>
+            ) : (
+                <AccountsList
                   data={comptes}
                   type={activeTab === TypeCompte.SAVINGS ? TypeCompte.SAVINGS : TypeCompte.CURRENT}
                   loading={loading}
                   onManage={(c) => setDetailCompteId(c.id)}
                   onTransaction={handleTransaction}
-               />
-            </div>
-          </>
-        )}
+                />
+            )}
+          </div>
       </div>
 
       {showAccountForm && (

@@ -83,15 +83,15 @@ interface ReevaluationDetailPanelProps {
 }
 
 const STATUT_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
-  'Demandée': { color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/50' },
-  'Éligibilité en cours': { color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/50' },
-  'Autorisée': { color: 'text-cyan-400', bg: 'bg-cyan-500/20', border: 'border-cyan-500/50' },
-  'Refusée': { color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/50' },
-  'Enquête complémentaire': { color: 'text-purple-400', bg: 'bg-purple-500/20', border: 'border-purple-500/50' },
-  'En comité': { color: 'text-orange-400', bg: 'bg-orange-500/20', border: 'border-orange-500/50' },
-  'Approuvée': { color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/50' },
-  'Rejetée définitivement': { color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/50' },
-  'Annulée': { color: 'text-slate-400', bg: 'bg-slate-500/20', border: 'border-slate-500/50' },
+  [StatutReevaluation.REQUESTED]: { color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/50' },
+  [StatutReevaluation.ELIGIBILITY_CHECK]: { color: 'text-amber-400', bg: 'bg-amber-500/20', border: 'border-amber-500/50' },
+  [StatutReevaluation.AUTHORIZED]: { color: 'text-cyan-400', bg: 'bg-cyan-500/20', border: 'border-cyan-500/50' },
+  [StatutReevaluation.REFUSED]: { color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/50' },
+  [StatutReevaluation.ADDITIONAL_INVESTIGATION]: { color: 'text-purple-400', bg: 'bg-purple-500/20', border: 'border-purple-500/50' },
+  [StatutReevaluation.IN_COMMITTEE]: { color: 'text-orange-400', bg: 'bg-orange-500/20', border: 'border-orange-500/50' },
+  [StatutReevaluation.APPROVED]: { color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/50' },
+  [StatutReevaluation.DEFINITIVELY_REJECTED]: { color: 'text-red-400', bg: 'bg-red-500/20', border: 'border-red-500/50' },
+  [StatutReevaluation.CANCELLED]: { color: 'text-slate-400', bg: 'bg-slate-500/20', border: 'border-slate-500/50' },
 };
 
 const StepDetailModal = ({ step, logs, onClose }: { step: any, logs: AuditLog[], onClose: () => void }) => {
@@ -152,8 +152,8 @@ const StepDetailModal = ({ step, logs, onClose }: { step: any, logs: AuditLog[],
 
 const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string, onStepClick: (step: any) => void }) => {
   const steps = [
-    { id: 'request', label: 'Demandée', status: [StatutReevaluation.REQUESTED, StatutReevaluation.ELIGIBILITY_CHECK] },
-    { id: 'authorized', label: 'Autorisée', status: [StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION] },
+    { id: 'request', label: STATUT_REEVALUATION_LABELS[StatutReevaluation.REQUESTED], status: [StatutReevaluation.REQUESTED, StatutReevaluation.ELIGIBILITY_CHECK] },
+    { id: 'authorized', label: STATUT_REEVALUATION_LABELS[StatutReevaluation.AUTHORIZED], status: [StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION] },
     { id: 'committee', label: 'En comité', status: [StatutReevaluation.IN_COMMITTEE] },
     { id: 'decision', label: 'Décision', status: [StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.REFUSED, StatutReevaluation.CANCELLED] }
   ];
@@ -168,12 +168,12 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
   const activeIndex = getCurrentStepIndex();
 
   return (
-    <div className="w-full py-6">
+    <div className="w-full py-2">
       <div className="relative flex items-center justify-between w-full max-w-3xl mx-auto px-4">
         {/* Connector Line */}
-        <div className="absolute left-4 right-4 top-[15px] h-0.5 bg-slate-800 -z-10"></div>
+        <div className="absolute left-4 right-4 top-[12px] h-0.5 bg-slate-800 -z-10"></div>
         <div 
-          className="absolute left-4 top-[15px] h-0.5 bg-cyan-500 -z-10 transition-all duration-500"
+          className="absolute left-4 top-[12px] h-0.5 bg-cyan-500 -z-10 transition-all duration-500"
           style={{ width: `calc(${(activeIndex / (steps.length - 1)) * 100}% - 32px)` }}
         ></div>
 
@@ -185,32 +185,32 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
           return (
             <div 
               key={step.id} 
-              className={`flex flex-col items-center gap-3 relative group ${isClickable ? 'cursor-pointer' : ''}`}
+              className={`flex flex-col items-center gap-1.5 relative group ${isClickable ? 'cursor-pointer' : ''}`}
               onClick={() => isClickable && onStepClick(step)}
             >
               <div 
-                className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-slate-900 z-10 ${
+                className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-slate-900 z-10 ${
                   isActive 
-                    ? 'bg-slate-900 border-cyan-500 text-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
+                    ? 'bg-slate-900 border-cyan-500 text-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.3)]' 
                     : 'bg-slate-900 border-slate-700 text-slate-600'
-                } ${isCurrent ? 'scale-110 ring-4 ring-cyan-500/10' : ''}`}
+                } ${isCurrent ? 'scale-110 ring-2 ring-cyan-500/10' : ''}`}
               >
-                {isActive ? <Check size={14} strokeWidth={3} /> : <span className="text-xs font-bold">{index + 1}</span>}
+                {isActive ? <Check size={12} strokeWidth={3} /> : <span className="text-[10px] font-bold">{index + 1}</span>}
               </div>
               
-              <div className="absolute top-10 flex flex-col items-center w-32">
-                <span className={`text-xs font-bold tracking-wide transition-colors ${isActive ? 'text-white' : 'text-slate-600'}`}>
+              <div className="absolute top-7 flex flex-col items-center w-32">
+                <span className={`text-[10px] font-bold tracking-wide transition-colors ${isActive ? 'text-white' : 'text-slate-600'}`}>
                   {step.label}
                 </span>
                 {isCurrent && (
-                  <span className="text-[10px] text-cyan-400 font-medium animate-pulse">En cours</span>
+                  <span className="text-[9px] text-cyan-400 font-medium animate-pulse">En cours</span>
                 )}
               </div>
               
               {/* Tooltip hint */}
               {isClickable && (
-                <div className="absolute -top-8 px-2 py-1 bg-slate-800 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap border border-slate-700">
-                  Voir détails
+                <div className="absolute -top-6 px-1.5 py-0.5 bg-slate-800 text-[10px] text-white rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap border border-slate-700">
+                  Voir
                 </div>
               )}
             </div>
@@ -223,40 +223,68 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
 
 const StatusExplanation = ({ status }: { status: string }) => {
   const config = {
-    'Demandée': {
+    [StatutReevaluation.REQUESTED]: {
       title: 'Dossier reçu',
       description: 'La demande a été créée mais n\'a pas encore été vérifiée. Vous devez vérifier l\'éligibilité pour continuer.',
       action: 'Action requise : Cliquez sur "Vérifier l\'éligibilité"',
       icon: Clock,
       color: 'blue'
     },
-    'Autorisée': {
+    [StatutReevaluation.ELIGIBILITY_CHECK]: {
+      title: 'Dossier reçu',
+      description: 'La demande a été créée mais n\'a pas encore été vérifiée. Vous devez vérifier l\'éligibilité pour continuer.',
+      action: 'Action requise : Cliquez sur "Vérifier l\'éligibilité"',
+      icon: Clock,
+      color: 'blue'
+    },
+    [StatutReevaluation.AUTHORIZED]: {
       title: 'Éligibilité validée',
       description: 'Le dossier respecte les critères d\'éligibilité. Il est prêt pour l\'analyse approfondie avant passage en comité.',
       action: 'Action requise : Préparez le dossier et cliquez sur "Soumettre au comité"',
       icon: CheckCircle,
       color: 'cyan'
     },
-    'En comité': {
+    [StatutReevaluation.ADDITIONAL_INVESTIGATION]: {
+      title: 'Éligibilité validée',
+      description: 'Le dossier respecte les critères d\'éligibilité. Il est prêt pour l\'analyse approfondie avant passage en comité.',
+      action: 'Action requise : Préparez le dossier et cliquez sur "Soumettre au comité"',
+      icon: CheckCircle,
+      color: 'cyan'
+    },
+    [StatutReevaluation.IN_COMMITTEE]: {
       title: 'Délibération en cours',
       description: 'Le dossier est entre les mains du comité de crédit. Les membres doivent examiner les nouvelles conditions proposées.',
       action: 'Action requise : Après la séance, cliquez sur "Enregistrer la décision" pour saisir le verdict.',
       icon: Users,
       color: 'orange'
     },
-    'Approuvée': {
+    [StatutReevaluation.APPROVED]: {
       title: 'Réévaluation validée',
       description: 'Le comité a donné son accord. Le crédit va être mis à jour avec les nouvelles conditions (montant, durée, score).',
       action: 'Terminé',
       icon: CheckCircle,
       color: 'emerald'
     },
-    'Refusée': {
+    [StatutReevaluation.REFUSED]: {
       title: 'Non éligible',
       description: 'Le dossier ne remplit pas les critères techniques (délai, nombre de tentatives, etc.).',
       action: 'Clôturé',
       icon: XCircle,
       color: 'red'
+    },
+    [StatutReevaluation.DEFINITIVELY_REJECTED]: {
+      title: 'Rejetée définitivement',
+      description: 'Le comité a rejeté la demande. Aucune autre action n\'est possible pour cette réévaluation.',
+      action: 'Clôturé',
+      icon: XCircle,
+      color: 'red'
+    },
+    [StatutReevaluation.CANCELLED]: {
+      title: 'Annulée',
+      description: 'La procédure de réévaluation a été annulée.',
+      action: 'Terminé',
+      icon: XCircle,
+      color: 'slate'
     }
   }[status];
 
@@ -264,14 +292,14 @@ const StatusExplanation = ({ status }: { status: string }) => {
   if (!config) return null;
 
   return (
-    <div className={`bg-${config.color}-500/10 border border-${config.color}-500/30 rounded-xl p-4 flex items-start gap-4`}>
-      <div className={`p-2 rounded-full bg-${config.color}-500/20 text-${config.color}-400 mt-1`}>
-        <config.icon size={20} />
+    <div className={`bg-${config.color}-500/10 border border-${config.color}-500/30 rounded-lg p-3 flex items-start gap-3`}>
+      <div className={`p-1.5 rounded-full bg-${config.color}-500/20 text-${config.color}-400 mt-0.5`}>
+        <config.icon size={16} />
       </div>
       <div>
-        <h4 className={`font-bold text-${config.color}-400 text-sm mb-1`}>{config.title}</h4>
-        <p className="text-slate-300 text-sm leading-relaxed">{config.description}</p>
-        <div className={`mt-2 text-xs font-semibold uppercase tracking-wider text-${config.color}-400/80`}>
+        <h4 className={`font-bold text-${config.color}-400 text-xs mb-0.5`}>{config.title}</h4>
+        <p className="text-slate-300 text-xs leading-relaxed">{config.description}</p>
+        <div className={`mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-${config.color}-400/80`}>
           {config.action}
         </div>
       </div>
@@ -533,13 +561,7 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
     }
   };
 
-  const getStatutConfig = (statut: string) => {
-    return STATUT_CONFIG[statut] || { 
-      color: 'text-slate-400', 
-      bg: 'bg-slate-500/20', 
-      border: 'border-slate-500/50' 
-    };
-  };
+
 
   const getActionButtons = () => {
     if (!reevaluation || reevaluation.verrouille) return null;
@@ -547,7 +569,8 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
     const actions: React.ReactNode[] = [];
     
     switch (reevaluation.statut) {
-      case 'Demandée':
+      case StatutReevaluation.REQUESTED:
+      case StatutReevaluation.ELIGIBILITY_CHECK:
         actions.push(
           <button
             key="validate"
@@ -565,7 +588,7 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
         );
         break;
         
-      case 'Autorisée':
+      case StatutReevaluation.AUTHORIZED:
         actions.push(
           <div key="committee-group" className="flex-1 flex flex-col gap-2">
             <button
@@ -587,7 +610,7 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
         );
         break;
         
-      case 'En comité':
+      case StatutReevaluation.IN_COMMITTEE:
         actions.push(
           <div key="decision-group" className="flex-1 flex flex-col gap-2">
             <button
@@ -665,7 +688,8 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
     );
   }
 
-  const statutConfig = getStatutConfig(reevaluation.statut);
+  const statutLabel = STATUT_REEVALUATION_LABELS[reevaluation.statut as keyof typeof STATUT_REEVALUATION_LABELS] || reevaluation.statut;
+  const statutConfig = STATUT_CONFIG[reevaluation.statut] || { color: 'text-slate-400', bg: 'bg-slate-500/20', border: 'border-slate-500/50' };
 
   return (
     <div className="space-y-6">
@@ -697,7 +721,9 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
         </div>
         
         <div className={`px-4 py-2 rounded-lg border ${statutConfig.bg} ${statutConfig.border}`}>
-          <span className={`font-medium ${statutConfig.color}`}>{reevaluation.statut}</span>
+          <span className={`font-medium ${statutConfig.color}`}>
+            {STATUT_REEVALUATION_LABELS[reevaluation.statut as keyof typeof STATUT_REEVALUATION_LABELS] || reevaluation.statut}
+          </span>
           {reevaluation.verrouille && (
             <span className="ml-2 text-xs text-slate-500">(verrouillée)</span>
           )}
@@ -723,24 +749,24 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       <StatusExplanation status={reevaluation.statut} />
 
       {/* Comparatif montants */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-          <div className="text-xs text-red-400 mb-1">Demande initiale (rejetée)</div>
-          <div className="text-2xl font-bold text-white">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+          <div className="text-[10px] text-red-400 mb-0.5">Demande initiale (rejetée)</div>
+          <div className="text-lg font-bold text-white">
             {formatMoney(Number(reevaluation.montantInitialDemande))}
           </div>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-xs text-slate-400 mt-0.5">
             Score: {reevaluation.scoreRejetInitial || 0}/100
           </div>
         </div>
         
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-          <div className="text-xs text-amber-400 mb-1">Nouvelle demande</div>
-          <div className="text-2xl font-bold text-white">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+          <div className="text-[10px] text-amber-400 mb-0.5">Nouvelle demande</div>
+          <div className="text-lg font-bold text-white">
             {formatMoney(Number(reevaluation.nouveauMontantDemande || reevaluation.montantInitialDemande))}
           </div>
           {reevaluation.nouveauScore !== undefined && reevaluation.nouveauScore !== null && (
-            <div className="flex items-center gap-2 text-sm mt-1">
+            <div className="flex items-center gap-2 text-xs mt-0.5">
               <span className="text-slate-400">Score: {reevaluation.nouveauScore}/100</span>
               {reevaluation.deltaScore !== undefined && (
                 <span className={reevaluation.deltaScore > 0 ? 'text-emerald-400' : 'text-red-400'}>
@@ -753,28 +779,26 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       </div>
 
       {/* Motif rejet initial */}
-      <div className="bg-slate-800/50 rounded-xl p-4">
-        <h4 className="text-sm font-medium text-slate-400 mb-2">Motif du rejet initial</h4>
-        <p className="text-white">{reevaluation.motifRejetInitial || 'Non spécifié'}</p>
-        <p className="text-xs text-slate-500 mt-1">
-        </p>
+      <div className="bg-slate-800/50 rounded-lg p-3">
+        <h4 className="text-xs font-medium text-slate-400 mb-1">Motif du rejet initial</h4>
+        <p className="text-white text-sm">{reevaluation.motifRejetInitial || 'Non spécifié'}</p>
       </div>
 
       {/* Éléments nouveaux */}
-      <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
-        <h3 className="text-sm font-bold text-slate-400 mb-4 flex items-center gap-2">
-          <RefreshCw size={16} /> Éléments Nouveaux
+      <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+        <h3 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
+          <RefreshCw size={14} /> Éléments Nouveaux
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           {reevaluation.elementsNouveaux?.map((el, i) => (
              <DetailedElementView key={i} element={el} reevaluation={reevaluation} />
           ))}
         </div>
         
-        <div className="pt-4 border-t border-slate-700">
-           <h4 className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Justification globale</h4>
-           <p className="text-slate-300 text-sm leading-relaxed bg-slate-900/30 p-4 rounded-lg border border-slate-700/30">
+        <div className="pt-3 border-t border-slate-700">
+           <h4 className="text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">Justification globale</h4>
+           <p className="text-slate-300 text-xs leading-relaxed bg-slate-900/30 p-2 rounded-lg border border-slate-700/30">
              {reevaluation.justification}
            </p>
         </div>
@@ -782,11 +806,11 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
 
       {/* Garanties additionnelles */}
       {reevaluation.garantiesAdditionnelles && reevaluation.garantiesAdditionnelles.length > 0 && (
-        <div className="bg-slate-800/50 rounded-xl p-4">
-          <h4 className="text-sm font-medium text-slate-400 mb-3">Garanties additionnelles</h4>
-          <div className="space-y-2">
+        <div className="bg-slate-800/50 rounded-lg p-3">
+          <h4 className="text-xs font-medium text-slate-400 mb-2">Garanties additionnelles</h4>
+          <div className="space-y-1">
             {reevaluation.garantiesAdditionnelles.map((g, i) => (
-              <div key={i} className="flex justify-between items-center bg-slate-900/50 rounded-lg p-3">
+              <div key={i} className="flex justify-between items-center bg-slate-900/50 rounded p-2 text-xs">
                 <span className="text-white">{g.type || 'Type non spécifié'}</span>
                 <span className="text-emerald-400 font-medium">{formatMoney(g.valeurEstimee || 0)}</span>
               </div>

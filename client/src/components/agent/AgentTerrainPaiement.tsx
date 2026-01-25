@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -11,6 +11,19 @@ import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, c
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { usePOSPrint } from '@/hooks/usePOSPrint';
 import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
+
+// MM Payment status types
+type MMPaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
+
+interface PaymentIntent {
+  id: string;
+  status: string;
+  amount: string;
+  provider: string;
+  externalRef: string;
+  providerTxnId?: string;
+  errorMessage?: string;
+}
 
 const AirtelLogo = ({ className = '' }: { className?: string }) => (
   <img src={airtelLogo} alt="Airtel Money" className={className} />
@@ -286,6 +299,11 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [lastPaymentInfo, setLastPaymentInfo] = useState<any>(null);
 
+  // Mobile Money payment state
+  const [mmPaymentStatus, setMmPaymentStatus] = useState<MMPaymentStatus>('idle');
+  const [mmPaymentIntent, setMmPaymentIntent] = useState<PaymentIntent | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const [formData, setFormData] = useState<{
     agent_id: string;
     client_id: string;
@@ -317,6 +335,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const isTontinePayment = formData.type_paiement === TypeOperationTerrain.TONTINE_CONTRIBUTION;
   const isCreditPayment = formData.type_paiement === TypeOperationTerrain.LOAN_REPAYMENT;
   const isComptePayment = formData.type_paiement === TypeOperationTerrain.SAVINGS_DEPOSIT || formData.type_paiement === TypeOperationTerrain.MISC_COLLECTION;
+  const isMobileMoneyPayment = formData.methode_paiement === 'Airtel Money' || formData.methode_paiement === 'MTN Mobile Money';
 
   const { user } = useUserProfile();
   const { autoPrint, isPrinting } = usePOSPrint();
@@ -371,6 +390,63 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       setClientComptes([]);
     }
   }, [formData.client_id, formData.type_paiement]);
+
+  // MM Payment status polling
+  useEffect(() => {
+    if (!mmPaymentIntent?.id || mmPaymentStatus !== 'pending') {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/payments/${mmPaymentIntent.id}`, { credentials: 'include' });
+        if (!response.ok) return;
+
+        const intent: PaymentIntent = await response.json();
+        setMmPaymentIntent(intent);
+
+        if (intent.status === 'SUCCESS') {
+          setMmPaymentStatus('success');
+          toast.success('Paiement Mobile Money confirmé!');
+          // Process success - create receipt and show success modal
+          await handleMmPaymentSuccess(intent);
+        } else if (intent.status === 'FAILED') {
+          setMmPaymentStatus('failed');
+          toast.error(`Paiement échoué: ${intent.errorMessage || 'Erreur inconnue'}`);
+        } else if (intent.status === 'EXPIRED') {
+          setMmPaymentStatus('expired');
+          toast.error('Le paiement a expiré');
+        }
+      } catch (error) {
+        console.error('[MM Poll] Error:', error);
+      }
+    };
+
+    // Poll every 5 seconds
+    pollingIntervalRef.current = setInterval(pollStatus, 5000);
+    // Initial poll
+    pollStatus();
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [mmPaymentIntent?.id, mmPaymentStatus]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   const loadSecurityConfig = async () => {
     try {
@@ -498,9 +574,12 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     if (!formData.agent_id) newErrors.agent_id = 'Requis';
     if (!formData.client_id) newErrors.client_id = 'Requis';
     if (!formData.montant || parseFloat(formData.montant) <= 0) newErrors.montant = 'Montant invalide';
-    if (['Airtel Money', 'MTN Mobile Money'].includes(formData.methode_paiement)) {
-      if (!formData.numero_telephone) newErrors.numero_telephone = 'Requis';
-      if (!formData.numero_transaction) newErrors.numero_transaction = 'Requis';
+    if (isMobileMoneyPayment) {
+      // For MM payments, only phone is required (transaction ID comes from provider)
+      if (!formData.numero_telephone) newErrors.numero_telephone = 'Numéro requis';
+      // Validate phone format (Congo: 06XXXXXXXX or 05XXXXXXXX)
+      const phoneClean = formData.numero_telephone.replace(/\s+/g, '').replace(/^\+242/, '');
+      if (phoneClean.length < 9) newErrors.numero_telephone = 'Numéro invalide';
     }
     if (isTontinePayment && !selectedTontine) newErrors.tontine = 'Sélectionner une tontine';
     if (isCreditPayment && !formData.credit_id) newErrors.credit_id = 'Sélectionner un crédit';
@@ -524,8 +603,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         visite_id: formData.visite_id || null,
         montant,
         methode_paiement: formData.methode_paiement,
-        numero_telephone: formData.methode_paiement !== 'Espèces' ? formData.numero_telephone : null,
-        numero_transaction: formData.methode_paiement !== 'Espèces' ? formData.numero_transaction : null,
+        numero_telephone: isMobileMoneyPayment ? formData.numero_telephone : null,
+        numero_transaction: null, // Will come from provider for MM
         type_paiement: formData.type_paiement,
         reference,
         notes: formData.notes.trim(),
@@ -536,6 +615,14 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         compteId: formData.compte_id || null
       };
 
+      // Mobile Money flow - initiate async payment
+      if (isMobileMoneyPayment) {
+        await initiateMobileMoneyPayment(paiementData);
+        // Don't set loading to false - we're now in polling mode
+        return;
+      }
+
+      // Cash flow - existing logic
       if (requiresPresenceVerification(formData.type_paiement)) {
         setPendingPaymentData(paiementData);
         setShowPresenceModal(true);
@@ -544,8 +631,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       }
     } catch (error: any) {
       console.error('Erreur:', error);
-      setErrors({ submit: error.error });
+      setErrors({ submit: error.message || error.error || 'Erreur inconnue' });
       setLoading(false);
+      setMmPaymentStatus('idle');
     }
   };
 
@@ -658,6 +746,167 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     setLoading(true);
     await finaliserPaiementDirect(pendingPaymentData, presenceData);
     setPendingPaymentData(null);
+  };
+
+  // Determine the payment type for the new agent MM API
+  const determineAgentMmPaymentType = (typePaiement: string): 'CREDIT_REPAYMENT' | 'DEPOSIT_SAVINGS' | 'TONTINE_CONTRIBUTION' => {
+    const lower = typePaiement.toLowerCase();
+    if (lower.includes('remboursement') || lower.includes('credit')) return 'CREDIT_REPAYMENT';
+    if (lower.includes('tontine') || lower.includes('cotisation')) return 'TONTINE_CONTRIBUTION';
+    return 'DEPOSIT_SAVINGS';
+  };
+
+  // Initiate Mobile Money payment via new Agent MM API
+  // This uses the new workflow: Agent initiates → MM succeeds → Client account updated immediately (no remise needed)
+  const initiateMobileMoneyPayment = async (paiementData: any): Promise<void> => {
+    const provider = paiementData.methode_paiement === 'MTN Mobile Money' ? 'MTN' : 'AIRTEL';
+
+    const agent = agents.find(a => a.id === paiementData.agent_id);
+    const agenceId = agent?.agenceId || agent?.agence_id;
+
+    if (!agenceId) {
+      throw new Error("L'agent n'est pas rattaché à une agence");
+    }
+
+    const typePaiement = determineAgentMmPaymentType(paiementData.type_paiement);
+
+    const payload = {
+      agentId: paiementData.agent_id,
+      clientId: paiementData.client_id,
+      agenceId,
+      provider,
+      phone: paiementData.numero_telephone,
+      amount: Number(paiementData.montant),
+      typePaiement,
+      compteId: paiementData.compteId || undefined,
+      creditId: paiementData.creditId || undefined,
+      tontineId: paiementData.tontineId || undefined,
+      description: paiementData.notes || `Collecte ${paiementData.type_paiement}`,
+      observations: paiementData.notes,
+      idempotencyKey: `agent-mm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    };
+
+    try {
+      // Use the new agent MM payment endpoint
+      const response = await fetch('/api/caisse-agent/mm-payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || error.error || 'Erreur lors de l\'initiation du paiement');
+      }
+
+      const result = await response.json();
+      // The response contains the agent mm payment and the paymentIntentId
+      // We'll poll the payment intent for status updates
+      if (result.paymentIntentId) {
+        setMmPaymentIntent({
+          id: result.paymentIntentId,
+          status: 'PENDING',
+          amount: paiementData.montant.toString(),
+          provider,
+          externalRef: result.payment?.externalReference || '',
+        });
+        setMmPaymentStatus('pending');
+
+        toast.info(`Paiement ${provider} initié. Veuillez confirmer sur votre téléphone.`, {
+          duration: 10000,
+        });
+      } else {
+        throw new Error('Aucun payment intent créé');
+      }
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
+  // Handle successful MM payment - create receipt and show modal
+  const handleMmPaymentSuccess = async (intent: PaymentIntent) => {
+    const agent = agents.find(a => a.id === formData.agent_id);
+    const agentName = agent ? `${agent.nom} ${agent.prenom}` : 'Agent';
+    const montant = Number(intent.amount);
+
+    const details: NonNullable<ReceiptData['details']> = [];
+    const compteSelectionne = formData.compte_id
+      ? clientComptes.find((compte: any) => compte.id === formData.compte_id)
+      : null;
+    const numeroCompte = maskAccountNumber(compteSelectionne?.numeroCompte || selectedClient?.numero_compte);
+
+    if (formData.type_paiement === TypeOperationTerrain.TONTINE_CONTRIBUTION && selectedTontine) {
+      const miseParTour = Number(selectedTontine.tontine.montantCotisation || 0);
+      const toursRegles = miseParTour > 0 ? Math.floor(montant / miseParTour) : 0;
+      details.push({ label: 'Mise/tour', value: formatReceiptAmount(miseParTour) });
+      details.push({ label: 'Tours', value: `${toursRegles}` });
+    } else {
+      details.push({ label: 'Montant', value: formatReceiptAmount(montant), isBold: true });
+    }
+
+    // Add MM-specific details
+    details.push({ label: 'Mode', value: formData.methode_paiement });
+    details.push({ label: 'Réf. Provider', value: intent.providerTxnId || intent.externalRef || '-' });
+
+    const rData: ReceiptData = {
+      title: 'REÇU PAIEMENT MOBILE',
+      reference: intent.externalRef || `MM-${Date.now()}`,
+      date: new Date(),
+      type: formData.type_paiement,
+      transaction: {
+        id: intent.id,
+        date: new Date(),
+        type: mapTransactionType(formData.type_paiement),
+        amount: montant,
+        cashierName: agentName,
+      },
+      client: {
+        nom: selectedClient?.nom || '',
+        prenom: selectedClient?.prenom || '',
+        email: selectedClient?.email,
+        telephone: formData.numero_telephone || selectedClient?.phone,
+        numeroCompte: numeroCompte || selectedClient?.numero_compte,
+      },
+      agent: { nom: agentName, prenom: '' },
+      details,
+      items: [{
+        description: `Collecte ${formData.type_paiement}`,
+        details: formData.notes || `Paiement ${intent.provider}`,
+        montant,
+        quantite: 1,
+      }],
+      total: montant,
+      modePaiement: formData.methode_paiement,
+      devise: 'FCFA',
+      notes: `Confirmé via ${intent.provider} - ${intent.providerTxnId || ''}`,
+    };
+
+    setReceiptData(rData);
+    setLastPaymentInfo({
+      ...formData,
+      montant,
+      reference: intent.externalRef,
+    });
+    setShowSuccessModal(true);
+    setLoading(false);
+    setMmPaymentStatus('idle');
+    setMmPaymentIntent(null);
+
+    // Auto-print receipt
+    autoPrint(rData).catch(err => console.warn('[AutoPrint]', err.message));
+  };
+
+  // Cancel MM payment polling
+  const cancelMmPayment = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    setMmPaymentStatus('idle');
+    setMmPaymentIntent(null);
+    setLoading(false);
+    toast.info('Paiement annulé');
   };
 
   const handleCloseSuccess = () => {
@@ -898,32 +1147,43 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { id: 'Espèces', label: 'Espèces', icon: Banknote, color: 'emerald', disabled: false },
-                      { id: 'Airtel Money', label: 'Airtel', icon: () => <AirtelLogo className="h-5 w-5" />, color: 'red', disabled: true },
-                      { id: 'MTN Mobile Money', label: 'MTN', icon: () => <MTNLogo className="h-5 w-5" />, color: 'yellow', disabled: true }
+                      { id: 'Espèces', label: 'Espèces', icon: Banknote, color: 'emerald' },
+                      { id: 'Airtel Money', label: 'Airtel', icon: () => <AirtelLogo className="h-5 w-5" />, color: 'red' },
+                      { id: 'MTN Mobile Money', label: 'MTN', icon: () => <MTNLogo className="h-5 w-5" />, color: 'yellow' }
                     ].map((m) => (
                       <button
                         key={m.id}
                         type="button"
-                        disabled={m.disabled}
-                        onClick={() => !m.disabled && setFormData({ ...formData, methode_paiement: m.id, numero_telephone: '', numero_transaction: '' })}
+                        onClick={() => setFormData({
+                          ...formData,
+                          methode_paiement: m.id,
+                          numero_telephone: selectedClient?.phone || '',
+                          numero_transaction: ''
+                        })}
                         className={`
                           relative py-3 px-2 rounded-xl border-2 flex flex-col items-center gap-1 transition-all
                           ${formData.methode_paiement === m.id
-                            ? 'border-emerald-500/60 bg-emerald-500/10'
-                            : m.disabled
-                              ? 'border-slate-800 bg-slate-800/20 opacity-40 cursor-not-allowed'
-                              : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
+                            ? m.id === 'Espèces'
+                              ? 'border-emerald-500/60 bg-emerald-500/10'
+                              : m.id === 'Airtel Money'
+                                ? 'border-red-500/60 bg-red-500/10'
+                                : 'border-yellow-500/60 bg-yellow-500/10'
+                            : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
                           }
                         `}
                       >
-                        {m.disabled && (
-                          <span className="absolute -top-1.5 -right-1 text-[8px] font-bold bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full">
-                            Soon
-                          </span>
-                        )}
-                        <m.icon size={18} className={formData.methode_paiement === m.id ? 'text-emerald-400' : 'text-slate-500'} />
-                        <span className={`text-[10px] font-semibold ${formData.methode_paiement === m.id ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        <m.icon size={18} className={
+                          formData.methode_paiement === m.id
+                            ? m.id === 'Espèces' ? 'text-emerald-400'
+                              : m.id === 'Airtel Money' ? 'text-red-400' : 'text-yellow-400'
+                            : 'text-slate-500'
+                        } />
+                        <span className={`text-[10px] font-semibold ${
+                          formData.methode_paiement === m.id
+                            ? m.id === 'Espèces' ? 'text-emerald-400'
+                              : m.id === 'Airtel Money' ? 'text-red-400' : 'text-yellow-400'
+                            : 'text-slate-500'
+                        }`}>
                           {m.label}
                         </span>
                       </button>
@@ -932,36 +1192,37 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 </div>
 
                 {/* Mobile Money Fields */}
-                {formData.methode_paiement !== 'Espèces' && (
-                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-800/30 rounded-xl border border-slate-700/30">
-                    <div>
-                      <label className="text-[10px] text-slate-500 mb-1 block">Téléphone</label>
-                      <div className="relative">
-                        <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input
-                          type="tel"
-                          value={formData.numero_telephone}
-                          onChange={(e) => setFormData({ ...formData, numero_telephone: e.target.value })}
-                          placeholder="+242..."
-                          className="w-full h-10 pl-9 pr-3 rounded-lg text-sm bg-slate-900/80 border border-slate-700/50 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
-                        />
-                      </div>
-                      {errors.numero_telephone && <p className="text-[10px] text-red-400 mt-0.5">{errors.numero_telephone}</p>}
+                {isMobileMoneyPayment && (
+                  <div className={`p-3 rounded-xl border ${
+                    formData.methode_paiement === 'Airtel Money'
+                      ? 'bg-red-500/5 border-red-500/20'
+                      : 'bg-yellow-500/5 border-yellow-500/20'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Phone size={14} className={formData.methode_paiement === 'Airtel Money' ? 'text-red-400' : 'text-yellow-400'} />
+                      <span className={`text-xs font-semibold ${formData.methode_paiement === 'Airtel Money' ? 'text-red-300' : 'text-yellow-300'}`}>
+                        Numéro {formData.methode_paiement === 'Airtel Money' ? 'Airtel' : 'MTN'}
+                      </span>
                     </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 mb-1 block">N° Transaction</label>
-                      <div className="relative">
-                        <FileText size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input
-                          type="text"
-                          value={formData.numero_transaction}
-                          onChange={(e) => setFormData({ ...formData, numero_transaction: e.target.value })}
-                          placeholder="ID..."
-                          className="w-full h-10 pl-9 pr-3 rounded-lg text-sm bg-slate-900/80 border border-slate-700/50 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
-                        />
-                      </div>
-                      {errors.numero_transaction && <p className="text-[10px] text-red-400 mt-0.5">{errors.numero_transaction}</p>}
+                    <div className="relative">
+                      <input
+                        type="tel"
+                        value={formData.numero_telephone}
+                        onChange={(e) => setFormData({ ...formData, numero_telephone: e.target.value })}
+                        placeholder="06XXXXXXXX ou 05XXXXXXXX"
+                        className={`w-full h-12 px-4 rounded-lg text-base font-medium bg-slate-900/80 border text-white placeholder-slate-600 focus:outline-none ${
+                          errors.numero_telephone
+                            ? 'border-red-500/50'
+                            : formData.methode_paiement === 'Airtel Money'
+                              ? 'border-red-500/30 focus:border-red-500/60'
+                              : 'border-yellow-500/30 focus:border-yellow-500/60'
+                        }`}
+                      />
                     </div>
+                    {errors.numero_telephone && <p className="text-[10px] text-red-400 mt-1">{errors.numero_telephone}</p>}
+                    <p className="text-[10px] text-slate-500 mt-1.5">
+                      Le client recevra une demande de paiement sur ce numéro
+                    </p>
                   </div>
                 )}
 
@@ -1053,6 +1314,70 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           amount={pendingPaymentData.montant}
           isLoading={loading}
         />
+      )}
+
+      {/* Mobile Money Pending Payment Overlay */}
+      {mmPaymentStatus === 'pending' && mmPaymentIntent && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="relative bg-slate-900 rounded-2xl border border-slate-700/50 p-6 max-w-sm mx-4 text-center animate-in zoom-in-95 duration-200">
+            {/* Provider Logo */}
+            <div className="mb-4">
+              {mmPaymentIntent.provider === 'MTN' ? (
+                <div className="w-16 h-16 mx-auto bg-yellow-500/10 rounded-full flex items-center justify-center">
+                  <MTNLogo className="h-10 w-10" />
+                </div>
+              ) : (
+                <div className="w-16 h-16 mx-auto bg-red-500/10 rounded-full flex items-center justify-center">
+                  <AirtelLogo className="h-10 w-10" />
+                </div>
+              )}
+            </div>
+
+            {/* Spinner */}
+            <div className="mb-4">
+              <Loader2 size={32} className={`mx-auto animate-spin ${
+                mmPaymentIntent.provider === 'MTN' ? 'text-yellow-400' : 'text-red-400'
+              }`} />
+            </div>
+
+            {/* Title */}
+            <h3 className="text-lg font-bold text-white mb-2">
+              En attente de confirmation
+            </h3>
+
+            {/* Instructions */}
+            <p className="text-sm text-slate-400 mb-4">
+              Une demande de paiement a été envoyée au numéro{' '}
+              <span className="font-semibold text-white">{formData.numero_telephone}</span>
+            </p>
+
+            {/* Amount */}
+            <div className={`py-3 px-4 rounded-xl mb-4 ${
+              mmPaymentIntent.provider === 'MTN' ? 'bg-yellow-500/10' : 'bg-red-500/10'
+            }`}>
+              <p className="text-xs text-slate-400 mb-1">Montant à confirmer</p>
+              <p className={`text-2xl font-bold ${
+                mmPaymentIntent.provider === 'MTN' ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {Number(mmPaymentIntent.amount).toLocaleString()} <span className="text-sm">FCFA</span>
+              </p>
+            </div>
+
+            {/* Ref */}
+            <p className="text-[10px] text-slate-600 mb-4">
+              Réf: {mmPaymentIntent.externalRef?.slice(0, 8)}...
+            </p>
+
+            {/* Cancel button */}
+            <button
+              onClick={cancelMmPayment}
+              className="w-full py-3 rounded-xl font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
       )}
     </>
   );

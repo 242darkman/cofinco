@@ -157,50 +157,62 @@ export default function RecrutementManager({
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="p-4">
-          <div className="text-slate-400 text-xs sm:text-sm mb-1">Total</div>
-          <div className="text-xl sm:text-2xl font-bold text-white">{stats.total}</div>
+    <div className="flex flex-col h-full space-y-2">
+      {/* Stats Cards - Compact */}
+      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
+          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">Total</div>
+          <div className="text-xl font-bold text-white leading-none">{stats.total}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-slate-400 text-xs sm:text-sm mb-1">En Attente</div>
-          <div className="text-xl sm:text-2xl font-bold text-blue-400">{stats.enAttente}</div>
+        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
+          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">En Attente</div>
+          <div className="text-xl font-bold text-blue-400 leading-none">{stats.enAttente}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-slate-400 text-xs sm:text-sm mb-1">Entretien</div>
-          <div className="text-xl sm:text-2xl font-bold text-yellow-400">{stats.entretien}</div>
+        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
+          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">Entretien</div>
+          <div className="text-xl font-bold text-yellow-400 leading-none">{stats.entretien}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-slate-400 text-xs sm:text-sm mb-1">Acceptés</div>
-          <div className="text-xl sm:text-2xl font-bold text-green-400">{stats.acceptes}</div>
+        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
+          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">Acceptés</div>
+          <div className="text-xl font-bold text-green-400 leading-none">{stats.acceptes}</div>
         </Card>
       </div>
 
-      <div className="flex justify-between items-center">
-        <h3 className="text-base sm:text-lg font-bold text-white">Candidatures</h3>
-        {canCreateCandidats && (
-          <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
-            <Plus size={16} />
-            <span className="hidden sm:inline">Nouvelle Candidature</span>
-          </Button>
-        )}
-      </div>
+      {/* Main Content - Flex Grow */}
+      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+        {/* Compact Header Toolbar */}
+        <div className="shrink-0 p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+           <h3 className="text-xs font-bold text-white flex items-center gap-2">
+              <Briefcase size={14} className="text-purple-400" />
+              Candidatures
+           </h3>
+           {canCreateCandidats && (
+             <Button variant="primary" size="sm" onClick={() => setShowForm(true)} className="h-7 text-xs px-2">
+               <Plus size={14} />
+               <span className="hidden sm:inline">Nouvelle</span>
+             </Button>
+           )}
+        </div>
 
-      <Card padding="none" className="bg-slate-900/50 overflow-hidden border-slate-800">
-        <ResponsiveTable
-          data={paginatedCandidats}
-          columns={columns}
-          mobileBreakpoint="md"
-          emptyMessage="Aucune candidature enregistrée."
-          maxHeight="500px"
-          pagination={{
-            page: currentPage,
-            totalPages,
-            onPageChange: setCurrentPage
-          }}
-        />
-      </Card>
+        {/* Table Container */}
+        <div className="flex-1 overflow-hidden">
+          <ResponsiveTable
+            data={paginatedCandidats}
+            columns={columns}
+            mobileBreakpoint="md"
+            emptyMessage="Aucune candidature enregistrée."
+            maxHeight="100%"
+            pagination={{
+              page: currentPage,
+              totalPages,
+              onPageChange: setCurrentPage
+            }}
+            density="compact"
+            className="border-0 rounded-none h-full"
+            headerClassName="bg-slate-900 sticky top-0"
+          />
+        </div>
+      </div>
 
       <Modal
         isOpen={showForm}

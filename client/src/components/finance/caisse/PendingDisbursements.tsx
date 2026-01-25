@@ -5,7 +5,7 @@ import {
   CheckCircle, XCircle, Banknote, FileText, Calendar, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button, Card } from '../../ui';
+import { Button, Card, Badge } from '../../ui';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import { api } from '../../../lib/api-client';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -199,222 +199,242 @@ export default function PendingDisbursements({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-orange-500/20 border border-orange-500/30">
-            <Wallet className="text-orange-400" size={20} />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-white">Décaissements Prêts</h3>
-            <p className="text-sm text-slate-400">
-              {count > 0 ? `${count} prêt${count > 1 ? 's' : ''} en attente` : 'Aucun prêt en attente'}
-            </p>
-          </div>
-        </div>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isRefetching}
-          className="text-slate-400 hover:text-white"
-        >
-          <RefreshCw className={`${isRefetching ? 'animate-spin' : ''}`} size={16} />
-        </Button>
-      </div>
-
-      {/* Empty State */}
-      {count === 0 && (
-        <Card className="p-8 text-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="p-4 rounded-full bg-slate-700/50">
-              <CheckCircle className="text-slate-500" size={32} />
-            </div>
-            <p className="text-slate-400">Aucun décaissement de prêt en attente</p>
-            <p className="text-sm text-slate-500">
-              Les nouveaux prêts à décaisser apparaîtront ici automatiquement
-            </p>
-          </div>
-        </Card>
-      )}
-
-      {/* List of pending disbursements */}
-      <div className="space-y-3">
-        {pendingCredits.map((credit) => {
-          const numeroCredit = credit.numeroCredit || credit.numero_credit;
-          const montant = parseFloat(credit.montant);
-          const createdAt = credit.createdAt || credit.created_at;
-
-          return (
-            <Card
-              key={credit.id}
-              className="p-4 hover:border-orange-500/50 transition-colors cursor-pointer"
-              onClick={() => handlePayout(credit)}
-            >
-              <div className="flex items-center justify-between">
-                {/* Client info */}
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden">
-                    {credit.client.photoUrl ? (
-                      <img
-                        src={credit.client.photoUrl}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User className="text-slate-400" size={20} />
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="text-white font-semibold">
-                      {formatClientName(credit.client.nom, credit.client.prenom)}
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <CreditCard size={14} />
-                      <span>{numeroCredit}</span>
+    <div className="h-full flex flex-col font-sans selection:bg-orange-500/30 p-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
+        
+        {/* LEFT COL: List of Pending Loans (4 cols) */}
+        <div className="lg:col-span-4 flex flex-col gap-3 h-full overflow-hidden">
+            {/* Header / Stats */}
+            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                         <div className="p-1.5 rounded-lg bg-orange-500/10">
+                            <Wallet className="w-4 h-4 text-orange-400" aria-hidden="true" />
+                        </div>
+                        <h3 className="font-semibold text-sm text-slate-200">Prêts en Attente</h3>
                     </div>
-                  </div>
+                     <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
+                        className="h-6 w-6 p-0 rounded-full hover:bg-slate-800 text-slate-400"
+                    >
+                        <RefreshCw className={`${isRefetching ? 'animate-spin' : ''}`} size={12} />
+                    </Button>
                 </div>
-
-                {/* Amount and actions */}
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-orange-400">
-                      {formatMoney(montant)}
-                    </p>
-                    <div className="flex items-center gap-1 text-xs text-slate-500">
-                      <Clock size={12} />
-                      <span>{createdAt ? formatDate(createdAt) : 'N/A'}</span>
+                
+                {count > 0 ? (
+                    <div className="text-xs text-slate-400">
+                        <span className="font-bold text-white">{count}</span> dossiers à traiter
                     </div>
-                  </div>
-
-                  <ChevronRight className="text-slate-500" size={20} />
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Payout Confirmation Modal */}
-      {selectedCredit && showPayoutConfirm && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md animate-in fade-in zoom-in-95">
-            {/* Header */}
-            <div className="p-6 border-b border-slate-700">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-orange-500/20 border border-orange-500/30">
-                  <Banknote className="text-orange-400" size={24} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Confirmer le Décaissement</h2>
-                  <p className="text-slate-400 text-sm">Vérifiez l'identité du client</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-4">
-              {/* Client Summary */}
-              <div className="bg-slate-700/50 rounded-xl p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Client</span>
-                  <span className="text-white font-semibold">
-                    {formatClientName(selectedCredit.client.nom, selectedCredit.client.prenom)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Crédit N°</span>
-                  <span className="text-white">
-                    {selectedCredit.numeroCredit || selectedCredit.numero_credit}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Montant à remettre</span>
-                  <span className="text-2xl font-bold text-orange-400">
-                    {formatMoney(parseFloat(selectedCredit.montant))}
-                  </span>
-                </div>
-              </div>
-
-              {/* Receipt Number (optional) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                  <FileText size={14} />
-                  N° Reçu (optionnel)
-                </label>
-                <input
-                  type="text"
-                  value={receiptNumber}
-                  onChange={(e) => setReceiptNumber(e.target.value)}
-                  placeholder="REC-2026-001"
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 outline-none"
-                />
-              </div>
-
-              {/* Warning */}
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-3">
-                <AlertCircle className="text-amber-400 flex-shrink-0 mt-0.5" size={18} />
-                <p className="text-sm text-amber-200">
-                  Vérifiez l'identité du client avant de remettre les fonds.
-                  Cette action est irréversible.
-                </p>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="p-6 border-t border-slate-700 flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowPayoutConfirm(false);
-                  setSelectedCredit(null);
-                  setReceiptNumber('');
-                }}
-                className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
-                disabled={payoutMutation.isPending}
-              >
-                Annuler
-              </Button>
-              <Button
-                onClick={confirmPayout}
-                disabled={payoutMutation.isPending}
-                className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white"
-              >
-                {payoutMutation.isPending ? (
-                  <>
-                    <RefreshCw className="animate-spin mr-2" size={18} />
-                    Traitement...
-                  </>
                 ) : (
-                  <>
-                    <Banknote className="mr-2" size={18} />
-                    Décaisser {formatMoney(parseFloat(selectedCredit.montant))}
-                  </>
+                    <div className="text-[10px] text-slate-500 italic">Aucun dossier en attente</div>
                 )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            </Card>
 
-      {/* Cancel Confirmation */}
+            {/* List */}
+             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar min-h-0">
+                {count > 0 ? (
+                    pendingCredits.map((credit) => (
+                        <div
+                            key={credit.id}
+                            onClick={() => {
+                                setSelectedCredit(credit);
+                                setReceiptNumber('');
+                                setShowPayoutConfirm(false); // Reset internal modal states just in case
+                            }}
+                            className={`p-3 rounded-xl border cursor-pointer transition-all group ${
+                                selectedCredit?.id === credit.id
+                                ? 'bg-orange-950/30 border-orange-500/50 shadow-lg shadow-orange-900/10'
+                                : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
+                            }`}
+                        >
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
+                                        {credit.client.photoUrl ? (
+                                            <img src={credit.client.photoUrl} className="w-full h-full object-cover" alt="" />
+                                        ) : (
+                                            <User size={14} className="text-slate-500" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-200 leading-tight">
+                                            {formatClientName(credit.client.nom, credit.client.prenom)}
+                                        </p>
+                                        <p className="text-[10px] text-slate-500 font-mono">
+                                            #{credit.numeroCredit || credit.numero_credit}
+                                        </p>
+                                    </div>
+                                </div>
+                                <ChevronRight size={14} className={`transition-transform duration-300 ${selectedCredit?.id === credit.id ? 'text-orange-400 rotate-90' : 'text-slate-600 group-hover:text-slate-400'}`} />
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-950/30 px-1.5 py-0.5 rounded">
+                                    <Clock size={10} />
+                                    {credit.createdAt ? new Date(credit.createdAt).toLocaleDateString([], {day: '2-digit', month: '2-digit'}) : '-'}
+                                </div>
+                                <p className="text-sm font-bold text-orange-400 font-mono">
+                                    {formatMoney(parseFloat(credit.montant))}
+                                </p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                     <div className="h-full flex flex-col items-center justify-center text-slate-500 p-6 border-2 border-dashed border-slate-800 rounded-xl">
+                        <div className="p-3 bg-slate-900 rounded-full mb-3">
+                            <CheckCircle size={24} className="text-slate-700" />
+                        </div>
+                        <p className="text-xs text-center font-medium">Tout est à jour</p>
+                        <p className="text-[10px] text-center mt-1 opacity-70">Les nouveaux prêts apparaîtront ici</p>
+                     </div>
+                )}
+             </div>
+        </div>
+
+        {/* RIGHT COL: Detail Cockpit (8 cols) */}
+        <div className="lg:col-span-8 h-full flex flex-col">
+            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative">
+                {selectedCredit ? (
+                    <>
+                        {/* Cockpit Header */}
+                        <div className="p-4 border-b border-slate-800 bg-slate-950/30 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Banknote className="text-orange-400" size={20} />
+                                Validation Décaissement
+                            </h2>
+                            <Badge variant="warning" value="En attente client" className="animate-pulse" />
+                        </div>
+
+                        {/* Main Cockpit Content */}
+                        <div className="flex-1 p-6 overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                {/* Zone Identité */}
+                                <div className="space-y-4">
+                                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Bénéficiaire</h3>
+                                     <div className="flex items-center gap-4 bg-slate-800/40 p-4 rounded-xl border border-slate-700/50">
+                                         <div className="w-16 h-16 rounded-full bg-slate-900 border-2 border-slate-700 overflow-hidden shrink-0">
+                                            {selectedCredit.client.photoUrl ? (
+                                                <img src={selectedCredit.client.photoUrl} className="w-full h-full object-cover" alt="" />
+                                            ) : (
+                                                <User size={24} className="w-full h-full p-4 text-slate-500" />
+                                            )}
+                                         </div>
+                                         <div className="min-w-0">
+                                             <p className="text-lg font-bold text-white truncate">
+                                                 {formatClientName(selectedCredit.client.nom, selectedCredit.client.prenom)}
+                                             </p>
+                                             <div className="flex flex-wrap gap-2 mt-1">
+                                                <span className="text-xs text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
+                                                    ID: {selectedCredit.client.id.slice(0, 8)}...
+                                                </span>
+                                             </div>
+                                         </div>
+                                     </div>
+
+                                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 flex gap-3">
+                                         <AlertCircle className="text-orange-400 shrink-0 mt-0.5" size={16} />
+                                         <div className="space-y-1">
+                                             <p className="text-xs font-bold text-orange-200">Vérification Requise</p>
+                                             <p className="text-[10px] text-orange-200/70 leading-relaxed">
+                                                 Veuillez vérifier la pièce d'identité du client et confirmer qu'il correspond à la photo ci-dessus avant de procéder.
+                                             </p>
+                                         </div>
+                                     </div>
+                                </div>
+
+                                {/* Zone Transaction */}
+                                <div className="space-y-4">
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Détails Transaction</h3>
+                                    
+                                    <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 text-center">
+                                        <p className="text-xs text-slate-500 mb-1">Montant à décaisser</p>
+                                        <p className="text-4xl font-black text-white tracking-tight mb-2">
+                                            {formatMoney(parseFloat(selectedCredit.montant))}
+                                        </p>
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400">
+                                            <CreditCard size={12} />
+                                            Prêt #{selectedCredit.numeroCredit || selectedCredit.numero_credit}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-400 ml-1">Référence Reçu (Facultatif)</label>
+                                        <div className="relative">
+                                            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                                            <input
+                                                type="text"
+                                                value={receiptNumber}
+                                                onChange={(e) => setReceiptNumber(e.target.value)}
+                                                placeholder="ex: REC-123456"
+                                                className="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500/50 outline-none transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="p-4 border-t border-slate-800 bg-slate-950/50 flex gap-3 mt-auto">
+                            <Button
+                                variant="outline"
+                                onClick={() => handleCancel(selectedCredit)}
+                                className="flex-1 border-rose-900/30 text-rose-400 hover:bg-rose-950/30 hover:border-rose-800"
+                            >
+                                <XCircle className="mr-2" size={16} />
+                                Annuler le Prêt
+                            </Button>
+                            
+                            <Button
+                                onClick={confirmPayout}
+                                disabled={payoutMutation.isPending}
+                                className="flex-[2] py-6 text-base font-bold tracking-wide bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 shadow-lg shadow-orange-900/20"
+                            >
+                                {payoutMutation.isPending ? (
+                                    <><RefreshCw className="animate-spin mr-2" size={18} /> Traitement...</>
+                                ) : (
+                                    <><CheckCircle className="mr-2" size={18} /> CONFIRMER LE DÉCAISSEMENT</>
+                                )}
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    /* Empty Selection State */
+                    <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                        <div className="w-24 h-24 bg-slate-950 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-inner">
+                            <Banknote size={40} className="text-slate-700" />
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-400 mb-2">Aucun prêt sélectionné</h2>
+                        <p className="max-w-xs text-center text-sm opacity-70">
+                            Sélectionnez un dossier dans la liste de gauche pour procéder au décaissement des fonds.
+                        </p>
+                    </div>
+                )}
+            </Card>
+        </div>
+      </div>
+
+      {/* Cancel Confirmation Dialog (Keep existing modal for cancellation as it's destructive) */}
       <ConfirmDialog
         isOpen={showCancelConfirm}
         title="Annuler le décaissement"
         message={
           selectedCredit
-            ? `Voulez-vous annuler le décaissement de ${formatMoney(parseFloat(selectedCredit.montant))} pour ${formatClientName(selectedCredit.client.nom, selectedCredit.client.prenom)} ? Cette action annulera le crédit.`
+            ? `Voulez-vous vraiment annuler ce prêt de ${formatMoney(parseFloat(selectedCredit.montant))} ? Cette action est irréversible.`
             : ''
         }
-        confirmText="Annuler le décaissement"
-        onConfirm={confirmCancel}
+        confirmText="Confirmer l'annulation"
+        onConfirm={() => {
+             if (selectedCredit) {
+                 cancelMutation.mutate(selectedCredit.id);
+             }
+        }}
         onClose={() => {
           setShowCancelConfirm(false);
-          setSelectedCredit(null);
+          // Don't deselect, just close modal
         }}
         variant="danger"
       />

@@ -123,31 +123,41 @@ export default function SanctionsManager({
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-base sm:text-lg font-bold text-white">Sanctions Disciplinaires</h3>
+    <div className="flex flex-col h-full space-y-2">
+      {/* Compact Header Toolbar */}
+      <div className="shrink-0 flex justify-between items-center p-1">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+           <AlertTriangle size={16} className="text-orange-400" />
+           Sanctions Disciplinaires
+        </h3>
         {canCreateSanctions && (
-          <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
-            <Plus size={16} />
+          <Button variant="primary" size="sm" onClick={() => setShowForm(true)} className="h-8 text-xs px-3">
+            <Plus size={14} />
             <span className="hidden sm:inline">Nouvelle Sanction</span>
           </Button>
         )}
       </div>
 
-      <Card padding="none" className="bg-slate-900/50 overflow-hidden border-slate-800">
-        <ResponsiveTable
-          data={paginatedSanctions}
-          columns={columns}
-          mobileBreakpoint="md"
-          emptyMessage="Aucune sanction enregistrée."
-          maxHeight="500px"
-          pagination={{
-            page: currentPage,
-            totalPages,
-            onPageChange: setCurrentPage
-          }}
-        />
-      </Card>
+      {/* Main Content - Flex Grow */}
+      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+        <div className="flex-1 overflow-hidden">
+          <ResponsiveTable
+            data={paginatedSanctions}
+            columns={columns}
+            mobileBreakpoint="md"
+            emptyMessage="Aucune sanction enregistrée."
+            maxHeight="100%"
+            pagination={{
+              page: currentPage,
+              totalPages,
+              onPageChange: setCurrentPage
+            }}
+            density="compact"
+            className="border-0 rounded-none h-full"
+            headerClassName="bg-slate-900 sticky top-0"
+          />
+        </div>
+      </div>
 
       <Modal
         isOpen={showForm}

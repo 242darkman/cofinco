@@ -2,8 +2,16 @@
  * ApprovalService - Approbation et rejet des opérations terrain
  *
  * Ce service gère le workflow d'approbation:
- * - SUBMITTED → APPROVED (poste les écritures comptables)
+ * - SUBMITTED → PENDING_SETTLEMENT (pour COLLECT_CASH - attend la REMISE)
+ * - SUBMITTED → SETTLED (pour SETTLEMENT_CASH - règlement immédiat)
  * - SUBMITTED → REJECTED (aucune écriture)
+ *
+ * IMPORTANT: Pour COLLECT_CASH, l'approbation:
+ * - Crée un mouvement uniquement sur la caisse agent (soldeValide += montant)
+ * - Crée un paiement terrain avec statut PENDING_SETTLEMENT
+ * - NE TOUCHE PAS aux comptes clients (crédit, épargne, tontine)
+ * - Les comptes clients sont impactés SEULEMENT à la validation de la REMISE
+ *   (voir RemiseSettlementService)
  *
  * Garanties:
  * - Idempotence: une opération déjà approuvée retourne success sans re-poster
@@ -87,7 +95,11 @@ export class ApprovalService {
       let paiementTerrainId: string | null = null;
 
       if (operation.type === "COLLECT_CASH") {
-        const result = await this.postCollectCashEntries(tx, operation, params.approvedBy);
+        // NOUVEAU WORKFLOW: N'impacte PAS les comptes clients
+        // - Seul le solde de l'agent est incrémenté
+        // - Un paiement terrain est créé avec statut PENDING_SETTLEMENT
+        // - Les comptes clients seront impactés à la validation de la REMISE
+        const result = await this.postCollectCashEntriesPendingSettlement(tx, operation, params.approvedBy);
         if (!result.success) {
           return result;
         }
@@ -102,7 +114,9 @@ export class ApprovalService {
       }
 
       // 5. Mettre à jour l'opération
-      const finalStatut = operation.type === "SETTLEMENT_CASH" ? "SETTLED" : "APPROVED";
+      // COLLECT_CASH → PENDING_SETTLEMENT (attend la remise)
+      // SETTLEMENT_CASH → SETTLED (règlement immédiat)
+      const finalStatut = operation.type === "SETTLEMENT_CASH" ? "SETTLED" : "PENDING_SETTLEMENT";
       const [updatedOperation] = await tx
         .update(operationsTerrain)
         .set({
@@ -142,9 +156,104 @@ export class ApprovalService {
   }
 
   /**
-   * Poste les écritures pour COLLECT_CASH
+   * NOUVEAU: Poste les écritures pour COLLECT_CASH avec statut PENDING_SETTLEMENT
+   *
+   * NE TOUCHE PAS AUX COMPTES CLIENTS!
+   * - Seul le solde de l'agent est incrémenté
+   * - Un paiement terrain est créé avec statut PENDING_SETTLEMENT
+   * - Les comptes clients seront impactés à la validation de la REMISE
    */
-  private async postCollectCashEntries(
+  private async postCollectCashEntriesPendingSettlement(
+    tx: PgTransaction<any, any, any>,
+    operation: OperationTerrain,
+    approvedBy: string
+  ): Promise<ApprovalResult & { paiementTerrainId?: string }> {
+    const montant = parseFloat(operation.montant);
+    const metadata = operation.metadata as OperationTerrainMetadata | null;
+
+    // 1. Créer mouvement CaisseAgent (Débit = Augmente la créance envers l'agent)
+    const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
+    const [mouvementCaisseAgent] = await tx
+      .insert(mouvementsFinanciers)
+      .values({
+        dateOperation: new Date(),
+        montant: operation.montant,
+        sens: "DEBIT", // Débit = Augmente la créance envers l'agent
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
+        reference: refCaisseAgent,
+        agentId: operation.agentId,
+        clientId: operation.clientId,
+        sourceModule: "CAISSE_AGENT" as any,
+        sourceTable: "operations_terrain",
+        sourceId: operation.id,
+        createdBy: approvedBy,
+        metadata: {
+          operationType: "COLLECT_CASH",
+          caisseAgentId: operation.caisseAgentId,
+          pendingSettlement: true,
+        },
+      })
+      .returning();
+
+    // 2. Mettre à jour solde CaisseAgent (atomique)
+    await tx
+      .update(caissesAgent)
+      .set({
+        soldeValide: sql`${caissesAgent.soldeValide} + ${montant}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(caissesAgent.id, operation.caisseAgentId));
+
+    const mouvements: MouvementFinancier[] = [mouvementCaisseAgent];
+
+    // 3. Créer le paiement terrain avec statut PENDING_SETTLEMENT
+    // PAS de mouvement client, PAS d'impact sur crédit/compte/tontine
+    // Cela sera fait à la validation de la REMISE
+    const typePaiement = this.determinePaymentType(metadata);
+    const refPaiement = `PAY-${generateReference("TERRAIN")}`;
+
+    const [paiement] = await tx
+      .insert(paiementsTerrain)
+      .values({
+        agentId: operation.agentId,
+        clientId: operation.clientId!,
+        typePaiement,
+        montant: operation.montant,
+        methodePaiement: "CASH",
+        reference: refPaiement,
+        // PAS de mouvementId client - sera créé à la REMISE
+        mouvementId: mouvementCaisseAgent.id, // Lien vers le mouvement caisse agent
+        creditId: metadata?.creditId,
+        compteId: metadata?.compteId,
+        tontineId: metadata?.tontineId,
+        statut: "PENDING_SETTLEMENT", // NOUVEAU STATUT
+        observations: metadata?.observations,
+        latitude: metadata?.latitude?.toString(),
+        longitude: metadata?.longitude?.toString(),
+        createdBy: approvedBy,
+      })
+      .returning();
+
+    return { success: true, mouvements, paiementTerrainId: paiement.id };
+  }
+
+  /**
+   * Détermine le type de paiement basé sur les métadonnées
+   */
+  private determinePaymentType(metadata: OperationTerrainMetadata | null): any {
+    if (metadata?.creditId) return TypeOperationCaisse.CREDIT_REPAYMENT;
+    if (metadata?.compteId) return TypeOperationCaisse.DEPOSIT_SAVINGS;
+    if (metadata?.tontineId) return TypeOperationCaisse.TONTINE_CONTRIBUTION;
+    return TypeOperationCaisse.MISC_COLLECTION;
+  }
+
+  /**
+   * @deprecated Utilisez postCollectCashEntriesPendingSettlement
+   * Cette méthode impactait les comptes clients à l'approbation
+   * Elle est conservée pour référence mais ne doit plus être utilisée
+   */
+  private async postCollectCashEntries_LEGACY(
     tx: PgTransaction<any, any, any>,
     operation: OperationTerrain,
     approvedBy: string

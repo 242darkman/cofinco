@@ -245,33 +245,51 @@ export default function RessourcesHumaines() {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
-      <PageHeader
-        title="Ressources Humaines"
-        description={`${employes.length} employés • ${statistics.actifs} actifs`}
-        actions={
-          activeTab === 'list' && canCreateEmployes && (
-            <button
-              onClick={() => {
-                setEditingEmploye(null);
-                setShowForm(true);
-              }}
-              className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-lg font-semibold shadow-lg transition flex items-center gap-2"
-            >
-              <Users size={18} />
-              <span>Nouvel Employé</span>
-            </button>
-          )
-        }
-      />
+    <div className="flex flex-col h-full bg-[#020617] overflow-hidden">
+      {/* Header & Tabs Section - Fixed */}
+      <div className="shrink-0 space-y-2 p-2 sm:p-4 pb-0 bg-[#020617] border-b border-slate-800/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                Ressources Humaines
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-medium tracking-wide">
+                  {employes.length} collab.
+                </span>
+              </h1>
+              <p className="text-[11px] text-slate-500 font-medium">
+                 {statistics.actifs} actifs • Administration du personnel
+              </p>
+            </div>
 
-      <TabGroup
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={(key) => setActiveTab(key as TabKey)}
-      />
+            {activeTab === 'list' && canCreateEmployes && (
+               <button
+                 onClick={() => {
+                   setEditingEmploye(null);
+                   setShowForm(true);
+                 }}
+                 className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-bold shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 self-start sm:self-auto"
+               >
+                 <UserPlus size={14} />
+                 <span>Nouvel Employé</span>
+               </button>
+             )}
+        </div>
 
-      {renderContent()}
+        <TabGroup
+          tabs={TABS}
+          activeTab={activeTab}
+          onTabChange={(key) => setActiveTab(key as TabKey)}
+          variant="underline"
+          size="sm"
+          className="mt-2"
+          scrollable={false}
+        />
+      </div>
+
+      {/* Main Content - Scrollable handled by children */}
+      <div className="flex-1 overflow-hidden p-2 sm:p-4">
+         {renderContent()}
+      </div>
 
       <EmployeeForm
         isOpen={showForm}

@@ -1,18 +1,50 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, CreditCard, Users, PiggyBank, Lock, RefreshCw, AlertCircle, Calendar, Calculator, Coins } from 'lucide-react';
+import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, Coins } from 'lucide-react';
 import { PhysicalConfirmationStep, PhysicalConfirmationData } from '../../auth/PhysicalConfirmationStep';
-import { Card, Button, Badge } from '@/components/ui';
+import { Card, Button } from '@/components/ui';
 import { clientSearchApi, creditApi, tontineApi, sessionCaisseApi, operationCaisseApi, echeanceCreditApi, compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
-import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
+import { VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
-import { SkeletonCard } from '../../ui/Skeleton';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
-import { StatutCredit, TypeCompte } from '@shared/enum/status-constants';
+import { StatutCredit, TypeCompte, TypeOperationCaisse } from '@shared/enum/status-constants';
+
+// Mapping des types UI (français) vers les enums système (EN)
+const mapToOperationEnum = (typeOp: string | null, typeDetaille: string | null): string => {
+  if (!typeDetaille) return TypeOperationCaisse.MISC_COLLECTION;
+
+  const detail = typeDetaille.toLowerCase();
+
+  // Dépôts
+  if (detail.includes('épargne') || detail.includes('epargne')) {
+    return typeOp === 'Retrait' ? TypeOperationCaisse.WITHDRAWAL_SAVINGS : TypeOperationCaisse.DEPOSIT_SAVINGS;
+  }
+  if (detail.includes('courant')) {
+    return typeOp === 'Retrait' ? TypeOperationCaisse.WITHDRAWAL_CURRENT : TypeOperationCaisse.DEPOSIT_CURRENT;
+  }
+  if (detail.includes('bloqué') || detail.includes('bloque')) {
+    return typeOp === 'Retrait' ? TypeOperationCaisse.WITHDRAWAL_BLOCKED : TypeOperationCaisse.DEPOSIT_BLOCKED;
+  }
+  if (detail.includes('tontine') && detail.includes('cotisation')) {
+    return TypeOperationCaisse.TONTINE_CONTRIBUTION;
+  }
+  if (detail.includes('tontine') && detail.includes('distribution')) {
+    return TypeOperationCaisse.TONTINE_WITHDRAWAL;
+  }
+  if (detail.includes('remboursement') || detail.includes('crédit')) {
+    return TypeOperationCaisse.LOAN_REPAYMENT;
+  }
+  if (detail.includes('décaissement') || detail.includes('decaissement')) {
+    return TypeOperationCaisse.LOAN_DISBURSEMENT;
+  }
+
+  // Fallback
+  return typeOp === 'Retrait' ? TypeOperationCaisse.MISC_DISBURSEMENT : TypeOperationCaisse.MISC_COLLECTION;
+};
 
 interface Client {
   id: string;
@@ -61,7 +93,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   const [prochaineEcheance, setProchaineEcheance] = useState<any>(null);
   const [tontinesActives, setTontinesActives] = useState<any[]>([]);
   const [tontineSelectionnee, setTontineSelectionnee] = useState<any>(null);
-  const [membresTontine, setMembresTontine] = useState<any[]>([]);
   const [comptesClient, setComptesClient] = useState<any[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [montantError, setMontantError] = useState<string | null>(null);
@@ -73,7 +104,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   // Universal Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
-  const [factureId, setFactureId] = useState<string | undefined>(undefined);
 
   // Billetage State
   const [showBilletage, setShowBilletage] = useState(false);
@@ -96,10 +126,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       setMontantError(null);
     }
   }, [billetage]);
-
-  const reinitialiserBilletage = useCallback(() => {
-    setBilletage({});
-  }, []);
 
   // NOTE: OTP/Security config removed - Physical Confirmation is now always used for sensitive operations
 
@@ -195,17 +221,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
     }
   }, []);
 
-  // Charger les membres d'une tontine
-  const chargerMembresTontine = useCallback(async (tontineId: string) => {
-    try {
-      const membres = await tontineApi.getMembres(tontineId);
-      setMembresTontine(membres || []);
-    } catch (error) {
-      console.error('Erreur chargement membres:', error);
-      setMembresTontine([]);
-    }
-  }, []);
-
   // Charger les comptes du client
   const chargerComptesClient = useCallback(async (clientId: string) => {
     try {
@@ -287,22 +302,27 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
       const compteId = getCompteIdForOperation(typeDetaille);
       const parsedMontant = parseFloat(montant);
 
+      // Map French UI strings to standardized enum values
+      const typeOperationEnum = mapToOperationEnum(typeOperation, typeDetaille);
+
       const operationData = {
         session_id: sessionId,
         client_id: selectedClient!.id,
         compte_id: compteId,
-        type_operation: typeOperation,
-        sous_type_operation: typeDetaille,
+        type_operation: typeOperationEnum,
         montant: parsedMontant,
-        mode_paiement: 'CASH',
-        type_paiement: 'CASH',
+        methode_paiement: 'CASH',
         reference: reference,
         description: sanitizeInput(description) || `${typeOperation} - ${typeDetaille}`,
-        details_billetage: Object.keys(billetage).length > 0 ? billetage : undefined,
-        client_info: {
-          nom: selectedClient!.nom,
-          prenom: selectedClient!.prenom,
-          telephone: selectedClient!.telephone || selectedClient!.phone
+        metadata: {
+          sous_type_operation: typeDetaille,
+          type_paiement: 'CASH',
+          details_billetage: Object.keys(billetage).length > 0 ? billetage : undefined,
+          client_info: {
+            nom: selectedClient!.nom,
+            prenom: selectedClient!.prenom,
+            telephone: selectedClient!.telephone || selectedClient!.phone
+          }
         }
       };
 
@@ -476,13 +496,6 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
 
 
 
-  // Calcul du total billetage mémorisé
-  const totalBilletage = useMemo(() => {
-    return Object.entries(billetage).reduce((acc, [val, qty]) => {
-      return acc + (parseInt(val) * qty);
-    }, 0);
-  }, [billetage]);
-
   // Message de confirmation mémorisé
   const confirmationMessage = useMemo(() => {
     if (!selectedClient || !typeOperation || !montant) return '';
@@ -491,418 +504,274 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   }, [selectedClient, typeOperation, typeDepot, typeRetrait, montant]);
 
   return (
-    <div className="flex flex-col font-sans selection:bg-emerald-500/30">
-      <div className="w-full max-w-sm mx-auto">
-        <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 shadow-2xl shadow-emerald-900/10 rounded-2xl overflow-hidden ring-1 ring-white/5">
-          <div className="p-5 relative">
-            {/* Background decoration */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" aria-hidden="true" />
-            <div className="absolute bottom-0 left-0 w-32 h-32 bg-teal-600/10 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none" aria-hidden="true" />
-
-            <div className="relative z-10">
-              <h2 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent mb-5 tracking-tight flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-emerald-400" aria-hidden="true" />
-                Caisse Espèces
-              </h2>
-
-              {!selectedClient ? (
-                <div
-                  className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 shadow-inner backdrop-blur-sm group transition-all hover:bg-slate-800/70"
-                  role="search"
-                  aria-label="Recherche de client"
-                >
-                  <div className="flex items-center gap-2 mb-3">
+    <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30 p-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
+        
+        {/* LEFT COL: Search & Client Summary (4 cols) */}
+        <div className="lg:col-span-4 flex flex-col gap-3 h-full">
+            {/* Search Section */}
+            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
+                <div className="flex items-center gap-2 mb-3">
                     <div className="p-1.5 rounded-lg bg-emerald-500/10">
-                      <Search className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                        <Search className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                     </div>
                     <h3 className="font-semibold text-sm text-slate-200">Identifier le client</h3>
-                  </div>
-
-                  <div className="space-y-3">
+                </div>
+                <div className="space-y-2">
                     <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
-                      placeholder="Rechercher (Nom, compte, tel)..."
-                      className="w-full px-4 py-3 text-sm bg-slate-950/50 border border-slate-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-slate-600 text-white shadow-sm hover:border-slate-600"
-                      aria-label="Rechercher un client par nom, numéro de compte ou téléphone"
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
+                        placeholder="Rechercher (Nom, compte, tel)..."
+                        className="w-full px-3 py-2 text-sm bg-slate-950/50 border border-slate-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-slate-600 text-white shadow-sm hover:border-slate-600"
                     />
                     <Button
-                      onClick={rechercherClient}
-                      disabled={searchLoading || !searchTerm.trim()}
-                      className="w-full py-3 text-sm font-bold tracking-wide shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/20 transition-all active:scale-[0.98]"
-                      variant="primary"
-                      aria-label="Rechercher le client"
-                    >
-                      {searchLoading ? <Loader className="w-4 h-4 animate-spin" aria-hidden="true" /> : 'Rechercher'}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  {/* Client Info */}
-                  <div
-                    className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3.5 relative overflow-hidden group hover:border-slate-600/50 transition-colors"
-                    role="region"
-                    aria-label="Informations du client sélectionné"
-                  >
-                    <button
-                      onClick={reinitialiserFormulaire}
-                      className="absolute top-2.5 right-2.5 text-slate-500 hover:text-red-400 transition bg-slate-800/50 hover:bg-slate-800 p-1 rounded-full backdrop-blur-sm z-20"
-                      aria-label="Annuler et réinitialiser le formulaire"
-                    >
-                      <XCircle size={16} aria-hidden="true" />
-                    </button>
-                    <div className="flex items-center gap-3 pr-6 relative z-10">
-                      <div className="w-12 h-12 rounded-full p-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
-                        <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white">
-                          <User size={20} aria-hidden="true" />
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-sm text-white truncate">
-                          {escapeHtml(selectedClient.nom)} {escapeHtml(selectedClient.prenom || '')}
-                        </h3>
-                        <p className="text-[11px] font-medium text-slate-400">
-                          {escapeHtml(selectedClient.telephone || '')}
-                        </p>
-                        {selectedClient.numero_compte && (
-                          <Badge
-                            variant="neutral"
-                            size="sm"
-                            className="mt-1 bg-slate-800 border-slate-700 text-slate-300 text-[10px]"
-                            value={escapeHtml(selectedClient.numero_compte)}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Success Message */}
-
-
-                  {/* Physical Confirmation Indicator */}
-                  {confirmationData && (
-                    <div
-                      className="bg-blue-950/30 border border-blue-500/30 rounded-xl p-3 animate-in slide-in-from-top-2"
-                      role="status"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="p-1 rounded-full bg-blue-500/20">
-                          <CheckCircle size={12} className="text-blue-400" />
-                        </div>
-                        <span className="text-xs font-semibold text-blue-300">Confirmation physique</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-[10px] text-blue-300 border border-blue-500/20">
-                          {confirmationData.verificationMethod === 'piece_identite' && "Pièce d'identité"}
-                          {confirmationData.verificationMethod === 'reconnaissance_visuelle' && 'Client connu'}
-                          {confirmationData.verificationMethod === 'signature' && 'Signature'}
-                        </span>
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-300 border border-emerald-500/20">
-                          Identité confirmée
-                        </span>
-                      </div>
-                      {confirmationData.agentNotes && (
-                        <p className="text-[10px] text-slate-400 mt-2 italic">
-                          Note: {confirmationData.agentNotes}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Operation Type */}
-                  <div
-                    className="grid grid-cols-2 gap-2.5"
-                    role="group"
-                    aria-label="Type d'opération"
-                  >
-                    {(['Dépôt', 'Retrait'] as TypeOperation[]).map((type) => (
-                      <button
-                        key={type}
-                        onClick={() => {
-                          setTypeOperation(type);
-                          setTypeDepot(null);
-                          setTypeRetrait(null);
-                          setShowBilletage(false);
-                          setMontantError(null);
-                        }}
-                        className={`p-3 rounded-xl border transition-all duration-300 flex flex-col items-center justify-center gap-1.5 h-[68px] relative overflow-hidden ${
-                          typeOperation === type
-                            ? type === 'Dépôt'
-                              ? 'border-emerald-500/50 bg-emerald-950/30 text-emerald-300 shadow-lg shadow-emerald-500/10'
-                              : 'border-rose-500/50 bg-rose-950/30 text-rose-300 shadow-lg shadow-rose-500/10'
-                            : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:bg-slate-800/50'
-                        }`}
-                        aria-pressed={typeOperation === type}
-                        aria-label={`Sélectionner ${type}`}
-                      >
-                        {type === 'Dépôt' ? <ArrowDownLeft size={20} aria-hidden="true" /> : <ArrowUpRight size={20} aria-hidden="true" />}
-                        <span className="font-bold text-sm">{type}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Sub-types */}
-                  {typeOperation && (
-                    <div className="space-y-2 animate-in slide-in-from-bottom-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">
-                        {typeOperation === 'Dépôt' ? 'Destination' : 'Source'}
-                      </label>
-                      <div
-                        className="grid grid-cols-2 gap-2"
-                        role="group"
-                        aria-label={typeOperation === 'Dépôt' ? 'Destination du dépôt' : 'Source du retrait'}
-                      >
-                        {(typeOperation === 'Dépôt'
-                          ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
-                          : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
-                        ).map((subType: string) => (
-                          <button
-                            key={subType}
-                            onClick={() => {
-                              if (typeOperation === 'Dépôt') setTypeDepot(subType as TypeDepot);
-                              else setTypeRetrait(subType as TypeRetrait);
-                              setCreditSelectionne(null);
-                              setTontineSelectionnee(null);
-                              setMontant('');
-                              setMontantError(null);
-                            }}
-                            className={`p-2.5 rounded-lg border text-xs font-medium text-left transition-all ${
-                              (typeDepot === subType || typeRetrait === subType)
-                                ? 'border-emerald-500/50 bg-emerald-900/20 text-emerald-200'
-                                : 'border-slate-700/50 bg-slate-800/20 text-slate-400 hover:bg-slate-800/40'
-                            }`}
-                            aria-pressed={typeDepot === subType || typeRetrait === subType}
-                          >
-                            {subType}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dynamic Sections: Credits */}
-                  {typeDepot === 'Remboursement Crédit' && creditsActifs.length > 0 && (
-                    <div className="space-y-2 animate-in slide-in-from-bottom-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase pl-1">
-                        Crédit à rembourser
-                      </label>
-                      <div
-                        className="flex overflow-x-auto gap-2.5 pb-2 -mx-1 px-1 snap-x scrollbar-thin scrollbar-thumb-slate-700"
-                        role="listbox"
-                        aria-label="Sélectionner un crédit"
-                      >
-                        {creditsActifs.map((credit) => (
-                          <div
-                            key={credit.id}
-                            onClick={() => {
-                              setCreditSelectionne(credit);
-                              chargerProchaineEcheance(credit.id);
-                            }}
-                            className={`min-w-[160px] snap-center p-3 rounded-xl border cursor-pointer transition-all ${
-                              creditSelectionne?.id === credit.id
-                                ? 'border-blue-500/50 bg-blue-900/20 shadow-lg shadow-blue-500/10'
-                                : 'border-slate-700/50 bg-slate-800/30 text-slate-400'
-                            }`}
-                            role="option"
-                            aria-selected={creditSelectionne?.id === credit.id}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                setCreditSelectionne(credit);
-                                chargerProchaineEcheance(credit.id);
-                              }
-                            }}
-                          >
-                            <div className="text-xs font-bold text-slate-200">
-                              # {escapeHtml(credit.numero_credit)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-1">
-                              Reste: <span className="text-blue-400 font-bold">{formatMoney(credit.solde_restant)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dynamic Sections: Tontines */}
-                  {typeDepot === 'Cotisation Tontine' && tontinesActives.length > 0 && (
-                    <div className="space-y-2 animate-in slide-in-from-bottom-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase pl-1">
-                        Sélectionner Tontine
-                      </label>
-                      <div
-                        className="flex overflow-x-auto gap-2.5 pb-2 -mx-1 px-1 snap-x scrollbar-thin scrollbar-thumb-slate-700"
-                        role="listbox"
-                        aria-label="Sélectionner une tontine"
-                      >
-                        {tontinesActives.map((tontine) => (
-                          <div
-                            key={tontine.id}
-                            onClick={() => {
-                              setTontineSelectionnee(tontine);
-                              chargerMembresTontine(tontine.id);
-                              setMontant(tontine.montant_contribution.toString());
-                              setMontantError(null);
-                            }}
-                            className={`min-w-[160px] snap-center p-3 rounded-xl border cursor-pointer transition-all ${
-                              tontineSelectionnee?.id === tontine.id
-                                ? 'border-emerald-500/50 bg-emerald-900/20 shadow-lg shadow-emerald-500/10'
-                                : 'border-slate-700/50 bg-slate-800/30 text-slate-400'
-                            }`}
-                            role="option"
-                            aria-selected={tontineSelectionnee?.id === tontine.id}
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                setTontineSelectionnee(tontine);
-                                chargerMembresTontine(tontine.id);
-                                setMontant(tontine.montant_contribution.toString());
-                              }
-                            }}
-                          >
-                            <div className="text-xs font-bold text-slate-200 truncate">
-                              {escapeHtml(tontine.nom)}
-                            </div>
-                            <div className="text-[10px] text-emerald-400 font-bold mt-1">
-                              {formatMoney(tontine.montant_contribution)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Montant & Billetage Input */}
-                  {((typeOperation === 'Dépôt' && typeDepot) || (typeOperation === 'Retrait' && typeRetrait)) && (
-                    <div className="space-y-4 animate-in slide-in-from-bottom-2">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between pl-1">
-                          <label
-                            htmlFor="montant-input"
-                            className="text-[10px] font-bold text-slate-500 uppercase"
-                          >
-                            Montant (FCFA)
-                          </label>
-                          <button
-                            onClick={toggleBilletage}
-                            className={`text-[10px] font-bold flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors ${
-                              showBilletage ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-emerald-400'
-                            }`}
-                            aria-expanded={showBilletage}
-                            aria-controls="billetage-section"
-                          >
-                            <Coins size={12} aria-hidden="true" />
-                            {showBilletage ? 'Masquer Billetage' : 'Billetage'}
-                          </button>
-                        </div>
-
-                        {showBilletage && (
-                          <div
-                            id="billetage-section"
-                            className="bg-slate-950/50 border border-slate-700/50 rounded-xl p-3 mb-3 animate-in fade-in slide-in-from-top-2"
-                          >
-                            <div className="grid grid-cols-3 gap-2">
-                              {DENOMINATIONS.map((denom) => (
-                                <div key={denom.value} className="space-y-1">
-                                  <label
-                                    htmlFor={`billetage-${denom.value}`}
-                                    className="text-[9px] text-slate-500 block text-center"
-                                  >
-                                    {denom.label}
-                                  </label>
-                                  <input
-                                    id={`billetage-${denom.value}`}
-                                    type="number"
-                                    min="0"
-                                    placeholder="0"
-                                    value={billetage[denom.value] || ''}
-                                    onChange={(e) => updateBilletage(denom.value, parseInt(e.target.value) || 0)}
-                                    className="w-full text-center py-1.5 text-xs bg-slate-800 border-slate-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-white font-mono"
-                                    aria-label={`Nombre de billets de ${denom.label} FCFA`}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                            {totalBilletage > 0 && (
-                              <div className="text-center mt-2 text-xs text-emerald-400 font-bold">
-                                Total: {formatMoney(totalBilletage)}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        <input
-                          id="montant-input"
-                          type="number"
-                          value={montant}
-                          onChange={(e) => {
-                            setMontant(e.target.value);
-                            if (e.target.value) validateMontant(e.target.value);
-                          }}
-                          disabled={typeDepot === 'Cotisation Tontine' || showBilletage}
-                          placeholder="0"
-                          className={`w-full px-4 py-3.5 text-2xl font-bold text-center border rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-slate-950/50 transition-all text-white shadow-inner ${
-                            showBilletage ? 'opacity-80' : ''
-                          } ${montantError ? 'border-red-500' : 'border-slate-700'}`}
-                          aria-invalid={!!montantError}
-                          aria-describedby={montantError ? 'montant-error' : undefined}
-                        />
-                        {montantError && (
-                          <p
-                            id="montant-error"
-                            className="text-[10px] text-red-400 text-center"
-                            role="alert"
-                          >
-                            {montantError}
-                          </p>
-                        )}
-                        {showBilletage && !montantError && (
-                          <p className="text-[10px] text-slate-500 text-center">
-                            Calculé automatiquement depuis le billetage
-                          </p>
-                        )}
-                      </div>
-
-                      {typeDepot === 'Remboursement Crédit' && prochaineEcheance && (
-                        <div className="text-center text-[10px] text-slate-400">
-                          Prochaine échéance:{' '}
-                          <time
-                            className="text-white font-bold"
-                            dateTime={prochaineEcheance.date_echeance}
-                          >
-                            {new Date(prochaineEcheance.date_echeance).toLocaleDateString('fr-FR')}
-                          </time>
-                          {' '}-{' '}
-                          <span className="text-white font-bold">
-                            {formatMoney(prochaineEcheance.montant_total)}
-                          </span>
-                        </div>
-                      )}
-
-                      <Button
-                        onClick={preparerOperation}
-                        disabled={loading || !montant || parseFloat(montant) <= 0 || !!montantError}
-                        className="w-full py-3.5 text-sm font-bold tracking-wide shadow-xl shadow-emerald-900/20 hover:shadow-emerald-500/25 transition-all"
+                        onClick={rechercherClient}
+                        disabled={searchLoading || !searchTerm.trim()}
+                        className="w-full py-2 text-xs font-bold tracking-wide"
                         variant="primary"
-                        aria-label="Confirmer l'opération"
-                      >
-                        {loading ? (
-                          <Loader className="w-5 h-5 animate-spin mx-auto" aria-hidden="true" />
-                        ) : (
-                          "CONFIRMER L'OPÉRATION"
-                        )}
-                      </Button>
-                    </div>
-                  )}
+                    >
+                        {searchLoading ? <Loader className="w-4 h-4 animate-spin" /> : 'Rechercher'}
+                    </Button>
                 </div>
-              )}
+            </Card>
+
+            {/* Client Result / Empty State */}
+            <div className="flex-1 min-h-0">
+                {selectedClient ? (
+                    <Card className="bg-slate-800/50 border border-slate-700/50 h-full p-4 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-300">
+                        <button
+                            onClick={reinitialiserFormulaire}
+                            className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition bg-slate-800/50 hover:bg-slate-800 p-1.5 rounded-full backdrop-blur-sm z-20"
+                        >
+                            <XCircle size={16} />
+                        </button>
+                        
+                        <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20 mb-3">
+                            <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white">
+                                <User size={24} aria-hidden="true" />
+                            </div>
+                        </div>
+                        
+                        <h3 className="font-bold text-lg text-white truncate text-center w-full">
+                            {escapeHtml(selectedClient.nom)} {escapeHtml(selectedClient.prenom || '')}
+                        </h3>
+                        <p className="text-sm font-medium text-slate-400 mb-4">{escapeHtml(selectedClient.telephone || '')}</p>
+                        
+                        {selectedClient.numero_compte && (
+                            <Badge
+                                variant="neutral"
+                                size="sm"
+                                className="bg-slate-800 border-slate-700 text-slate-300 text-xs mb-6"
+                                value={escapeHtml(selectedClient.numero_compte)}
+                            />
+                        )}
+
+                        {/* Recent Activity Mini-Summary (Placeholder for visual balance) */}
+                        <div className="grid grid-cols-2 gap-2 w-full mt-auto">
+                            <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
+                                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Dernière Op.</p>
+                                <p className="font-mono text-white text-xs font-bold">-</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
+                                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Solde Cash</p>
+                                <p className="font-mono text-white text-xs font-bold">-</p>
+                            </div>
+                        </div>
+                    </Card>
+                ) : (
+                     <div className="h-full rounded-xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-4 p-6">
+                        <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center">
+                            <Wallet size={20} className="opacity-50" />
+                        </div>
+                        <p className="text-xs font-medium text-center">Sélectionnez un client pour<br/>effectuer un dépôt ou retrait</p>
+                     </div>
+                )}
             </div>
-          </div>
-        </Card>
+        </div>
+
+        {/* RIGHT COL: Operation Cockpit (8 cols) */}
+        {selectedClient && (
+             <div className="lg:col-span-8 h-full flex flex-col">
+                <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative">
+                    
+                    {/* Header: Operation Type Selector */}
+                    <div className="p-4 border-b border-slate-800 bg-slate-950/30">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Coins className="text-emerald-400" size={20} />
+                                Opération Caisse
+                            </h2>
+                            {/* Segmented Control for Type */}
+                            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                                {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => {
+                                             setTypeOperation(type);
+                                             setTypeDepot(null);
+                                             setTypeRetrait(null);
+                                             setShowBilletage(false);
+                                             setMontantError(null);
+                                        }}
+                                        className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold transition-all ${
+                                            typeOperation === type 
+                                            ? type === 'Dépôt' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-rose-600 text-white shadow-lg' 
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                        }`}
+                                    >
+                                        {type === 'Dépôt' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                         {/* Sub-types Pills */}
+                         {typeOperation && (
+                             <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2">
+                                {(typeOperation === 'Dépôt'
+                                  ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
+                                  : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
+                                ).map((subType: string) => (
+                                  <button
+                                    key={subType}
+                                    onClick={() => {
+                                      if (typeOperation === 'Dépôt') setTypeDepot(subType as TypeDepot);
+                                      else setTypeRetrait(subType as TypeRetrait);
+                                      setCreditSelectionne(null);
+                                      setTontineSelectionnee(null);
+                                      setMontant('');
+                                      setMontantError(null);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                                      (typeDepot === subType || typeRetrait === subType)
+                                        ? 'bg-slate-800 text-white border-slate-600 shadow-sm'
+                                        : 'bg-transparent border-slate-800 text-slate-500 hover:border-slate-700'
+                                    }`}
+                                  >
+                                    {subType}
+                                  </button>
+                                ))}
+                             </div>
+                         )}
+                    </div>
+
+                    {/* Main Form Content */}
+                    <div className="flex-1 p-6 overflow-y-auto space-y-6">
+                        {/* Dynamic Sections: Credits */}
+                        {typeDepot === 'Remboursement Crédit' && creditsActifs.length > 0 && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">Crédit à rembourser</label>
+                              <div className="flex overflow-x-auto gap-3 pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-slate-700">
+                                {creditsActifs.map((credit) => (
+                                  <div
+                                    key={credit.id}
+                                    onClick={() => {
+                                      setCreditSelectionne(credit);
+                                      chargerProchaineEcheance(credit.id);
+                                    }}
+                                    className={`min-w-[180px] p-3 rounded-xl border cursor-pointer transition-all ${
+                                      creditSelectionne?.id === credit.id
+                                        ? 'border-blue-500/50 bg-blue-900/20 shadow-lg'
+                                        : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-600'
+                                    }`}
+                                  >
+                                    <div className="text-xs font-bold text-slate-200"># {escapeHtml(credit.numero_credit)}</div>
+                                    <div className="text-[10px] text-slate-400 mt-1">Reste: <span className="text-blue-400 font-bold">{formatMoney(credit.solde_restant)}</span></div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                        )}
+
+                        {/* Amount & Billetage Section */}
+                        {((typeOperation === 'Dépôt' && typeDepot) || (typeOperation === 'Retrait' && typeRetrait)) && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Left: Amount Input */}
+                                <div className="space-y-4">
+                                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className="text-xs font-medium text-slate-500">Montant (FCFA)</label>
+                                            <button
+                                              onClick={toggleBilletage}
+                                              className={`text-[10px] font-bold flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors ${
+                                                showBilletage ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-emerald-400'
+                                              }`}
+                                            >
+                                              <Coins size={12} />
+                                              {showBilletage ? 'Masquer Billetage' : 'Ouvrir Billetage'}
+                                            </button>
+                                        </div>
+                                        <input
+                                          type="number"
+                                          value={montant}
+                                          onChange={(e) => {
+                                            setMontant(e.target.value);
+                                            if (e.target.value) validateMontant(e.target.value);
+                                          }}
+                                          disabled={typeDepot === 'Cotisation Tontine' || showBilletage}
+                                          placeholder="0"
+                                          className={`w-full py-2 text-3xl font-bold bg-transparent border-b-2 outline-none text-center transition-all ${
+                                              montantError ? 'border-red-500 text-red-400' : 'border-slate-700 text-white focus:border-emerald-500'
+                                          }`}
+                                        />
+                                        {montantError && <p className="text-[10px] text-red-400 text-center mt-2">{montantError}</p>}
+                                    </div>
+
+                                    {/* Physical Confirmation Indicator (If needed) */}
+                                    {confirmationData && (
+                                        <div className="bg-blue-950/20 border border-blue-500/20 rounded-xl p-3 flex items-start gap-3">
+                                            <CheckCircle size={16} className="text-blue-400 mt-0.5" />
+                                            <div>
+                                                <p className="text-xs font-bold text-blue-300">Identité Confirmée</p>
+                                                <p className="text-[10px] text-slate-400 capitalize">Méthode: {confirmationData.verificationMethod.replace('_', ' ')}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right: Billetage (Conditional) */}
+                                {showBilletage && (
+                                    <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 animate-in fade-in slide-in-from-right-4">
+                                        <div className="grid grid-cols-2 gap-3 mb-2 h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                            {DENOMINATIONS.map((denom) => (
+                                                <div key={denom.value} className="flex items-center gap-2">
+                                                    <span className="text-[10px] text-slate-500 w-10 text-right">{denom.label}</span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={billetage[denom.value] || ''}
+                                                        onChange={(e) => updateBilletage(denom.value, parseInt(e.target.value) || 0)}
+                                                        className="flex-1 py-1 px-2 text-xs bg-slate-900 border border-slate-700 rounded text-right text-white focus:border-emerald-500 outline-none"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer: Action Button */}
+                    <div className="p-4 border-t border-slate-800 bg-slate-950/50 mt-auto">
+                        <Button
+                            onClick={preparerOperation}
+                            disabled={loading || !montant || parseFloat(montant) <= 0 || !!montantError}
+                            className={`w-full py-4 text-sm font-bold tracking-wide shadow-xl transition-all ${
+                                typeOperation === 'Retrait' 
+                                ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/20' 
+                                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20'
+                            }`}
+                        >
+                            {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" /> : `CONFIRMER ${typeOperation?.toUpperCase() || 'OPÉRATION'}`}
+                        </Button>
+                    </div>
+                </Card>
+             </div>
+        )}
       </div>
 
       {/* Confirmation Dialog */}

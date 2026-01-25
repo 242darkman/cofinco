@@ -71,66 +71,67 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
 
   return (
     <div className={`space-y-3 ${className}`}>
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-        {/* Search Input - Spans more columns on desktop */}
-        <div className="md:col-span-5 lg:col-span-6">
-          <label className="block text-xs font-medium text-slate-500 mb-1.5 ml-1">Recherche</label>
+      <div className="flex items-center gap-2 w-full">
+        {/* Search Input - Flexible */}
+        <div className="flex-1 min-w-[200px]">
           <SearchInput
             value={filters.searchTerm}
             onChange={handleSearchChange}
             onClear={handleSearchClear}
-            placeholder="Nom complet, email, téléphone..."
-            className="w-full"
+            placeholder="Rechercher un client..."
+            className="w-full h-8 text-xs"
           />
         </div>
 
-        {/* Status Filter */}
-        <div className="md:col-span-3 lg:col-span-2">
-            <SelectField
-              label="Statut"
-              name="statut"
-              value={filters.statut}
-              onChange={handleStatusChange}
-              options={[
-                { value: 'all', label: 'Tous les statuts' },
-                { value: StatutClient.ACTIVE, label: CLIENT_STATUS_LABELS.ACTIVE },
-                { value: StatutClient.SUSPENDED, label: CLIENT_STATUS_LABELS.SUSPENDED },
-                { value: StatutClient.INACTIVE, label: CLIENT_STATUS_LABELS.INACTIVE }
-              ]}
-              className="mb-0"
-            />
+        {/* Status Filter - Fixed Width */}
+        <div className="w-[140px]">
+          <SelectField
+            label=""
+            name="statut"
+            value={filters.statut}
+            onChange={handleStatusChange}
+            options={[
+              { value: 'all', label: 'Tous les statuts' },
+              { value: StatutClient.ACTIVE, label: CLIENT_STATUS_LABELS.ACTIVE },
+              { value: StatutClient.SUSPENDED, label: CLIENT_STATUS_LABELS.SUSPENDED },
+              { value: StatutClient.INACTIVE, label: CLIENT_STATUS_LABELS.INACTIVE }
+            ]}
+            className="mb-0 [&>select]:h-8 [&>select]:text-xs [&>select]:py-0"
+            containerClassName="!mb-0"
+            placeholder={undefined} // Remove placeholder option for clearer selection
+          />
         </div>
 
-        {/* Segment Filter */}
-        <div className="md:col-span-3 lg:col-span-3">
-            <SelectField
-              label="Segment"
-              name="segment"
-              value={filters.segment}
-              onChange={handleSegmentChange}
-              options={[
-                { value: 'all', label: 'Tous les segments' },
-                { value: 'VIP', label: 'VIP' },
-                { value: 'Premium', label: 'Premium' },
-                { value: 'Standard', label: 'Standard' }
-              ]}
-              className="mb-0"
-            />
+        {/* Segment Filter - Fixed Width */}
+        <div className="w-[140px]">
+          <SelectField
+            label=""
+            name="segment"
+            value={filters.segment}
+            onChange={handleSegmentChange}
+            options={[
+              { value: 'all', label: 'Tous les segments' },
+              { value: 'VIP', label: 'VIP' },
+              { value: 'Premium', label: 'Premium' },
+              { value: 'Standard', label: 'Standard' }
+            ]}
+            className="mb-0 [&>select]:h-8 [&>select]:text-xs [&>select]:py-0"
+            containerClassName="!mb-0"
+            placeholder={undefined}
+          />
         </div>
 
-        {/* Clear Button - Fixed width, aligned with inputs */}
-        <div className="md:col-span-1 flex justify-center md:justify-start">
-           {hasActiveFilters && (
-             <Button
-              variant="ghost"
-              size="md" // Match input height
-              icon={X}
-              onClick={clearFilters}
-              className="text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full md:w-auto justify-center"
-              title="Effacer"
-            />
-           )}
-        </div>
+        {/* Clear Button */}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={X}
+            onClick={clearFilters}
+            className="text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 h-8 w-8 p-0 flex items-center justify-center shrink-0"
+            title="Effacer les filtres"
+          />
+        )}
       </div>
     </div>
   );

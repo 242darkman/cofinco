@@ -701,4 +701,249 @@ caisseAgentRouter.post(
   }
 );
 
+// ============================================================================
+// ROUTES - PAIEMENTS MOBILE MONEY AGENT
+// ============================================================================
+
+import { agentMmPaymentService } from "../services/caisse-agent/agent-mm-payment-service";
+
+const initiateMmPaymentSchema = z.object({
+  agentId: z.string().uuid(),
+  clientId: z.string().uuid(),
+  agenceId: z.string().uuid(),
+  provider: z.enum(["MTN", "AIRTEL"]),
+  phone: z.string().regex(/^(\+242|0)[456]\d{7}$/, "Format téléphone invalide"),
+  amount: z.number().positive("Le montant doit être positif"),
+  typePaiement: z.enum(["CREDIT_REPAYMENT", "DEPOSIT_SAVINGS", "TONTINE_CONTRIBUTION"]),
+  creditId: z.string().uuid().optional(),
+  compteId: z.string().uuid().optional(),
+  tontineId: z.string().uuid().optional(),
+  description: z.string().optional(),
+  idempotencyKey: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  observations: z.string().optional(),
+});
+
+const listMmPaymentsSchema = z.object({
+  agentId: z.string().uuid().optional(),
+  clientId: z.string().uuid().optional(),
+  agenceId: z.string().uuid().optional(),
+  statut: z.string().optional(),
+  provider: z.enum(["MTN", "AIRTEL"]).optional(),
+  typePaiement: z.string().optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(20),
+});
+
+/**
+ * POST /api/caisse-agent/mm-payments
+ * Initie un paiement Mobile Money par un agent terrain
+ *
+ * Flow:
+ * 1. Agent initie le paiement MM
+ * 2. Le client reçoit une demande de confirmation sur son téléphone
+ * 3. Sur SUCCESS (webhook), le compte client est impacté directement
+ * 4. Pas de remise nécessaire pour les paiements MM
+ */
+caisseAgentRouter.post(
+  "/mm-payments",
+  idempotencyMiddleware("agent-mm-payment"),
+  async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const parsed = initiateMmPaymentSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: "Données invalides",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      const result = await agentMmPaymentService.initiatePayment({
+        ...parsed.data,
+        createdBy: userId,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: result.error,
+          code: result.errorCode,
+          payment: result.payment,
+        });
+      }
+
+      res.status(201).json({
+        success: true,
+        payment: result.payment,
+        paymentIntentId: result.paymentIntentId,
+        message: "Paiement initié. Le client va recevoir une demande de confirmation.",
+      });
+    } catch (error: any) {
+      console.error("Erreur initiation paiement MM:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/caisse-agent/mm-payments
+ * Liste les paiements MM avec filtres
+ */
+caisseAgentRouter.get(
+  "/mm-payments",
+  async (req, res) => {
+    try {
+      const user = (req as any).user;
+
+      if (!user) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const parsed = listMmPaymentsSchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: "Paramètres invalides",
+          details: parsed.error.flatten(),
+        });
+      }
+
+      // Appliquer le filtre d'agence pour les non-admins
+      const normalizedRole = normalizeRole(user.role);
+      const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.SUPERVISEUR;
+
+      const filter = {
+        ...parsed.data,
+        agenceId: isAdmin ? parsed.data.agenceId : user.agenceId,
+        from: parsed.data.from ? new Date(parsed.data.from) : undefined,
+        to: parsed.data.to ? new Date(parsed.data.to) : undefined,
+      };
+
+      const result = await agentMmPaymentService.list(filter);
+
+      res.json({
+        data: result.data,
+        total: result.total,
+        pagination: {
+          page: filter.page,
+          limit: filter.limit,
+          hasMore: (filter.page * filter.limit) < result.total,
+        },
+      });
+    } catch (error: any) {
+      console.error("Erreur liste paiements MM:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/caisse-agent/mm-payments/:id
+ * Détails d'un paiement MM
+ */
+caisseAgentRouter.get(
+  "/mm-payments/:id",
+  async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const payment = await agentMmPaymentService.getById(req.params.id);
+
+      if (!payment) {
+        return res.status(404).json({
+          error: "Paiement non trouvé",
+        });
+      }
+
+      res.json({ payment });
+    } catch (error: any) {
+      console.error("Erreur détails paiement MM:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/caisse-agent/mm-payments/:id/cancel
+ * Annule un paiement MM en attente
+ */
+caisseAgentRouter.post(
+  "/mm-payments/:id/cancel",
+  async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const result = await agentMmPaymentService.cancelPayment(req.params.id, userId);
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: result.error,
+          code: result.errorCode,
+        });
+      }
+
+      res.json({
+        success: true,
+        payment: result.payment,
+      });
+    } catch (error: any) {
+      console.error("Erreur annulation paiement MM:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/caisse-agent/agents/:id/mm-payments/stats
+ * Statistiques des paiements MM d'un agent
+ */
+caisseAgentRouter.get(
+  "/agents/:id/mm-payments/stats",
+  async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      const agentId = req.params.id;
+      const from = req.query.from ? new Date(req.query.from as string) : undefined;
+      const to = req.query.to ? new Date(req.query.to as string) : undefined;
+
+      const stats = await agentMmPaymentService.getAgentStats(agentId, from, to);
+
+      res.json({ stats });
+    } catch (error: any) {
+      console.error("Erreur statistiques MM:", error);
+      res.status(500).json({
+        error: error.message || "Erreur interne",
+      });
+    }
+  }
+);
+
 export default caisseAgentRouter;

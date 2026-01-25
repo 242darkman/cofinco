@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Smartphone, TrendingUp, TrendingDown, Loader2, X, CheckCircle, ArrowRight } from 'lucide-react';
+import { Search, Smartphone, TrendingUp, TrendingDown, Loader2, X, CheckCircle, ArrowRight, Phone, AlertCircle } from 'lucide-react';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
+import { PaymentStatusModal, PaymentStatus } from '../payments';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { securityConfigApi, SecurityConfigResponse, clientSearchApi } from '../../../lib/api-client';
 import { toast } from '../../../lib/toast';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
 
 interface Client {
   id: string;
@@ -20,15 +23,51 @@ interface Client {
 }
 
 type TypeOperation = 'Dépôt' | 'Retrait';
-type Operateur = 'Airtel Money' | 'MTN Mobile Money';
+type Provider = 'MTN' | 'AIRTEL';
 type TypeDepot = 'Compte Courant' | 'Compte Épargne' | 'Compte Bloqué' | 'Cotisation Tontine' | 'Remboursement Crédit';
 type TypeRetrait = 'Retrait Compte Courant' | 'Retrait Épargne' | 'Décaissement Crédit' | 'Distribution Tontine';
+
+interface PaymentIntent {
+  id: string;
+  externalRef: string;
+  provider: Provider;
+  type: 'COLLECTION' | 'PAYOUT';
+  status: PaymentStatus;
+  amount: string;
+  phone: string;
+  providerTxnId?: string;
+  errorMessage?: string;
+  createdAt: string;
+  confirmedAt?: string;
+}
 
 interface CaisseMobileMoneyProps {
   sessionId: string;
   onTransactionComplete: () => void;
-  user?: any; // Add user prop
+  user?: any;
 }
+
+// Map operation sub-types to payment intent types
+const getPaymentIntentType = (typeOperation: TypeOperation, subType: string): string => {
+  if (typeOperation === 'Dépôt') {
+    switch (subType) {
+      case 'Remboursement Crédit': return 'CREDIT_REPAYMENT';
+      case 'Cotisation Tontine': return 'TONTINE_CONTRIBUTION';
+      case 'Compte Courant':
+      case 'Compte Épargne':
+      case 'Compte Bloqué':
+      default: return 'DEPOSIT';
+    }
+  } else {
+    switch (subType) {
+      case 'Décaissement Crédit': return 'CREDIT_DISBURSEMENT';
+      case 'Distribution Tontine': return 'TONTINE_DISTRIBUTION';
+      case 'Retrait Compte Courant':
+      case 'Retrait Épargne':
+      default: return 'WITHDRAWAL';
+    }
+  }
+};
 
 export default function CaisseMobileMoney({ sessionId, onTransactionComplete, user }: CaisseMobileMoneyProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,26 +75,27 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
   const [typeOperation, setTypeOperation] = useState<TypeOperation | null>(null);
   const [typeDepot, setTypeDepot] = useState<TypeDepot | null>(null);
   const [typeRetrait, setTypeRetrait] = useState<TypeRetrait | null>(null);
-  const [operateur, setOperateur] = useState<Operateur>('Airtel Money');
+  const [provider, setProvider] = useState<Provider>('MTN');
   const [montant, setMontant] = useState('');
-  const [numeroTransaction, setNumeroTransaction] = useState('');
-  const [frais, setFrais] = useState('0');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
-  const [operationData, setOperationData] = useState<any>(null);
-  
+
+  // Payment Intent State
+  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('CREATED');
+  const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
+
   // Success Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
-  const [factureId, setFactureId] = useState<string | undefined>(undefined);
-  
+
   // Security configuration
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
   const [showPresenceModal, setShowPresenceModal] = useState(false);
-  const [presenceVerified, setPresenceVerified] = useState<PresenceConfirmationData | null>(null);
 
-  const operateurs = [
-    { name: 'Airtel Money' as Operateur, color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/50', logo: '/airtel-logo.png' },
-    { name: 'MTN Mobile Money' as Operateur, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', logo: '/mtn-logo.png' }
+  const providers = [
+    { id: 'MTN' as Provider, name: 'MTN MoMo', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', logo: mtnLogo },
+    { id: 'AIRTEL' as Provider, name: 'Airtel Money', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/50', logo: airtelLogo }
   ];
 
   // Load security config on mount
@@ -66,7 +106,6 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
         setSecurityConfig(config);
       } catch (error) {
         console.error('Erreur chargement config sécurité:', error);
-        // Default: OTP disabled, presence required for withdrawals
         setSecurityConfig({
           otpEnabled: false,
           requireAccountHolderPresence: true,
@@ -77,6 +116,45 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
     };
     loadSecurityConfig();
   }, []);
+
+  // Polling for payment status
+  useEffect(() => {
+    if (!paymentIntent || !showPaymentStatusModal) return;
+
+    // Don't poll if already in a terminal state
+    if (['SUCCESS', 'FAILED', 'EXPIRED', 'REVERSED'].includes(paymentStatus)) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/payments/${paymentIntent.id}`, { credentials: 'include' });
+        if (res.ok) {
+          const intent: PaymentIntent = await res.json();
+          setPaymentStatus(intent.status);
+          setPaymentIntent(intent);
+
+          if (intent.status === 'SUCCESS') {
+            clearInterval(pollInterval);
+            handlePaymentSuccess(intent);
+          } else if (['FAILED', 'EXPIRED', 'REVERSED'].includes(intent.status)) {
+            clearInterval(pollInterval);
+            toast.error(`Paiement ${intent.status === 'FAILED' ? 'échoué' : intent.status === 'EXPIRED' ? 'expiré' : 'annulé'}`);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur polling paiement:', error);
+      }
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [paymentIntent?.id, paymentStatus, showPaymentStatusModal]);
+
+  // Auto-fill phone from selected client
+  useEffect(() => {
+    if (selectedClient) {
+      const clientPhone = selectedClient.telephone || selectedClient.phone || '';
+      setPhoneNumber(clientPhone);
+    }
+  }, [selectedClient]);
 
   // Check if operation requires presence verification
   const requiresPresenceVerification = useCallback((opType: string, subType?: string): boolean => {
@@ -89,200 +167,138 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
 
   const rechercherClient = async () => {
     if (!searchTerm.trim()) return;
-
     setLoading(true);
     try {
       const response = await clientSearchApi.search(searchTerm, { page: 1, perPage: 1 });
       const clients = response.data || [];
-
       if (clients.length > 0) {
         setSelectedClient(clients[0]);
+      } else {
+        toast.warning('Aucun client trouvé');
       }
     } catch (error: any) {
       console.error('Erreur recherche client:', error);
+      toast.error('Erreur lors de la recherche');
     } finally {
       setLoading(false);
     }
   };
 
-  const preparerOperation = async () => {
-    if (!typeOperation || !montant || parseFloat(montant) <= 0 || !numeroTransaction) {
+  const handlePaymentSuccess = async (intent: PaymentIntent) => {
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+
+    // Prepare Receipt Data
+    const rData: ReceiptData = {
+      title: `Reçu ${typeOperation} Mobile Money`,
+      reference: intent.externalRef,
+      date: new Date(intent.confirmedAt || intent.createdAt),
+      type: typeOperation || '',
+      client: {
+        nom: selectedClient?.nom || '',
+        prenom: selectedClient?.prenom || '',
+        telephone: intent.phone,
+        numeroCompte: selectedClient?.numero_compte
+      },
+      items: [{
+        description: `${typeOperation} - ${subType}`,
+        details: `Via ${provider} Mobile Money`,
+        montant: parseFloat(intent.amount),
+        quantite: 1
+      }],
+      total: parseFloat(intent.amount),
+      modePaiement: `${provider} Mobile Money`,
+      notes: intent.providerTxnId ? `ID Transaction: ${intent.providerTxnId}` : undefined,
+      agent: {
+        nom: user?.nom || 'Caissier',
+        prenom: user?.prenom || ''
+      }
+    };
+
+    setReceiptData(rData);
+    setShowPaymentStatusModal(false);
+    setShowSuccessModal(true);
+    onTransactionComplete();
+  };
+
+  const initiatePayment = async (presenceData?: PresenceConfirmationData) => {
+    if (!selectedClient || !typeOperation || !montant || parseFloat(montant) <= 0 || !phoneNumber) {
       toast.warning('Veuillez remplir tous les champs requis');
       return;
     }
 
-    if (typeOperation === 'Dépôt' && !typeDepot) {
-      toast.warning('Veuillez sélectionner la destination du dépôt');
-      return;
-    }
-    if (typeOperation === 'Retrait' && !typeRetrait) {
-      toast.warning('Veuillez sélectionner la source du retrait');
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    if (!subType) {
+      toast.warning(`Veuillez sélectionner le type de ${typeOperation.toLowerCase()}`);
       return;
     }
 
     setLoading(true);
     try {
-      const reference = `MM-${new Date().getTime()}`;
-      const montantNum = parseFloat(montant);
-      const fraisNum = parseFloat(frais);
-      const typeDetaille = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+      const isCollection = typeOperation === 'Dépôt';
+      const endpoint = isCollection ? '/api/payments/collect' : '/api/payments/payout';
+      const paymentType = getPaymentIntentType(typeOperation, subType);
 
-      const operation = {
-        session_id: sessionId,
-        client_id: selectedClient!.id,
-        type_operation: typeOperation,
-        sous_type_operation: typeDetaille,
-        montant: montantNum,
-        mode_paiement: operateur,
-        type_paiement: 'Mobile Money',
-        reference: reference,
-        description: `${typeOperation} ${operateur} - ${typeDetaille}`,
-        numero_transaction: numeroTransaction,
-        numero_telephone: selectedClient!.telephone || selectedClient!.phone,
-        client_info: {
-          nom: selectedClient!.nom,
-          prenom: selectedClient!.prenom,
-          telephone: selectedClient!.telephone || selectedClient!.phone
+      const payload: any = {
+        provider,
+        amount: parseFloat(montant),
+        phone: phoneNumber,
+        clientId: selectedClient.id,
+        type: paymentType,
+        metadata: {
+          sessionId,
+          subType,
+          presenceVerification: presenceData
         }
       };
 
-      const mobileMoneyData = {
-        session_id: sessionId,
-        operateur: operateur,
-        numero_telephone: selectedClient!.telephone || selectedClient!.phone,
-        numero_transaction: numeroTransaction,
-        montant: montantNum,
-        frais: fraisNum,
-        type_operation: typeOperation,
-        statut: 'VALIDATED'
-      };
+      // Add specific IDs based on type
+      // In a real app, you'd select the specific compte/credit/tontine ID
+      // For now we just pass clientId
 
-      setOperationData({ operation, mobileMoney: mobileMoneyData });
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
 
-      // Decide validation type based on security config
-      const isWithdrawal = requiresPresenceVerification(typeOperation!, typeDetaille || undefined);
-
-      if (isWithdrawal) {
-        // Withdrawal - require account holder presence
-        setShowPresenceModal(true);
-      } else {
-        // Deposit - execute directly (OTP bypass)
-        setLoading(false);
-        await executeOperationDirect({ operation, mobileMoney: mobileMoneyData });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Erreur lors du paiement');
       }
+
+      const intent: PaymentIntent = await res.json();
+      setPaymentIntent(intent);
+      setPaymentStatus(intent.status);
+      setShowPaymentStatusModal(true);
+
+      toast.info(isCollection
+        ? 'Demande envoyée. Le client doit valider sur son téléphone.'
+        : 'Décaissement en cours...');
+
     } catch (error: any) {
-      console.error('Erreur:', error);
-      toast.error('Erreur lors de la préparation de l\'opération');
-      setLoading(false);
+      console.error('Erreur paiement MM:', error);
+      toast.error(error.message || 'Erreur lors de l\'initiation du paiement');
     } finally {
-      if (requiresPresenceVerification(typeOperation!, typeDepot || typeRetrait || undefined)) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
+  const handleSubmit = async () => {
+    const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
+    const isWithdrawal = requiresPresenceVerification(typeOperation!, subType || undefined);
 
-  // Central function to execute operation (used by both direct and presence validation)
-  const executeOperation = useCallback(async (data: any) => {
-    try {
-      setLoading(true);
-
-      // Create mobile money transaction
-      const mmResponse = await fetch('/api/mobile-money-transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(data.mobileMoney)
-      });
-      if (!mmResponse.ok) throw new Error('Erreur transaction mobile money');
-
-      // Create caisse operation
-      const opResponse = await fetch('/api/operations-caisse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ...data.operation,
-          montant: String(data.operation.montant)
-        })
-      });
-      if (!opResponse.ok) throw new Error('Erreur opération caisse');
-
-      // Update session balance
-      await fetch(`/api/sessions-caisse/${sessionId}/update-solde`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          type: typeOperation,
-          montant: parseFloat(montant)
-        })
-      });
-
-      toast.success(`${typeOperation} ${operateur} de ${parseFloat(montant).toLocaleString()} FCFA effectué avec succès !`);
-      
-      // Prepare Receipt Data
-      const rData: ReceiptData = {
-        title: `Reçu ${typeOperation} Mobile Money`,
-        reference: data.operation.reference,
-        date: new Date(),
-        type: typeOperation || '',
-        client: {
-          nom: selectedClient?.nom || '',
-          prenom: selectedClient?.prenom || '',
-          telephone: selectedClient?.telephone || selectedClient?.phone,
-          numeroCompte: selectedClient?.numero_compte
-        },
-        items: [
-           {
-              description: `${typeOperation} - ${data.operation.sous_type_operation}`,
-              details: `Via ${operateur} - Transaction: ${numeroTransaction}`,
-              montant: parseFloat(montant),
-              quantite: 1
-           }
-        ],
-        total: parseFloat(montant),
-        modePaiement: operateur,
-        notes: `ID Transaction Mobile: ${numeroTransaction}`,
-        agent: {
-             nom: user?.nom || 'Caissier',
-             prenom: user?.prenom || ''
-        }
-      };
-
-      setReceiptData(rData);
-      setShowSuccessModal(true);
-
-    } catch (error: any) {
-      console.error('Erreur validation:', error);
-      toast.error(error.message || 'Erreur lors de l\'opération');
-    } finally {
-      setLoading(false);
+    if (isWithdrawal) {
+      setShowPresenceModal(true);
+    } else {
+      await initiatePayment();
     }
-  }, [typeOperation, operateur, montant, sessionId, onTransactionComplete, selectedClient, numeroTransaction, user]);
+  };
 
-  // Execute operation directly (deposit bypass)
-  const executeOperationDirect = useCallback(async (data: any) => {
-    await executeOperation(data);
-  }, [executeOperation]);
-
-  // Execute operation after presence verification (withdrawal)
-  const validerOperationAvecPresence = useCallback(async (presenceData: PresenceConfirmationData) => {
+  const handlePresenceConfirm = async (presenceData: PresenceConfirmationData) => {
     setShowPresenceModal(false);
-    setPresenceVerified(presenceData);
-    
-    if (operationData) {
-      // Add presence verification data for audit trail
-      const operationWithPresence = {
-        ...operationData,
-        operation: {
-          ...operationData.operation,
-          presence_verification: presenceData
-        }
-      };
-      await executeOperation(operationWithPresence);
-    }
-  }, [operationData, executeOperation]);
+    await initiatePayment(presenceData);
+  };
 
   const reinitialiserFormulaire = () => {
     setSelectedClient(null);
@@ -290,225 +306,285 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
     setTypeDepot(null);
     setTypeRetrait(null);
     setMontant('');
-    setNumeroTransaction('');
-    setFrais('0');
+    setPhoneNumber('');
     setSearchTerm('');
+    setPaymentIntent(null);
+    setPaymentStatus('CREATED');
     setReceiptData(undefined);
     setShowSuccessModal(false);
+    setShowPaymentStatusModal(false);
   };
 
   const handleCloseSuccess = () => {
     setShowSuccessModal(false);
     reinitialiserFormulaire();
-    onTransactionComplete();
+  };
+
+  const handleCancelPayment = () => {
+    setShowPaymentStatusModal(false);
+    if (paymentStatus === 'PENDING' || paymentStatus === 'CREATED') {
+      toast.info('Le paiement est toujours en attente de confirmation');
+    }
+  };
+
+  const handleRetryPayment = () => {
+    setShowPaymentStatusModal(false);
+    setPaymentIntent(null);
+    setPaymentStatus('CREATED');
+    // User can retry with same data
   };
 
   return (
-    <div className="flex flex-col justify-center min-h-[calc(100vh-160px)] p-4 font-sans selection:bg-emerald-500/30">
+    <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30">
+      {/* Success Modal */}
       <UniversalPaymentSuccessModal
         isOpen={showSuccessModal}
         onClose={handleCloseSuccess}
         term="Terminer"
         data={receiptData}
       />
-      <div className="w-full max-w-sm mx-auto">
-        <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 shadow-2xl shadow-emerald-900/10 rounded-2xl overflow-hidden ring-1 ring-white/5">
-          {/* Header */}
-          <div className="p-5 border-b border-slate-800 bg-slate-900/50">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
-                <Smartphone size={20} />
-              </span>
-              Mobile Money
-            </h2>
-            <p className="text-xs text-slate-400 mt-1 pl-11">Transactions numériques sécurisées</p>
+
+      {/* Payment Status Modal */}
+      <PaymentStatusModal
+        isOpen={showPaymentStatusModal}
+        onClose={handleCancelPayment}
+        status={paymentStatus}
+        provider={provider}
+        amount={parseFloat(montant) || 0}
+        phone={phoneNumber}
+        reference={paymentIntent?.externalRef}
+        providerTxnId={paymentIntent?.providerTxnId}
+        errorMessage={paymentIntent?.errorMessage}
+        onRetry={handleRetryPayment}
+        onViewDetails={() => {
+          setShowPaymentStatusModal(false);
+          // Could open detail modal here
+        }}
+      />
+
+      <div className="w-full h-full p-2">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
+          
+          {/* LEFT COL: Search & Client Summary */}
+          <div className="lg:col-span-4 flex flex-col gap-3 h-full">
+             {/* Search Section */}
+             <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 h-4 w-4" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
+                    placeholder="Rechercher client..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-4 text-sm text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                    autoFocus
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                     <span className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded border border-slate-700">ENTER</span>
+                  </div>
+                </div>
+             </Card>
+
+             {/* Client Result / Empty State */}
+             <div className="flex-1 min-h-0">
+               {selectedClient ? (
+                 <Card className="bg-slate-800/50 border border-slate-700/50 h-full p-6 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-2xl mb-4 shadow-xl">
+                      {selectedClient.nom.charAt(0)}{selectedClient.prenom.charAt(0)}
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-1">
+                      {selectedClient.nom} {selectedClient.prenom}
+                    </h3>
+                    <p className="text-slate-400 font-mono mb-6">{selectedClient.telephone || selectedClient.phone}</p>
+                    
+                    <div className="grid grid-cols-2 gap-2 w-full mt-auto">
+                        <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                           <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Dépôt</p>
+                           <p className="font-mono text-emerald-400 font-bold">-</p>
+                        </div>
+                         <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-800">
+                           <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Dernier Retrait</p>
+                           <p className="font-mono text-rose-400 font-bold">-</p>
+                        </div>
+                    </div>
+                 </Card>
+               ) : (
+                 <div className="h-full rounded-2xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-4 p-8">
+                    <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center">
+                        <Search size={24} className="opacity-50" />
+                    </div>
+                    <p className="text-sm font-medium">Recherchez un client pour commencer</p>
+                 </div>
+               )}
+             </div>
           </div>
 
-          <div className="p-5 space-y-6">
-              <>
-                {/* Client Search */}
-                {!selectedClient ? (
-                  <div className="space-y-4 animate-in slide-in-from-right duration-300">
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500">
-                        <Search size={18} />
-                      </div>
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
-                        placeholder="Rechercher un client..."
-                        className="w-full bg-slate-950/50 border border-slate-800 text-white text-sm rounded-xl py-3.5 pl-10 pr-4 placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all outline-none"
-                      />
+          {/* RIGHT COL: Operation Cockpit */}
+          <div className="lg:col-span-8 h-full flex flex-col">
+             <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative">
+                {!selectedClient && (
+                    <div className="absolute inset-0 z-10 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center">
+                        <p className="text-slate-500 font-medium bg-slate-900 px-4 py-2 rounded-full border border-slate-800 shadow-xl">
+                            Sélectionnez un client à gauche
+                        </p>
                     </div>
-                    <Button 
-                      onClick={rechercherClient} 
-                      disabled={loading || !searchTerm.trim()}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 rounded-xl font-medium shadow-lg shadow-emerald-500/20 transition-all"
-                    >
-                      {loading ? <Loader2 size={18} className="animate-spin" /> : 'Rechercher'}
-                    </Button>
-                    <p className="text-xs text-center text-slate-500">
-                      Recherchez par nom, prénom ou numéro de téléphone
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-6 animate-in slide-in-from-right duration-300">
-                    {/* Selected Client Card */}
-                    <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/50 flex items-start justify-between group">
-                      <div className="flex gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-sm">
-                          {selectedClient.nom.charAt(0)}{selectedClient.prenom.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-white text-sm group-hover:text-emerald-400 transition-colors">
-                            {selectedClient.nom} {selectedClient.prenom}
-                          </p>
-                          <p className="text-xs text-slate-400 font-mono">
-                            {selectedClient.telephone || selectedClient.phone}
-                          </p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={reinitialiserFormulaire}
-                        className="text-slate-500 hover:text-white transition-colors p-1"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-
-                    {/* Operator Selection */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {operateurs.map((op) => (
-                        <div
-                          key={op.name}
-                          onClick={() => setOperateur(op.name)}
-                          className={`
-                            cursor-pointer rounded-xl p-3 border transition-all duration-200 relative overflow-hidden
-                            ${operateur === op.name 
-                              ? `${op.bg} ${op.border} ring-1 ring-offset-0` 
-                              : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'}
-                          `}
-                        >
-                          <div className="flex flex-col items-center gap-2">
-                             {/* Placeholder for Logo if not available, usually an icon */}
-                             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${operateur === op.name ? 'bg-white/20' : 'bg-slate-800'}`}>
-                                <Smartphone size={16} className={op.color} />
-                             </div>
-                             <span className={`text-xs font-medium text-center ${operateur === op.name ? 'text-white' : 'text-slate-400'}`}>
-                               {op.name.replace(' Mobile Money', '').replace(' Money', '')}
-                             </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Operation Type */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {(['Dépôt', 'Retrait'] as TypeOperation[]).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setTypeOperation(type)}
-                          className={`
-                            h-12 rounded-xl text-sm font-medium border flex items-center justify-center gap-2 transition-all
-                            ${typeOperation === type
-                              ? type === 'Dépôt' 
-                                ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' 
-                                : 'bg-red-500/10 border-red-500/50 text-red-400'
-                              : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:bg-slate-800'}
-                          `}
-                        >
-                          {type === 'Dépôt' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Sub Type Selection */}
-                    {typeOperation && (
-                      <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider ml-1">Type de compte</label>
-                        <div className="flex flex-wrap gap-2">
-                          {(typeOperation === 'Dépôt' 
-                            ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit'] 
-                            : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
-                           ).map((subType: any) => (
-                            <button
-                              key={subType}
-                              onClick={() => typeOperation === 'Dépôt' ? setTypeDepot(subType) : setTypeRetrait(subType)}
-                              className={`
-                                px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
-                                ${(typeOperation === 'Dépôt' ? typeDepot : typeRetrait) === subType
-                                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20'
-                                  : 'bg-slate-900/40 border-slate-800 text-slate-400 hover:border-slate-600'}
-                              `}
-                            >
-                              {subType}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Amount & Transaction Inputs */}
-                    {typeOperation && (typeDepot || typeRetrait) && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
-                        <div className="space-y-3">
-                          <div className="relative">
-                            <label className="text-xs text-slate-500 mb-1 block">Montant</label>
-                            <input
-                              type="number"
-                              value={montant}
-                              onChange={(e) => setMontant(e.target.value)}
-                              placeholder="0"
-                              className="w-full bg-slate-950/50 border border-slate-800 text-white text-lg font-bold rounded-xl py-3 pl-4 pr-12 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-700"
-                            />
-                            <div className="absolute right-4 bottom-3.5 text-xs font-bold text-slate-500">FCFA</div>
-                          </div>
-
-                          <div className="relative">
-                            <label className="text-xs text-slate-500 mb-1 block">Référence Transaction</label>
-                            <input
-                              type="text"
-                              value={numeroTransaction}
-                              onChange={(e) => setNumeroTransaction(e.target.value)}
-                              placeholder="ID Transaction (SMS)"
-                              className="w-full bg-slate-950/50 border border-slate-800 text-white text-sm rounded-xl py-3 px-4 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-700 font-mono"
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                             <div className="flex-1">
-                                <label className="text-xs text-slate-500 mb-1 block">Frais (Optionnel)</label>
-                                <input
-                                  type="number"
-                                  value={frais}
-                                  onChange={(e) => setFrais(e.target.value)}
-                                  className="w-full bg-slate-950/50 border border-slate-800 text-slate-300 text-sm rounded-xl py-2.5 px-4 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-                                />
-                             </div>
-                             {/* Summary Badge */}
-                             <div className="flex-1 flex justify-end items-end h-full pb-1">
-                                <Badge variant="neutral" className="bg-slate-800/50 border-slate-700 text-slate-400" value={`Total: ${((parseFloat(montant) || 0) + (parseFloat(frais) || 0)).toLocaleString()}`} />
-                             </div>
-                          </div>
-                        </div>
-
-                        <Button
-                          onClick={preparerOperation}
-                          disabled={loading || !montant || parseFloat(montant) <= 0 || !numeroTransaction}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 rounded-xl font-bold shadow-lg shadow-emerald-500/20 mt-4"
-                        >
-                          {loading ? <Loader2 className="animate-spin" /> : <div className="flex items-center gap-2"><span>Valider</span> <ArrowRight size={18} /></div>}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
                 )}
-              </>
+                
+                {/* 1. Header & Provider Selector */}
+                <div className="p-6 border-b border-slate-800 bg-slate-950/30">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                Transaction Mobile
+                            </h2>
+                            <p className="text-xs text-slate-500">Sélectionnez le réseau et le type</p>
+                        </div>
+                        {/* Provider Toggle */}
+                        <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                            {providers.map(p => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => setProvider(p.id)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold transition-all ${
+                                        provider === p.id 
+                                        ? `bg-white text-slate-900 shadow-sm` 
+                                        : 'text-slate-500 hover:text-slate-300'
+                                    }`}
+                                >
+                                    <img src={p.logo} className="w-4 h-4 object-contain" alt="" />
+                                    {p.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                     {/* Type Selector (Segmented) */}
+                     <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                         {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
+                             <button
+                                 key={type}
+                                 onClick={() => {
+                                      setTypeOperation(type);
+                                      setTypeDepot(null);
+                                      setTypeRetrait(null);
+                                 }}
+                                 className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold transition-all ${
+                                     typeOperation === type
+                                     ? type === 'Dépôt' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'bg-rose-500 text-white shadow-lg shadow-rose-900/20'
+                                     : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                                 }`}
+                             >
+                                 {type === 'Dépôt' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                                 {type}
+                             </button>
+                         ))}
+                     </div>
+                </div>
+
+                {/* 2. Main Form Area */}
+                <div className="flex-1 p-6 overflow-y-auto space-y-6">
+                    {/* SubType Pills */}
+                    {typeOperation && (
+                        <div className="space-y-2">
+                            <label className="text-[10px] uppercase tracking-wider text-slate-500 font-bold ml-1">Destination / Source</label>
+                            <div className="flex flex-wrap gap-2">
+                                {(typeOperation === 'Dépôt'
+                                    ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
+                                    : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
+                                ).map((subType: any) => (
+                                    <button
+                                        key={subType}
+                                        onClick={() => typeOperation === 'Dépôt' ? setTypeDepot(subType) : setTypeRetrait(subType)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                                            (typeOperation === 'Dépôt' ? typeDepot : typeRetrait) === subType
+                                            ? 'bg-slate-800 text-white border-slate-600 shadow-sm'
+                                            : 'bg-transparent border-slate-800 text-slate-500 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        {subType.replace('Retrait ', '')}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Inputs Row */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs text-slate-500 font-medium">Numéro Mobile</label>
+                            <div className="relative">
+                                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                <input
+                                    type="tel"
+                                    value={phoneNumber}
+                                    onChange={(e) => setPhoneNumber(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-9 pr-3 text-sm text-white focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none font-mono"
+                                    placeholder="06..."
+                                />
+                            </div>
+                        </div>
+                         <div className="space-y-1.5">
+                            <label className="text-xs text-slate-500 font-medium">Montant (FCFA)</label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    value={montant}
+                                    onChange={(e) => setMontant(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-4 pr-12 text-sm text-white font-bold focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 outline-none font-mono"
+                                    placeholder="0"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 font-bold">FCFA</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Info Box */}
+                    {typeOperation && (
+                        <div className={`p-4 rounded-xl border flex gap-3 ${
+                             typeOperation === 'Dépôt' 
+                             ? 'bg-emerald-500/5 border-emerald-500/10' 
+                             : 'bg-rose-500/5 border-rose-500/10'
+                        }`}>
+                           <AlertCircle size={16} className={typeOperation === 'Dépôt' ? 'text-emerald-500' : 'text-rose-500'} />
+                           <div className="space-y-1">
+                               <p className={`text-xs font-bold ${typeOperation === 'Dépôt' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                   Confirmation Requise
+                               </p>
+                               <p className="text-[10px] text-slate-400 leading-relaxed">
+                                  {typeOperation === 'Dépôt'
+                                    ? `Une demande de paiement de ${montant || '0'} FCFA sera envoyée au ${phoneNumber || '...'}. Le client devra valider avec son code PIN ${provider}.`
+                                    : `Vous allez initier un transfert de ${montant || '0'} FCFA vers le ${phoneNumber || '...'}. Assurez-vous d'avoir vérifié l'identité du bénéficiaire.`}
+                               </p>
+                           </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-4 border-t border-slate-800 bg-slate-950/50 mt-auto">
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={loading || !montant || parseFloat(montant) <= 0 || !phoneNumber || !(typeOperation === 'Dépôt' ? typeDepot : typeRetrait)}
+                      className={`w-full h-12 rounded-xl font-bold shadow-lg transition-all ${
+                        typeOperation === 'Dépôt'
+                          ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
+                          : 'bg-rose-600 hover:bg-rose-500 shadow-rose-500/20'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {loading ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                           <span className="uppercase tracking-wide">{typeOperation === 'Dépôt' ? 'Lancer la Collecte' : 'Confirmer l\'Envoi'}</span>
+                           <ArrowRight size={16} />
+                        </div>
+                      )}
+                    </Button>
+                </div>
+             </Card>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Account Holder Presence Modal (for withdrawals) */}
@@ -516,7 +592,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
         <AccountHolderPresenceModal
           isOpen={showPresenceModal}
           onClose={() => setShowPresenceModal(false)}
-          onConfirm={validerOperationAvecPresence}
+          onConfirm={handlePresenceConfirm}
           clientName={`${selectedClient.nom} ${selectedClient.prenom}`}
           clientPhone={selectedClient.telephone || selectedClient.phone}
           operationType={typeOperation || 'Retrait'}

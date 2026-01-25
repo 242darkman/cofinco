@@ -106,44 +106,36 @@ export default function EmployesList({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 space-y-6">
+    <div className="flex flex-col h-full bg-slate-950 space-y-2">
       
-      {/* 1. HEADER D'ACTIONS */}
-      <div className="flex flex-col md:flex-row justify-between gap-4 px-2">
-        <div>
-           <h1 className="text-2xl font-bold text-white">Ressources Humaines</h1>
-           <p className="text-slate-400 text-sm">Gérez les {employes.length} collaborateurs • {filteredEmployes.length} affichés</p>
-        </div>
-      </div>
-
-      {/* 2. BARRE D'OUTILS */}
-      <div className="flex flex-col gap-3 px-2">
-        <div className="flex flex-col md:flex-row gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+      {/* 2. BARRE D'OUTILS - Compact */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col md:flex-row gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-800">
            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5" />
               <input 
                 type="text"
                 value={searchTerm}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Rechercher par nom, matricule ou poste..." 
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-4 py-2.5 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                placeholder="Rechercher..." 
+                className="w-full bg-slate-950 border border-slate-800 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-indigo-500 focus:outline-none h-9"
               />
            </div>
            <div className="flex gap-2">
               <button 
                 onClick={() => setShowSalaries(!showSalaries)}
-                className="px-4 py-2.5 text-slate-400 hover:text-white border border-slate-800 rounded-lg bg-slate-950 flex items-center gap-2 text-sm transition-colors"
+                className="px-3 py-1.5 text-slate-400 hover:text-white border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9"
               >
-                {showSalaries ? <EyeOff size={16}/> : <Eye size={16}/>} 
+                {showSalaries ? <EyeOff size={14}/> : <Eye size={14}/>} 
                 <span className="hidden md:inline">Salaires</span>
               </button>
               <button 
                 onClick={() => setShowFilters(!showFilters)}
-                className={`px-4 py-2.5 border border-slate-800 rounded-lg bg-slate-950 flex items-center gap-2 text-sm transition-colors ${
+                className={`px-3 py-1.5 border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9 ${
                   showFilters ? 'text-indigo-400 border-indigo-500/50' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Filter size={16}/> Filtres
+                <Filter size={14}/> Filtres
               </button>
            </div>
         </div>
@@ -193,21 +185,22 @@ export default function EmployesList({
       </div>
 
       {/* 3. TABLEAU PIXEL PERFECT (Desktop) */}
-      <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-2xl overflow-visible shadow-xl mx-2">
+      <div className="hidden md:block flex-1 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-sm min-h-0">
+        <div className="h-full overflow-y-auto">
         <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-slate-800 bg-slate-900/50">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Employé</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Poste & Service</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contrat</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Statut</th>
-              <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+          <thead className="sticky top-0 z-10 bg-slate-900 shadow-sm border-b border-slate-800">
+            <tr>
+              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Employé</th>
+              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Poste & Service</th>
+              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Contrat</th>
+              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Statut</th>
+              <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/50">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center">
+                <td colSpan={5} className="px-4 py-12 text-center">
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
                   </div>
@@ -215,7 +208,7 @@ export default function EmployesList({
               </tr>
             ) : paginatedEmployes.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
                   Aucun employé trouvé.
                 </td>
               </tr>
@@ -228,10 +221,10 @@ export default function EmployesList({
                 >
                   
                   {/* 1. EMPLOYÉ (Alignement Flex) */}
-                  <td className="px-6 py-4 align-middle">
-                    <div className="flex items-center gap-4">
+                  <td className="px-4 py-2 align-middle">
+                    <div className="flex items-center gap-3">
                       {emp.photoProfile ? (
-                        <div className="w-11 h-11 flex-shrink-0 rounded-full bg-slate-800 border-2 border-slate-700 overflow-hidden">
+                        <div className="w-8 h-8 flex-shrink-0 rounded-full bg-slate-800 border border-slate-700 overflow-hidden">
                           <img 
                             src={resolveStorageUrl(emp.photoProfile)} 
                             alt={`${emp.nom} ${emp.prenom}`}
@@ -239,58 +232,58 @@ export default function EmployesList({
                           />
                         </div>
                       ) : (
-                        <div className={`w-11 h-11 flex-shrink-0 rounded-full bg-gradient-to-br ${getGradientColors(emp.nom)} border-2 border-slate-700 flex items-center justify-center`}>
-                          <span className="font-bold text-slate-100 text-sm">{getInitials(emp.nom, emp.prenom)}</span>
+                        <div className={`w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br ${getGradientColors(emp.nom)} border border-slate-700 flex items-center justify-center`}>
+                          <span className="font-bold text-slate-100 text-xs">{getInitials(emp.nom, emp.prenom)}</span>
                         </div>
                       )}
                       <div>
-                        <div className="font-bold text-white text-sm group-hover:text-indigo-400 transition-colors">
+                        <div className="font-bold text-white text-xs group-hover:text-indigo-400 transition-colors">
                           {emp.nom} {emp.prenom}
                         </div>
-                        <div className="text-xs text-slate-500 font-mono mt-0.5">{emp.matricule}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{emp.matricule}</div>
                       </div>
                     </div>
                   </td>
 
                   {/* 2. POSTE */}
-                  <td className="px-6 py-4 align-middle">
-                     <div className="flex flex-col gap-1">
-                        <span className="text-sm text-slate-200 font-medium">{emp.poste || 'Non défini'}</span>
-                        <span className="text-xs text-slate-500">{emp.departement || 'N/A'}</span>
+                  <td className="px-4 py-2 align-middle">
+                     <div className="flex flex-col">
+                        <span className="text-xs text-slate-200 font-medium">{emp.poste || 'Non défini'}</span>
+                        <span className="text-[10px] text-slate-500">{emp.departement || 'N/A'}</span>
                      </div>
                   </td>
 
                   {/* 3. CONTRAT & SALAIRE */}
-                  <td className="px-6 py-4 align-middle">
+                  <td className="px-4 py-2 align-middle">
                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getContractBadge(emp.typeContrat)}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${getContractBadge(emp.typeContrat)}`}>
                           {emp.typeContrat}
                         </span>
-                        <span className={`text-sm font-medium transition-all ${showSalaries ? 'text-emerald-400' : 'text-slate-600 blur-sm select-none'}`}>
+                        <span className={`text-xs font-medium transition-all ${showSalaries ? 'text-emerald-400' : 'text-slate-600 blur-sm select-none'}`}>
                           {parseFloat(emp.salaireBase || '0').toLocaleString()}
                         </span>
                      </div>
                   </td>
 
                   {/* 4. STATUT */}
-                  <td className="px-6 py-4 align-middle">
+                  <td className="px-4 py-2 align-middle">
                      <StatusBadge status={getStatusLabel(emp.statut)} />
                   </td>
 
                   {/* 5. ACTIONS (Dropdown Only) */}
-                  <td className="px-6 py-4 align-middle text-right relative">
+                  <td className="px-4 py-2 align-middle text-right relative">
                      <button 
                        onClick={(e) => { 
                          e.stopPropagation(); 
                          setOpenMenuId(openMenuId === emp.id ? null : emp.id); 
                        }}
-                       className={`p-2 rounded-lg transition-colors ${
+                       className={`p-1.5 rounded-lg transition-colors ${
                          openMenuId === emp.id 
                            ? 'bg-indigo-600 text-white' 
                            : 'text-slate-500 hover:text-white hover:bg-slate-700'
                        }`}
                      >
-                       <MoreVertical size={18} />
+                       <MoreVertical size={14} />
                      </button>
 
                      {/* DROPDOWN MENU FLOTTANT */}
@@ -302,7 +295,7 @@ export default function EmployesList({
                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} 
                          />
                          
-                         <div className="absolute right-8 top-10 z-20 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 animate-in fade-in zoom-in-95 duration-200">
+                         <div className="absolute right-8 top-8 z-20 w-44 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-0.5 animate-in fade-in zoom-in-95 duration-200">
                            <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-800">
                              Actions
                            </div>
@@ -349,6 +342,7 @@ export default function EmployesList({
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* 4. CARTES RESPONSIVES (Mobile/POS) */}

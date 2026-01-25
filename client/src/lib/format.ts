@@ -203,15 +203,17 @@ export function formatPhoneNumber(phone: string | null | undefined): string {
 
   const cleaned = phone.replace(/\D/g, '');
 
-  // Format for Congo numbers
+  // Format for Congo numbers (9 digits) -> +242 XX XXX XX XX
   if (cleaned.length === 9) {
-    return `${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(5, 7)} ${cleaned.slice(7)}`;
+    return `+242 ${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(5, 7)} ${cleaned.slice(7)}`;
   }
 
+  // Format with country code (12 digits starting with 242) -> +242 XX XXX XX XX
   if (cleaned.length === 12 && cleaned.startsWith('242')) {
     return `+${cleaned.slice(0, 3)} ${cleaned.slice(3, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8, 10)} ${cleaned.slice(10)}`;
   }
 
+  // Fallback
   return phone;
 }
 

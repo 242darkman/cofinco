@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { insertCompteSchema, insertEcritureSchema, insertJournalSchema, insertDeclarationTvaSchema } from "@shared/schema";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
@@ -6,6 +6,10 @@ import { requireAuth, requireRole } from "../auth";
 import { SystemRole } from "@shared/types/roles";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
+import accountingPostingService from "../services/accounting-posting-service";
+import { db } from "../db";
+import { glPeriods, glPostingLinks, ecritures, lignesEcritures, planComptable, journaux } from "@shared/schema";
+import { eq, and, desc, asc } from "drizzle-orm";
 
 export function registerAccountingRoutes(app: Express) {
 
@@ -250,6 +254,415 @@ export function registerAccountingRoutes(app: Express) {
     } catch (error) {
       console.error('Erreur TAFIRE:', error);
       res.status(500).json({ message: 'Erreur calcul TAFIRE' });
+    }
+  });
+
+  // ============================================================================
+  // NEW ENDPOINTS - ENHANCED ACCOUNTING WITH POSTING ENGINE
+  // ============================================================================
+
+  // 11. Grand Livre V2 - With Running Balance (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/v2/grand-livre/:compteId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const { compteId } = req.params;
+      const agenceId = (req as any).user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
+      const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+
+      const result = await accountingPostingService.getGrandLivre(
+        compteId,
+        agenceId,
+        dateDebut,
+        dateFin,
+        page,
+        pageSize
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Erreur Grand Livre V2:', error);
+      res.status(500).json({ message: error.message || 'Erreur récupération grand livre' });
+    }
+  });
+
+  // 12. Balance V2 - Enhanced Trial Balance (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/v2/balance", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
+      const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
+      const classe = req.query.classe ? parseInt(req.query.classe as string) : undefined;
+
+      const result = await accountingPostingService.getBalance(
+        agenceId,
+        dateDebut,
+        dateFin,
+        classe
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Erreur Balance V2:', error);
+      res.status(500).json({ message: error.message || 'Erreur calcul balance' });
+    }
+  });
+
+  // 13. Periods Management (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/periods", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+
+      const periods = await db
+        .select()
+        .from(glPeriods)
+        .where(and(eq(glPeriods.agenceId, agenceId), eq(glPeriods.year, year)))
+        .orderBy(asc(glPeriods.month));
+
+      res.json(addSnakeCaseAliasesDeep(periods));
+    } catch (error: any) {
+      console.error('Erreur récupération périodes:', error);
+      res.status(500).json({ message: error.message || 'Erreur récupération périodes' });
+    }
+  });
+
+  // 14. Close Period (roles: admin, comptable)
+  app.post("/api/comptabilite/periods/close", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId;
+      const userId = (req as any).user?.id;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const { year, month, notes } = req.body;
+
+      if (!year || !month) {
+        return res.status(400).json({ message: "Année et mois requis" });
+      }
+
+      await accountingPostingService.closePeriod({
+        agenceId,
+        year: parseInt(year),
+        month: parseInt(month),
+        userId,
+        notes
+      });
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'period_closed', year, month } });
+      }
+
+      res.json({ success: true, message: `Période ${month}/${year} clôturée` });
+    } catch (error: any) {
+      console.error('Erreur clôture période:', error);
+      res.status(400).json({ message: error.message || 'Erreur clôture période' });
+    }
+  });
+
+  // 15. Reverse Entry (Extourne) (roles: admin, comptable)
+  app.post("/api/comptabilite/entries/:ecritureId/reverse", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const { ecritureId } = req.params;
+      const agenceId = (req as any).user?.agenceId;
+      const userId = (req as any).user?.id;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const { reason } = req.body;
+
+      if (!reason) {
+        return res.status(400).json({ message: "Motif d'extourne requis" });
+      }
+
+      const result = await accountingPostingService.reverseEntry({
+        ecritureId,
+        reason,
+        userId,
+        agenceId
+      });
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "ACCOUNTING_UPDATE",
+          payload: {
+            type: 'entry_reversed',
+            originalId: result.originalEcritureId,
+            reversalId: result.reversalEcritureId
+          }
+        });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('Erreur extourne:', error);
+      res.status(400).json({ message: error.message || 'Erreur extourne' });
+    }
+  });
+
+  // 16. Get Entry Details with Lines (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/entries/:ecritureId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const { ecritureId } = req.params;
+
+      // Get entry header
+      const [entry] = await db
+        .select()
+        .from(ecritures)
+        .where(eq(ecritures.id, ecritureId))
+        .limit(1);
+
+      if (!entry) {
+        return res.status(404).json({ message: "Écriture non trouvée" });
+      }
+
+      // Get journal info
+      const [journal] = await db
+        .select()
+        .from(journaux)
+        .where(eq(journaux.id, entry.journalId))
+        .limit(1);
+
+      // Get lines
+      const lines = await db
+        .select({
+          id: lignesEcritures.id,
+          compteId: lignesEcritures.compteId,
+          numeroCompte: lignesEcritures.numeroCompte,
+          compteIntitule: planComptable.intitule,
+          libelle: lignesEcritures.libelle,
+          debit: lignesEcritures.debit,
+          credit: lignesEcritures.credit,
+          refExterne: lignesEcritures.refExterne,
+        })
+        .from(lignesEcritures)
+        .leftJoin(planComptable, eq(lignesEcritures.compteId, planComptable.id))
+        .where(eq(lignesEcritures.ecritureId, ecritureId))
+        .orderBy(desc(lignesEcritures.debit));
+
+      // Calculate totals
+      const totalDebit = lines.reduce((sum, l) => sum + parseFloat(l.debit), 0);
+      const totalCredit = lines.reduce((sum, l) => sum + parseFloat(l.credit), 0);
+
+      res.json({
+        ...(addSnakeCaseAliasesDeep(entry) as Record<string, unknown>),
+        journal: journal ? addSnakeCaseAliasesDeep(journal) : null,
+        lignes: addSnakeCaseAliasesDeep(lines),
+        total_debit: totalDebit,
+        total_credit: totalCredit,
+        is_balanced: Math.abs(totalDebit - totalCredit) < 0.01
+      });
+    } catch (error: any) {
+      console.error('Erreur détail écriture:', error);
+      res.status(500).json({ message: error.message || 'Erreur récupération écriture' });
+    }
+  });
+
+  // 17. Check if Source is Posted (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/posting-status/:sourceType/:sourceId", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const { sourceType, sourceId } = req.params;
+      const agenceId = (req as any).user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const [link] = await db
+        .select()
+        .from(glPostingLinks)
+        .where(and(
+          eq(glPostingLinks.agenceId, agenceId),
+          eq(glPostingLinks.sourceType, sourceType),
+          eq(glPostingLinks.sourceId, sourceId)
+        ))
+        .limit(1);
+
+      if (link) {
+        // Get entry details
+        const [entry] = await db
+          .select()
+          .from(ecritures)
+          .where(eq(ecritures.id, link.ecritureId))
+          .limit(1);
+
+        res.json({
+          posted: true,
+          ecritureId: link.ecritureId,
+          numeroPiece: entry?.numeroPiece,
+          statut: entry?.statut,
+          dateEcriture: entry?.dateEcriture
+        });
+      } else {
+        res.json({ posted: false });
+      }
+    } catch (error: any) {
+      console.error('Erreur vérification posting:', error);
+      res.status(500).json({ message: error.message || 'Erreur vérification' });
+    }
+  });
+
+  // 18. Get Posted Entries by Source Type (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/entries-by-source/:sourceType", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const { sourceType } = req.params;
+      const agenceId = (req as any).user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const offset = (page - 1) * pageSize;
+
+      const entries = await db
+        .select({
+          id: ecritures.id,
+          dateEcriture: ecritures.dateEcriture,
+          numeroPiece: ecritures.numeroPiece,
+          libelle: ecritures.libelle,
+          statut: ecritures.statut,
+          sourceType: ecritures.sourceType,
+          sourceId: ecritures.sourceId,
+          metadata: ecritures.metadata,
+          journalCode: journaux.code,
+          journalIntitule: journaux.intitule,
+        })
+        .from(ecritures)
+        .leftJoin(journaux, eq(ecritures.journalId, journaux.id))
+        .where(and(
+          eq(ecritures.agenceId, agenceId),
+          eq(ecritures.sourceType, sourceType)
+        ))
+        .orderBy(desc(ecritures.dateEcriture))
+        .limit(pageSize)
+        .offset(offset);
+
+      res.json(addSnakeCaseAliasesDeep(entries));
+    } catch (error: any) {
+      console.error('Erreur récupération écritures par source:', error);
+      res.status(500).json({ message: error.message || 'Erreur récupération' });
+    }
+  });
+
+  // 19. Manual Post Entry (roles: admin, comptable)
+  // For manual accounting entries (not auto-posted from business transactions)
+  app.post("/api/comptabilite/v2/ecritures", requireAuth, requireRole(SystemRole.ADMIN, SystemRole.COMPTABLE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as any).user?.agenceId;
+      const userId = (req as any).user?.id;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const { journalCode, dateEcriture, libelle, lignes } = req.body;
+
+      if (!journalCode || !dateEcriture || !libelle || !lignes || !Array.isArray(lignes)) {
+        return res.status(400).json({ message: "Données manquantes: journalCode, dateEcriture, libelle, lignes requis" });
+      }
+
+      // Validate lines have accounts
+      const processedLines = [];
+      for (const ligne of lignes) {
+        if (!ligne.numeroCompte && !ligne.compteId) {
+          return res.status(400).json({ message: "Chaque ligne doit avoir un compte" });
+        }
+
+        // Get account if only number provided
+        let compteId = ligne.compteId;
+        let numeroCompte = ligne.numeroCompte;
+
+        if (!compteId && numeroCompte) {
+          const [compte] = await db
+            .select()
+            .from(planComptable)
+            .where(eq(planComptable.numeroCompte, numeroCompte))
+            .limit(1);
+
+          if (!compte) {
+            return res.status(400).json({ message: `Compte non trouvé: ${numeroCompte}` });
+          }
+          compteId = compte.id;
+        } else if (compteId && !numeroCompte) {
+          const [compte] = await db
+            .select()
+            .from(planComptable)
+            .where(eq(planComptable.id, compteId))
+            .limit(1);
+
+          if (!compte) {
+            return res.status(400).json({ message: `Compte non trouvé: ${compteId}` });
+          }
+          numeroCompte = compte.numeroCompte;
+        }
+
+        processedLines.push({
+          compteId,
+          numeroCompte,
+          libelle: ligne.libelle || libelle,
+          debit: parseFloat(ligne.debit || 0),
+          credit: parseFloat(ligne.credit || 0),
+          refExterne: ligne.refExterne
+        });
+      }
+
+      // Generate unique source ID for manual entries
+      const manualSourceId = `manual-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const result = await accountingPostingService.postEntry({
+        agenceId,
+        sourceType: "MANUAL",
+        sourceId: manualSourceId,
+        journalCode,
+        entryDate: new Date(dateEcriture),
+        description: libelle,
+        lines: processedLines,
+        metadata: { manualEntry: true },
+        userId
+      });
+
+      // Notify
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "ACCOUNTING_UPDATE",
+          payload: { type: 'ecriture_new', id: result.ecritureId, numeroPiece: result.numeroPiece }
+        });
+      }
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error: any) {
+      console.error('Erreur création écriture manuelle:', error);
+      res.status(400).json({ message: error.message || 'Erreur création écriture' });
     }
   });
 }

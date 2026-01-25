@@ -149,58 +149,74 @@ export default function CongesManager({
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="flex flex-col h-full space-y-2">
+      {/* Stats Cards - Compact */}
+      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard
             title="En Cours"
-            value={stats.enCours}
-            icon={Clock}
-            color="primary"
+             value={stats.enCours}
+             icon={Clock}
+             color="primary"
+             className="p-3"
         />
         <StatCard
-            title="En Attente"
-            value={stats.enAttente}
-            icon={Lock}
-            color="warning"
+             title="En Attente"
+             value={stats.enAttente}
+             icon={Lock}
+             color="warning"
+             className="p-3"
         />
         <StatCard
-            title="Approuvés"
-            value={stats.approuves}
-            icon={CheckCircle}
-            color="success"
+             title="Approuvés"
+             value={stats.approuves}
+             icon={CheckCircle}
+             color="success"
+             className="p-3"
         />
         <StatCard
-            title="Refusés"
-            value={stats.refuses}
-            icon={XCircle}
-            color="danger"
+             title="Refusés"
+             value={stats.refuses}
+             icon={XCircle}
+             color="danger"
+             className="p-3"
         />
       </div>
 
-      <div className="flex justify-between items-center">
-        <h3 className="text-base sm:text-lg font-bold text-white">Demandes de Congés</h3>
-        {canCreateConges && (
-          <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
-            <Plus size={16} />
-            <span className="hidden sm:inline">Nouvelle Demande</span>
-          </Button>
-        )}
-      </div>
+      {/* Main Content - Flex Grow */}
+      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+        {/* Compact Header Toolbar */}
+        <div className="shrink-0 p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+           <h3 className="text-xs font-bold text-white flex items-center gap-2">
+              <Calendar size={14} className="text-cyan-400" />
+              Demandes de Congés
+           </h3>
+           {canCreateConges && (
+             <Button variant="primary" size="sm" onClick={() => setShowForm(true)} className="h-7 text-xs px-2">
+               <Plus size={14} />
+               <span className="hidden sm:inline">Nouvelle Demande</span>
+             </Button>
+           )}
+        </div>
 
-      <Card padding="none" className="bg-slate-900/50 overflow-hidden border-slate-800">
+        {/* Table Container */}
+        <div className="flex-1 overflow-hidden">
           <ResponsiveTable
             data={paginatedDemandes}
             columns={columns}
             mobileBreakpoint="md"
             emptyMessage="Aucune demande de congé."
-            maxHeight="500px"
+            maxHeight="100%"
             pagination={{
               page: currentPage,
               totalPages,
               onPageChange: setCurrentPage
             }}
+            density="compact"
+            className="border-0 rounded-none h-full"
+            headerClassName="bg-slate-900 sticky top-0"
           />
-      </Card>
+        </div>
+      </div>
 
       <Modal
         isOpen={showForm}

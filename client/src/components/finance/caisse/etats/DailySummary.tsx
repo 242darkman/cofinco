@@ -169,71 +169,71 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
   }
 
   return (
-    <div className="space-y-6">
-      {/* KPIs Principaux */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 p-4">
+    <div className="space-y-4">
+      {/* KPIs Principaux - Compacted */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 p-3">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs text-emerald-400/70 font-medium uppercase tracking-wide">
                 Total Entrées
               </p>
-              <p className="text-2xl font-bold text-emerald-400 mt-1">
+              <p className="text-xl font-bold text-emerald-400 mt-0.5">
                 {metrics.totalEntrees.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-emerald-400/50 mt-1">
-                Moy: {metrics.moyenneEntrees.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}/session
+              <p className="text-[10px] text-emerald-400/50 mt-0.5">
+                Moy: {metrics.moyenneEntrees.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
               </p>
             </div>
-            <div className="p-2 bg-emerald-500/20 rounded-lg">
-              <TrendingUp size={20} className="text-emerald-400" />
+            <div className="p-1.5 bg-emerald-500/20 rounded-lg">
+              <TrendingUp size={16} className="text-emerald-400" />
             </div>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20 p-4">
+        <Card className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20 p-3">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs text-rose-400/70 font-medium uppercase tracking-wide">
                 Total Sorties
               </p>
-              <p className="text-2xl font-bold text-rose-400 mt-1">
+              <p className="text-xl font-bold text-rose-400 mt-0.5">
                 {metrics.totalSorties.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-rose-400/50 mt-1">
-                Moy: {metrics.moyenneSorties.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}/session
+              <p className="text-[10px] text-rose-400/50 mt-0.5">
+                Moy: {metrics.moyenneSorties.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
               </p>
             </div>
-            <div className="p-2 bg-rose-500/20 rounded-lg">
-              <TrendingDown size={20} className="text-rose-400" />
+            <div className="p-1.5 bg-rose-500/20 rounded-lg">
+              <TrendingDown size={16} className="text-rose-400" />
             </div>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20 p-4">
+        <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20 p-3">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs text-cyan-400/70 font-medium uppercase tracking-wide">
                 Solde Net
               </p>
               <p
-                className={`text-2xl font-bold mt-1 ${
+                className={`text-xl font-bold mt-0.5 ${
                   metrics.soldeNet >= 0 ? 'text-cyan-400' : 'text-amber-400'
                 }`}
               >
                 {metrics.soldeNet >= 0 ? '+' : ''}
                 {metrics.soldeNet.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-cyan-400/50 mt-1">{metrics.nbTransactions} opérations</p>
+              <p className="text-[10px] text-cyan-400/50 mt-0.5">{metrics.nbTransactions} ops</p>
             </div>
-            <div className="p-2 bg-cyan-500/20 rounded-lg">
-              <DollarSign size={20} className="text-cyan-400" />
+            <div className="p-1.5 bg-cyan-500/20 rounded-lg">
+              <DollarSign size={16} className="text-cyan-400" />
             </div>
           </div>
         </Card>
 
         <Card
-          className={`bg-gradient-to-br p-4 ${
+          className={`bg-gradient-to-br p-3 ${
             metrics.tauxConformite >= 95
               ? 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20'
               : metrics.tauxConformite >= 80
@@ -255,7 +255,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                 Conformité
               </p>
               <p
-                className={`text-2xl font-bold mt-1 ${
+                className={`text-xl font-bold mt-0.5 ${
                   metrics.tauxConformite >= 95
                     ? 'text-emerald-400'
                     : metrics.tauxConformite >= 80
@@ -266,7 +266,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                 {metrics.tauxConformite.toFixed(1)}%
               </p>
               <p
-                className={`text-[10px] mt-1 ${
+                className={`text-[10px] mt-0.5 ${
                   metrics.tauxConformite >= 95
                     ? 'text-emerald-400/50'
                     : metrics.tauxConformite >= 80
@@ -278,7 +278,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               </p>
             </div>
             <div
-              className={`p-2 rounded-lg ${
+              className={`p-1.5 rounded-lg ${
                 metrics.tauxConformite >= 95
                   ? 'bg-emerald-500/20'
                   : metrics.tauxConformite >= 80
@@ -287,81 +287,85 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               }`}
             >
               {metrics.tauxConformite >= 95 ? (
-                <CheckCircle size={20} className="text-emerald-400" />
+                <CheckCircle size={16} className="text-emerald-400" />
               ) : (
-                <AlertTriangle size={20} className={metrics.tauxConformite >= 80 ? 'text-amber-400' : 'text-rose-400'} />
+                <AlertTriangle size={16} className={metrics.tauxConformite >= 80 ? 'text-amber-400' : 'text-rose-400'} />
               )}
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Graphiques */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      {/* Graphiques - Compacted Heights */}
+      <div className="grid lg:grid-cols-2 gap-4">
         {/* Évolution journalière */}
-        <Card className="bg-slate-900/80 border-slate-800 p-6">
-          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <Activity size={16} className="text-cyan-400" />
+        <Card className="bg-slate-900/80 border-slate-800 p-4">
+          <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
+            <Activity size={14} className="text-cyan-400" />
             Mouvements par Jour
           </h3>
           {dailyData.length > 0 ? (
-            <div className="h-[280px]">
+            <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <BarChart data={dailyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                   <XAxis
                     dataKey="date"
                     tick={{ fill: '#94a3b8', fontSize: 10 }}
-                    tickLine={{ stroke: '#475569' }}
+                    tickLine={false}
                     axisLine={{ stroke: '#475569' }}
+                    dy={5}
                   />
                   <YAxis
                     tick={{ fill: '#94a3b8', fontSize: 10 }}
-                    tickLine={{ stroke: '#475569' }}
-                    axisLine={{ stroke: '#475569' }}
+                    tickLine={false}
+                    axisLine={false}
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
+                    cursor={{ fill: '#334155', opacity: 0.2 }}
                     contentStyle={{
                       backgroundColor: '#1e293b',
                       border: '1px solid #334155',
                       borderRadius: '8px',
                       color: '#f8fafc',
+                      fontSize: '12px',
+                      padding: '8px'
                     }}
                     formatter={(value: number) => [value.toLocaleString('fr-FR') + ' FCFA', '']}
                   />
-                  <Bar dataKey="entrees" name="Entrées" fill={COLORS.entrees} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="sorties" name="Sorties" fill={COLORS.sorties} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="entrees" name="Entrées" fill={COLORS.entrees} radius={[3, 3, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="sorties" name="Sorties" fill={COLORS.sorties} radius={[3, 3, 0, 0]} maxBarSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-[280px] flex items-center justify-center text-slate-500">
+            <div className="h-[200px] flex items-center justify-center text-slate-500 text-xs">
               Aucune donnée disponible
             </div>
           )}
         </Card>
 
         {/* Répartition par type */}
-        <Card className="bg-slate-900/80 border-slate-800 p-6">
-          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <Percent size={16} className="text-purple-400" />
+        <Card className="bg-slate-900/80 border-slate-800 p-4">
+          <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
+            <Percent size={14} className="text-purple-400" />
             Répartition par Type
           </h3>
           {operationTypeData.length > 0 ? (
-            <div className="h-[280px]">
+            <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={operationTypeData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
+                    innerRadius={50}
+                    outerRadius={80}
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                    labelLine={{ stroke: '#475569' }}
+                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
                   >
                     {operationTypeData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
@@ -373,47 +377,56 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                       border: '1px solid #334155',
                       borderRadius: '8px',
                       color: '#f8fafc',
+                      fontSize: '12px',
+                      padding: '8px'
                     }}
                     formatter={(value: number) => [value.toLocaleString('fr-FR') + ' FCFA', '']}
+                  />
+                  <Legend 
+                    layout="vertical" 
+                    verticalAlign="middle" 
+                    align="right"
+                    wrapperStyle={{ fontSize: '10px' }} 
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-[280px] flex items-center justify-center text-slate-500">
+            <div className="h-[200px] flex items-center justify-center text-slate-500 text-xs">
               Aucune donnée disponible
             </div>
           )}
         </Card>
       </div>
 
-      {/* Évolution du solde */}
+      {/* Évolution du solde - Compacted */}
       {soldeEvolution.length > 0 && (
-        <Card className="bg-slate-900/80 border-slate-800 p-6">
-          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <TrendingUp size={16} className="text-emerald-400" />
+        <Card className="bg-slate-900/80 border-slate-800 p-4">
+          <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
+            <TrendingUp size={14} className="text-emerald-400" />
             Évolution du Solde Net
           </h3>
-          <div className="h-[200px]">
+          <div className="h-[180px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={soldeEvolution} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <AreaChart data={soldeEvolution} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soldeGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                 <XAxis
                   dataKey="date"
                   tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  tickLine={{ stroke: '#475569' }}
+                  tickLine={false}
                   axisLine={{ stroke: '#475569' }}
+                  dy={5}
                 />
                 <YAxis
                   tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  tickLine={{ stroke: '#475569' }}
-                  axisLine={{ stroke: '#475569' }}
+                  tickLine={false}
+                  axisLine={false}
                   tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
@@ -422,6 +435,8 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                     border: '1px solid #334155',
                     borderRadius: '8px',
                     color: '#f8fafc',
+                    fontSize: '12px',
+                    padding: '8px'
                   }}
                   formatter={(value: number) => [value.toLocaleString('fr-FR') + ' FCFA', 'Solde']}
                 />
@@ -438,59 +453,51 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
         </Card>
       )}
 
-      {/* Stats secondaires */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-slate-900/60 border-slate-800 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/10 rounded-lg">
-              <Users size={18} className="text-blue-400" />
+      {/* Stats secondaires - Hidden to save space or made extremely compact */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pb-2">
+        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
+            <div className="p-1.5 bg-blue-500/10 rounded-lg shrink-0">
+              <Users size={16} className="text-blue-400" />
             </div>
             <div>
-              <p className="text-xs text-slate-400">Sessions</p>
-              <p className="text-lg font-bold text-white">{metrics.nbSessions}</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Sessions</p>
+              <p className="text-sm font-bold text-white">{metrics.nbSessions}</p>
             </div>
-          </div>
         </Card>
 
-        <Card className="bg-slate-900/60 border-slate-800 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-500/10 rounded-lg">
-              <Activity size={18} className="text-purple-400" />
+        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
+            <div className="p-1.5 bg-purple-500/10 rounded-lg shrink-0">
+              <Activity size={16} className="text-purple-400" />
             </div>
             <div>
-              <p className="text-xs text-slate-400">Opérations</p>
-              <p className="text-lg font-bold text-white">{metrics.nbTransactions}</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Opérations</p>
+              <p className="text-sm font-bold text-white">{metrics.nbTransactions}</p>
             </div>
-          </div>
         </Card>
 
-        <Card className="bg-slate-900/60 border-slate-800 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-500/10 rounded-lg">
-              <CheckCircle size={18} className="text-emerald-400" />
+        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
+            <div className="p-1.5 bg-emerald-500/10 rounded-lg shrink-0">
+              <CheckCircle size={16} className="text-emerald-400" />
             </div>
             <div>
-              <p className="text-xs text-slate-400">Fermées</p>
-              <p className="text-lg font-bold text-white">{metrics.sessionsTerminees}</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Fermées</p>
+              <p className="text-sm font-bold text-white">{metrics.sessionsTerminees}</p>
             </div>
-          </div>
         </Card>
 
-        <Card className="bg-slate-900/60 border-slate-800 p-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${metrics.totalEcarts > 0 ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
+        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
+            <div className={`p-1.5 rounded-lg shrink-0 ${metrics.totalEcarts > 0 ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
               <AlertTriangle
-                size={18}
+                size={16}
                 className={metrics.totalEcarts > 0 ? 'text-amber-400' : 'text-emerald-400'}
               />
             </div>
             <div>
-              <p className="text-xs text-slate-400">Total Écarts</p>
-              <p className={`text-lg font-bold ${metrics.totalEcarts > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Total Écarts</p>
+              <p className={`text-sm font-bold ${metrics.totalEcarts > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                 {metrics.totalEcarts.toLocaleString('fr-FR')}
               </p>
             </div>
-          </div>
         </Card>
       </div>
     </div>

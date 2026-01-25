@@ -849,6 +849,204 @@ export async function processTontineDistribution(
   };
 }
 
+// ============ RETIRABLE CALCULATION ============
+
+/**
+ * Résultat du calcul de montant retirable
+ */
+export interface TontineRetirableResult {
+  /** Solde actuel du pot de la tontine */
+  potDisponible: number;
+  /** Droit du membre: contributions * nombre de membres */
+  droitMembre: number;
+  /** Limite par cycle si définie dans les règles */
+  reglesCycle: number;
+  /** Montant effectivement retirable (min des 3) */
+  montantRetirable: number;
+  /** Explication si le montant est limité */
+  raison?: string;
+  /** Le membre a-t-il déjà reçu son bénéfice? */
+  aDejaRecuBenefice: boolean;
+  /** Peut-on effectuer un retrait? */
+  peutRetirer: boolean;
+  /** Message d'erreur si ne peut pas retirer */
+  erreur?: string;
+}
+
+/**
+ * Interface pour les règles de tontine
+ */
+interface TontineRegles {
+  maxDistributionParCycle?: number;
+  minContributionsAvantRetrait?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Calcule le montant qu'un membre peut retirer de la tontine
+ *
+ * Règle: min(pot_disponible, droit_membre, règles_cycle)
+ *
+ * Le droit du membre est calculé comme: totalCotisations * nombreMembres
+ * (car chaque membre contribue pour chaque tour, donc le pot total = cotisation * membres)
+ *
+ * @param tontineId - ID de la tontine
+ * @param membreId - ID du membre tontine (pas clientId)
+ * @returns Détails du montant retirable avec explications
+ */
+export async function calculateTontineRetirable(
+  tontineId: string,
+  membreId: string
+): Promise<TontineRetirableResult> {
+  // 1. Récupérer la tontine avec ses informations
+  const [tontineData] = await db
+    .select({
+      id: tontines.id,
+      solde: tontines.solde,
+      nombreMembres: tontines.nombreMembres,
+      montantCotisation: tontines.montantCotisation,
+      regles: tontines.regles,
+    })
+    .from(tontines)
+    .where(eq(tontines.id, tontineId));
+
+  if (!tontineData) {
+    return {
+      potDisponible: 0,
+      droitMembre: 0,
+      reglesCycle: Infinity,
+      montantRetirable: 0,
+      aDejaRecuBenefice: false,
+      peutRetirer: false,
+      erreur: "Tontine non trouvée",
+    };
+  }
+
+  // 2. Récupérer le membre
+  const [membreData] = await db
+    .select({
+      id: membresTontine.id,
+      clientId: membresTontine.clientId,
+      totalCotisations: membresTontine.totalCotisations,
+      aRecuBenefice: membresTontine.aRecuBenefice,
+      statut: membresTontine.statut,
+    })
+    .from(membresTontine)
+    .where(eq(membresTontine.id, membreId));
+
+  if (!membreData) {
+    return {
+      potDisponible: 0,
+      droitMembre: 0,
+      reglesCycle: Infinity,
+      montantRetirable: 0,
+      aDejaRecuBenefice: false,
+      peutRetirer: false,
+      erreur: "Membre non trouvé",
+    };
+  }
+
+  // 3. Vérifier si le membre est actif
+  if (membreData.statut !== StatutMembreTontine.ACTIVE) {
+    return {
+      potDisponible: Number(tontineData.solde || 0),
+      droitMembre: 0,
+      reglesCycle: Infinity,
+      montantRetirable: 0,
+      aDejaRecuBenefice: membreData.aRecuBenefice || false,
+      peutRetirer: false,
+      erreur: "Membre n'est pas actif dans la tontine",
+    };
+  }
+
+  // 4. Vérifier si le membre a déjà reçu son bénéfice
+  if (membreData.aRecuBenefice) {
+    return {
+      potDisponible: Number(tontineData.solde || 0),
+      droitMembre: 0,
+      reglesCycle: Infinity,
+      montantRetirable: 0,
+      aDejaRecuBenefice: true,
+      peutRetirer: false,
+      erreur: "Ce membre a déjà reçu son bénéfice pour ce cycle",
+    };
+  }
+
+  // 5. Calculer les valeurs
+  const potDisponible = Number(tontineData.solde || 0);
+  const nombreMembres = tontineData.nombreMembres || 1;
+  const montantCotisation = Number(tontineData.montantCotisation || 0);
+
+  // Le droit du membre = pot théorique d'un tour complet
+  // Normalement c'est montantCotisation * nombreMembres (un tour complet)
+  const droitMembre = montantCotisation * nombreMembres;
+
+  // Règles du cycle
+  const regles = tontineData.regles as TontineRegles | null;
+  const reglesCycle = regles?.maxDistributionParCycle ?? Infinity;
+
+  // 6. Calculer le montant retirable = min des 3 valeurs
+  const montantRetirable = Math.min(potDisponible, droitMembre, reglesCycle);
+
+  // 7. Déterminer la raison si limité
+  let raison: string | undefined;
+
+  if (montantRetirable < droitMembre) {
+    if (potDisponible < droitMembre && potDisponible <= montantRetirable) {
+      raison = `Pot insuffisant: ${potDisponible.toLocaleString()} FCFA disponible`;
+    } else if (reglesCycle < droitMembre && reglesCycle <= montantRetirable) {
+      raison = `Limite par cycle: ${reglesCycle.toLocaleString()} FCFA maximum`;
+    }
+  }
+
+  // 8. Vérifier si retrait possible
+  const peutRetirer = montantRetirable > 0;
+
+  return {
+    potDisponible,
+    droitMembre,
+    reglesCycle,
+    montantRetirable,
+    raison,
+    aDejaRecuBenefice: false,
+    peutRetirer,
+    erreur: peutRetirer ? undefined : "Montant retirable insuffisant",
+  };
+}
+
+/**
+ * Vérifie si un membre peut effectuer un retrait d'un montant donné
+ * Utile pour validation avant traitement
+ */
+export async function canMemberWithdraw(
+  tontineId: string,
+  membreId: string,
+  montant: number
+): Promise<{ canWithdraw: boolean; reason?: string; maxAmount: number }> {
+  const retirable = await calculateTontineRetirable(tontineId, membreId);
+
+  if (!retirable.peutRetirer) {
+    return {
+      canWithdraw: false,
+      reason: retirable.erreur,
+      maxAmount: 0,
+    };
+  }
+
+  if (montant > retirable.montantRetirable) {
+    return {
+      canWithdraw: false,
+      reason: `Montant demandé (${montant.toLocaleString()} FCFA) dépasse le retirable (${retirable.montantRetirable.toLocaleString()} FCFA). ${retirable.raison || ""}`.trim(),
+      maxAmount: retirable.montantRetirable,
+    };
+  }
+
+  return {
+    canWithdraw: true,
+    maxAmount: retirable.montantRetirable,
+  };
+}
+
 export default {
   dispatchTontinePayment,
   getMemberTontineState,
@@ -857,5 +1055,7 @@ export default {
   previewPaymentDispatch,
   distributeTontineGain,
   processTontineContribution,
-  processTontineDistribution
+  processTontineDistribution,
+  calculateTontineRetirable,
+  canMemberWithdraw,
 };

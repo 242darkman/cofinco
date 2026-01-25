@@ -551,8 +551,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
 
   return (
-    <div className="space-y-6 pt-2">
-      <div className="sticky top-[3.5rem] lg:top-0 z-40 -mx-4 px-4 py-3 bg-slate-950/80 backdrop-blur-md border-b border-white/5 transition-all duration-200">
+    <div className="space-y-3 pt-2">
+      <div className="sticky top-[3.5rem] lg:top-0 z-40 -mx-4 px-4 py-2 bg-slate-950/80 backdrop-blur-md border-b border-white/5 transition-all duration-200">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 max-w-7xl mx-auto">
           <div className="flex items-center gap-4">
               <div className="bg-blue-600/20 p-2 rounded-xl">
@@ -619,47 +619,49 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       ) : (
         <>
         {/* Header Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard
-            title="Solde Coffre"
-            value={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}
-            icon={Wallet}
-            color="primary"
-        />
-        <StatCard
-            title="En Attente"
-            value={pendingCount + (pendingOpeningRequests?.length || 0)}
-            variant="default"
-            color="warning"
-            icon={Clock}
-        />
-        <StatCard
-            title="Mouvements J"
-            value={todayVolume}
-            variant="default"
-            color="primary"
-            icon={ArrowRightLeft}
-        />
+      {/* Header Stats - Compact */}
+      <div className="grid grid-cols-3 gap-2">
+         <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Solde Coffre</span>
+            <div className="flex items-center gap-2">
+               <Wallet className="text-blue-500" size={16} />
+               <div className="text-lg font-black text-white">{isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}</div>
+            </div>
+         </div>
+         <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">En Attente</span>
+            <div className="flex items-center gap-2">
+               <Clock className="text-amber-500" size={16} />
+               <div className="text-lg font-black text-white">{pendingCount + (pendingOpeningRequests?.length || 0)}</div>
+            </div>
+         </div>
+         <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Mouvements J</span>
+            <div className="flex items-center gap-2">
+               <ArrowRightLeft className="text-emerald-500" size={16} />
+               <div className="text-lg font-black text-white">{todayVolume.toLocaleString()} FCFA</div>
+            </div>
+         </div>
       </div>
 
       {/* Pending Opening Requests Section - New Secure Workflow */}
       {(pendingOpeningRequests?.length > 0 || isLoadingOpeningRequests) && (
         <Card className="overflow-hidden bg-gradient-to-br from-amber-500/5 to-orange-500/5 border-amber-500/30">
-          <div className="p-4 border-b border-amber-500/20 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/20">
-                <KeyRound className="w-5 h-5 text-amber-400" />
+          <div className="p-3 border-b border-amber-500/20 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-500/20">
+                <KeyRound className="w-4 h-4 text-amber-400" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                  Demandes d'Ouverture de Caisse
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  Ouverture de Caisse
                   {pendingOpeningRequests?.length > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-xs font-bold animate-pulse">
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold animate-pulse">
                       {pendingOpeningRequests.length}
                     </span>
                   )}
                 </h3>
-                <p className="text-slate-400 text-sm">Caissiers en attente de dotation pour ouvrir leur session</p>
+                <p className="text-slate-400 text-xs">Caissiers en attente de dotation</p>
               </div>
             </div>
             <Button
@@ -667,10 +669,10 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               size="sm"
               onClick={() => refetchOpeningRequests()}
               disabled={isLoadingOpeningRequests}
-              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+              className="h-8 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
             >
               <Loader2
-                size={14}
+                size={12}
                 className={`mr-2 ${isLoadingOpeningRequests ? 'animate-spin' : ''}`}
               />
               Actualiser
@@ -678,59 +680,58 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           </div>
 
           {isLoadingOpeningRequests ? (
-            <div className="p-8 text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-amber-400 mx-auto" />
-              <p className="text-slate-400 mt-2">Chargement des demandes...</p>
+            <div className="p-4 text-center">
+              <Loader2 className="w-6 h-6 animate-spin text-amber-400 mx-auto" />
+              <p className="text-slate-400 mt-1 text-xs">Chargement...</p>
             </div>
           ) : (
             <div className="divide-y divide-amber-500/10">
               {pendingOpeningRequests.map((request: any) => (
                 <div
                   key={request.transfert?.id || request.session?.id}
-                  className="p-4 hover:bg-amber-500/5 transition-colors"
+                  className="p-2 hover:bg-amber-500/5 transition-colors"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                     {/* Request Info */}
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 rounded-xl bg-slate-800 border border-slate-700">
-                        <User className="w-6 h-6 text-slate-400" />
+                    <div className="flex items-start gap-2">
+                      <div className="p-2 rounded-xl bg-slate-800 border border-slate-700">
+                        <User className="w-4 h-4 text-slate-400" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-bold text-white">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-sm">
                             {request.caissierNom || request.transfert?.requestedByNom || 'Caissier'}
                           </span>
-                          <span className="text-slate-500">•</span>
-                          <span className="text-sm text-slate-400">
-                            {request.caisseNom || request.transfert?.caisseDestinationNom || 'Caisse'}
+                          <span className="text-slate-500 text-xs gap-1 flex items-center">
+                             • {request.caisseNom || request.transfert?.caisseDestinationNom || 'Caisse'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-xs">
                           <span className="text-amber-400 font-bold">
                             {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} FCFA
                           </span>
                           {request.soldeVeille > 0 && (
                             <span className="text-slate-500">
-                              (+ {Number(request.soldeVeille).toLocaleString()} FCFA solde veille)
+                              (+{Number(request.soldeVeille).toLocaleString()} veille)
                             </span>
                           )}
                         </div>
                         {request.fundsRequestedAt && (
-                          <span className="text-xs text-slate-500 mt-1 block">
-                            Demandé le {format(new Date(request.fundsRequestedAt), "dd/MM/yyyy à HH:mm", { locale: fr })}
+                          <span className="text-[10px] text-slate-500 block">
+                            {format(new Date(request.fundsRequestedAt), "dd/MM HH:mm", { locale: fr })}
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex items-center gap-1 ml-auto">
                       {canValidate && (
                         <>
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="h-9 px-4 text-xs font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                            className="h-7 px-3 text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
                             onClick={() => setConfirmAction({
                               type: 'validate-opening',
                               transfert: {
@@ -744,10 +745,10 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                             disabled={actionLoading === request.transfert?.id}
                           >
                             {actionLoading === request.transfert?.id ? (
-                              <Loader2 size={14} className="animate-spin" />
+                              <Loader2 size={12} className="animate-spin" />
                             ) : (
                               <>
-                                <CheckCircle2 size={14} className="mr-1.5" />
+                                <CheckCircle2 size={12} className="mr-1" />
                                 Valider
                               </>
                             )}
@@ -755,7 +756,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="h-9 px-4 text-xs font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                            className="h-7 px-3 text-[10px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
                             onClick={() => setConfirmAction({
                               type: 'reject-opening',
                               transfert: {
@@ -768,15 +769,15 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                             })}
                             disabled={actionLoading === request.transfert?.id}
                           >
-                            <XCircle size={14} className="mr-1.5" />
+                            <XCircle size={12} className="mr-1" />
                             Rejeter
                           </Button>
                         </>
                       )}
                       {!canValidate && (
-                        <span className="text-xs text-slate-500 italic flex items-center gap-1.5">
-                          <Clock size={12} />
-                          En attente de validation
+                        <span className="text-[10px] text-slate-500 italic flex items-center gap-1">
+                          <Clock size={10} />
+                          En attente
                         </span>
                       )}
                     </div>
@@ -789,10 +790,10 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       )}
 
       <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-        <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-             <div>
-                <h3 className="font-bold text-white text-lg">Demandes de Transfert</h3>
-                <p className="text-slate-400 text-sm">Gestion des mouvements de fonds agence</p>
+        <div className="p-3 border-b border-slate-800 flex justify-between items-center">
+             <div className="flex items-center gap-2">
+                <ArrowRightLeft className="text-blue-500" size={16} />
+                <h3 className="font-bold text-white text-sm">Transferts</h3>
              </div>
              <Button 
                 variant="outline" 
@@ -813,6 +814,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             data={transferts}
             columns={columns}
             emptyMessage="Aucune demande de transfert en cours."
+            density="compact"
         />
       </Card>
       </>
@@ -920,20 +922,20 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
 
     return (
         <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-            <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-                <div>
-                    <h3 className="font-bold text-white text-lg">Historique des Mouvements</h3>
-                    <p className="text-slate-400 text-sm">Traçabilité complète des opérations du coffre</p>
+            <div className="p-3 border-b border-slate-800 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <Clock className="text-slate-500" size={16} />
+                    <h3 className="font-bold text-white text-sm">Historique des Mouvements</h3>
                 </div>
                 <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => refetch()}
                     disabled={isRefetching}
-                    className="transition-all duration-200"
+                    className="h-8 text-xs transition-all duration-200"
                 >
                     <Loader2 
-                        size={14} 
+                        size={12} 
                         className={`mr-2 ${isRefetching ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
                     />
                     {isRefetching ? 'Actualisation...' : 'Actualiser'}
@@ -944,6 +946,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
                 data={mouvements}
                 columns={columns}
                 emptyMessage="Aucun mouvement enregistré."
+                density="compact"
             />
         </Card>
     );

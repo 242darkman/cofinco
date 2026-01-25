@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowUpRight, ArrowDownLeft, Wallet, Clock, User, CreditCard, Filter, UserCircle } from 'lucide-react';
-import { Card, Pagination } from '@/components/ui';
+import { Card, ResponsiveTable } from '@/components/ui';
 import { CaisseTransaction, SessionCaisse } from '@/types/finance';
 
 interface CashJournalProps {
@@ -163,25 +163,140 @@ export function CashJournal({
     };
   }, [journalEntries]);
 
-  if (loading) {
+  // Définition des colonnes ResponsiveTable
+  const columns = useMemo(() => [
+        {
+          key: 'date',
+          label: 'Date & Heure',
+          primary: true,
+          format: (_: any, entry: JournalEntry) => (
+            <div className="flex items-center gap-2">
+              <Clock size={12} className="text-slate-500" />
+              <div>
+                <p className="text-slate-300 font-medium text-xs">
+                  {entry.date.toLocaleDateString('fr-FR')}
+                </p>
+                <p className="text-slate-500 text-[10px] leading-none">
+                  {entry.date.toLocaleTimeString('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+            </div>
+          ),
+          mobileFormat: (_: any, entry: JournalEntry) => (
+             <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                <Clock size={12} />
+                <span>{entry.date.toLocaleDateString('fr-FR')} {entry.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+             </div>
+          )
+        },
+        {
+          key: 'operation',
+          label: 'Opération',
+          format: (_: any, entry: JournalEntry) => (
+             <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                   {entry.type === 'OUVERTURE' && (
+                    <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold rounded border border-blue-500/20">
+                      OUVERTURE
+                    </span>
+                   )}
+                   {entry.type === 'FERMETURE' && (
+                    <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] font-bold rounded border border-purple-500/20">
+                      FERMETURE
+                    </span>
+                   )}
+                   {entry.type === 'OPERATION' && (
+                    <span
+                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded border ${
+                        entry.sens === 'ENTREE'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                      }`}
+                    >
+                      {entry.sens === 'ENTREE' ? '↓' : '↑'} {getOperationLabel(entry.operationType)}
+                    </span>
+                   )}
+                </div>
+                {entry.description && entry.type === 'OPERATION' && (
+                  <p className="text-slate-500 text-[10px] truncate max-w-[180px]">
+                    {entry.description}
+                  </p>
+                )}
+             </div>
+          ),
+          mobileClassName: 'font-medium text-white mb-1'
+        },
+        {
+          key: 'tier',
+          label: 'Client / Caissier',
+          format: (_: any, entry: JournalEntry) => renderClientOrCaissier(entry),
+          mobileFormat: (_: any, entry: JournalEntry) => renderClientOrCaissier(entry)
+        },
+        {
+          key: 'reference',
+          label: 'Référence',
+          format: (val: string) => val ? <span className="text-slate-400 text-xs font-mono">{val}</span> : <span className="text-slate-600 text-xs">—</span>,
+          hideOnMobile: true
+        },
+        {
+          key: 'entree',
+          label: 'Entrée',
+          align: 'right' as const,
+          format: (_: any, entry: JournalEntry) => (
+             entry.sens === 'ENTREE' ? (
+                <span className="text-emerald-400 font-bold font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
+             ) : entry.type === 'OUVERTURE' ? (
+                <span className="text-blue-400 font-medium font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
+             ) : <span className="text-slate-600">—</span>
+          ),
+          hideOnMobile: true
+        },
+        {
+          key: 'sortie',
+          label: 'Sortie',
+          align: 'right' as const,
+          format: (_: any, entry: JournalEntry) => (
+             entry.sens === 'SORTIE' ? (
+                <span className="text-rose-400 font-bold font-mono">-{entry.montant.toLocaleString('fr-FR')}</span>
+             ) : <span className="text-slate-600">—</span>
+          ),
+          hideOnMobile: true
+        },
+        {
+            key: 'solde',
+            label: 'Solde',
+            align: 'right' as const,
+            format: (val: number, entry: JournalEntry) => (
+                <span className="text-white font-bold font-mono bg-slate-800/50 px-2 py-1 rounded text-xs">
+                    {entry.soldeProgressif.toLocaleString('fr-FR')}
+                </span>
+            ),
+            mobileFormat: (val: number, entry: JournalEntry) => (
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-800/50">
+                    <div className="text-lg font-bold">
+                        {entry.sens === 'ENTREE' && <span className="text-emerald-400">+{entry.montant.toLocaleString('fr-FR')}</span>}
+                        {entry.sens === 'SORTIE' && <span className="text-rose-400">-{entry.montant.toLocaleString('fr-FR')}</span>}
+                        {entry.sens === 'NEUTRE' && <span className="text-blue-400">{entry.montant.toLocaleString('fr-FR')}</span>}
+                    </div>
+                    <div>
+                         <span className="text-[10px] text-slate-500 mr-2">Solde</span>
+                         <span className="text-white font-mono font-bold">{entry.soldeProgressif.toLocaleString('fr-FR')}</span>
+                    </div>
+                </div>
+            )
+        }
+  ], []);
+
+  if (loading && journalEntries.length === 0) {
     return (
       <Card className="bg-slate-900/80 border-slate-800 p-8">
         <div className="flex items-center justify-center gap-3">
           <div className="animate-spin w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full" />
           <span className="text-slate-400">Chargement du journal...</span>
         </div>
-      </Card>
-    );
-  }
-
-  if (journalEntries.length === 0) {
-    return (
-      <Card className="bg-slate-900/80 border-slate-800 p-12 text-center">
-        <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Wallet size={32} className="text-slate-600" />
-        </div>
-        <h3 className="text-lg font-semibold text-white mb-1">Aucune opération</h3>
-        <p className="text-slate-500 text-sm">Aucune opération trouvée pour cette période.</p>
       </Card>
     );
   }
@@ -229,7 +344,7 @@ export function CashJournal({
         </Card>
       </div>
 
-      {/* Filter Pills - Horizontal scroll on mobile */}
+      {/* Filter Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 shrink-0 scrollbar-none">
         <Filter size={16} className="text-slate-500 shrink-0" />
         <button
@@ -264,145 +379,23 @@ export function CashJournal({
         </button>
       </div>
 
-      {/* Journal - Cards on mobile, Table on desktop */}
-      <Card className="bg-slate-900/80 border-slate-800 flex-1 min-h-0 flex flex-col overflow-hidden">
-        {/* Mobile: Cards View */}
-        <div className="md:hidden flex-1 overflow-y-auto p-3 space-y-2">
-          {paginatedEntries.map((entry) => (
-            <JournalCard key={entry.id} entry={entry} />
-          ))}
-        </div>
-
-        {/* Desktop: Table View */}
-        <div className="hidden md:flex flex-1 flex-col min-h-0">
-          <div className="overflow-x-auto flex-1 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-950/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider sticky top-0 z-10">
-                <tr>
-                  <th className="px-4 py-3 text-left">Date & Heure</th>
-                  <th className="px-4 py-3 text-left">Opération</th>
-                  <th className="px-4 py-3 text-left">Client / Caissier</th>
-                  <th className="px-4 py-3 text-left">Référence</th>
-                  <th className="px-4 py-3 text-right">Entrée</th>
-                  <th className="px-4 py-3 text-right">Sortie</th>
-                  <th className="px-4 py-3 text-right">Solde</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {paginatedEntries.map((entry) => (
-                  <tr
-                    key={entry.id}
-                    className={`transition-colors ${
-                      entry.type === 'OUVERTURE' || entry.type === 'FERMETURE'
-                        ? 'bg-slate-800/30'
-                        : 'hover:bg-slate-800/20'
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Clock size={12} className="text-slate-500" />
-                        <div>
-                          <p className="text-slate-300 font-medium text-xs">
-                            {entry.date.toLocaleDateString('fr-FR')}
-                          </p>
-                          <p className="text-slate-500 text-[10px]">
-                            {entry.date.toLocaleTimeString('fr-FR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {entry.type === 'OUVERTURE' && (
-                          <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold rounded">
-                            OUVERTURE
-                          </span>
-                        )}
-                        {entry.type === 'FERMETURE' && (
-                          <span className="px-2 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] font-bold rounded">
-                            FERMETURE
-                          </span>
-                        )}
-                        {entry.type === 'OPERATION' && (
-                          <span
-                            className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                              entry.sens === 'ENTREE'
-                                ? 'bg-emerald-500/10 text-emerald-400'
-                                : 'bg-rose-500/10 text-rose-400'
-                            }`}
-                          >
-                            {entry.sens === 'ENTREE' ? '↓' : '↑'} {getOperationLabel(entry.operationType)}
-                          </span>
-                        )}
-                      </div>
-                      {entry.description && entry.type === 'OPERATION' && (
-                        <p className="text-slate-500 text-[10px] mt-1 truncate max-w-[200px]">
-                          {entry.description}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {renderClientOrCaissier(entry)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {entry.reference ? (
-                        <span className="text-slate-400 text-xs font-mono">{entry.reference}</span>
-                      ) : (
-                        <span className="text-slate-600 text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {entry.sens === 'ENTREE' ? (
-                        <span className="text-emerald-400 font-bold font-mono">
-                          +{entry.montant.toLocaleString('fr-FR')}
-                        </span>
-                      ) : entry.type === 'OUVERTURE' ? (
-                        <span className="text-blue-400 font-medium font-mono">
-                          {entry.montant.toLocaleString('fr-FR')}
-                        </span>
-                      ) : (
-                        <span className="text-slate-600">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {entry.sens === 'SORTIE' ? (
-                        <span className="text-rose-400 font-bold font-mono">
-                          -{entry.montant.toLocaleString('fr-FR')}
-                        </span>
-                      ) : (
-                        <span className="text-slate-600">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-white font-bold font-mono bg-slate-800/50 px-2 py-1 rounded">
-                        {entry.soldeProgressif.toLocaleString('fr-FR')}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Pagination */}
-        {filteredEntries.length > itemsPerPage && (
-          <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/30 shrink-0">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={onPageChange}
-              itemsPerPage={itemsPerPage}
-              totalItems={filteredEntries.length}
-              canGoNext={currentPage < totalPages}
-              canGoPrevious={currentPage > 1}
-            />
-          </div>
-        )}
-      </Card>
+      {/* Journal - Responsive Table */}
+      <div className="flex-1 min-h-0 border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden flex flex-col">
+         <ResponsiveTable
+            data={paginatedEntries}
+            columns={columns}
+            loading={loading && journalEntries.length === 0}
+            emptyMessage="Aucune opération trouvée"
+            density="compact"
+            className="flex-1 overflow-auto"
+            headerClassName="sticky top-0 z-10 bg-slate-900 border-b border-slate-800"
+            pagination={{
+                page: currentPage,
+                totalPages: totalPages,
+                onPageChange: onPageChange
+            }}
+         />
+      </div>
     </div>
   );
 }
@@ -433,109 +426,7 @@ function renderClientOrCaissier(entry: JournalEntry) {
   return <span className="text-slate-600 text-xs">—</span>;
 }
 
-// Mobile Card Component
-function JournalCard({ entry }: { entry: JournalEntry }) {
-  const isSession = entry.type === 'OUVERTURE' || entry.type === 'FERMETURE';
-
-  return (
-    <div
-      className={`p-3 rounded-lg border transition-colors ${
-        isSession
-          ? 'bg-slate-800/40 border-slate-700/50'
-          : entry.sens === 'ENTREE'
-          ? 'bg-emerald-500/5 border-emerald-500/20'
-          : 'bg-rose-500/5 border-rose-500/20'
-      }`}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          {entry.type === 'OUVERTURE' && (
-            <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold rounded">
-              OUVERTURE
-            </span>
-          )}
-          {entry.type === 'FERMETURE' && (
-            <span className="px-2 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] font-bold rounded">
-              FERMETURE
-            </span>
-          )}
-          {entry.type === 'OPERATION' && (
-            <span
-              className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                entry.sens === 'ENTREE'
-                  ? 'bg-emerald-500/10 text-emerald-400'
-                  : 'bg-rose-500/10 text-rose-400'
-              }`}
-            >
-              {entry.sens === 'ENTREE' ? '↓' : '↑'} {getOperationLabel(entry.operationType)}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1 text-slate-500 text-[10px]">
-          <Clock size={10} />
-          {entry.date.toLocaleDateString('fr-FR')} {entry.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </div>
-
-      {/* Person info (Client or Caissier) */}
-      <div className="flex items-center gap-3 mb-2 text-xs">
-        {isSession ? (
-          // Internal operation: show caissier
-          <div className="flex items-center gap-1 text-blue-400">
-            <UserCircle size={12} />
-            <span>{entry.caissier || 'Caissier'}</span>
-          </div>
-        ) : entry.client ? (
-          // Client operation with client name
-          <div className="flex items-center gap-1 text-slate-400">
-            <User size={12} />
-            <span>{entry.client}</span>
-          </div>
-        ) : (
-          // Client operation without client name
-          <div className="flex items-center gap-1 text-slate-500">
-            <User size={12} />
-            <span className="italic">Non renseigné</span>
-          </div>
-        )}
-        {entry.reference && (
-          <span className="text-slate-500 font-mono text-[10px]">{entry.reference}</span>
-        )}
-      </div>
-
-      {/* Amount & Balance */}
-      <div className="flex items-center justify-between">
-        <div>
-          {entry.sens === 'ENTREE' && (
-            <span className="text-emerald-400 font-bold text-lg">
-              +{entry.montant.toLocaleString('fr-FR')}
-            </span>
-          )}
-          {entry.sens === 'SORTIE' && (
-            <span className="text-rose-400 font-bold text-lg">
-              -{entry.montant.toLocaleString('fr-FR')}
-            </span>
-          )}
-          {entry.sens === 'NEUTRE' && (
-            <span className="text-blue-400 font-medium text-lg">
-              {entry.montant.toLocaleString('fr-FR')}
-            </span>
-          )}
-          <span className="text-slate-500 text-xs ml-1">F CFA</span>
-        </div>
-        <div className="text-right">
-          <p className="text-slate-500 text-[10px]">Solde</p>
-          <p className="text-white font-bold font-mono">
-            {entry.soldeProgressif.toLocaleString('fr-FR')}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Helper functions
+// Helper functions (unchanged)
 function isEntreeOperation(type: string): boolean {
   const entreeTypes = [
     'DEPOSIT',

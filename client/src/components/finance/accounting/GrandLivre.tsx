@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BookOpen, Search, Download, Printer, Filter, Calendar as CalendarIcon, ArrowRight, TrendingUp, ArrowDownRight, ArrowUpRight, DollarSign } from 'lucide-react';
+import { BookOpen, Search, Download, Printer, Filter, Calendar as CalendarIcon, ArrowRight, TrendingUp, ArrowDownRight, ArrowUpRight, DollarSign, ChevronLeft, ChevronRight, RefreshCw, FileText, Info, ExternalLink } from 'lucide-react';
 import PageHeader from '../../ui/PageHeader';
 import StatCard from '../../ui/StatCard';
 import ResponsiveTable from '../../ui/ResponsiveTable';
@@ -10,22 +10,51 @@ import jsPDF from 'jspdf';
 import { comptabiliteApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 
-interface MouvementCompte {
-  date: string;
-  numero_piece: string;
-  libelle: string;
+interface GrandLivreEntry {
+  id: string;
+  dateEcriture: string;
+  numeroPiece: string;
+  journalCode: string;
+  journalIntitule: string;
+  ecritureLibelle: string;
+  ligneLibelle: string;
   debit: number;
   credit: number;
-  solde: number;
+  soldeProgressif: number;
+  sourceType?: string;
+  sourceId?: string;
+  refExterne?: string;
+}
+
+interface GrandLivreData {
+  compteId: string;
+  numeroCompte: string;
+  intitule: string;
+  classe: number;
+  typeCompte: string;
+  sensNormal: string;
+  soldeOuverture: number;
+  totalDebits: number;
+  totalCredits: number;
+  soldeFinal: number;
+  entries: GrandLivreEntry[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export default function GrandLivre() {
   const [comptes, setComptes] = useState<any[]>([]);
   const [compteSelectionne, setCompteSelectionne] = useState('');
-  const [mouvements, setMouvements] = useState<MouvementCompte[]>([]);
-  const [dateDebut, setDateDebut] = useState('2024-01-01');
+  const [grandLivreData, setGrandLivreData] = useState<GrandLivreData | null>(null);
+  const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(50);
 
   const fetchComptes = useCallback(async () => {
     try {
@@ -37,31 +66,24 @@ export default function GrandLivre() {
     }
   }, []);
 
-  const fetchMouvements = useCallback(async () => {
+  const fetchGrandLivre = useCallback(async () => {
     if (!compteSelectionne) return;
     setLoading(true);
     try {
-      const data = await comptabiliteApi.getGrandLivre(compteSelectionne, { dateDebut, dateFin });
-      let solde = 0;
-      const mouvementsAvecSolde: MouvementCompte[] = (data || []).map((ligne: any) => {
-        solde += (ligne.debit || 0) - (ligne.credit || 0);
-        return {
-          date: ligne.date_ecriture || ligne.date,
-          numero_piece: ligne.numero_piece,
-          libelle: ligne.libelle,
-          debit: ligne.debit || 0,
-          credit: ligne.credit || 0,
-          solde: solde
-        };
+      const data = await comptabiliteApi.getGrandLivreV2(compteSelectionne, {
+        dateDebut,
+        dateFin,
+        page,
+        pageSize
       });
-      setMouvements(mouvementsAvecSolde);
-    } catch (error) {
+      setGrandLivreData(data);
+    } catch (error: any) {
       toast.error(handleApiError(error, 'Erreur lors du chargement du grand livre'));
-      setMouvements([]);
+      setGrandLivreData(null);
     } finally {
       setLoading(false);
     }
-  }, [compteSelectionne, dateDebut, dateFin]);
+  }, [compteSelectionne, dateDebut, dateFin, page, pageSize]);
 
   useEffect(() => {
     fetchComptes();
@@ -69,40 +91,51 @@ export default function GrandLivre() {
 
   useEffect(() => {
     if (compteSelectionne) {
-      fetchMouvements();
+      setPage(1); // Reset to first page when account changes
+      fetchGrandLivre();
     } else {
-      setMouvements([]);
+      setGrandLivreData(null);
     }
-  }, [compteSelectionne, fetchMouvements]);
+  }, [compteSelectionne, dateDebut, dateFin]);
 
-  const compteInfo = comptes.find(c => c.id === compteSelectionne);
-  const totalDebit = mouvements.reduce((sum, m) => sum + m.debit, 0);
-  const totalCredit = mouvements.reduce((sum, m) => sum + m.credit, 0);
-  const soldeFinal = mouvements.length > 0 ? mouvements[mouvements.length - 1].solde : 0;
+  useEffect(() => {
+    if (compteSelectionne && page > 1) {
+      fetchGrandLivre();
+    }
+  }, [page]);
+
+  const entries = grandLivreData?.entries || [];
+  const totalDebit = grandLivreData?.totalDebits || 0;
+  const totalCredit = grandLivreData?.totalCredits || 0;
+  const soldeFinal = grandLivreData?.soldeFinal || 0;
+  const soldeOuverture = grandLivreData?.soldeOuverture || 0;
+  const pagination = grandLivreData?.pagination;
 
   const handleExportExcel = useCallback(() => {
-    if (!compteInfo || mouvements.length === 0) {
-      toast.warning('Aucune donnée à exporter');
+    if (!grandLivreData || entries.length === 0) {
+      toast.warning('Aucune donnee a exporter');
       return;
     }
 
     try {
-      const data = mouvements.map(m => ({
-        'Date': new Date(m.date).toLocaleDateString('fr-FR'),
-        'N° Pièce': m.numero_piece,
-        'Libellé': m.libelle,
-        'Débit': m.debit,
-        'Crédit': m.credit,
-        'Solde': m.solde
+      const data = entries.map(m => ({
+        'Date': new Date(m.dateEcriture).toLocaleDateString('fr-FR'),
+        'N Piece': m.numeroPiece,
+        'Journal': m.journalCode,
+        'Libelle': m.ecritureLibelle || m.ligneLibelle,
+        'Debit': m.debit,
+        'Credit': m.credit,
+        'Solde': m.soldeProgressif
       }));
 
       // Add totals row
       data.push({
         'Date': 'TOTAUX',
-        'N° Pièce': '',
-        'Libellé': '',
-        'Débit': totalDebit,
-        'Crédit': totalCredit,
+        'N Piece': '',
+        'Journal': '',
+        'Libelle': '',
+        'Debit': totalDebit,
+        'Credit': totalCredit,
         'Solde': soldeFinal
       });
 
@@ -111,22 +144,23 @@ export default function GrandLivre() {
 
       // Add header info
       XLSX.utils.sheet_add_aoa(ws, [
-        [`Grand Livre - Compte ${compteInfo.numero_compte} - ${compteInfo.intitule}`],
-        [`Période: ${dateDebut} au ${dateFin}`],
+        [`Grand Livre - Compte ${grandLivreData.numeroCompte} - ${grandLivreData.intitule}`],
+        [`Periode: ${dateDebut} au ${dateFin}`],
+        [`Solde d'ouverture: ${soldeOuverture.toLocaleString('fr-FR')} FCFA`],
         []
       ], { origin: 'A1' });
 
       XLSX.utils.book_append_sheet(wb, ws, 'Grand Livre');
-      XLSX.writeFile(wb, `Grand_Livre_${compteInfo.numero_compte}_${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast.success('Export Excel réussi');
+      XLSX.writeFile(wb, `Grand_Livre_${grandLivreData.numeroCompte}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success('Export Excel reussi');
     } catch (error) {
       toast.error(handleApiError(error, "Erreur lors de l'export Excel"));
     }
-  }, [compteInfo, mouvements, totalDebit, totalCredit, soldeFinal, dateDebut, dateFin]);
+  }, [grandLivreData, entries, totalDebit, totalCredit, soldeFinal, soldeOuverture, dateDebut, dateFin]);
 
   const handleExportPDF = useCallback(() => {
-    if (!compteInfo || mouvements.length === 0) {
-      toast.warning('Aucune donnée à exporter');
+    if (!grandLivreData || entries.length === 0) {
+      toast.warning('Aucune donnee a exporter');
       return;
     }
 
@@ -140,49 +174,52 @@ export default function GrandLivre() {
 
       doc.setFontSize(14);
       doc.setTextColor(50);
-      doc.text(`Compte: ${compteInfo.numero_compte} - ${compteInfo.intitule}`, 148, 30, { align: 'center' });
+      doc.text(`Compte: ${grandLivreData.numeroCompte} - ${grandLivreData.intitule}`, 148, 30, { align: 'center' });
 
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Période: ${dateDebut} au ${dateFin}`, 148, 38, { align: 'center' });
-      doc.text(`Édité le: ${new Date().toLocaleDateString('fr-FR')}`, 148, 44, { align: 'center' });
+      doc.text(`Periode: ${dateDebut} au ${dateFin}`, 148, 38, { align: 'center' });
+      doc.text(`Solde d'ouverture: ${soldeOuverture.toLocaleString('fr-FR')} FCFA`, 148, 44, { align: 'center' });
+      doc.text(`Edite le: ${new Date().toLocaleDateString('fr-FR')}`, 148, 50, { align: 'center' });
 
       // Line separator
       doc.setDrawColor(30, 58, 138);
-      doc.line(20, 50, 277, 50);
+      doc.line(20, 55, 277, 55);
 
       // Table header
       doc.setFontSize(9);
       doc.setTextColor(255);
       doc.setFillColor(30, 58, 138);
-      doc.rect(20, 55, 257, 10, 'F');
-      doc.text('Date', 25, 62);
-      doc.text('N° Pièce', 55, 62);
-      doc.text('Libellé', 90, 62);
-      doc.text('Débit', 180, 62);
-      doc.text('Crédit', 210, 62);
-      doc.text('Solde', 245, 62);
+      doc.rect(20, 60, 257, 10, 'F');
+      doc.text('Date', 25, 67);
+      doc.text('N Piece', 50, 67);
+      doc.text('Journal', 80, 67);
+      doc.text('Libelle', 100, 67);
+      doc.text('Debit', 180, 67);
+      doc.text('Credit', 210, 67);
+      doc.text('Solde', 245, 67);
 
       // Table content
       doc.setTextColor(0);
-      let y = 72;
-      const maxRows = Math.min(mouvements.length, 25);
+      let y = 77;
+      const maxRows = Math.min(entries.length, 25);
 
-      mouvements.slice(0, maxRows).forEach((m) => {
+      entries.slice(0, maxRows).forEach((m) => {
         doc.setFontSize(8);
-        doc.text(new Date(m.date).toLocaleDateString('fr-FR'), 25, y);
-        doc.text(m.numero_piece || '', 55, y);
-        doc.text((m.libelle || '').substring(0, 45), 90, y);
+        doc.text(new Date(m.dateEcriture).toLocaleDateString('fr-FR'), 25, y);
+        doc.text(m.numeroPiece || '', 50, y);
+        doc.text(m.journalCode || '', 80, y);
+        doc.text((m.ecritureLibelle || m.ligneLibelle || '').substring(0, 40), 100, y);
         doc.text(m.debit > 0 ? m.debit.toLocaleString('fr-FR') : '-', 180, y);
         doc.text(m.credit > 0 ? m.credit.toLocaleString('fr-FR') : '-', 210, y);
-        doc.text(m.solde.toLocaleString('fr-FR'), 245, y);
+        doc.text(m.soldeProgressif.toLocaleString('fr-FR'), 245, y);
         y += 7;
       });
 
-      if (mouvements.length > maxRows) {
+      if (entries.length > maxRows) {
         doc.setFontSize(8);
         doc.setTextColor(100);
-        doc.text(`... et ${mouvements.length - maxRows} autres mouvements`, 25, y);
+        doc.text(`... et ${entries.length - maxRows} autres mouvements`, 25, y);
         y += 10;
       }
 
@@ -197,23 +234,33 @@ export default function GrandLivre() {
       doc.text(totalCredit.toLocaleString('fr-FR') + ' FCFA', 210, y + 3);
       doc.text(soldeFinal.toLocaleString('fr-FR') + ' FCFA', 245, y + 3);
 
-      doc.save(`Grand_Livre_${compteInfo.numero_compte}_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast.success('Export PDF réussi');
+      doc.save(`Grand_Livre_${grandLivreData.numeroCompte}_${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('Export PDF reussi');
     } catch (error) {
       toast.error(handleApiError(error, "Erreur lors de l'export PDF"));
     }
-  }, [compteInfo, mouvements, totalDebit, totalCredit, soldeFinal, dateDebut, dateFin]);
+  }, [grandLivreData, entries, totalDebit, totalCredit, soldeFinal, soldeOuverture, dateDebut, dateFin]);
 
   const columns = [
     {
-      label: 'Libellé',
-      key: 'libelle',
-      primary: true, // Make Libellé primary for cleaner mobile cards
-      format: (val: string) => <span className="text-white font-medium line-clamp-2 text-xs sm:text-sm">{val}</span>
+      label: 'Libelle',
+      key: 'ecritureLibelle',
+      primary: true,
+      format: (val: string, row: GrandLivreEntry) => (
+        <div>
+          <span className="text-white font-medium line-clamp-2 text-xs sm:text-sm">{val || row.ligneLibelle}</span>
+          {row.sourceType && (
+            <span className="text-[10px] text-cyan-400/70 flex items-center gap-1 mt-0.5">
+              <ExternalLink size={10} />
+              {row.sourceType}
+            </span>
+          )}
+        </div>
+      )
     },
     {
       label: 'Date',
-      key: 'date',
+      key: 'dateEcriture',
       format: (val: string) => (
         <span className="flex items-center gap-1 text-slate-400 text-xs text-[10px] sm:text-xs">
           <CalendarIcon size={12} />
@@ -222,24 +269,31 @@ export default function GrandLivre() {
       )
     },
     {
-      label: 'Pièce',
-      key: 'numero_piece',
-      hideOnMobile: true, // Hide on mobile card summary, or keep if critical
-      format: (val: string) => <span className="font-mono text-cyan-400 text-[10px] sm:text-xs">{val}</span>
+      label: 'Piece',
+      key: 'numeroPiece',
+      hideOnMobile: true,
+      format: (val: string, row: GrandLivreEntry) => (
+        <div>
+          <span className="font-mono text-cyan-400 text-[10px] sm:text-xs">{val}</span>
+          {row.journalCode && (
+            <span className="block text-[9px] text-slate-500">{row.journalCode}</span>
+          )}
+        </div>
+      )
     },
     {
-      label: 'Débit',
+      label: 'Debit',
       key: 'debit',
-      format: (val: number) => val > 0 ? <span className="text-white font-mono text-xs">{val.toLocaleString()}</span> : <span className="text-slate-600 text-xs">-</span>
+      format: (val: number) => val > 0 ? <span className="text-amber-400 font-mono text-xs font-medium">{val.toLocaleString()}</span> : <span className="text-slate-600 text-xs">-</span>
     },
     {
-      label: 'Crédit',
+      label: 'Credit',
       key: 'credit',
-      format: (val: number) => val > 0 ? <span className="text-white font-mono text-xs">{val.toLocaleString()}</span> : <span className="text-slate-600 text-xs">-</span>
+      format: (val: number) => val > 0 ? <span className="text-emerald-400 font-mono text-xs font-medium">{val.toLocaleString()}</span> : <span className="text-slate-600 text-xs">-</span>
     },
     {
       label: 'Solde',
-      key: 'solde',
+      key: 'soldeProgressif',
       format: (val: number) => (
         <span className={`font-mono font-bold text-xs ${val >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
           {val.toLocaleString()}
@@ -264,7 +318,7 @@ export default function GrandLivre() {
                         onChange={(e) => setCompteSelectionne(e.target.value)}
                         className="w-full bg-slate-900/50 text-white text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500 transition-colors"
                       >
-                        <option value="">Sélectionner un compte...</option>
+                        <option value="">Selectionner un compte...</option>
                         {comptes.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.numero_compte} - {c.intitule}
@@ -272,14 +326,23 @@ export default function GrandLivre() {
                         ))}
                     </select>
                  </div>
-                 
+
                  <div className="flex gap-2 self-end sm:self-center">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={RefreshCw}
+                        onClick={fetchGrandLivre}
+                        disabled={!compteSelectionne || loading}
+                        className={`bg-slate-900/50 border-slate-700 hover:bg-slate-800 ${loading ? 'animate-spin' : ''}`}
+                        title="Rafraichir"
+                    />
                     <Button
                         variant="outline"
                         size="sm"
                         icon={Download}
                         onClick={handleExportExcel}
-                        disabled={!compteSelectionne || mouvements.length === 0}
+                        disabled={!compteSelectionne || entries.length === 0}
                         className="bg-slate-900/50 border-slate-700 hover:bg-slate-800"
                     >
                         <span className="hidden sm:inline">Excel</span>
@@ -289,7 +352,7 @@ export default function GrandLivre() {
                         size="sm"
                         icon={Printer}
                         onClick={handleExportPDF}
-                        disabled={!compteSelectionne || mouvements.length === 0}
+                        disabled={!compteSelectionne || entries.length === 0}
                         className="bg-slate-900/50 border-slate-700 hover:bg-slate-800"
                     >
                         <span className="hidden sm:inline">PDF</span>
@@ -300,7 +363,7 @@ export default function GrandLivre() {
             {/* Bottom Row: Dates */}
             <div className="flex gap-3 pt-2 border-t border-slate-700/50">
                  <div className="flex-1">
-                   <label className="text-[10px] uppercase text-slate-500 font-bold mb-1.5">Début</label>
+                   <label className="text-[10px] uppercase text-slate-500 font-bold mb-1.5">Debut</label>
                    <div className="relative">
                        <input
                         type="date"
@@ -329,51 +392,105 @@ export default function GrandLivre() {
 
       {compteSelectionne ? (
         <>
-          {/* Stats Carousel - Mobile Optimized */}
-          {/* Stats Carousel - Mobile Optimized */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-             <StatCard 
-               title="Total Débits" 
+          {/* Account Info */}
+          {grandLivreData && (
+            <div className="flex items-center gap-2 px-2">
+              <FileText size={14} className="text-cyan-400" />
+              <span className="text-sm text-white font-medium">{grandLivreData.numeroCompte}</span>
+              <span className="text-sm text-slate-400">-</span>
+              <span className="text-sm text-slate-300">{grandLivreData.intitule}</span>
+              <span className="text-xs text-slate-500 ml-auto">
+                Classe {grandLivreData.classe} | {grandLivreData.typeCompte}
+              </span>
+            </div>
+          )}
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+             {soldeOuverture !== 0 && (
+               <StatCard
+                 title="Solde Ouverture"
+                 value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(soldeOuverture)}
+                 icon={Info}
+                 color="neutral"
+                 subtitle="Report a nouveau"
+                 className="bg-slate-800/50 border-slate-700/50"
+               />
+             )}
+             <StatCard
+               title="Total Debits"
                value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(totalDebit)}
-               icon={ArrowDownRight} 
-               color="warning" 
-               subtitle="Cumul débit"
+               icon={ArrowDownRight}
+               color="warning"
+               subtitle={`${entries.length} mouvements`}
                className="bg-slate-800/50 border-slate-700/50"
              />
-             <StatCard 
-               title="Total Crédits" 
+             <StatCard
+               title="Total Credits"
                value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(totalCredit)}
-               icon={ArrowUpRight} 
-               color="success" 
-               subtitle="Cumul crédit"
+               icon={ArrowUpRight}
+               color="success"
+               subtitle="Cumul credit"
                className="bg-slate-800/50 border-slate-700/50"
              />
-             <StatCard 
-               title="Solde Final" 
+             <StatCard
+               title="Solde Final"
                value={new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', minimumFractionDigits: 0 }).format(soldeFinal)}
-               icon={DollarSign} 
-               color={soldeFinal >= 0 ? 'success' : 'primary'} 
-               subtitle={compteInfo?.intitule}
+               icon={DollarSign}
+               color={soldeFinal >= 0 ? 'success' : 'primary'}
+               subtitle={grandLivreData?.sensNormal || ''}
                className="bg-slate-800/50 border-slate-700/50 shadow-lg shadow-blue-500/5"
              />
           </div>
 
+          {/* Table */}
           <div className="bg-slate-900/50 rounded-xl overflow-hidden">
               <ResponsiveTable
-                data={mouvements}
+                data={entries}
                 columns={columns}
                 loading={loading}
-                emptyMessage="Aucun mouvement sur cette période."
+                emptyMessage="Aucun mouvement sur cette periode."
                 mobileBreakpoint="md"
               />
           </div>
+
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between px-2">
+              <span className="text-xs text-slate-400">
+                Page {pagination.page} sur {pagination.totalPages} ({pagination.total} lignes)
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={ChevronLeft}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1 || loading}
+                  className="bg-slate-800/50"
+                >
+                  Prec.
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={ChevronRight}
+                  onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                  disabled={page === pagination.totalPages || loading}
+                  className="bg-slate-800/50"
+                >
+                  Suiv.
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 text-center opacity-50">
            <div className="bg-slate-800 p-4 rounded-full mb-4">
              <BookOpen className="w-8 h-8 text-blue-400" />
            </div>
-           <p className="text-sm font-medium text-white">Sélectionnez un compte</p>
+           <p className="text-sm font-medium text-white">Selectionnez un compte</p>
            <p className="text-xs text-slate-400 max-w-[200px] mt-1">Choisissez un compte ci-dessus pour afficher le grand livre.</p>
         </div>
       )}

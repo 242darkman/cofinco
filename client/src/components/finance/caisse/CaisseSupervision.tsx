@@ -398,7 +398,7 @@ export default function CaisseSupervision({
   }, [pendingSupervisionSession, currentUser, onTakeControl, onSupervisionStart]);
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500">
+    <div className="flex flex-col h-full space-y-2 animate-in fade-in duration-500 overflow-hidden">
       
       {/* Sélecteur d'agence pour Admin */}
       {permissions.isAdmin && agences.length > 1 && (
@@ -419,68 +419,68 @@ export default function CaisseSupervision({
         </div>
       )}
 
-      {/* KPI Supervision - optimisé mobile */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {/* KPI Supervision - Compact */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 shrink-0">
         {/* KPI Principal - Fonds */}
-        <div className="col-span-3 sm:col-span-1 p-3 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-cyan-500/10
-                      border border-emerald-500/20 backdrop-blur-sm">
-          <div className="flex items-center justify-between sm:flex-col sm:items-start sm:gap-1">
+        <div className="col-span-2 sm:col-span-1 p-2 rounded-lg bg-gradient-to-br from-emerald-500/10 to-cyan-500/10
+                      border border-emerald-500/20 backdrop-blur-sm shadow-sm">
+          <div className="flex items-center justify-between sm:flex-col sm:items-start sm:gap-0.5">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 sm:p-2 rounded-lg bg-emerald-500/20">
-                <Wallet size={16} className="text-emerald-400 sm:size-5" />
+              <div className="p-1.5 rounded-md bg-emerald-500/20">
+                <Wallet size={14} className="text-emerald-400" />
               </div>
-              <span className="text-[10px] sm:text-xs text-slate-400 uppercase font-semibold tracking-wider sm:hidden">
-                Fonds en Caisse
+              <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider sm:hidden">
+                Fonds
               </span>
             </div>
             <div className="text-right sm:text-left sm:w-full">
-              <div className="hidden sm:block text-[10px] sm:text-xs text-slate-400 uppercase font-semibold tracking-wider mb-1">
+              <div className="hidden sm:block text-[10px] text-slate-400 uppercase font-semibold tracking-wider mb-0.5">
                 Fonds en Caisse
               </div>
-              <div className="text-lg sm:text-xl font-bold text-white font-mono">
+              <div className="text-base sm:text-lg font-bold text-white font-mono leading-tight">
                 {formatMoney(totalEspeces)}
               </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">
-                {activeSessions.length} caisse{activeSessions.length > 1 ? 's' : ''} active{activeSessions.length > 1 ? 's' : ''}
+              <div className="text-[9px] text-slate-500">
+                {activeSessions.length} caisse{activeSessions.length > 1 ? 's' : ''}
               </div>
             </div>
           </div>
         </div>
 
         {/* KPI Caissiers Actifs */}
-        <div className="p-3 sm:p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex flex-col items-center sm:items-start gap-1">
-            <div className="flex items-center gap-2">
-              <User size={14} className="text-cyan-400 sm:size-4" />
-              <span className="text-[10px] text-slate-500 uppercase font-semibold hidden sm:inline">Actifs</span>
+        <div className="p-2 rounded-lg bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm shadow-sm">
+          <div className="flex flex-col items-center sm:items-start gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <User size={12} className="text-cyan-400" />
+              <span className="text-[9px] text-slate-500 uppercase font-semibold hidden sm:inline">Actifs</span>
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-white">{activeSessions.length}</div>
-            <div className="text-[9px] sm:text-[10px] text-emerald-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="text-lg sm:text-xl font-bold text-white leading-tight">{activeSessions.length}</div>
+            <div className="text-[9px] text-emerald-400 flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
               En ligne
             </div>
           </div>
         </div>
 
         {/* KPI Fermées */}
-        <div className="p-3 sm:p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex flex-col items-center sm:items-start gap-1">
-            <div className="flex items-center gap-2">
-              <Lock size={14} className="text-slate-400 sm:size-4" />
-              <span className="text-[10px] text-slate-500 uppercase font-semibold hidden sm:inline">Fermées</span>
+        <div className="p-2 rounded-lg bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm shadow-sm">
+          <div className="flex flex-col items-center sm:items-start gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <Lock size={12} className="text-slate-400" />
+              <span className="text-[9px] text-slate-500 uppercase font-semibold hidden sm:inline">Fermées</span>
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-white">
+            <div className="text-lg sm:text-xl font-bold text-white leading-tight">
               {closedSessions.filter(s => new Date(resolveClosedAt(s) || resolveOpenedAt(s)).toDateString() === new Date().toDateString()).length}
             </div>
-            <div className="text-[9px] sm:text-[10px] text-slate-500">Aujourd'hui</div>
+            <div className="text-[9px] text-slate-500">Aujourd'hui</div>
           </div>
         </div>
       </div>
 
-      <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-xl shadow-xl overflow-hidden">
+      <div className="flex-1 min-h-0 bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col">
 
         {/* Navigation Tabs - sticky sur mobile */}
-        <div className="sticky top-0 z-20 bg-slate-950/95 backdrop-blur-lg border-b border-slate-800/50">
+        <div className="sticky top-0 z-20 bg-slate-950/95 backdrop-blur-lg border-b border-slate-800/50 shrink-0">
           <div className="flex">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key;
@@ -490,19 +490,19 @@ export default function CaisseSupervision({
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as any)}
                   className={`
-                    flex-1 flex items-center justify-center gap-2 py-3 px-4
-                    text-xs sm:text-sm font-medium transition-all relative
+                    flex-1 flex items-center justify-center gap-2 py-2 px-4
+                    text-xs font-medium transition-all relative
                     ${isActive
                       ? 'text-emerald-400'
                       : 'text-slate-400 hover:text-white'
                     }
                   `}
                 >
-                  {Icon && <Icon size={16} className="sm:size-[18px]" />}
-                  <span className="hidden xs:inline">{tab.label}</span>
+                  {Icon && <Icon size={14} className="sm:size-[16px]" />}
+                  <span>{tab.label}</span>
                   {tab.badge !== undefined && (
                     <span className={`
-                      min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold
+                      min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold
                       flex items-center justify-center
                       ${isActive
                         ? 'bg-emerald-500/20 text-emerald-400'
@@ -522,7 +522,7 @@ export default function CaisseSupervision({
           </div>
         </div>
 
-        <div className="p-3 sm:p-5">
+        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
           
           {/* VUE SESSIONS */}
           {activeTab === 'sessions' && (
@@ -538,20 +538,20 @@ export default function CaisseSupervision({
                   className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all"
                   aria-label="Actualiser"
                 >
-                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                   <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                 </button>
               </div>
 
               {activeSessions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                   <div className="bg-slate-800/50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                     <Lock size={32} className="opacity-50" />
+                <div className="text-center py-8 text-slate-500">
+                   <div className="bg-slate-800/50 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
+                     <Lock size={24} className="opacity-50" />
                    </div>
-                   <p className="text-sm">Aucune caisse ouverte actuellement.</p>
+                   <p className="text-xs">Aucune caisse ouverte actuellement.</p>
                 </div>
               ) : (
-                /* Mobile: Stack vertical, Desktop: Grid 2 cols */
-                <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4">
+                /* Mobile: Stack vertical, Desktop: Grid 2 cols - Compact Grid */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {activeSessions.map(session => {
                     // Vérifier si c'est la propre session de l'utilisateur connecté
                     const isOwnSession = session.caissier_id === currentUser?.id;
@@ -559,8 +559,8 @@ export default function CaisseSupervision({
                     return (
                     <div
                       key={session.id}
-                      className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl overflow-hidden
-                                 active:scale-[0.98] transition-transform touch-manipulation"
+                      className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-lg overflow-hidden
+                                 active:scale-[0.98] transition-transform touch-manipulation hover:bg-slate-800/60"
                     >
                       {/* Indicateur de statut actif - barre gauche */}
                       <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${isOwnSession ? 'from-cyan-400 to-cyan-600' : 'from-emerald-400 to-emerald-600'}`} />
@@ -568,24 +568,24 @@ export default function CaisseSupervision({
                       {/* Badge Agence - positionné en haut à droite */}
                       {session.agence_nom && (
                         <div className="absolute top-2 right-2 z-10">
-                          <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                             {session.agence_code || session.agence_nom.substring(0, 4).toUpperCase()}
                           </span>
                         </div>
                       )}
 
-                      <div className="p-3 sm:p-4 pl-4">
+                      <div className="p-3 pl-4">
                         {/* En-tête: Nom de la Caisse */}
                         {session.caisse_nom && (
-                          <div className="mb-2 pb-2 border-b border-slate-700/30">
-                            <div className="flex items-center gap-2">
-                              <Wallet size={14} className="text-amber-400" />
-                              <span className="text-sm font-bold text-white">
+                          <div className="mb-2 pb-1.5 border-b border-slate-700/30">
+                            <div className="flex items-center gap-1.5">
+                              <Wallet size={12} className="text-amber-400" />
+                              <span className="text-xs font-bold text-white truncate max-w-[140px]">
                                 {session.caisse_nom}
                               </span>
                               {isOwnSession && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                                  VOUS
+                                <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                  MOI
                                 </span>
                               )}
                             </div>
@@ -593,10 +593,10 @@ export default function CaisseSupervision({
                         )}
 
                         {/* Header: Avatar + Info + Solde */}
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-2.5">
                           {/* Avatar */}
-                          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br
-                                        flex items-center justify-center border font-bold text-sm shrink-0
+                          <div className={`w-8 h-8 rounded-full bg-gradient-to-br
+                                        flex items-center justify-center border font-bold text-xs shrink-0
                                         ${isOwnSession
                                           ? 'from-cyan-700 to-cyan-800 border-cyan-600 text-cyan-200'
                                           : 'from-slate-700 to-slate-800 border-slate-600 text-slate-200'
@@ -606,100 +606,64 @@ export default function CaisseSupervision({
 
                           {/* Info caissier */}
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-white text-sm sm:text-base truncate pr-16">
+                            <h4 className="font-semibold text-white text-sm truncate pr-8">
                               {session.caissier_nom || 'Caissier Inconnu'}
                             </h4>
-                            <div className="flex items-center gap-1.5 text-xs text-emerald-400 mt-0.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                              <span>Ouverte il y a {formatTimeAgo(resolveOpenedAt(session))}</span>
+                            <div className="flex items-center gap-1 text-[10px] text-emerald-400">
+                              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span>{formatTimeAgo(resolveOpenedAt(session))}</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Solde - mis en évidence sur mobile */}
-                        <div className="mt-3 p-2.5 sm:p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] sm:text-xs text-slate-500 uppercase font-semibold tracking-wider">
-                              Solde Théorique
-                            </span>
-                            <span className="text-base sm:text-lg font-mono font-bold text-white">
-                              {formatMoney(getSoldeTheorique(session))}
-                            </span>
-                          </div>
+                        {/* Solde - Compact */}
+                        <div className="mt-2 p-2 rounded bg-slate-900/50 border border-slate-700/30 flex items-center justify-between">
+                          <span className="text-[9px] text-slate-500 uppercase font-semibold tracking-wider">
+                            Solde
+                          </span>
+                          <span className="text-sm font-mono font-bold text-white">
+                            {formatMoney(getSoldeTheorique(session))}
+                          </span>
                         </div>
 
-                        {/* Actions - optimisées pour le touch */}
-                        <div className="flex items-center gap-2 mt-3">
+                        {/* Actions - optimisées */}
+                        <div className="flex items-center gap-1.5 mt-2">
                           <button
                             onClick={() => handleViewDetails(session)}
-                            className="flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
+                            className="flex-1 py-1.5 px-2 rounded text-xs font-medium
                                      bg-slate-700/50 text-slate-300 border border-slate-600/50
                                      hover:bg-slate-700 hover:text-white active:scale-[0.97]
-                                     transition-all touch-manipulation"
+                                     transition-all"
                           >
-                            Voir Détails
+                            Détails
                           </button>
 
-                          {/* Bouton "Prendre la main" - visible si permission canTakeControl */}
+                          {/* Bouton "Prendre la main" */}
                           {onTakeControl && permissions.canTakeControl && (
                             isOwnSession ? (
-                              <Tooltip
-                                content="Vous ne pouvez pas superviser votre propre session active"
-                                position="top"
+                              <button
+                                disabled
+                                className="flex-1 py-1.5 px-2 rounded text-xs font-medium
+                                         bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
                               >
-                                <button
-                                  disabled
-                                  className="flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
-                                           bg-cyan-500/20 text-cyan-400 cursor-not-allowed border border-cyan-500/30
-                                           transition-all touch-manipulation"
-                                >
-                                  <span className="flex items-center justify-center gap-1.5">
-                                    <Info size={14} />
-                                    Votre Session
-                                  </span>
-                                </button>
-                              </Tooltip>
+                                Votre Session
+                              </button>
                             ) : (
                               <button
                                 onClick={() => handleRequestSupervision(session)}
                                 disabled={!!activeSupervision && activeSupervision.sessionId !== session.id}
-                                className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-medium
-                                         transition-all touch-manipulation
+                                className={`flex-1 py-1.5 px-2 rounded text-xs font-medium
+                                         transition-all
                                          ${activeSupervision && activeSupervision.sessionId !== session.id
                                            ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
                                            : activeSupervision?.sessionId === session.id
-                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20'
-                                             : 'bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.97] shadow-lg shadow-emerald-500/20'
+                                             ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                             : 'bg-emerald-500 text-white hover:bg-emerald-600'
                                          }`}
                               >
-                                {activeSupervision?.sessionId === session.id ? (
-                                  <span className="flex items-center justify-center gap-1.5">
-                                    <Shield size={14} />
-                                    En supervision
-                                  </span>
-                                ) : activeSupervision ? (
-                                  'Supervision active'
-                                ) : (
-                                  'Prendre la main'
-                                )}
+                                {activeSupervision?.sessionId === session.id ? 'En cours' : 'Superviser'}
                               </button>
                             )
-                          )}
-
-                          {/* Bouton "Forcer la fermeture" - visible si permission canForceClose */}
-                          {permissions.canForceClose && (
-                            <button
-                              onClick={() => {
-                                setSelectedSession(session);
-                                setIsClosingOpen(true);
-                              }}
-                              className="p-2.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20
-                                       hover:bg-red-500/20 active:scale-[0.95]
-                                       transition-all touch-manipulation"
-                              title="Forcer la fermeture"
-                            >
-                              <Lock size={16} />
-                            </button>
                           )}
                         </div>
                       </div>

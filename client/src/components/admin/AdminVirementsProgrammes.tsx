@@ -333,10 +333,10 @@ export default function AdminVirementsProgrammes() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="flex flex-col h-full space-y-3 overflow-hidden animate-in fade-in duration-500">
       
-      {/* 1. Hero Zone: KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 1. Hero Zone: KPIs - Compact */}
+      <div className="shrink-0 grid grid-cols-1 md:grid-cols-3 gap-3">
         <StatCard 
             title="Volume Mensuel" 
             value={formatMoney(stats.totalVolume || 0)} 
@@ -345,6 +345,7 @@ export default function AdminVirementsProgrammes() {
             variant="glass"
             trend={stats.trend ? `${stats.trend > 0 ? '+' : ''}${Math.round(stats.trend)}%` : undefined}
             trendUp={stats.trendUp ?? true}
+            className="py-3 px-4"
         />
         <StatCard 
             title="Actifs" 
@@ -353,6 +354,7 @@ export default function AdminVirementsProgrammes() {
             icon={Activity} 
             color="success"
             variant="glass"
+            className="py-3 px-4"
         />
         <StatCard 
             title="Prochaine exécution" 
@@ -361,11 +363,12 @@ export default function AdminVirementsProgrammes() {
             icon={Clock} 
             color="warning"
             variant="glass"
+            className="py-3 px-4"
         />
       </div>
 
-      {/* 2. Toolbar & Filters */}
-      <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4 backdrop-blur-sm">
+      {/* 2. Toolbar & Filters - Compact */}
+      <div className="shrink-0 bg-slate-800/50 p-1.5 rounded-xl border border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-3 backdrop-blur-sm">
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar">
               <TabGroup 
                  activeTab={statusFilter}
@@ -381,26 +384,26 @@ export default function AdminVirementsProgrammes() {
               />
           </div>
           
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
               <SearchInput 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Rechercher (Cmd+K)..."
-                  className="w-full sm:w-64"
+                  placeholder="Rechercher..."
+                  className="w-full sm:w-48 h-8 text-xs"
               />
               
-              <div className="flex bg-slate-700/50 p-1 rounded-lg border border-slate-600">
+              <div className="flex bg-slate-700/50 p-0.5 rounded-lg border border-slate-600 shrink-0">
                   <button 
                     onClick={() => setViewMode('list')}
                     className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
                   >
-                      <LayoutList size={16} />
+                      <LayoutList size={14} />
                   </button>
                   <button 
                     onClick={() => setViewMode('calendar')}
                     className={`p-1.5 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
                   >
-                      <CalendarIcon size={16} />
+                      <CalendarIcon size={14} />
                   </button>
               </div>
 
@@ -408,45 +411,50 @@ export default function AdminVirementsProgrammes() {
                 variant="ghost" 
                 size="sm"
                 onClick={() => loadData(false)}
-                className="text-slate-400 hover:text-slate-100"
+                className="text-slate-400 hover:text-slate-100 h-8 w-8 p-0"
                 aria-label="Rafraîchir"
               >
-                  <RefreshCw size={20} />
+                  <RefreshCw size={16} />
               </Button>
 
               <Button 
                 variant="primary" 
                 icon={Plus} 
+                size="sm"
                 onClick={() => {
-                     // Open create modal or drawer (Not implemented in this task scope, but button is here)
                      toast.info("Création à venir");
                 }}
+                className="h-8 text-xs"
               >
                   Nouveau
               </Button>
           </div>
       </div>
 
-      {/* 3. Data Table */}
-      <div className="bg-surface-base rounded-xl border border-edge overflow-hidden min-h-[400px]">
+      {/* 3. Data Table - Fixed Height Scrollable */}
+      <div className="flex-1 min-h-0 bg-surface-base rounded-xl border border-edge overflow-hidden flex flex-col">
          {transfers.length > 0 ? (
-             <ResponsiveTable
-                data={transfers}
-                columns={tableColumns}
-                loading={loading}
-                emptyMessage="Aucun résultat"
-                onRowClick={handleRowClick}
-             />
+             <div className="flex-1 overflow-y-auto custom-scrollbar">
+                 <ResponsiveTable
+                    data={transfers}
+                    columns={tableColumns}
+                    loading={loading}
+                    emptyMessage="Aucun résultat"
+                    onRowClick={handleRowClick}
+                 />
+             </div>
          ) : (
-             <EmptyState 
-                icon={CalendarIcon}
-                title="Aucun virement programmé"
-                description="Automatisez vos flux financiers en créant votre premier virement programmé."
-                action={{
-                    label: "Planifier un virement",
-                    onClick: () => toast.info("Création à venir")
-                }}
-             />
+             <div className="flex-1 flex flex-col justify-center">
+                 <EmptyState 
+                    icon={CalendarIcon}
+                    title="Aucun virement programmé"
+                    description="Automatisez vos flux financiers en créant votre premier virement programmé."
+                    action={{
+                        label: "Planifier un virement",
+                        onClick: () => toast.info("Création à venir")
+                    }}
+                 />
+             </div>
          )}
       </div>
 
@@ -457,10 +465,7 @@ export default function AdminVirementsProgrammes() {
           transfer={selectedTransfer}
           onToggleActive={handleToggleActive}
           onRunNow={handleRunNow}
-          // Edit handler could open the old modal or keep editing in drawer. 
-          // For now, let's keep it simple.
           onEdit={(t) => {
-              // Logic to switch to edit mode
               toast.info("Mode édition");
           }}
       />

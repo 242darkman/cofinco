@@ -188,16 +188,17 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="flex flex-col h-full space-y-2">
+      {/* Stats Cards - Compact */}
+      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard
           title="Présents"
           value={`${stats.presents}/${stats.totalEmployes}`}
-          subtitle={`${stats.tauxPresence}% taux`}
+          subtitle={`${stats.tauxPresence}%`}
           icon={CheckCircle}
           color="success"
           onClick={() => handleShowEmployees('Présent')}
-          className="cursor-pointer hover:scale-105 transition-transform"
+          className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
         />
 
         <StatCard
@@ -206,7 +207,7 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
           icon={Clock}
           color="warning"
           onClick={() => handleShowEmployees('Retard')}
-          className="cursor-pointer hover:scale-105 transition-transform"
+          className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
         />
 
         <StatCard
@@ -215,66 +216,72 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
           icon={XCircle}
           color="danger"
           onClick={() => handleShowEmployees('Absent')}
-          className="cursor-pointer hover:scale-105 transition-transform"
+          className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
         />
 
-        <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 flex flex-col justify-center items-center gap-2">
-            <h4 className="text-white text-xs font-bold">Pointage</h4>
+        <div className="bg-slate-800/50 rounded-xl p-2 border border-slate-700/50 flex flex-col justify-center items-center gap-1.5 h-full">
+            <h4 className="text-white text-[10px] font-bold uppercase tracking-wider">Pointage</h4>
             {!userPresence?.heureArrivee && (
-              <Button variant="primary" size="sm" fullWidth icon={UserCheck} onClick={handleCheckIn}>
+              <Button variant="primary" size="sm" fullWidth icon={UserCheck} onClick={handleCheckIn} className="h-8 text-xs">
                 Pointer Arrivée
               </Button>
             )}
             {userPresence?.heureArrivee && !userPresence?.pauseDebut && !userPresence?.heureDepart && (
-              <>
-                <Button variant="secondary" size="sm" fullWidth onClick={handleStartBreak}>
-                  Départ Pause
+              <div className="grid grid-cols-2 gap-1 w-full">
+                <Button variant="secondary" size="sm" onClick={handleStartBreak} className="h-8 text-xs px-1">
+                  Pause
                 </Button>
-                <Button variant="danger" size="sm" fullWidth onClick={handleCheckOut}>
-                  Fin de Journée
+                <Button variant="danger" size="sm" onClick={handleCheckOut} className="h-8 text-xs px-1">
+                  Fin
                 </Button>
-              </>
+              </div>
             )}
             {userPresence?.pauseDebut && !userPresence?.pauseFin && (
-              <Button variant="success" size="sm" fullWidth onClick={handleEndBreak}>
+              <Button variant="success" size="sm" fullWidth onClick={handleEndBreak} className="h-8 text-xs">
                 Retour Pause
               </Button>
             )}
             {userPresence?.pauseFin && !userPresence?.heureDepart && (
-              <Button variant="danger" size="sm" fullWidth onClick={handleCheckOut}>
+              <Button variant="danger" size="sm" fullWidth onClick={handleCheckOut} className="h-8 text-xs">
                 Fin de Journée
               </Button>
             )}
             {userPresence?.heureDepart && (
-              <div className="text-xs text-green-400 text-center">Journée terminée</div>
+              <div className="text-xs text-green-400 text-center font-bold">Terminé ✅</div>
             )}
         </div>
       </div>
 
-      <Card padding="sm" className="bg-slate-900/50 border-slate-800">
-        <div className="flex items-center justify-between mb-4 px-2">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Clock size={16} className="text-cyan-400" />
+      {/* Table Section - Flex Grow */}
+      <div className="flex-1 min-h-0 bg-slate-900/50 border border-slate-800 rounded-lg flex flex-col">
+        <div className="shrink-0 flex items-center justify-between p-2 border-b border-slate-800 bg-slate-900/50">
+            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                <Clock size={14} className="text-cyan-400" />
                 Feuille de Présence - {new Date().toLocaleDateString('fr-FR')}
             </h3>
-            <span className="text-xs text-slate-400">
+            <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
                 {presenceData.length} employés
             </span>
         </div>
         
-        <ResponsiveTable 
-            data={paginatedPresenceData}
-            columns={columns}
-            loading={loading}
-            mobileBreakpoint="sm"
-            maxHeight="500px"
-            pagination={{
-              page: currentPage,
-              totalPages,
-              onPageChange: setCurrentPage
-            }}
-        />
-      </Card>
+        <div className="flex-1 overflow-hidden">
+          <ResponsiveTable 
+              data={paginatedPresenceData}
+              columns={columns}
+              loading={loading}
+              mobileBreakpoint="sm"
+              maxHeight="100%"
+              pagination={{
+                page: currentPage,
+                totalPages,
+                onPageChange: setCurrentPage
+              }}
+              density="compact"
+              className="border-0 rounded-none h-full"
+              headerClassName="bg-slate-900 sticky top-0"
+          />
+        </div>
+      </div>
 
       {/* Modal Liste Employés */}
       {showModal && (

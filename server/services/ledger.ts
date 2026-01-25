@@ -14,12 +14,13 @@ import {
 import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { TypeCompte } from "@shared/enum/status-constants";
+import accountingPostingService from "./accounting-posting-service";
 
 // Infer MouvementFinancier type from table
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
 
 // Types for the ledger service
-export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE";
+export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE" | "MOBILE_MONEY";
 export type SensMouvement = "DEBIT" | "CREDIT";
 export type TypeEvenement =
   | "MOUVEMENT_CREE"
@@ -84,6 +85,7 @@ export function generateReference(sourceModule: SourceModule | "TIC"): string {
     COMPTE: "CPT",
     TIC: "TIC",
     COFFRE: "COF",
+    MOBILE_MONEY: "MMO",
   };
   
   return `${prefixes[sourceModule]}-${year}${month}${day}-${time}${random}`;
@@ -140,8 +142,8 @@ export async function createMouvementFinancier(
     agenceId: data.agenceId,
     agentId: data.agentId,
     reference,
-    referenceExterne: data.referenceExterne,
-    idempotencyKey: data.idempotencyKey,
+    referenceExterne: data.referenceExterne || null,
+    idempotencyKey: data.idempotencyKey || null,
     metadata: data.metadata,
     createdBy: validatedUserId,
     dateOperation: new Date(),
@@ -537,7 +539,7 @@ export async function executeWithLedger<T>(
     }
   }
 
-  return await db.transaction(async (tx) => {
+  const transactionResult = await db.transaction(async (tx) => {
     // 1. Create mouvement financier
     const mouvement = await createMouvementFinancier(
       tx,
@@ -551,8 +553,110 @@ export async function executeWithLedger<T>(
     // 3. Create outbox events for all relevant channels
     await createMouvementEvents(tx, mouvement, additionalEventData);
 
-    return { result, mouvement };
+    return { result, mouvement, additionalEventData };
   });
+
+  // 4. Post to GL asynchronously (fire-and-forget, non-blocking)
+  // This ensures the business transaction succeeds even if GL posting fails
+  // GL posting has its own idempotency, so retries are safe
+  if (mouvementData.agenceId && transactionResult.mouvement) {
+    postToGeneralLedger(transactionResult.mouvement, mouvementData.agenceId, userId, transactionResult.additionalEventData)
+      .catch(err => console.warn(`[Ledger] GL posting deferred for ${transactionResult.mouvement.id}: ${err.message}`));
+  }
+
+  return { result: transactionResult.result, mouvement: transactionResult.mouvement };
+}
+
+/**
+ * Post a mouvement to the General Ledger (SYSCOHADA)
+ * This is called asynchronously after the business transaction completes
+ * It's idempotent - safe to retry
+ */
+async function postToGeneralLedger(
+  mouvement: MouvementFinancier,
+  agenceId: string,
+  userId?: string,
+  additionalEventData?: Record<string, any>
+): Promise<void> {
+  try {
+    // Build additional metadata for the GL entry
+    const metadata: Record<string, any> = {
+      ...(additionalEventData || {}),
+    };
+
+    // Try to get client name if available (nom/prenom are in users table)
+    if (mouvement.clientId) {
+      try {
+        const [clientUser] = await db
+          .select({ nom: users.nom, prenom: users.prenom })
+          .from(clients)
+          .innerJoin(users, eq(clients.userId, users.id))
+          .where(eq(clients.id, mouvement.clientId))
+          .limit(1);
+        if (clientUser) {
+          metadata.clientName = `${clientUser.nom} ${clientUser.prenom || ""}`.trim();
+        }
+      } catch (e) {
+        // Ignore - clientName will be "Client"
+      }
+    }
+
+    // Try to get credit number if available
+    if (mouvement.creditId) {
+      try {
+        const [credit] = await db.select({ numeroCredit: credits.numeroCredit })
+          .from(credits)
+          .where(eq(credits.id, mouvement.creditId))
+          .limit(1);
+        if (credit) {
+          metadata.creditNumber = credit.numeroCredit;
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    // Try to get tontine name if available
+    if (mouvement.tontineId) {
+      try {
+        const [tontine] = await db.select({ nom: tontines.nom })
+          .from(tontines)
+          .where(eq(tontines.id, mouvement.tontineId))
+          .limit(1);
+        if (tontine) {
+          metadata.tontineName = tontine.nom;
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    // Determine provider from metadata if Mobile Money
+    if (mouvement.methodePaiement === "MOBILE_MONEY" && mouvement.metadata) {
+      const mouvMeta = mouvement.metadata as Record<string, any>;
+      if (mouvMeta.provider) {
+        metadata.provider = mouvMeta.provider;
+      }
+    }
+
+    // Post to GL using the accounting posting service
+    const result = await accountingPostingService.postFromMouvement({
+      mouvement,
+      agenceId,
+      userId,
+      additionalMetadata: metadata
+    });
+
+    if (result) {
+      console.log(`[Ledger] GL posted: ${mouvement.id} -> ${result.numeroPiece}`);
+    } else {
+      console.log(`[Ledger] GL posting skipped for ${mouvement.id} (no matching rule or already posted)`);
+    }
+  } catch (error: any) {
+    // Log but don't throw - GL posting is async and shouldn't break business flow
+    console.error(`[Ledger] GL posting failed for ${mouvement.id}: ${error.message}`);
+    // In a production system, we'd queue this for retry
+  }
 }
 
 export default {

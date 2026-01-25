@@ -144,74 +144,81 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-500 font-sans selection:bg-cyan-500/30">
+    <div className="flex flex-col h-full space-y-4 animate-in fade-in duration-500 font-sans selection:bg-cyan-500/30 overflow-hidden">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="shrink-0 flex items-center justify-between gap-4 py-1">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={onBack}
-            className="rounded-full w-10 h-10 p-0 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
+            className="rounded-full w-8 h-8 p-0 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </Button>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">États Financiers</h2>
+            <h2 className="text-lg font-bold text-white tracking-tight">États Financiers</h2>
             <p className="text-xs text-slate-400 font-medium whitespace-nowrap">Rapports & Analyses</p>
           </div>
         </div>
       </div>
 
       {/* Toolbar */}
-      <ReportsToolbar
-        dateDebut={dateDebut}
-        dateFin={dateFin}
-        typeRapport={typeRapport}
-        onDateDebutChange={setDateDebut}
-        onDateFinChange={setDateFin}
-        onTypeRapportChange={setTypeRapport}
-        onExportPDF={exporterPDF}
-        onExportExcel={exporterExcel}
-        loading={loading}
-      />
-
-      {/* Content based on report type */}
-      {typeRapport === 'journal' && (
-        <CashJournal
-          sessions={sessions}
-          transactions={transactions}
+      <div className="shrink-0">
+        <ReportsToolbar
+          dateDebut={dateDebut}
+          dateFin={dateFin}
+          typeRapport={typeRapport}
+          onDateDebutChange={setDateDebut}
+          onDateFinChange={setDateFin}
+          onTypeRapportChange={setTypeRapport}
+          onExportPDF={exporterPDF}
+          onExportExcel={exporterExcel}
           loading={loading}
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          onPageChange={setCurrentPage}
         />
-      )}
+      </div>
 
-      {typeRapport === 'synthese' && (
-        <DailySummary sessions={sessions} transactions={transactions} loading={loading} />
-      )}
+      <div className="flex-1 min-h-0 flex flex-col">
+          {typeRapport === 'journal' ? (
+            <CashJournal
+              sessions={sessions}
+              transactions={transactions}
+              loading={loading}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          ) : (
+            <div className="flex-1 overflow-y-auto pr-2 pb-4 scrollbar-thin">
+                {typeRapport === 'synthese' && (
+                    <DailySummary sessions={sessions} transactions={transactions} loading={loading} />
+                )}
 
-      {typeRapport === 'ecarts' && (
-        <DiscrepancyReport
-          sessions={sessions}
-          loading={loading}
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          onPageChange={setCurrentPage}
-        />
-      )}
+                {typeRapport === 'ecarts' && (
+                    <DiscrepancyReport
+                    sessions={sessions}
+                    loading={loading}
+                    currentPage={currentPage}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    />
+                )}
+            </div>
+          )}
 
-      {/* Empty state */}
-      {!loading && sessions.length === 0 && (
-        <Card className="bg-slate-900/80 border-slate-800 py-16 text-center">
-          <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText size={32} className="text-slate-600" />
-          </div>
-          <h3 className="text-lg font-semibold text-white mb-1">Aucune donnée disponible</h3>
-          <p className="text-slate-500 text-sm">Sélectionnez une période différente pour voir les états.</p>
-        </Card>
-      )}
+          {/* Empty state */}
+          {!loading && sessions.length === 0 && (
+            <div className="flex items-center justify-center h-full">
+                <Card className="bg-slate-900/80 border-slate-800 py-16 text-center max-w-md w-full">
+                <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText size={32} className="text-slate-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-1">Aucune donnée disponible</h3>
+                <p className="text-slate-500 text-sm">Sélectionnez une période différente pour voir les états.</p>
+                </Card>
+            </div>
+          )}
+      </div>
     </div>
   );
 }
