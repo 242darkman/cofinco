@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -608,39 +608,114 @@ export const virementsProgrammes = pgTable(
     compteSourceId: uuid("compte_source_id").notNull().references(() => comptes.id, { onDelete: "cascade" }),
     compteDestId: uuid("compte_dest_id").notNull().references(() => comptes.id, { onDelete: "cascade" }),
 
+    // Agence pour filtrage RBAC rapide (denormalise depuis compte source)
+    agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "set null" }),
+
     montant: numeric("montant").notNull(),
     frequence: frequenceVirementEnum("frequence").notNull(),
 
+    // Configuration timezone et jour d'execution
+    timezone: text("timezone").notNull().default("Africa/Brazzaville"),
+    jourExecution: integer("jour_execution"), // 1-28 pour mensuel, 1-7 pour hebdo
+
+    // Scheduling
     prochaineExecution: timestamp("prochaine_execution"),
     actif: boolean("actif").notNull().default(true),
 
+    // Dernier resultat (cache pour affichage rapide)
     dernierExecution: timestamp("dernier_execution"),
     statutDernier: statutAuditVirementEnum("statut_dernier"),
     erreurDerniere: text("erreur_derniere"),
 
+    // Retry management
+    retryCount: integer("retry_count").notNull().default(0),
+    maxRetries: integer("max_retries").notNull().default(3),
+
+    // Verrou de traitement (anti double-execution)
+    processingLock: text("processing_lock"), // worker_id
+    processingStartedAt: timestamp("processing_started_at"),
+
+    // Libelle personnalise (optionnel)
+    libelle: text("libelle"),
+
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"), // Soft delete
   },
   (t) => ({
     idxExecution: index("idx_virements_prog_execution").on(t.actif, t.prochaineExecution),
     idxSource: index("idx_virements_prog_source").on(t.compteSourceId, t.createdAt),
     idxDest: index("idx_virements_prog_dest").on(t.compteDestId, t.createdAt),
+    idxAgence: index("idx_virements_prog_agence").on(t.agenceId, t.actif),
+    idxProcessingLock: index("idx_virements_prog_lock").on(t.processingLock, t.processingStartedAt),
     chkMontantPos: sql`CONSTRAINT chk_virements_prog_montant_pos CHECK (${t.montant} > 0)`,
+    chkJourExecution: sql`CONSTRAINT chk_virements_prog_jour_execution CHECK (${t.jourExecution} IS NULL OR (${t.jourExecution} >= 1 AND ${t.jourExecution} <= 28))`,
   }),
 );
 
-export const insertVirementProgrammeSchema = createInsertSchema(virementsProgrammes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVirementProgrammeSchema = createInsertSchema(virementsProgrammes).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true, processingLock: true, processingStartedAt: true });
 export type InsertVirementProgramme = z.infer<typeof insertVirementProgrammeSchema>;
 export type VirementProgramme = typeof virementsProgrammes.$inferSelect;
 
+// Executions de virements programmes (1 ligne par tentative)
+// CRITIQUE: La contrainte UNIQUE sur executionKey garantit l'idempotence
+export const scheduledTransferRuns = pgTable(
+  "scheduled_transfer_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    scheduledTransferId: uuid("scheduled_transfer_id").notNull().references(() => virementsProgrammes.id, { onDelete: "cascade" }),
+
+    // Cle d'idempotence: VP-{scheduleId}-{YYYY-MM-DD}
+    // UNIQUE constraint empeche toute double execution pour la meme date
+    executionKey: text("execution_key").notNull(),
+
+    // Statut de l'execution
+    status: statutRunVirementEnum("status").notNull().default("PENDING"),
+
+    // Timestamps
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+
+    // Resultat
+    mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+    errorMessage: text("error_message"),
+
+    // Tentative (pour retries)
+    attemptNumber: integer("attempt_number").notNull().default(1),
+
+    // Metadata supplementaire (montants, soldes avant/apres, etc.)
+    metadata: jsonb("metadata"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    // CRITIQUE: Contrainte unique anti double-execution
+    uqExecutionKey: uniqueIndex("uq_scheduled_transfer_runs_execution_key").on(t.executionKey),
+    // Index pour recherche par schedule
+    idxScheduleStatus: index("idx_scheduled_runs_schedule_status").on(t.scheduledTransferId, t.status),
+    // Index pour recherche par date
+    idxCreatedAt: index("idx_scheduled_runs_created_at").on(t.createdAt),
+  }),
+);
+
+export const insertScheduledTransferRunSchema = createInsertSchema(scheduledTransferRuns).omit({ id: true, createdAt: true });
+export type InsertScheduledTransferRun = z.infer<typeof insertScheduledTransferRunSchema>;
+export type ScheduledTransferRun = typeof scheduledTransferRuns.$inferSelect;
+
 // Audit logs pour virements programmés
+// Note: Cette table est conservee pour compatibilite ascendante
+// Les nouvelles executions utilisent scheduled_transfer_runs comme source de verite
 export const virementsProgrammesAuditLogs = pgTable(
   "virements_programmes_audit_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
     virementId: uuid("virement_id").notNull().references(() => virementsProgrammes.id, { onDelete: "cascade" }),
+
+    // Reference optionnelle au run (nouveau champ)
+    runId: uuid("run_id").references(() => scheduledTransferRuns.id, { onDelete: "set null" }),
 
     statut: statutAuditVirementEnum("statut").notNull(),
     message: text("message"),
@@ -656,6 +731,7 @@ export const virementsProgrammesAuditLogs = pgTable(
     idxVirementId: index("idx_virement_audit_virement_id").on(t.virementId),
     idxExecutedAt: index("idx_virement_audit_executed_at").on(t.executedAt),
     idxStatut: index("idx_virement_audit_statut").on(t.statut),
+    idxRunId: index("idx_virement_audit_run_id").on(t.runId),
   }),
 );
 

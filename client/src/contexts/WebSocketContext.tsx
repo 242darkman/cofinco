@@ -3,24 +3,79 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 import { useServerHealth } from './ServerHealthContext';
+import {
+  balanceKeys,
+  compteKeys,
+  creditKeys,
+  caisseKeys,
+  coffreKeys,
+  tontineKeys,
+  dashboardKeys,
+  agentKeys,
+  scheduledTransferKeys,
+  getInvalidationKeysForEntity,
+} from '../lib/query-keys';
 
+/**
+ * Types de messages WebSocket unifiés
+ * SOURCE UNIQUE DE VERITE - Synchronisé avec server/ws-server.ts
+ */
 type MessageType =
-  // Legacy messaging (v1)
+  // =============================================
+  // MESSAGING
+  // =============================================
+  // V1 - Messages directs
   | "CHAT_MESSAGE" | "TYPING" | "READ_RECEIPT"
-  // Messaging V2 - Conversations
+  // V2 - Conversations
   | "CHAT_MESSAGE_V2" | "TYPING_V2" | "READ_UPDATE"
   | "CONVERSATION_UPDATE" | "MESSAGE_REACTION" | "MESSAGE_DELETED" | "MESSAGE_EDITED"
   | "SUBSCRIBE_CONVERSATION" | "UNSUBSCRIBE_CONVERSATION"
   | "SUBSCRIBED_CONVERSATION" | "UNSUBSCRIBED_CONVERSATION"
-  // System
-  | "NOTIFICATION" | "PRESENCE" | "DASHBOARD_UPDATE"
-  | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE"
-  | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE"
-  | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE"
-  | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE"
-  | "REALTIME_EVENT" | "SUBSCRIBED" | "UNSUBSCRIBED" | "COMPTE_UPDATE"
-  | "MAINTENANCE_UPDATE" | "SESSION_TIMEOUT" | "SESSION_RISK_ALERT" | "FORCE_LOGOUT"
-  | "BALANCE_UPDATED";
+
+  // =============================================
+  // SYSTÈME & NOTIFICATIONS
+  // =============================================
+  | "NOTIFICATION" | "PRESENCE" | "PRESENCE_UPDATE" | "DASHBOARD_UPDATE"
+  | "LIVE_ACTIVITY" | "REALTIME_EVENT"
+  | "SUBSCRIBED" | "UNSUBSCRIBED"
+
+  // =============================================
+  // MODULES MÉTIER
+  // =============================================
+  | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "COMPTE_UPDATE"
+  | "CAISSE_UPDATE" | "TONTINE_UPDATE" | "OPERATIONS_UPDATE"
+  | "EMPLOYE_UPDATE" | "AGENCE_UPDATE" | "HR_UPDATE"
+  | "ACCOUNTING_UPDATE" | "LOYALTY_UPDATE"
+  | "SETTINGS_UPDATE" | "RBAC_UPDATE"
+
+  // =============================================
+  // LOCALISATION (Agents terrain)
+  // =============================================
+  | "LOCATION_UPDATE" | "USER_LOCATION"
+
+  // =============================================
+  // SESSIONS & SÉCURITÉ
+  // =============================================
+  | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT"
+  | "MAINTENANCE_UPDATE" | "FORCE_LOGOUT"
+
+  // =============================================
+  // COFFRE-FORT
+  // =============================================
+  | "OPENING_REQUEST_CREATED" | "OPENING_REQUEST_VALIDATED" | "OPENING_REQUEST_REJECTED"
+  | "REFUND_PENDING_CAISSE" | "REFUND_PAID"
+
+  // =============================================
+  // BALANCE & RÉCONCILIATION
+  // =============================================
+  | "BALANCE_UPDATED"
+  | "BALANCE_ALERT" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_ERROR"
+
+  // =============================================
+  // VIREMENTS PROGRAMMÉS
+  // =============================================
+  | "SCHEDULED_TRANSFER_UPDATED" | "SCHEDULED_TRANSFER_EXECUTED"
+  | "SCHEDULED_TRANSFERS_BATCH_COMPLETED";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -52,6 +107,10 @@ const MAX_RETRIES = 3;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 1000; // 1 second
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds
+
+// Idempotence: Track processed eventIds to ignore duplicates
+const PROCESSED_EVENTS_MAX_SIZE = 1000;
+const processedEventIds = new Set<string>();
 
 // Messages that should be buffered when offline
 const BUFFERABLE_TYPES: MessageType[] = [
@@ -239,14 +298,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   // Debounce Map for query invalidations
   const invalidationTimeoutRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
-  const debounceInvalidate = useCallback((queryKey: string[], delay = 1000) => {
-     const keyStr = JSON.stringify(queryKey);
+  const debounceInvalidate = useCallback((queryKey: readonly (string | undefined)[], delay = 1000) => {
+     // Filter out undefined values and convert to mutable array for React Query
+     const cleanKey = queryKey.filter((k): k is string => k !== undefined);
+     const keyStr = JSON.stringify(cleanKey);
      if (invalidationTimeoutRef.current.has(keyStr)) {
        clearTimeout(invalidationTimeoutRef.current.get(keyStr));
      }
-     
+
      const timeout = setTimeout(() => {
-       queryClient.invalidateQueries({ queryKey });
+       queryClient.invalidateQueries({ queryKey: cleanKey });
        invalidationTimeoutRef.current.delete(keyStr);
      }, delay);
      
@@ -353,8 +414,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "CREDIT_UPDATE":
-         debounceInvalidate(["credits"]);
-         debounceInvalidate(["dashboard-stats"]);
+         // NOTE: Les mises à jour de solde crédit sont gérées par BALANCE_UPDATED
+         // Ce handler reste pour les notifications non-financières (création, suppression, etc.)
+         debounceInvalidate(creditKeys.all);
+         // dashboard-stats est invalidé par BALANCE_UPDATED, pas besoin de le faire ici
          window.dispatchEvent(new CustomEvent('credit-update', { detail: message.payload }));
          break;
 
@@ -369,17 +432,23 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "DASHBOARD_UPDATE":
-         debounceInvalidate(["dashboard-stats"]);
+         // Fallback pour forcer un refresh du dashboard
+         // BALANCE_UPDATED gère déjà les mises à jour financières, mais ce signal
+         // peut être utile pour les mises à jour non-financières (agents, clients, etc.)
+         debounceInvalidate(dashboardKeys.stats());
          break;
 
       case "CAISSE_UPDATE":
-         // Invalider les queries du module caisse pour sync temps réel
-         debounceInvalidate(['session-caisse']);          // Rafraîchir le solde et stats du header
-         debounceInvalidate(['session-caisse', 'active']); // Session active spécifique
-         debounceInvalidate(['operations-caisse']);        // Liste "Transactions Récentes"
-         debounceInvalidate(['operations-caisse', 'today']); // Opérations du jour
-         debounceInvalidate(['supervision-sessions']);     // Vue supervision (ouverture/fermeture caisses)
-         debounceInvalidate(["caisses"]);                  // Liste générale des caisses
+         // NOTE: Les mises à jour de solde caisse/session sont gérées par BALANCE_UPDATED
+         // Ce handler reste pour les notifications non-financières (ouverture session, transferts, etc.)
+         // Utilisation des query keys centralisés
+         debounceInvalidate(caisseKeys.sessions());
+         debounceInvalidate(caisseKeys.sessionActive());
+         debounceInvalidate(caisseKeys.operations());
+         debounceInvalidate(caisseKeys.operationsToday());
+         debounceInvalidate(caisseKeys.supervision());
+         debounceInvalidate(caisseKeys.all);
+         // dashboard-stats est invalidé par BALANCE_UPDATED
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
          break;
 
@@ -426,7 +495,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "TONTINE_UPDATE":
-         debounceInvalidate(["/api/tontines"]);
+         // NOTE: Les mises à jour de solde tontine sont gérées par BALANCE_UPDATED
+         // Ce handler reste pour les notifications non-financières (création, ajout membre, etc.)
+         debounceInvalidate(tontineKeys.all);
          break;
 
       case "ACCOUNTING_UPDATE":
@@ -526,7 +597,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "COMPTE_UPDATE":
-         debounceInvalidate(["comptes-epargne"]);
+         // NOTE: Les mises à jour de solde compte sont gérées par BALANCE_UPDATED
+         // Ce handler reste pour les notifications non-financières
+         debounceInvalidate(compteKeys.epargne());
          window.dispatchEvent(new CustomEvent('compte-update', { detail: message.payload }));
          break;
 
@@ -583,41 +656,118 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
       case "BALANCE_UPDATED":
          // Unified balance update handler - invalidates relevant queries based on entityType
-         const { entityType, entityId, newBalance } = message.payload;
+         const { eventId, entityType, entityId, newBalance } = message.payload;
+
+         // Idempotence check: ignore duplicate events
+         if (eventId && processedEventIds.has(eventId)) {
+           console.log(`[WS] Ignoring duplicate BALANCE_UPDATED event: ${eventId}`);
+           break;
+         }
+
+         // Track this eventId to prevent processing duplicates
+         if (eventId) {
+           processedEventIds.add(eventId);
+           // Clean up old eventIds to prevent memory leak
+           if (processedEventIds.size > PROCESSED_EVENTS_MAX_SIZE) {
+             const idsToRemove = Array.from(processedEventIds).slice(0, 100);
+             idsToRemove.forEach(id => processedEventIds.delete(id));
+           }
+         }
 
          // Dispatch custom event for components that need direct updates
          window.dispatchEvent(new CustomEvent('balance-updated', { detail: message.payload }));
 
-         // Invalidate relevant queries based on entity type
+         // Invalidate relevant queries using centralized query keys
+         // SOURCE UNIQUE: Toutes les invalidations financières passent par ici
          switch (entityType) {
            case 'compte':
-             debounceInvalidate(['compte-balance', entityId]);
-             debounceInvalidate(['comptes-epargne']);
-             debounceInvalidate(['dashboard-stats']);
+             debounceInvalidate(balanceKeys.compte(entityId));
+             debounceInvalidate(compteKeys.epargne());
+             debounceInvalidate(dashboardKeys.stats());
              break;
            case 'caisse':
            case 'session_caisse':
-             debounceInvalidate(['session-caisse']);
-             debounceInvalidate(['session-caisse', 'active']);
-             debounceInvalidate(['operations-caisse']);
-             debounceInvalidate(['dashboard-stats']);
+             debounceInvalidate(caisseKeys.sessions());
+             debounceInvalidate(caisseKeys.sessionActive());
+             debounceInvalidate(caisseKeys.operations());
+             debounceInvalidate(dashboardKeys.stats());
              break;
            case 'credit':
-             debounceInvalidate(['credits']);
-             debounceInvalidate(['credit', entityId]);
-             debounceInvalidate(['dashboard-stats']);
+             debounceInvalidate(creditKeys.all);
+             debounceInvalidate(creditKeys.detail(entityId));
+             debounceInvalidate(dashboardKeys.stats());
              break;
            case 'tontine':
-             debounceInvalidate(['/api/tontines']);
-             debounceInvalidate(['tontine', entityId]);
+             debounceInvalidate(tontineKeys.all);
+             debounceInvalidate(tontineKeys.detail(entityId));
              break;
            case 'coffre':
-             debounceInvalidate(['coffre-stats']);
-             debounceInvalidate(['dashboard-stats']);
+             debounceInvalidate(coffreKeys.stats());
+             debounceInvalidate(dashboardKeys.stats());
              break;
            case 'caisse_agent':
-             debounceInvalidate(['caisse-agent', entityId]);
+             debounceInvalidate(agentKeys.caisseAgent(entityId));
              break;
+         }
+         break;
+
+      // ============================================
+      // VIREMENTS PROGRAMMÉS (Scheduled Transfers)
+      // ============================================
+
+      case "SCHEDULED_TRANSFER_UPDATED":
+         // Un virement programmé a été modifié (pause, reprise, modification)
+         debounceInvalidate(scheduledTransferKeys.all);
+         debounceInvalidate(scheduledTransferKeys.stats());
+         if (message.payload?.transferId) {
+           debounceInvalidate(scheduledTransferKeys.detail(message.payload.transferId));
+         }
+         window.dispatchEvent(new CustomEvent('scheduled-transfer-updated', { detail: message.payload }));
+         break;
+
+      case "SCHEDULED_TRANSFER_EXECUTED":
+         // Un virement programmé a été exécuté (succès ou échec)
+         debounceInvalidate(scheduledTransferKeys.all);
+         debounceInvalidate(scheduledTransferKeys.stats());
+         if (message.payload?.transferId) {
+           debounceInvalidate(scheduledTransferKeys.detail(message.payload.transferId));
+           debounceInvalidate(scheduledTransferKeys.history(message.payload.transferId));
+         }
+         // Invalider aussi les comptes source/dest car leurs soldes ont changé
+         if (message.payload?.compteSourceId) {
+           debounceInvalidate(balanceKeys.compte(message.payload.compteSourceId));
+         }
+         if (message.payload?.compteDestId) {
+           debounceInvalidate(balanceKeys.compte(message.payload.compteDestId));
+         }
+         debounceInvalidate(compteKeys.epargne());
+         window.dispatchEvent(new CustomEvent('scheduled-transfer-executed', { detail: message.payload }));
+
+         // Toast notification si succès ou échec
+         if (message.payload?.success) {
+           toast.success('Virement programmé exécuté avec succès');
+         } else if (message.payload?.error) {
+           toast.error(`Échec virement programmé: ${message.payload.error}`);
+         }
+         break;
+
+      case "SCHEDULED_TRANSFERS_BATCH_COMPLETED":
+         // Batch de virements programmés terminé (cron 02h30)
+         debounceInvalidate(scheduledTransferKeys.all);
+         debounceInvalidate(scheduledTransferKeys.stats());
+         debounceInvalidate(scheduledTransferKeys.health());
+         debounceInvalidate(compteKeys.epargne());
+         debounceInvalidate(dashboardKeys.stats());
+         window.dispatchEvent(new CustomEvent('scheduled-transfers-batch-completed', { detail: message.payload }));
+
+         // Toast récapitulatif pour les admins
+         const { success, skipped, failed } = message.payload || {};
+         if (typeof success === 'number' || typeof failed === 'number') {
+           if (failed > 0) {
+             toast.warning(`Virements programmés: ${success || 0} succès, ${failed} échecs, ${skipped || 0} ignorés`);
+           } else {
+             toast.success(`Virements programmés: ${success || 0} exécutés avec succès`);
+           }
          }
          break;
     }

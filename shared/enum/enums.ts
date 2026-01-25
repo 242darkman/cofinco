@@ -529,6 +529,18 @@ export const statutAuditVirementEnum = pgEnum("statut_audit_virement_enum", [
 ]);
 
 // ============================================
+// STATUT EXECUTION VIREMENT PROGRAMME
+// ============================================
+
+export const statutRunVirementEnum = pgEnum("statut_run_virement_enum", [
+  "PENDING",
+  "RUNNING",
+  "SUCCESS",
+  "FAILED",
+  "SKIPPED",  // Deja execute (idempotence)
+]);
+
+// ============================================
 // ENQUETE COMPLEMENTAIRE
 // ============================================
 

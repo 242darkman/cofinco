@@ -18,6 +18,7 @@ import { getAccountBalance } from '../../../lib/account-config';
 import { computeSessionStatus } from '../../../lib/format';
 import { TypeCompte, type TypeCompteType, StatutCompte } from '@shared/enum/status-constants';
 import { AccountActivationModal } from '../caisse/AccountActivationModal';
+import { caisseKeys } from '../../../lib/query-keys';
 
 
 interface Compte {
@@ -68,7 +69,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
 
   // Query for active caisse session (needed for account activation)
   const { data: sessionActive } = useQuery({
-    queryKey: ['session-caisse', 'active'],
+    queryKey: caisseKeys.sessionActive(),
     queryFn: async () => {
       const data = await sessionCaisseApi.getActive();
       const status = data ? computeSessionStatus(data) : null;

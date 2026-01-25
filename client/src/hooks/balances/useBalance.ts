@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useCallback } from 'react';
 import { api } from '../../lib/api-client';
 import type { Balance, BalanceEntityType, CashPosition, BalanceUpdatePayload } from '@shared/types/balances';
+import { balanceKeys } from '../../lib/query-keys';
 
 // ============================================
 // API Functions
@@ -46,6 +47,28 @@ const balanceApi = {
     return api.get<CashPosition>(`/api/balances/cash-position${params}`);
   }
 };
+
+// Helper pour mapper entityType vers les clés centralisées
+function getBalanceQueryKey(entityType: BalanceEntityType, entityId: string) {
+  switch (entityType) {
+    case 'compte':
+      return balanceKeys.compte(entityId);
+    case 'caisse':
+      return balanceKeys.caisse(entityId);
+    case 'session_caisse':
+      return balanceKeys.session(entityId);
+    case 'credit':
+      return balanceKeys.credit(entityId);
+    case 'tontine':
+      return balanceKeys.tontine(entityId);
+    case 'coffre':
+      return balanceKeys.coffre(entityId);
+    case 'caisse_agent':
+      return balanceKeys.caisseAgent(entityId);
+    default:
+      return [`${entityType}-balance`, entityId] as const;
+  }
+}
 
 // ============================================
 // Generic Balance Hook
@@ -93,8 +116,8 @@ export function useBalance(
     }
   }, [entityType, entityId]);
 
-  // Query key
-  const queryKey = [`${entityType}-balance`, entityId];
+  // Query key - utilise les clés centralisées
+  const queryKey = entityId ? getBalanceQueryKey(entityType, entityId) : [`${entityType}-balance`, entityId];
 
   // Écoute des événements BALANCE_UPDATED via WebSocket
   useEffect(() => {
@@ -203,7 +226,7 @@ export function useGlobalCashPosition(agenceId?: string, options?: UseBalanceOpt
       const { entityType } = event.detail;
       // Invalider si changement sur caisse, coffre, ou session
       if (['caisse', 'session_caisse', 'coffre', 'caisse_agent'].includes(entityType)) {
-        queryClient.invalidateQueries({ queryKey: ['cash-position'] });
+        queryClient.invalidateQueries({ queryKey: balanceKeys.cashPosition() });
       }
     };
 
@@ -212,7 +235,7 @@ export function useGlobalCashPosition(agenceId?: string, options?: UseBalanceOpt
   }, [queryClient]);
 
   return useQuery({
-    queryKey: ['cash-position', agenceId],
+    queryKey: balanceKeys.cashPosition(agenceId),
     queryFn: () => balanceApi.getGlobalCashPosition(agenceId),
     enabled,
     staleTime,

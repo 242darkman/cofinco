@@ -536,20 +536,18 @@ export class HrService {
     }
 
     // Get all active employees
-    let query = db
+    const whereConditions = agenceId
+      ? and(eq(employes.statut, 'ACTIVE'), eq(employes.agenceId, agenceId))
+      : eq(employes.statut, 'ACTIVE');
+
+    const employeesList = await db
       .select({
         employe: employes,
         user: users,
       })
       .from(employes)
       .innerJoin(users, eq(employes.userId, users.id))
-      .where(eq(employes.statut, 'ACTIVE'));
-
-    if (agenceId) {
-      query = query.where(eq(employes.agenceId, agenceId)) as any;
-    }
-
-    const employeesList = await query;
+      .where(whereConditions);
 
     const results: any[] = [];
     let skipped = 0;
@@ -641,10 +639,10 @@ export class HrService {
     let diff: Record<string, { old: any; new: any }> | undefined;
     if (oldValues && newValues) {
       diff = {};
-      const allKeys = new Set([
+      const allKeys = Array.from(new Set([
         ...Object.keys(oldValues || {}),
         ...Object.keys(newValues || {}),
-      ]);
+      ]));
       for (const key of allKeys) {
         if (oldValues?.[key] !== newValues?.[key]) {
           diff[key] = { old: oldValues?.[key], new: newValues?.[key] };

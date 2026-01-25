@@ -34,6 +34,7 @@ import { ProvisionCoffreModal } from './ProvisionCoffreModal';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import TransfertInterCoffresModule from '../transfert-coffres/TransfertInterCoffresModule';
 import { TreasurySupervision } from '../../admin/TreasurySupervision';
+import { coffreKeys, caisseKeys } from '../../../lib/query-keys';
 
 
 interface CoffreFortDashboardProps {
@@ -49,7 +50,7 @@ interface ConfirmAction {
 export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   // Fetch transferts
   const { data: transfertsData, isLoading, refetch, isRefetching: isRefetchingTransferts } = useQuery({
-    queryKey: ['transferts-coffre', agenceId],
+    queryKey: coffreKeys.transferts(agenceId),
     queryFn: () => coffreApi.listTransferts({
       agenceId,
       limit: 50, // Increased limit to ensure recent requests are visible
@@ -60,13 +61,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   });
 
   const { data: statsData, isLoading: isLoadingStats, refetch: refetchStats } = useQuery({
-    queryKey: ["coffre-stats", agenceId],
+    queryKey: coffreKeys.stats(agenceId),
     queryFn: () => coffreApi.getStats(agenceId),
   });
 
   // Query for pending opening requests (new secure workflow)
   const { data: pendingOpeningRequests = [], isLoading: isLoadingOpeningRequests, refetch: refetchOpeningRequests } = useQuery({
-    queryKey: ['coffre', 'pending-opening-requests', agenceId],
+    queryKey: coffreKeys.pendingOpeningRequests(agenceId),
     queryFn: () => coffreApi.getPendingOpeningRequests(agenceId),
     enabled: !!agenceId,
     refetchInterval: 15000, // Poll more frequently for opening requests
@@ -176,7 +177,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       refetch(); // Refresh transferts list
       refetchStats(); // Refresh coffre balance
       // Invalidate session queries to update cashier view
-      queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
+      queryClient.invalidateQueries({ queryKey: caisseKeys.sessions() });
     } catch (e: any) {
       const errorMessage = e.message || "";
       let userMessage = errorMessage;
@@ -847,7 +848,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
 function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
     const { data, isLoading, refetch, isRefetching } = useQuery({
-        queryKey: ['coffre-mouvements', agenceId],
+        queryKey: coffreKeys.mouvements(agenceId),
         queryFn: () => coffreApi.getMouvements({ agenceId, limit: 100 }),
     });
 

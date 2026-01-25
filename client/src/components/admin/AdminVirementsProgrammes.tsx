@@ -1,37 +1,40 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { 
-    CalendarClock, 
-    Edit2, 
-    Lock, 
-    RefreshCw, 
-    Play, 
-    Pause, 
-    ArrowRight, 
-    Activity, 
-    Banknote, 
-    Clock, 
-    LayoutList, 
+import {
+    CalendarClock,
+    Edit2,
+    Lock,
+    RefreshCw,
+    Play,
+    Pause,
+    ArrowRight,
+    Activity,
+    Banknote,
+    Clock,
+    LayoutList,
     Calendar as CalendarIcon,
     Plus,
-    Filter
+    Filter,
+    Wifi,
+    WifiOff
 } from 'lucide-react';
-import { 
-    Badge, 
-    Button, 
-    Card, 
-    ConfirmDialog, 
-    IconButton, 
-    ResponsiveTable, 
-    SearchInput, 
+import {
+    Badge,
+    Button,
+    Card,
+    ConfirmDialog,
+    IconButton,
+    ResponsiveTable,
+    SearchInput,
     TabGroup,
     EmptyState,
-    StatCard // Assuming StatCard is exported from ui
+    StatCard
 } from '../ui';
 import { compteEpargneApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { formatMoney, formatDate } from '../../lib/format';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { useWebSocketContext } from '../../contexts/WebSocketContext';
 import ScheduledTransferDetails, { ScheduledTransfer } from './ScheduledTransferDetails';
 
 // --- Types ---
@@ -110,6 +113,7 @@ export default function AdminVirementsProgrammes() {
 
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const { hasPermission } = usePermissions();
+  const { isConnected: wsConnected } = useWebSocketContext();
 
   const canView = hasPermission('virements_programmes', 'view') || hasPermission('admin', 'manage');
   const canEdit = hasPermission('virements_programmes', 'edit') || hasPermission('admin', 'manage');
@@ -164,16 +168,43 @@ export default function AdminVirementsProgrammes() {
 
   useEffect(() => {
     if (canView) loadData();
-    
-    // Polling every 30s
-    const interval = setInterval(() => {
-        if (canView && !document.hidden) {
-            loadData(true);
-        }
-    }, 30000);
-
-    return () => clearInterval(interval);
   }, [canView, loadData]);
+
+  // WebSocket event listeners pour mise à jour temps réel
+  useEffect(() => {
+    if (!canView) return;
+
+    const handleTransferUpdated = () => {
+      loadData(true); // Silent refresh
+    };
+
+    const handleTransferExecuted = (e: CustomEvent) => {
+      loadData(true);
+      // Update selected transfer if it's the one that was executed
+      if (selectedTransfer && e.detail?.transferId === selectedTransfer.id) {
+        setSelectedTransfer(prev => prev ? ({
+          ...prev,
+          statutDernier: e.detail.success ? 'success' : 'failed',
+          derniereExecution: new Date().toISOString(),
+        }) : null);
+      }
+    };
+
+    const handleBatchCompleted = () => {
+      loadData(true);
+    };
+
+    // Subscribe to WebSocket events
+    window.addEventListener('scheduled-transfer-updated', handleTransferUpdated as EventListener);
+    window.addEventListener('scheduled-transfer-executed', handleTransferExecuted as EventListener);
+    window.addEventListener('scheduled-transfers-batch-completed', handleBatchCompleted as EventListener);
+
+    return () => {
+      window.removeEventListener('scheduled-transfer-updated', handleTransferUpdated as EventListener);
+      window.removeEventListener('scheduled-transfer-executed', handleTransferExecuted as EventListener);
+      window.removeEventListener('scheduled-transfers-batch-completed', handleBatchCompleted as EventListener);
+    };
+  }, [canView, loadData, selectedTransfer]);
 
   // Actions
   const handleToggleActive = async (transfer: ScheduledTransferType, nextActive: boolean) => {
@@ -205,12 +236,11 @@ export default function AdminVirementsProgrammes() {
           variant: "danger",
           onConfirm: async () => {
                try {
-                   // Assuming an API endpoint exists or simulating
-                   // await compteEpargneApi.runScheduledTransfer(transfer.id);
+                   await compteEpargneApi.runScheduledTransferNow(transfer.id);
                    toast.success("Exécution lancée");
-                   // In real app, we would refresh to see new status
+                   // WebSocket va automatiquement déclencher le refresh
                } catch (e) {
-                   toast.error("Erreur lancement");
+                   toast.error(handleApiError(e, "Erreur lors de l'exécution"));
                }
           }
       });
@@ -407,8 +437,20 @@ export default function AdminVirementsProgrammes() {
                   </button>
               </div>
 
-              <Button 
-                variant="ghost" 
+              {/* Indicateur WebSocket temps réel */}
+              <div className="flex items-center gap-1 px-2" title={wsConnected ? "Temps réel actif" : "Temps réel déconnecté"}>
+                  {wsConnected ? (
+                    <Wifi size={14} className="text-emerald-500" />
+                  ) : (
+                    <WifiOff size={14} className="text-red-500" />
+                  )}
+                  <span className={`text-xs ${wsConnected ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {wsConnected ? 'Live' : 'Hors ligne'}
+                  </span>
+              </div>
+
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => loadData(false)}
                 className="text-slate-400 hover:text-slate-100 h-8 w-8 p-0"

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useWebSocket } from "../useWebSocket";
+import { creditKeys } from "../../lib/query-keys";
 
 export interface CreditCounts {
   toProcess: number;
@@ -13,7 +14,7 @@ export interface CreditCounts {
 
 export function useCreditCounts() {
   const { data, isLoading, error } = useQuery<CreditCounts>({
-    queryKey: ['/api/demandes-credit/counts'],
+    queryKey: creditKeys.demandesCounts(),
     queryFn: async () => {
       const res = await fetch('/api/demandes-credit/counts');
       if (!res.ok) {
@@ -42,7 +43,7 @@ export function useCreditCounts() {
             const data = JSON.parse(event.data);
             if (['CREDIT_UPDATE', 'DASHBOARD_UPDATE', 'DEMANDE_UPDATE', 'NOTIFICATION'].includes(data.type)) {
                 // Invalidate the counts query to trigger an immediate refetch
-                queryClient.invalidateQueries({ queryKey: ['/api/demandes-credit/counts'] });
+                queryClient.invalidateQueries({ queryKey: creditKeys.demandesCounts() });
             }
         } catch (e) {
             console.error('WebSocket message parsing error', e);

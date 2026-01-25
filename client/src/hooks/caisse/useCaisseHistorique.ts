@@ -10,6 +10,7 @@ import {
   CaisseHistoriqueResult,
   CaisseHistoriqueSummary
 } from '../../lib/api-client';
+import { caisseKeys } from '../../lib/query-keys';
 
 export interface UseCaisseHistoriqueOptions {
   /** ID de la caisse */
@@ -78,7 +79,7 @@ export function useCaisseHistorique({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['caisse-historique', caisseId, queryFilters],
+    queryKey: caisseKeys.historique(caisseId, queryFilters),
     queryFn: () => caisseApi.getHistorique(caisseId, queryFilters),
     enabled: enabled && !!caisseId,
     refetchInterval,
@@ -90,7 +91,7 @@ export function useCaisseHistorique({
     data: summaryData,
     isLoading: summaryLoading,
   } = useQuery({
-    queryKey: ['caisse-historique-summary', caisseId],
+    queryKey: caisseKeys.historiqueSummary(caisseId),
     queryFn: () => caisseApi.getHistoriqueSummary(caisseId),
     enabled: enabled && !!caisseId,
     staleTime: 60000, // 1 minute
@@ -119,7 +120,7 @@ export function useCaisseHistorique({
   // Rafraîchir toutes les données
   const handleRefetch = useCallback(() => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ['caisse-historique-summary', caisseId] });
+    queryClient.invalidateQueries({ queryKey: caisseKeys.historiqueSummary(caisseId) });
   }, [refetch, queryClient, caisseId]);
 
   return {

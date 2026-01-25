@@ -57,25 +57,68 @@ setInterval(() => {
   });
 }, RATE_LIMIT_WINDOW_MS);
 
+/**
+ * Types de messages WebSocket unifiés
+ * SOURCE UNIQUE DE VERITE - Synchronisé avec client/src/contexts/WebSocketContext.tsx
+ */
 type GlobalMessage = {
   type:
-    // Legacy messaging (v1)
+    // =============================================
+    // MESSAGING
+    // =============================================
+    // V1 - Messages directs (toujours utilisé dans routes/messages.ts)
     | "CHAT_MESSAGE" | "TYPING" | "READ_RECEIPT"
-    // Messaging V2 - Conversations
+    // V2 - Conversations (routes/conversations.ts)
     | "CHAT_MESSAGE_V2" | "TYPING_V2" | "READ_UPDATE"
     | "CONVERSATION_UPDATE" | "MESSAGE_REACTION" | "MESSAGE_DELETED" | "MESSAGE_EDITED"
-    // System
+    | "SUBSCRIBE_CONVERSATION" | "UNSUBSCRIBE_CONVERSATION"
+    | "SUBSCRIBED_CONVERSATION" | "UNSUBSCRIBED_CONVERSATION"
+
+    // =============================================
+    // SYSTÈME & NOTIFICATIONS
+    // =============================================
     | "NOTIFICATION" | "PRESENCE" | "PRESENCE_UPDATE" | "DASHBOARD_UPDATE"
-    | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE"
-    | "LIVE_ACTIVITY" | "REALTIME_EVENT" | "OPERATIONS_UPDATE" | "TONTINE_UPDATE"
-    | "CAISSE_UPDATE" | "COMPTE_UPDATE" | "EMPLOYE_UPDATE" | "RBAC_UPDATE" | "HR_UPDATE"
+    | "LIVE_ACTIVITY" | "REALTIME_EVENT"
+    | "SUBSCRIBED" | "UNSUBSCRIBED"
+
+    // =============================================
+    // MODULES MÉTIER
+    // =============================================
+    | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "COMPTE_UPDATE"
+    | "CAISSE_UPDATE" | "TONTINE_UPDATE" | "OPERATIONS_UPDATE"
+    | "EMPLOYE_UPDATE" | "AGENCE_UPDATE" | "HR_UPDATE"
+    | "ACCOUNTING_UPDATE" | "LOYALTY_UPDATE"
+    | "SETTINGS_UPDATE" | "RBAC_UPDATE"
+
+    // =============================================
+    // LOCALISATION (Agents terrain)
+    // =============================================
+    | "LOCATION_UPDATE" | "USER_LOCATION"
+
+    // =============================================
+    // SESSIONS & SÉCURITÉ
+    // =============================================
     | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT"
-    | "MAINTENANCE_UPDATE" | "SETTINGS_UPDATE" | "FORCE_LOGOUT"
-    | "ACCOUNTING_UPDATE" | "AGENCE_UPDATE" | "LOYALTY_UPDATE"
+    | "MAINTENANCE_UPDATE" | "FORCE_LOGOUT"
+
+    // =============================================
+    // COFFRE-FORT
+    // =============================================
     | "OPENING_REQUEST_CREATED" | "OPENING_REQUEST_VALIDATED" | "OPENING_REQUEST_REJECTED"
     | "REFUND_PENDING_CAISSE" | "REFUND_PAID"
-    // Balance updates (unified source of truth)
-    | "BALANCE_UPDATED";
+
+    // =============================================
+    // BALANCE & RÉCONCILIATION
+    // =============================================
+    | "BALANCE_UPDATED"
+    | "BALANCE_ALERT" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_ERROR"
+
+    // =============================================
+    // VIREMENTS PROGRAMMÉS
+    // =============================================
+    | "SCHEDULED_TRANSFER_UPDATED" | "SCHEDULED_TRANSFER_EXECUTED"
+    | "SCHEDULED_TRANSFERS_BATCH_COMPLETED";
+
   payload: any;
 };
 

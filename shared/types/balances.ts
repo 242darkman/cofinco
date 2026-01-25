@@ -29,6 +29,7 @@ export interface Balance {
  * Event WebSocket normalisé pour mise à jour de solde
  */
 export interface BalanceUpdatePayload {
+  eventId: string;           // UUID unique pour idempotence côté client
   entityType: BalanceEntityType;
   entityId: string;
   agenceId: string;

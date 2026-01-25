@@ -41,7 +41,7 @@ export default function AdminGestionUtilisateurs() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(8);
 
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -146,29 +146,29 @@ export default function AdminGestionUtilisateurs() {
     <div className="h-full flex flex-col space-y-2">
       <Card variant="default" padding="none" className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Mobile-First Header */}
-        <div className="p-4 border-b border-edge bg-surface-muted/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-3 border-b border-edge bg-surface-muted/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
+                <Users className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-content-primary">Utilisateurs</h2>
-                <p className="text-xs sm:text-sm text-content-muted">Gestion des comptes ({filteredUsers.length})</p>
+                <h2 className="text-base sm:text-lg font-bold text-content-primary">Utilisateurs</h2>
+                <p className="text-xs text-content-muted">Gestion des comptes ({filteredUsers.length})</p>
               </div>
             </div>
             {/* Button removed to prevent incomplete account creation. Use Profils/Personnel page instead. */}
           </div>
 
           {/* Search Bar */}
-          <div className="mt-4 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={18} />
+          <div className="mt-2 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={16} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Rechercher (nom, rôle...)"
-              className="w-full pl-10 pr-4 py-2 bg-surface-base border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+              className="w-full pl-9 pr-4 py-1.5 bg-surface-base border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
             />
           </div>
         </div>
@@ -285,9 +285,9 @@ export default function AdminGestionUtilisateurs() {
             </div>
 
             {/* Pagination Controls - Mobile First */}
-            <div className="p-3 sm:p-4 border-t border-edge bg-surface-muted/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="p-2 border-t border-edge bg-surface-muted/30 flex flex-col sm:flex-row items-center justify-between gap-2">
               {/* Page info & size selector */}
-              <div className="flex items-center gap-3 text-xs sm:text-sm text-content-muted">
+              <div className="flex items-center gap-3 text-xs text-content-muted">
                 <span className="hidden sm:inline">
                   {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredUsers.length)} sur {filteredUsers.length}
                 </span>
@@ -317,7 +317,7 @@ export default function AdminGestionUtilisateurs() {
                   size="sm"
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className="w-8 h-8 text-content-muted disabled:opacity-30"
+                  className="w-7 h-7 text-content-muted disabled:opacity-30"
                   aria-label="Première page"
                 />
                 <IconButton
@@ -326,7 +326,7 @@ export default function AdminGestionUtilisateurs() {
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="w-8 h-8 text-content-muted disabled:opacity-30"
+                  className="w-7 h-7 text-content-muted disabled:opacity-30"
                   aria-label="Page précédente"
                 />
                 
@@ -348,7 +348,7 @@ export default function AdminGestionUtilisateurs() {
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                        className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors ${
                           currentPage === pageNum
                             ? 'bg-primary text-white'
                             : 'text-content-muted hover:bg-surface-muted'
@@ -366,7 +366,7 @@ export default function AdminGestionUtilisateurs() {
                   size="sm"
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className="w-8 h-8 text-content-muted disabled:opacity-30"
+                  className="w-7 h-7 text-content-muted disabled:opacity-30"
                   aria-label="Page suivante"
                 />
                 <IconButton
@@ -375,7 +375,7 @@ export default function AdminGestionUtilisateurs() {
                   size="sm"
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  className="w-8 h-8 text-content-muted disabled:opacity-30"
+                  className="w-7 h-7 text-content-muted disabled:opacity-30"
                   aria-label="Dernière page"
                 />
               </div>

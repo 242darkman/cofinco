@@ -35,6 +35,7 @@ import type {
 } from "@shared/types/balances";
 import { RECONCILIATION_THRESHOLDS } from "@shared/types/balances";
 import { getWsInstance } from "../ws-server";
+import { randomUUID } from "crypto";
 
 class BalanceService {
 
@@ -51,7 +52,8 @@ class BalanceService {
       soldeCourant: comptes.soldeCourant,
       typeCompte: comptes.typeCompte,
       statut: comptes.statut,
-      bloqueJusquau: comptes.bloqueJusquau
+      blocageActif: comptes.blocageActif,
+      blocageFin: comptes.blocageFin
     })
     .from(comptes)
     .where(eq(comptes.id, compteId));
@@ -61,7 +63,8 @@ class BalanceService {
     }
 
     const current = Number(compte.soldeCourant || 0);
-    const isBlocked = compte.bloqueJusquau && new Date(compte.bloqueJusquau) > new Date();
+    // Compte bloqué si blocageActif ET (pas de date de fin OU date de fin dans le futur)
+    const isBlocked = compte.blocageActif && (!compte.blocageFin || new Date(compte.blocageFin) > new Date());
 
     return {
       entityId: compteId,
@@ -521,7 +524,7 @@ class BalanceService {
     .from(contributionsTontine)
     .where(and(
       eq(contributionsTontine.tontineId, tontineId),
-      eq(contributionsTontine.statut, 'POSTED' as any)
+      eq(contributionsTontine.statutTransaction, 'POSTED' as any)
     ));
 
     const [distributions] = await db.select({
@@ -659,6 +662,7 @@ class BalanceService {
 
   /**
    * Émet un événement BALANCE_UPDATED normalisé via WebSocket
+   * Génère un eventId unique pour permettre l'idempotence côté client
    */
   broadcastBalanceUpdate(params: {
     entityType: BalanceEntityType;
@@ -673,11 +677,15 @@ class BalanceService {
     const wsInstance = getWsInstance();
     if (!wsInstance) return;
 
+    const eventId = randomUUID();
     const payload = {
+      eventId,
       ...params,
       delta: params.newBalance - params.previousBalance,
       timestamp: new Date().toISOString()
     };
+
+    console.log(`[BALANCE_UPDATED] ${params.entityType}:${params.entityId} = ${params.newBalance} (Δ${payload.delta}) ref:${params.mouvementRef}`);
 
     // Broadcast global
     wsInstance.broadcast({
@@ -686,10 +694,12 @@ class BalanceService {
     });
 
     // Broadcast ciblé à l'agence
-    wsInstance.broadcastToAgency(params.agenceId, {
-      type: 'BALANCE_UPDATED' as any,
-      payload
-    });
+    if (params.agenceId) {
+      wsInstance.broadcastToAgency(params.agenceId, {
+        type: 'BALANCE_UPDATED' as any,
+        payload
+      });
+    }
 
     // Broadcast au channel spécifique (pour les clients abonnés)
     wsInstance.broadcastToAggregate(params.entityType, params.entityId, {

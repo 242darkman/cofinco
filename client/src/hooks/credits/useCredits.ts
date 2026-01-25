@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useWebSocket } from '../useWebSocket';
 import { StatutCredit } from '@shared/enum/status-constants';
+import { creditKeys } from '../../lib/query-keys';
 
 export interface Credit {
   id: string;
@@ -27,7 +28,7 @@ export interface Credit {
 
 export function useCredits() {
   const { data: credits = [], isLoading: loading, error, refetch } = useQuery<Credit[]>({
-    queryKey: ['credits'],
+    queryKey: creditKeys.all,
     queryFn: async () => {
       const response = await fetch('/api/credits');
       if (!response.ok) throw new Error('Erreur serveur');

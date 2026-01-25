@@ -537,64 +537,55 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                 </div>
             </Card>
 
-            {/* Client Result / Empty State */}
-            <div className="flex-1 min-h-0">
-                {selectedClient ? (
-                    <Card className="bg-slate-800/50 border border-slate-700/50 h-full p-4 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-300">
-                        <button
-                            onClick={reinitialiserFormulaire}
-                            className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition bg-slate-800/50 hover:bg-slate-800 p-1.5 rounded-full backdrop-blur-sm z-20"
-                        >
-                            <XCircle size={16} />
-                        </button>
-                        
-                        <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20 mb-3">
-                            <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white">
-                                <User size={24} aria-hidden="true" />
-                            </div>
+            {/* Client Profile Card (Only if selected) */}
+            {selectedClient && (
+                <Card className="bg-slate-800/50 border border-slate-700/50 flex-1 p-4 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-300">
+                    <button
+                        onClick={reinitialiserFormulaire}
+                        className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition bg-slate-800/50 hover:bg-slate-800 p-1.5 rounded-full backdrop-blur-sm z-20"
+                    >
+                        <XCircle size={16} />
+                    </button>
+                    
+                    <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20 mb-3">
+                        <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white">
+                            <User size={24} aria-hidden="true" />
                         </div>
-                        
-                        <h3 className="font-bold text-lg text-white truncate text-center w-full">
-                            {escapeHtml(selectedClient.nom)} {escapeHtml(selectedClient.prenom || '')}
-                        </h3>
-                        <p className="text-sm font-medium text-slate-400 mb-4">{escapeHtml(selectedClient.telephone || '')}</p>
-                        
-                        {selectedClient.numero_compte && (
-                            <Badge
-                                variant="neutral"
-                                size="sm"
-                                className="bg-slate-800 border-slate-700 text-slate-300 text-xs mb-6"
-                                value={escapeHtml(selectedClient.numero_compte)}
-                            />
-                        )}
+                    </div>
+                    
+                    <h3 className="font-bold text-lg text-white truncate text-center w-full">
+                        {escapeHtml(selectedClient.nom)} {escapeHtml(selectedClient.prenom || '')}
+                    </h3>
+                    <p className="text-sm font-medium text-slate-400 mb-4">{escapeHtml(selectedClient.telephone || '')}</p>
+                    
+                    {selectedClient.numero_compte && (
+                        <Badge
+                            variant="neutral"
+                            size="sm"
+                            className="bg-slate-800 border-slate-700 text-slate-300 text-xs mb-6"
+                            value={escapeHtml(selectedClient.numero_compte)}
+                        />
+                    )}
 
-                        {/* Recent Activity Mini-Summary (Placeholder for visual balance) */}
-                        <div className="grid grid-cols-2 gap-2 w-full mt-auto">
-                            <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
-                                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Dernière Op.</p>
-                                <p className="font-mono text-white text-xs font-bold">-</p>
-                            </div>
-                            <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
-                                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Solde Cash</p>
-                                <p className="font-mono text-white text-xs font-bold">-</p>
-                            </div>
+                    {/* Recent Activity Mini-Summary */}
+                    <div className="grid grid-cols-2 gap-2 w-full mt-auto">
+                        <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
+                            <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Dernière Op.</p>
+                            <p className="font-mono text-white text-xs font-bold">-</p>
                         </div>
-                    </Card>
-                ) : (
-                     <div className="h-full rounded-xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 space-y-4 p-6">
-                        <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center">
-                            <Wallet size={20} className="opacity-50" />
+                        <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-800 text-center">
+                            <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Solde Cash</p>
+                            <p className="font-mono text-white text-xs font-bold">-</p>
                         </div>
-                        <p className="text-xs font-medium text-center">Sélectionnez un client pour<br/>effectuer un dépôt ou retrait</p>
-                     </div>
-                )}
-            </div>
+                    </div>
+                </Card>
+            )}
         </div>
 
         {/* RIGHT COL: Operation Cockpit (8 cols) */}
-        {selectedClient && (
-             <div className="lg:col-span-8 h-full flex flex-col">
-                <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative">
+        <div className="lg:col-span-8 h-full flex flex-col">
+            {selectedClient ? (
+                <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative animate-in slide-in-from-right-4 duration-300">
                     
                     {/* Header: Operation Type Selector */}
                     <div className="p-4 border-b border-slate-800 bg-slate-950/30">
@@ -770,8 +761,18 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                         </Button>
                     </div>
                 </Card>
-             </div>
-        )}
+            ) : (
+                <div className="h-full rounded-xl border-2 border-dashed border-slate-800 bg-slate-900/20 flex flex-col items-center justify-center text-slate-600 space-y-4 p-6">
+                    <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center ring-4 ring-slate-800/50">
+                        <Wallet size={24} className="opacity-50" />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-sm font-medium text-slate-500">En attente de client</p>
+                        <p className="text-xs text-slate-600 mt-1">Utilisez la recherche à gauche pour commencer</p>
+                    </div>
+                </div>
+            )}
+        </div>
       </div>
 
       {/* Confirmation Dialog */}

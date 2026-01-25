@@ -1,18 +1,36 @@
+/**
+ * Compte Transfers Service
+ *
+ * Ce fichier est maintenant un wrapper vers scheduled-transfers-service.ts
+ * pour assurer la compatibilite ascendante avec le code existant.
+ *
+ * @deprecated Utiliser scheduled-transfers-service.ts directement pour les nouvelles fonctionnalites
+ */
+
 import crypto from "crypto";
 import { db } from "../db";
-import { comptes, mouvementsFinanciers, transactionsCompte, virementsProgrammes, virementsProgrammesAuditLogs, tachesRegularisation } from "@shared/schema";
-import { and, eq, lte, sql } from "drizzle-orm";
+import { comptes, mouvementsFinanciers, transactionsCompte } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 import { canDeposit, canWithdraw } from "./comptes";
-import {
-  FrequenceVirement,
-  FrequenceVirementType,
-  StatutAuditVirement,
-  TypeTacheRegularisation,
-  Priorite,
-  StatutTransaction,
-} from "@shared/enum/status-constants";
+import { StatutTransaction } from "@shared/enum/status-constants";
 
-export type VirementFrequence = FrequenceVirementType;
+// Re-export depuis le nouveau service
+export {
+  createVirementProgramme,
+  getVirementsProgrammesDue,
+  processScheduledTransfers,
+  runVirementsProgrammes,
+  computeNextExecution,
+  getScheduledTransferHistory,
+  getScheduledTransfersHealth,
+  cleanupStaleProcessingLocks,
+} from "./scheduled-transfers-service";
+
+export type { VirementFrequence } from "./scheduled-transfers-service";
+
+// ============================================
+// TYPES
+// ============================================
 
 interface ExecuteTransferInput {
   compteSourceId: string;
@@ -20,41 +38,30 @@ interface ExecuteTransferInput {
   montant: number;
   createdBy?: string | null;
   description?: string;
-  idempotencyKey?: string; // Clé pour éviter les doublons
+  idempotencyKey?: string;
 }
 
-interface ScheduleTransferInput {
-  compteSourceId: string;
-  compteDestId: string;
-  montant: number;
-  frequence: VirementFrequence;
-  createdBy?: string | null;
-}
+// ============================================
+// HELPERS
+// ============================================
 
-/** Génère une référence unique pour un virement avec crypto.randomUUID() */
+/** Genere une reference unique pour un virement avec crypto.randomUUID() */
 const generateReference = () =>
   `VIR-${Date.now()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-const computeNextExecution = (base: Date, frequence: string): Date | null => {
-  const next = new Date(base);
+// ============================================
+// EXECUTE IMMEDIATE TRANSFER
+// ============================================
 
-  switch (frequence as FrequenceVirementType) {
-    case FrequenceVirement.DAILY:
-      next.setDate(next.getDate() + 1);
-      return next;
-    case FrequenceVirement.WEEKLY:
-      next.setDate(next.getDate() + 7);
-      return next;
-    case FrequenceVirement.MONTHLY:
-      next.setMonth(next.getMonth() + 1);
-      next.setDate(Math.min(next.getDate(), 28));
-      return next;
-    case FrequenceVirement.ONCE:
-    default:
-      return null;
-  }
-};
-
+/**
+ * Execute un virement immediat entre deux comptes.
+ *
+ * ATTENTION: Pour les virements programmes, utiliser scheduled-transfers-service.ts
+ * qui garantit l'idempotence et la robustesse.
+ *
+ * Cette fonction reste disponible pour les virements manuels/immediats
+ * qui ne font pas partie d'un schedule.
+ */
 export async function executeCompteTransfer({
   compteSourceId,
   compteDestId,
@@ -64,7 +71,7 @@ export async function executeCompteTransfer({
   idempotencyKey,
 }: ExecuteTransferInput): Promise<{ mouvementId: string }> {
   return db.transaction(async (tx) => {
-    // Vérification d'idempotence: si cette opération a déjà été exécutée, retourner le résultat existant
+    // Verification d'idempotence si cle fournie
     if (idempotencyKey) {
       const [existingMouvement] = await tx
         .select({ id: mouvementsFinanciers.id })
@@ -77,8 +84,8 @@ export async function executeCompteTransfer({
       }
     }
 
-    // Verrouillage des comptes avec FOR UPDATE pour éviter les race conditions
-    // L'ordre est important: on verrouille toujours dans le même ordre (par ID) pour éviter les deadlocks
+    // Verrouillage des comptes avec FOR UPDATE pour eviter les race conditions
+    // L'ordre est important: on verrouille toujours dans le meme ordre (par ID) pour eviter les deadlocks
     const [smallerId, largerId] = compteSourceId < compteDestId
       ? [compteSourceId, compteDestId]
       : [compteDestId, compteSourceId];
@@ -121,9 +128,9 @@ export async function executeCompteTransfer({
       throw new Error(`Solde insuffisant (${soldeSource} FCFA disponible)`);
     }
 
-    // Utiliser l'idempotencyKey comme référence si fournie, sinon générer une nouvelle
+    // Utiliser l'idempotencyKey comme reference si fournie, sinon generer une nouvelle
     const reference = idempotencyKey || generateReference();
-    const mouvement = await tx
+    const mouvementResult = await tx
       .insert(mouvementsFinanciers)
       .values({
         dateOperation: new Date(),
@@ -146,7 +153,7 @@ export async function executeCompteTransfer({
       })
       .returning();
 
-    const mouvementId = mouvement[0]?.id;
+    const mouvementId = mouvementResult[0].id;
 
     const nouveauSoldeSource = (soldeSource - montant).toString();
     const nouveauSoldeDest = (soldeDest + montant).toString();
@@ -183,141 +190,4 @@ export async function executeCompteTransfer({
 
     return { mouvementId };
   });
-}
-
-export async function createVirementProgramme({
-  compteSourceId,
-  compteDestId,
-  montant,
-  frequence,
-  createdBy,
-}: ScheduleTransferInput) {
-  const [schedule] = await db
-    .insert(virementsProgrammes)
-    .values({
-      compteSourceId,
-      compteDestId,
-      montant: montant.toString(),
-      frequence,
-      prochaineExecution: new Date(),
-      actif: true,
-      createdBy: createdBy || undefined,
-      statutDernier: null, // No execution yet
-    })
-    .returning();
-
-  return schedule;
-}
-
-export async function getVirementsProgrammesDue(referenceDate = new Date()) {
-  return db
-    .select()
-    .from(virementsProgrammes)
-    .where(
-      and(
-        eq(virementsProgrammes.actif, true),
-        lte(virementsProgrammes.prochaineExecution, referenceDate)
-      )
-    );
-}
-
-export async function runVirementsProgrammes(referenceDate = new Date()) {
-  const schedules = await getVirementsProgrammesDue(referenceDate);
-  const results: { id: string; success: boolean; error?: string; mouvementId?: string }[] = [];
-
-  for (const schedule of schedules) {
-    const startTime = performance.now();
-    // Générer une clé d'idempotence unique pour ce virement programmé à cette date
-    const idempotencyKey = `VP-${schedule.id}-${referenceDate.toISOString().slice(0, 10)}-${crypto.randomUUID().slice(0, 8)}`;
-
-    try {
-      const { mouvementId } = await executeCompteTransfer({
-        compteSourceId: schedule.compteSourceId,
-        compteDestId: schedule.compteDestId,
-        montant: Number(schedule.montant || 0),
-        createdBy: schedule.createdBy || undefined,
-        description: "Virement programmé",
-        idempotencyKey,
-      });
-
-      const executionTimeMs = Math.round(performance.now() - startTime);
-      const nextExecution = computeNextExecution(referenceDate, schedule.frequence);
-
-      // Mise à jour du virement programmé
-      await db
-        .update(virementsProgrammes)
-        .set({
-          dernierExecution: referenceDate,
-          prochaineExecution: nextExecution,
-          actif: nextExecution ? true : false,
-          statutDernier: StatutAuditVirement.SUCCESS,
-          erreurDerniere: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(virementsProgrammes.id, schedule.id));
-
-      // Insertion du log d'audit
-      await db.insert(virementsProgrammesAuditLogs).values({
-        virementId: schedule.id,
-        statut: StatutAuditVirement.SUCCESS,
-        message: "Virement exécuté avec succès",
-        executedAt: new Date(),
-        executionTimeMs,
-        mouvementId,
-        metadata: {
-          montant: Number(schedule.montant),
-          compteSourceId: schedule.compteSourceId,
-          compteDestId: schedule.compteDestId,
-          frequence: schedule.frequence,
-          idempotencyKey,
-        },
-      });
-
-      results.push({ id: schedule.id, success: true, mouvementId });
-    } catch (error) {
-      const executionTimeMs = Math.round(performance.now() - startTime);
-      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
-
-      // Mise à jour du virement programmé avec l'erreur
-      await db
-        .update(virementsProgrammes)
-        .set({
-          dernierExecution: referenceDate,
-          statutDernier: StatutAuditVirement.FAILED,
-          erreurDerniere: errorMessage,
-          updatedAt: new Date(),
-        })
-        .where(eq(virementsProgrammes.id, schedule.id));
-
-      // Insertion du log d'audit d'échec
-      await db.insert(virementsProgrammesAuditLogs).values({
-        virementId: schedule.id,
-        statut: StatutAuditVirement.FAILED,
-        message: errorMessage,
-        executedAt: new Date(),
-        executionTimeMs,
-        metadata: {
-          montant: Number(schedule.montant),
-          compteSourceId: schedule.compteSourceId,
-          compteDestId: schedule.compteDestId,
-          frequence: schedule.frequence,
-          idempotencyKey,
-          errorStack: error instanceof Error ? error.stack : undefined,
-        },
-      });
-
-      // Créer une tâche de régularisation pour le virement échoué
-      await db.insert(tachesRegularisation).values({
-        type: TypeTacheRegularisation.VIREMENT_PROG_ECHEC,
-        description: `Virement programmé #${schedule.id.slice(0, 8)} échoué: ${errorMessage}`,
-        montantEcart: schedule.montant,
-        priorite: Priorite.HIGH,
-        dateEcheance: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0], // J+1
-      });
-
-      results.push({ id: schedule.id, success: false, error: errorMessage });
-    }
-  }
-
-  return results;
 }

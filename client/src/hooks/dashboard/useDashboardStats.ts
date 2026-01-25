@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAgence } from '../../contexts/AgenceContext';
 import { dashboardApi } from '../../lib/api-client';
+import { dashboardKeys } from '../../lib/query-keys';
 
 export interface DashboardStats {
   role: string;
@@ -59,7 +60,7 @@ export function useDashboardStats(userRole?: string) {
   const { selectedAgence } = useAgence();
   
   const { data: stats, isLoading: loading, error, refetch } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats', userRole, selectedAgence?.id],
+    queryKey: dashboardKeys.stats(userRole, selectedAgence?.id),
     queryFn: () => dashboardApi.getStats(),
     // Smart Polling Strategy (Performance Optimized)
     refetchInterval: 30_000, // 30s background polling (mobile-friendly)

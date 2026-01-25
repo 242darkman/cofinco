@@ -374,20 +374,20 @@ export default function UserCustomPermissionsManager({
   if (!selectedUser) return null;
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-300 space-y-4">
+    <div className="flex flex-col h-full animate-in fade-in duration-300 space-y-2">
       
-      {/* STICKY HEADER */}
-      <div className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl">
-        <div className="flex items-center gap-4">
+      {/* STICKY HEADER - ULTRA COMPACT */}
+      <div className="flex items-center justify-between p-2 bg-slate-900 border border-slate-800 rounded-lg shrink-0">
+        <div className="flex items-center gap-3">
           <button 
             onClick={handleBackToSelection}
-            className="w-9 h-9 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            className="w-7 h-7 rounded-md bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
           </button>
           
           <div className="relative">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-base font-bold text-white shadow-lg shadow-indigo-500/20 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-indigo-500/20 overflow-hidden">
               {getUserPhotoUrl(selectedUser) ? (
                 <img
                   src={getUserPhotoUrl(selectedUser)}
@@ -398,46 +398,46 @@ export default function UserCustomPermissionsManager({
                 getUserInitials(selectedUser)
               )}
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-slate-900 rounded-full">
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full">
               <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
             </span>
           </div>
 
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
               {getUserFullName(selectedUser)}
-              <span className={`text-xs font-normal px-2 py-0.5 rounded-full border ${getRoleBadgeStyle(selectedUser.role).classes}`}>
+              <span className={`text-[10px] font-normal px-1.5 py-0 rounded-full border ${getRoleBadgeStyle(selectedUser.role).classes}`}>
                 {getRoleBadgeStyle(selectedUser.role).label}
               </span>
             </h3>
-            <p className="text-xs text-emerald-400 flex items-center gap-1">
-              <Wifi className="w-3 h-3" /> En ligne • Sync active
+            <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+              <Wifi className="w-2.5 h-2.5" /> En ligne • Sync
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="hidden md:block text-right">
-            <div className="text-xs text-slate-500">Exceptions</div>
-            <div className={`text-sm font-bold ${totalExceptions > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+            <div className="text-[10px] text-slate-500">Exceptions</div>
+            <div className={`text-xs font-bold ${totalExceptions > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
               {totalExceptions > 0 ? `${totalExceptions} Actives` : 'Aucune'}
             </div>
           </div>
           
-          <div className="hidden sm:block text-right border-l border-slate-700 pl-4">
-            <div className="text-xs text-slate-500">Actives</div>
-            <div className="text-sm font-bold text-indigo-400">{activePermissionsCount}</div>
+          <div className="hidden sm:block text-right border-l border-slate-700 pl-2">
+            <div className="text-[10px] text-slate-500">Actives</div>
+            <div className="text-xs font-bold text-indigo-400">{activePermissionsCount}</div>
           </div>
           
           <button
             onClick={handleReset}
             disabled={isResetting}
-            className="px-3 py-2 border border-slate-700 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 py-1.5 border border-slate-700 rounded-md text-xs text-slate-300 hover:bg-slate-800 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isResetting ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={12} className="animate-spin" />
             ) : (
-              <RotateCcw size={14} />
+              <RotateCcw size={12} />
             )}
             <span className="hidden sm:inline">{isResetting ? 'Reset...' : 'Reset'}</span>
           </button>
@@ -445,22 +445,22 @@ export default function UserCustomPermissionsManager({
       </div>
 
       {confirmMessage && (
-        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2 text-sm text-emerald-400 animate-in fade-in slide-in-from-top-2">
-          <CheckCircle size={16} /> {confirmMessage}
+        <div className="p-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2 text-xs text-emerald-400 animate-in fade-in slide-in-from-top-2 shrink-0">
+          <CheckCircle size={12} /> {confirmMessage}
         </div>
       )}
 
       {/* SPLIT VIEW */}
-      <div className="grid grid-cols-12 gap-4 lg:gap-6 items-start flex-1 min-h-0">
+      <div className="grid grid-cols-12 gap-2 lg:gap-3 items-start flex-1 min-h-0">
         
         {/* SIDEBAR - Modules List */}
-        <div className="col-span-12 lg:col-span-4 bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-          <div className="px-4 py-3 bg-slate-800/50 border-b border-slate-700 flex items-center gap-2">
-            <Award size={16} className="text-slate-400" />
-            <span className="font-semibold text-slate-300">Modules</span>
-            <span className="ml-auto text-xs text-slate-500">{modulesList.length}</span>
+        <div className="col-span-12 lg:col-span-4 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col h-full min-h-0">
+          <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-2 shrink-0">
+            <Award size={14} className="text-slate-400" />
+            <span className="font-semibold text-slate-300 text-xs">Modules</span>
+            <span className="ml-auto text-[10px] text-slate-500">{modulesList.length}</span>
           </div>
-          <div className="max-h-[500px] lg:max-h-[550px] overflow-y-auto divide-y divide-slate-800/50">
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50 custom-scrollbar scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
             {modulesList.map(module => {
               const isActive = activeModuleId === module.id;
               
@@ -469,7 +469,7 @@ export default function UserCustomPermissionsManager({
                   key={module.id}
                   onClick={() => setActiveModuleId(module.id)}
                   className={`
-                    w-full flex justify-between items-center px-4 py-3 hover:bg-slate-800/70 transition-colors text-left
+                    w-full flex justify-between items-center px-3 py-2 hover:bg-slate-800/70 transition-colors text-left
                     ${isActive ? 'bg-slate-800 border-l-2 border-indigo-500' : 'border-l-2 border-transparent'}
                     ${module.hasExceptions ? 'border-l-amber-500' : ''}
                   `}
@@ -478,7 +478,7 @@ export default function UserCustomPermissionsManager({
                     {module.hasExceptions && (
                       <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
                     )}
-                    <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                    <span className={`text-xs font-medium ${isActive ? 'text-white' : 'text-slate-300'}`}>
                       {module.name}
                     </span>
                   </div>
@@ -490,16 +490,16 @@ export default function UserCustomPermissionsManager({
         </div>
 
         {/* MAIN CONTENT - Permissions Detail */}
-        <div className="col-span-12 lg:col-span-8 bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col max-h-[600px] lg:max-h-[650px]">
+        <div className="col-span-12 lg:col-span-8 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col h-full min-h-0">
           {/* Module Header + Search */}
-          <div className="px-5 py-4 border-b border-slate-800 bg-slate-800/30 shrink-0 space-y-3">
+          <div className="px-3 py-2 border-b border-slate-800 bg-slate-800/30 shrink-0 space-y-2">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Shield size={18} className="text-indigo-400" />
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Shield size={14} className="text-indigo-400" />
                   {activeModule?.name || 'Sélectionnez un module'}
                 </h3>
-                <p className="text-sm text-slate-400 mt-0.5">
+                <p className="text-[10px] text-slate-400 mt-0.5">
                   {activeModule ? `${activeModule.activeCount}/${activeModule.permissions.length} actives` : ''}
                   {activeModule?.hasExceptions && (
                     <span className="ml-2 text-amber-400">• {activeModule.exceptionCount} exception(s)</span>
@@ -511,52 +511,55 @@ export default function UserCustomPermissionsManager({
             {/* Search & Filter */}
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={12} />
                 <input 
                   type="text" 
                   value={permSearchTerm}
                   onChange={(e) => setPermSearchTerm(e.target.value)}
                   placeholder="Filtrer..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none text-white placeholder:text-slate-500"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-md pl-8 pr-3 py-1 text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-white placeholder:text-slate-500"
                 />
               </div>
               <button 
                 onClick={() => setShowOnlyCustom(!showOnlyCustom)}
                 className={`
-                  px-3 py-2 rounded-lg text-xs border flex items-center gap-1.5 transition-all whitespace-nowrap
+                  px-2 py-1 rounded-md text-[10px] border flex items-center gap-1 transition-all whitespace-nowrap
                   ${showOnlyCustom 
                     ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' 
                     : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'
                   }
                 `}
               >
-                <Filter size={14} />
+                <Filter size={10} />
                 <span className="hidden sm:inline">Exceptions</span>
               </button>
             </div>
           </div>
 
           {/* Permissions List */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {activeModulePermissions.length > 0 ? (
-              <div className="divide-y divide-slate-800/50">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
                 {activeModulePermissions.map(perm => {
                   const status = getUserPermissionStatus(perm.code);
                   const isCustom = status.source === 'custom';
                   
                   let statusLabel = 'Hérité';
                   let statusColor = 'text-slate-500';
-                  let borderColor = 'border-transparent';
+                  let borderColor = 'border-slate-800/50';
+                  let bgHover = 'hover:bg-slate-800/40';
                   
                   if (isCustom) {
                     if (status.granted) {
-                      statusLabel = 'Forcé (ON)';
+                      statusLabel = 'Forcé';
                       statusColor = 'text-emerald-400';
-                      borderColor = 'border-emerald-500';
+                      borderColor = 'border-emerald-500/30';
+                      bgHover = 'bg-emerald-500/5 hover:bg-emerald-500/10';
                     } else {
-                      statusLabel = 'Bloqué (OFF)';
+                      statusLabel = 'Bloqué';
                       statusColor = 'text-rose-400';
-                      borderColor = 'border-rose-500';
+                      borderColor = 'border-rose-500/30';
+                      bgHover = 'bg-rose-500/5 hover:bg-rose-500/10';
                     }
                   }
                   
@@ -567,51 +570,45 @@ export default function UserCustomPermissionsManager({
                     <div
                       key={perm.id}
                       className={`
-                        flex items-center justify-between p-4 hover:bg-slate-800/40 transition-all duration-300 group border-l-2 ${borderColor}
+                        flex items-center justify-between p-2 rounded-md border transition-all duration-200 group
+                        ${borderColor} ${bgHover}
                         ${wasRecentlyToggled ? 'bg-indigo-500/10 scale-[1.01]' : ''}
                         ${isLoading ? 'opacity-70' : ''}
                       `}
                     >
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className={`text-sm font-medium transition-colors ${status.granted ? 'text-white' : 'text-slate-400'}`}>
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className={`text-xs font-medium transition-colors truncate ${status.granted ? 'text-white' : 'text-slate-400'}`}>
                             {perm.name}
                           </span>
-                          {isCustom && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium animate-in fade-in duration-300 ${
-                              status.granted
-                                ? 'bg-emerald-500/10 text-emerald-400'
-                                : 'bg-rose-500/10 text-rose-400'
-                            }`}>
-                              Exception
-                            </span>
-                          )}
                           {wasRecentlyToggled && (
-                            <Sparkles size={14} className="text-indigo-400 animate-pulse" />
+                            <Sparkles size={10} className="text-indigo-400 animate-pulse shrink-0" />
                           )}
                         </div>
-                        <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
+                        <div className="text-[9px] text-slate-500 font-mono flex items-center gap-1 truncate">
                           {perm.code}
-                          {perm.description && (
-                            <span className="hidden sm:inline text-slate-600">• {perm.description}</span>
+                          {isCustom && (
+                             <span className={`text-[8px] px-1 py-0 rounded font-bold uppercase tracking-wide ml-auto ${
+                               status.granted
+                                 ? 'bg-emerald-500/10 text-emerald-400'
+                                 : 'bg-rose-500/10 text-rose-400'
+                             }`}>
+                               {statusLabel}
+                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs text-right hidden sm:block font-medium transition-colors ${statusColor}`}>
-                          {statusLabel}
-                        </span>
-
+                      <div className="flex items-center gap-2 shrink-0">
                         {isLoading ? (
-                          <div className="w-11 h-6 flex items-center justify-center">
-                            <Loader2 size={16} className="animate-spin text-indigo-400" />
+                          <div className="w-8 h-4 flex items-center justify-center">
+                            <Loader2 size={12} className="animate-spin text-indigo-400" />
                           </div>
                         ) : (
                           <Switch
                             checked={status.granted}
                             onChange={() => handleTogglePermission(perm.id, perm.name, status.granted)}
-                            className={`transition-all ${isCustom
+                            className={`transition-all scale-75 ${isCustom
                               ? (status.granted ? "bg-amber-500" : "bg-rose-500")
                               : (status.granted ? "bg-indigo-600" : "bg-slate-600")
                             }`}
@@ -622,9 +619,9 @@ export default function UserCustomPermissionsManager({
                           <button
                             onClick={() => handleTogglePermission(perm.id, perm.name, status.granted)}
                             title="Rétablir au rôle"
-                            className="p-1.5 text-slate-600 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                            className="p-1 text-slate-500 hover:text-white hover:bg-slate-700/50 rounded transition-colors"
                           >
-                            <RotateCcw size={14} />
+                            <RotateCcw size={10} />
                           </button>
                         )}
                       </div>
@@ -633,9 +630,9 @@ export default function UserCustomPermissionsManager({
                 })}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-                <Shield size={40} className="mb-4 opacity-50" />
-                <p className="text-base font-medium">
+              <div className="flex flex-col items-center justify-center h-full text-slate-500 pb-10">
+                <Shield size={32} className="mb-3 opacity-50" />
+                <p className="text-sm font-medium">
                   {permSearchTerm || showOnlyCustom ? 'Aucun résultat' : 'Aucune permission'}
                 </p>
               </div>

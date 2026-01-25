@@ -15,6 +15,8 @@ import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { TypeCompte } from "@shared/enum/status-constants";
 import accountingPostingService from "./accounting-posting-service";
+import { balanceService } from "./balance-service";
+import type { BalanceEntityType } from "@shared/types/balances";
 
 // Infer MouvementFinancier type from table
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
@@ -564,6 +566,10 @@ export async function executeWithLedger<T>(
       .catch(err => console.warn(`[Ledger] GL posting deferred for ${transactionResult.mouvement.id}: ${err.message}`));
   }
 
+  // 5. Emit BALANCE_UPDATED events via WebSocket (immediate, after commit)
+  // This provides real-time updates without waiting for outbox worker polling
+  emitBalanceUpdates(transactionResult.mouvement, mouvementData.agenceId, transactionResult.additionalEventData);
+
   return { result: transactionResult.result, mouvement: transactionResult.mouvement };
 }
 
@@ -659,6 +665,125 @@ async function postToGeneralLedger(
   }
 }
 
+/**
+ * Emit BALANCE_UPDATED events via WebSocket for all affected entities
+ * Called immediately after transaction commit for real-time updates
+ *
+ * Calcule automatiquement previousBalance à partir du montant et sens du mouvement
+ * si ancienSolde* n'est pas fourni dans additionalEventData.
+ */
+function emitBalanceUpdates(
+  mouvement: MouvementFinancier,
+  agenceId?: string,
+  additionalEventData?: {
+    agentId?: string;
+    nouveauSoldeCompte?: string;
+    ancienSoldeCompte?: string;
+    nouveauSoldeCredit?: string;
+    ancienSoldeCredit?: string;
+    nouveauSoldeSession?: string;
+    ancienSoldeSession?: string;
+    nouveauSoldeCoffre?: string;
+    ancienSoldeCoffre?: string;
+    nouveauSoldeTontine?: string;
+    ancienSoldeTontine?: string;
+  }
+): void {
+  try {
+    const sourceModule = mouvement.sourceModule || 'SYSTEME';
+    const mouvementRef = mouvement.reference;
+    const effectiveAgenceId = agenceId || mouvement.agenceId || 'unknown';
+    const montant = Number(mouvement.montant || 0);
+    const isCredit = mouvement.sens === 'CREDIT';
+
+    // Helper pour calculer previousBalance si non fourni
+    const calculatePrevious = (newBalance: number, ancienSolde?: string): number => {
+      if (ancienSolde !== undefined) {
+        return Number(ancienSolde);
+      }
+      // Si pas d'ancien solde fourni, le calculer à partir du nouveau et du mouvement
+      // CREDIT = entrée d'argent = previous = new - montant
+      // DEBIT = sortie d'argent = previous = new + montant
+      return isCredit ? newBalance - montant : newBalance + montant;
+    };
+
+    // Emit for compte updates
+    if (mouvement.compteId && additionalEventData?.nouveauSoldeCompte) {
+      const newBalance = Number(additionalEventData.nouveauSoldeCompte);
+      const previousBalance = calculatePrevious(newBalance, additionalEventData.ancienSoldeCompte);
+
+      balanceService.broadcastBalanceUpdate({
+        entityType: 'compte' as BalanceEntityType,
+        entityId: mouvement.compteId,
+        agenceId: effectiveAgenceId,
+        newBalance,
+        previousBalance,
+        mouvementRef,
+        sourceModule,
+        typePaiement: mouvement.typePaiement || undefined,
+      });
+    }
+
+    // Emit for credit updates
+    if (mouvement.creditId && additionalEventData?.nouveauSoldeCredit) {
+      const newBalance = Number(additionalEventData.nouveauSoldeCredit);
+      const previousBalance = calculatePrevious(newBalance, additionalEventData.ancienSoldeCredit);
+
+      balanceService.broadcastBalanceUpdate({
+        entityType: 'credit' as BalanceEntityType,
+        entityId: mouvement.creditId,
+        agenceId: effectiveAgenceId,
+        newBalance,
+        previousBalance,
+        mouvementRef,
+        sourceModule,
+        typePaiement: mouvement.typePaiement || undefined,
+      });
+    }
+
+    // Emit for session caisse updates
+    if (mouvement.sessionCaisseId && additionalEventData?.nouveauSoldeSession) {
+      const newBalance = Number(additionalEventData.nouveauSoldeSession);
+      const previousBalance = calculatePrevious(newBalance, additionalEventData.ancienSoldeSession);
+
+      balanceService.broadcastBalanceUpdate({
+        entityType: 'session_caisse' as BalanceEntityType,
+        entityId: mouvement.sessionCaisseId,
+        agenceId: effectiveAgenceId,
+        newBalance,
+        previousBalance,
+        mouvementRef,
+        sourceModule,
+        typePaiement: mouvement.typePaiement || undefined,
+      });
+    }
+
+    // Emit for tontine updates
+    if (mouvement.tontineId && additionalEventData?.nouveauSoldeTontine) {
+      const newBalance = Number(additionalEventData.nouveauSoldeTontine);
+      const previousBalance = calculatePrevious(newBalance, additionalEventData.ancienSoldeTontine);
+
+      balanceService.broadcastBalanceUpdate({
+        entityType: 'tontine' as BalanceEntityType,
+        entityId: mouvement.tontineId,
+        agenceId: effectiveAgenceId,
+        newBalance,
+        previousBalance,
+        mouvementRef,
+        sourceModule,
+        typePaiement: mouvement.typePaiement || undefined,
+      });
+    }
+
+    // Note: Coffre updates are typically handled separately in coffre transfer services
+    // as they don't go through the standard mouvement flow
+
+  } catch (error) {
+    // Log but don't throw - WS emission shouldn't break business flow
+    console.error(`[Ledger] BALANCE_UPDATED emission failed for ${mouvement.id}:`, error);
+  }
+}
+
 export default {
   generateReference,
   createMouvementFinancier,
@@ -672,4 +797,5 @@ export default {
   checkIdempotencyKey,
   executeWithLedger,
   validateUserId,
+  emitBalanceUpdates, // Export pour les services qui ne passent pas par executeWithLedger
 };

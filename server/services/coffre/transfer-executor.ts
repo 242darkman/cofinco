@@ -13,6 +13,7 @@ import { eq, sql, desc, and, isNull } from "drizzle-orm";
 import { getWsInstance } from "../../ws-server";
 
 import { updateSessionSolde } from "../ledger";
+import { balanceService } from "../balance-service";
 
 import type { TransfertCoffreCaisse } from "@shared/schema";
 
@@ -270,38 +271,47 @@ export async function executeTransfertCoffre(
       userAgent,
     });
 
-    // 12. WebSocket Notification (Real-Time)
+    // 12. WebSocket Notification (Real-Time) - BALANCE_UPDATED standardisé
     try {
-        const ws = getWsInstance();
-        if (ws) {
-             // Notify Agence (Coffre Updates)
-             ws.broadcastToAggregate('coffre', transfert.agenceId, {
-                type: 'REALTIME_EVENT',
-                payload: {
-                    aggregateType: 'coffre',
-                    aggregateId: transfert.agenceId,
-                    event: 'TRANSFERT_EXECUTED',
-                    transfertId: transfertId
-                }
-             });
+        const mouvementRef = groupRef;
+        const previousCoffreBalance = parseFloat(coffre.solde || "0");
+        const previousCaisseBalance = parseFloat(caisse.solde || "0");
 
-             // Notify Caisse (Balance Updates)
-             // Pour les transferts de clôture, le solde de la caisse est déjà le montantReporte
-             const newCaisseBalance = isCoffreSource
-                 ? (Number(caisse.solde) + Number(montant))
-                 : (isClosingTransfer ? Number(caisse.solde) : (Number(caisse.solde) - Number(montant)));
+        // Coffre balance update
+        const newCoffreBalance = isCoffreSource
+          ? previousCoffreBalance - montant
+          : previousCoffreBalance + montant;
 
-             ws.broadcastToAggregate('caisse', caisse.id, {
-                type: 'CAISSE_UPDATE',
-                payload: {
-                    caisseId: caisse.id,
-                    type: 'BALANCE_UPDATED',
-                    newBalance: newCaisseBalance
-                }
-             });
+        balanceService.broadcastBalanceUpdate({
+          entityType: 'coffre',
+          entityId: coffre.id,
+          agenceId: transfert.agenceId,
+          newBalance: newCoffreBalance,
+          previousBalance: previousCoffreBalance,
+          mouvementRef,
+          sourceModule: 'TRANSFERT',
+          typePaiement: isCoffreSource ? 'SAFE_SUPPLY' : 'SAFE_DEPOSIT',
+        });
+
+        // Caisse balance update (si pas un transfert de clôture)
+        if (!isClosingTransfer) {
+          const newCaisseBalance = isCoffreSource
+            ? previousCaisseBalance + montant
+            : previousCaisseBalance - montant;
+
+          balanceService.broadcastBalanceUpdate({
+            entityType: 'caisse',
+            entityId: caisse.id,
+            agenceId: transfert.agenceId,
+            newBalance: newCaisseBalance,
+            previousBalance: previousCaisseBalance,
+            mouvementRef,
+            sourceModule: 'TRANSFERT',
+            typePaiement: isCoffreSource ? 'SAFE_SUPPLY' : 'SAFE_DEPOSIT',
+          });
         }
     } catch (e) {
-        console.error("Failed to broadcast WS event for transfert", e);
+        console.error("Failed to broadcast BALANCE_UPDATED for transfert", e);
     }
 
     return {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { StatutDemande } from '@shared/enum/status-constants';
+import { creditKeys } from '../../lib/query-keys';
 
 export interface DemandeCredit {
   id: string;
@@ -40,7 +41,7 @@ export function useDemandes() {
 
   // Helper to invalidate counts after mutations
   const invalidateCounts = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/demandes-credit/counts'] });
+    queryClient.invalidateQueries({ queryKey: creditKeys.demandesCounts() });
   };
 
   const fetchDemandes = async () => {

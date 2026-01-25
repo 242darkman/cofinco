@@ -1208,6 +1208,31 @@ export const STATUT_AUDIT_VIREMENT_LABELS: Record<StatutAuditVirementType, strin
 
 
 // ============================================
+// STATUT RUN VIREMENT (Etat d'une execution)
+// ============================================
+
+export const StatutRunVirement = {
+  PENDING: "PENDING",
+  RUNNING: "RUNNING",
+  SUCCESS: "SUCCESS",
+  FAILED: "FAILED",
+  SKIPPED: "SKIPPED",
+} as const;
+
+export type StatutRunVirementType = (typeof StatutRunVirement)[keyof typeof StatutRunVirement];
+
+/** Labels FR pour l'UI des statuts d'execution */
+export const STATUT_RUN_VIREMENT_LABELS: Record<StatutRunVirementType, string> = {
+  [StatutRunVirement.PENDING]: "En attente",
+  [StatutRunVirement.RUNNING]: "En cours",
+  [StatutRunVirement.SUCCESS]: "Succès",
+  [StatutRunVirement.FAILED]: "Échec",
+  [StatutRunVirement.SKIPPED]: "Ignoré",
+};
+
+
+
+// ============================================
 // TYPE TACHE REGULARISATION
 // ============================================
 

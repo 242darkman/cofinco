@@ -817,6 +817,62 @@ export const compteEpargneApi = {
       trend?: number;
       trendUp?: boolean;
     }>('/comptes/transferts-programmes/stats'),
+
+  // PR3: Nouveaux endpoints production-ready
+
+  /** Suppression soft d'un virement programmé */
+  deleteScheduledTransfer: (id: string) =>
+    request<{ success: boolean }>(`/comptes/transferts-programmes/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /** Exécution manuelle immédiate d'un virement programmé */
+  runScheduledTransferNow: (id: string) =>
+    request<{
+      success: boolean;
+      mouvementId?: string;
+      error?: string;
+    }>(`/comptes/transferts-programmes/${id}/run-now`, {
+      method: 'POST',
+    }),
+
+  /** Historique des exécutions d'un virement programmé */
+  getScheduledTransferHistory: (id: string, params?: { page?: number; limit?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
+    const query = queryParams.toString();
+    return request<{
+      data: Array<{
+        id: string;
+        executionKey: string;
+        status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
+        startedAt: string | null;
+        completedAt: string | null;
+        mouvementId: string | null;
+        errorMessage: string | null;
+        attemptNumber: number;
+        createdAt: string;
+      }>;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/comptes/transferts-programmes/${id}/history${query ? `?${query}` : ''}`);
+  },
+
+  /** Santé du système de virements programmés */
+  getScheduledTransfersHealth: () =>
+    request<{
+      totalSchedules: number;
+      activeSchedules: number;
+      pausedSchedules: number;
+      schedulesWithFailures: number;
+      totalRuns: number;
+      successRuns: number;
+      failedRuns: number;
+      skippedRuns: number;
+      staleProcessingLocks: number;
+      oldestPendingSchedule: string | null;
+      avgExecutionTimeMs: number | null;
+    }>('/comptes/transferts-programmes/health'),
 };
 
 // Transaction Epargne API
