@@ -711,9 +711,9 @@ export function registerFinanceRoutes(app: Express) {
         const results = await query;
 
         // Map to frontend tabs using standardized EN enum values
-        // toProcess = PENDING_FEES + REJECTED + CANCELLED
-        // investigation = READY_FOR_INVESTIGATION
-        // approval = UNDER_INVESTIGATION + INVESTIGATION_COMPLETE
+        // toProcess = PENDING_FEES
+        // investigation = READY_FOR_INVESTIGATION + UNDER_INVESTIGATION + INVESTIGATION_COMPLETE
+        // approval = PENDING_APPROVAL
         // commission = APPROVED + APPROVED_AFTER_REEVALUATION
         // reevaluation = REEVALUATION_IN_PROGRESS
 
@@ -732,9 +732,9 @@ export function registerFinanceRoutes(app: Express) {
 
             if ([StatutDemande.PENDING_FEES].includes(s as any)) {
                 mapping.toProcess += c;
-            } else if (s === StatutDemande.READY_FOR_INVESTIGATION) {
+            } else if ([StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.INVESTIGATION_COMPLETE].includes(s as any)) {
                 mapping.investigation += c;
-            } else if ([StatutDemande.UNDER_INVESTIGATION, StatutDemande.INVESTIGATION_COMPLETE].includes(s as any)) {
+            } else if (s === StatutDemande.PENDING_APPROVAL) {
                 mapping.approval += c;
             } else if ([StatutDemande.APPROVED, StatutDemande.APPROVED_AFTER_REEVALUATION].includes(s as any)) {
                 mapping.commission += c;
@@ -870,14 +870,19 @@ export function registerFinanceRoutes(app: Express) {
 
       let updated;
 
-      // Auto-transition: UNDER_INVESTIGATION → INVESTIGATION_COMPLETE → APPROVED
-      // When approving from investigation status, automatically complete the investigation first
+      // Auto-transition: UNDER_INVESTIGATION → INVESTIGATION_COMPLETE → PENDING_APPROVAL → APPROVED
+      // When approving from investigation status, automatically route through intermediate states
       if (updateData.statut === StatutDemande.APPROVED && existing.statut === StatutDemande.UNDER_INVESTIGATION) {
-        // First transition to INVESTIGATION_COMPLETE, then to APPROVED in a transaction
         updated = await db.transaction(async (tx) => {
-          // Step 1: Complete the investigation
           await storage.updateDemandeCredit(id, { statut: StatutDemande.INVESTIGATION_COMPLETE }, tx);
-          // Step 2: Approve
+          await storage.updateDemandeCredit(id, { statut: StatutDemande.PENDING_APPROVAL }, tx);
+          return await storage.updateDemandeCredit(id, updateData, tx);
+        });
+      }
+      // Auto-transition: INVESTIGATION_COMPLETE → PENDING_APPROVAL → APPROVED
+      else if (updateData.statut === StatutDemande.APPROVED && existing.statut === StatutDemande.INVESTIGATION_COMPLETE) {
+        updated = await db.transaction(async (tx) => {
+          await storage.updateDemandeCredit(id, { statut: StatutDemande.PENDING_APPROVAL }, tx);
           return await storage.updateDemandeCredit(id, updateData, tx);
         });
       }
@@ -1591,31 +1596,24 @@ export function registerFinanceRoutes(app: Express) {
           recommandation: commentaire || raison // Store comment
       });
 
-      // Update Demande status - Workflow: UNDER_INVESTIGATION -> INVESTIGATION_COMPLETE -> APPROVED/REJECTED
+      // Update Demande status - Workflow: UNDER_INVESTIGATION -> INVESTIGATION_COMPLETE -> PENDING_APPROVAL
+      // The enquête validation moves the demande to PENDING_APPROVAL for committee decision
       if (enquete.demandeId) {
           // Step 1: Transition to INVESTIGATION_COMPLETE (enquête terminée)
           await storage.updateDemandeCredit(enquete.demandeId, {
               statut: StatutDemande.INVESTIGATION_COMPLETE as any
           });
 
-          // Step 2: Transition to final status based on decision
-          let nouveauStatutDemande: string = StatutDemande.INVESTIGATION_COMPLETE;
-          if (decision === 'APPROVED' || decision === 'approuve' || decision === 'REDUCED' || decision === 'reduit') {
-              nouveauStatutDemande = StatutDemande.APPROVED; // Prêt pour décaissement
-          } else if (decision === 'REJECTED' || decision === 'rejete') {
-              nouveauStatutDemande = StatutDemande.REJECTED; // Rejetée suite enquête
-          }
-
+          // Step 2: Transition to PENDING_APPROVAL (en attente d'approbation par le comité)
           await storage.updateDemandeCredit(enquete.demandeId, {
-              statut: nouveauStatutDemande as any,
-              montantApprouve: montant_approuve ? montant_approuve.toString() : undefined,
-              motifRejet: (decision === 'REJECTED' || decision === 'rejete') ? raison : undefined
+              statut: StatutDemande.PENDING_APPROVAL as any,
+              montantApprouve: montant_approuve ? montant_approuve.toString() : undefined
           });
 
           // Notify
           const wsInstance = getWsInstance();
           if (wsInstance) {
-               wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_updated', id: enquete.demandeId, statut: nouveauStatutDemande } });
+               wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_updated', id: enquete.demandeId, statut: StatutDemande.PENDING_APPROVAL } });
           }
       }
 

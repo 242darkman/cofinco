@@ -9,11 +9,12 @@
  * 2. READY_FOR_INVESTIGATION (A enquêter) - Frais payés, prête pour enquête terrain
  * 3. UNDER_INVESTIGATION (En enquête) - Enquête terrain en cours
  * 4. INVESTIGATION_COMPLETE (Enquête terminée) - Enquête soumise, attente validation
- * 5. APPROVED (Approuvée) - Demande approuvée, prête pour décaissement
- * 6. REJECTED (Rejetée) - Demande rejetée
- * 7. CANCELLED (Annulée) - Demande annulée par le client
- * 8. DISBURSED (Décaissée) - Fonds décaissés, crédit créé
- * 9. CLOSED (Clôturée) - Demande archivée
+ * 5. PENDING_APPROVAL (En cours d'approbation) - Enquête validée, attente décision comité
+ * 6. APPROVED (Approuvée) - Demande approuvée, prête pour décaissement
+ * 7. REJECTED (Rejetée) - Demande rejetée
+ * 8. CANCELLED (Annulée) - Demande annulée par le client
+ * 9. DISBURSED (Décaissée) - Fonds décaissés, crédit créé
+ * 10. CLOSED (Clôturée) - Demande archivée
  *
  * États de réévaluation:
  * 10. REEVALUATION_IN_PROGRESS - Réévaluation en cours après rejet initial
@@ -33,6 +34,7 @@ export const DemandeStatus = {
   READY_FOR_INVESTIGATION: "READY_FOR_INVESTIGATION",
   UNDER_INVESTIGATION: "UNDER_INVESTIGATION",
   INVESTIGATION_COMPLETE: "INVESTIGATION_COMPLETE",
+  PENDING_APPROVAL: "PENDING_APPROVAL",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
   CANCELLED: "CANCELLED",
@@ -54,6 +56,7 @@ export const DEMANDE_STATUS_FR_TO_EN: Record<string, DemandeStatusType> = {
   "A enquêter": DemandeStatus.READY_FOR_INVESTIGATION,
   "En enquête": DemandeStatus.UNDER_INVESTIGATION,
   "Enquête terminée": DemandeStatus.INVESTIGATION_COMPLETE,
+  "En cours d'approbation": DemandeStatus.PENDING_APPROVAL,
   "Approuvée": DemandeStatus.APPROVED,
   "Rejetée": DemandeStatus.REJECTED,
   "Annulée": DemandeStatus.CANCELLED,
@@ -72,6 +75,7 @@ export const DEMANDE_STATUS_EN_TO_FR: Record<DemandeStatusType, string> = {
   [DemandeStatus.READY_FOR_INVESTIGATION]: "A enquêter",
   [DemandeStatus.UNDER_INVESTIGATION]: "En enquête",
   [DemandeStatus.INVESTIGATION_COMPLETE]: "Enquête terminée",
+  [DemandeStatus.PENDING_APPROVAL]: "En cours d'approbation",
   [DemandeStatus.APPROVED]: "Approuvée",
   [DemandeStatus.REJECTED]: "Rejetée",
   [DemandeStatus.CANCELLED]: "Annulée",
@@ -143,13 +147,24 @@ export const DEMANDE_TRANSITIONS: Record<DemandeStatusType, readonly DemandeStat
 
   /**
    * INVESTIGATION_COMPLETE (Enquête terminée)
-   * - Peut être approuvée par le comité
-   * - Peut être rejetée
+   * - Passe en approbation après validation de l'enquête
    * - Peut retourner en enquête si complément nécessaire
    */
   [DemandeStatus.INVESTIGATION_COMPLETE]: [
-    DemandeStatus.APPROVED,                // Approbation
-    DemandeStatus.REJECTED,                // Rejet
+    DemandeStatus.PENDING_APPROVAL,        // Envoi en approbation
+    DemandeStatus.UNDER_INVESTIGATION,     // Retour enquête (complément)
+  ],
+
+  /**
+   * PENDING_APPROVAL (En cours d'approbation)
+   * - Enquête validée, en attente de décision du comité
+   * - Peut être approuvée par le comité
+   * - Peut être rejetée par le comité
+   * - Peut retourner en enquête si complément nécessaire
+   */
+  [DemandeStatus.PENDING_APPROVAL]: [
+    DemandeStatus.APPROVED,                // Approbation comité
+    DemandeStatus.REJECTED,                // Rejet comité
     DemandeStatus.UNDER_INVESTIGATION,     // Retour enquête (complément)
   ],
 
@@ -342,7 +357,15 @@ export const DEMANDE_STATUS_METADATA: Record<DemandeStatusType, {
     color: "text-purple-700",
     bgColor: "bg-purple-100",
     icon: "FileCheck",
-    description: "Rapport d'enquête soumis, en attente de décision",
+    description: "Rapport d'enquête soumis, en attente de validation",
+    phase: "investigation",
+  },
+  [DemandeStatus.PENDING_APPROVAL]: {
+    label: "En cours d'approbation",
+    color: "text-orange-700",
+    bgColor: "bg-orange-100",
+    icon: "UserCheck",
+    description: "Enquête validée, en attente de décision du comité",
     phase: "decision",
   },
   [DemandeStatus.APPROVED]: {

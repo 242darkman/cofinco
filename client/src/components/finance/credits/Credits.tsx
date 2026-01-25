@@ -159,10 +159,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     const stepEnquete = d.filter(i => i.statut === StatutDemande.UNDER_INVESTIGATION);
     const overdueEnquete = stepEnquete.filter(i => new Date(i.updated_at || i.created_at || new Date().toISOString()) < sevenDaysAgo).length;
 
-    // 4. Comité (Investigation Complete + Approved waiting for disbursement?)
-    // Actually Approved items are waiting for Disbursement, so they might belong to "Decaissement" pipeline or "Comité" output?
-    // Let's put Investigation Complete AND Approved here as "Comité / Validés"
-    const stepComite = d.filter(i => i.statut === StatutDemande.INVESTIGATION_COMPLETE);
+    // 4. Approbation (En cours d'approbation - enquête validée, attente décision comité)
+    const stepComite = d.filter(i => i.statut === StatutDemande.PENDING_APPROVAL);
     
     // 5. Décaissement (Approved, waiting for disbursement)
     const stepDecaissement = d.filter(i => i.statut === StatutDemande.APPROVED || i.statut === StatutDemande.APPROVED_AFTER_REEVALUATION);
@@ -220,14 +218,14 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // High Priority: Comité de Crédit (Investigation Complete) & Overdue Investigations
-    const high = d.filter(i => 
-      i.statut === StatutDemande.INVESTIGATION_COMPLETE || 
+    // High Priority: En cours d'approbation & Overdue Investigations
+    const high = d.filter(i =>
+      i.statut === StatutDemande.PENDING_APPROVAL ||
       (i.statut === StatutDemande.UNDER_INVESTIGATION && new Date(i.updated_at || i.created_at || new Date().toISOString()) < sevenDaysAgo)
-    ).map(i => ({ 
-      ...i, 
-      priority: 'high', 
-      label: i.statut === StatutDemande.INVESTIGATION_COMPLETE ? 'Prêt pour Comité' : 'Enquête En Retard' 
+    ).map(i => ({
+      ...i,
+      priority: 'high',
+      label: i.statut === StatutDemande.PENDING_APPROVAL ? 'En cours d\'approbation' : 'Enquête En Retard'
     }));
 
     // Medium: Enquêtes en cours (On time) & Approved waiting for disbursement
@@ -649,7 +647,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
-              .filter(d => ([StatutDemande.INVESTIGATION_COMPLETE, StatutDemande.UNDER_INVESTIGATION] as string[]).includes(d.statut))
+              .filter(d => d.statut === StatutDemande.PENDING_APPROVAL)
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={demandeColumns}
             loading={isLoading}
@@ -661,7 +659,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             maxHeight="calc(100vh - 350px)"
             pagination={{
               page: demandesPage,
-              totalPages: Math.ceil(demandes.demandes.filter(d => ([StatutDemande.INVESTIGATION_COMPLETE, StatutDemande.UNDER_INVESTIGATION] as string[]).includes(d.statut)).length / ITEMS_PER_PAGE),
+              totalPages: Math.ceil(demandes.demandes.filter(d => d.statut === StatutDemande.PENDING_APPROVAL).length / ITEMS_PER_PAGE),
               onPageChange: setDemandesPage
             }}
             density="compact"
@@ -887,12 +885,11 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           <Card variant="default" padding="none" className="overflow-hidden">
             <ResponsiveTable
               data={demandes.demandes
-                  .filter(d => d.statut === StatutDemande.READY_FOR_INVESTIGATION)
+                  .filter(d => ([StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.INVESTIGATION_COMPLETE] as string[]).includes(d.statut))
                   .map(d => ({
                     ...d,
-                    id: d.id, 
+                    id: d.id,
                     type_activite: d.objet_credit || 'À définir',
-                    statut: 'Prêt pour enquête', 
                     isDemande: true
                   }))
               }

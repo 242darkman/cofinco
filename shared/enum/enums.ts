@@ -40,6 +40,7 @@ export const statutDemandeEnum = pgEnum("statut_demande_enum", [
   "READY_FOR_INVESTIGATION",
   "UNDER_INVESTIGATION",
   "INVESTIGATION_COMPLETE",
+  "PENDING_APPROVAL",
   "APPROVED",
   "REJECTED",
   "CANCELLED",
