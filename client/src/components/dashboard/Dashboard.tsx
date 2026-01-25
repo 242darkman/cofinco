@@ -52,16 +52,18 @@ export default function Dashboard({
     const handleRefresh = () => {
       refresh();
     };
-    
+
     // Listen for any activity to refresh stats
     window.addEventListener('live-activity', handleRefresh);
     window.addEventListener('transaction-created', handleRefresh);
     window.addEventListener('refresh-dashboard', handleRefresh);
-    
+    window.addEventListener('balance-updated', handleRefresh);
+
     return () => {
       window.removeEventListener('live-activity', handleRefresh);
       window.removeEventListener('transaction-created', handleRefresh);
       window.removeEventListener('refresh-dashboard', handleRefresh);
+      window.removeEventListener('balance-updated', handleRefresh);
     };
   }, [refresh]);
 

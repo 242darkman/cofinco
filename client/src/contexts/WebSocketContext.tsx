@@ -4,7 +4,23 @@ import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 import { useServerHealth } from './ServerHealthContext';
 
-type MessageType = "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE" | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE" | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE" | "REALTIME_EVENT" | "SUBSCRIBED" | "UNSUBSCRIBED" | "COMPTE_UPDATE" | "MAINTENANCE_UPDATE" | "SESSION_TIMEOUT" | "SESSION_RISK_ALERT" | "FORCE_LOGOUT";
+type MessageType =
+  // Legacy messaging (v1)
+  | "CHAT_MESSAGE" | "TYPING" | "READ_RECEIPT"
+  // Messaging V2 - Conversations
+  | "CHAT_MESSAGE_V2" | "TYPING_V2" | "READ_UPDATE"
+  | "CONVERSATION_UPDATE" | "MESSAGE_REACTION" | "MESSAGE_DELETED" | "MESSAGE_EDITED"
+  | "SUBSCRIBE_CONVERSATION" | "UNSUBSCRIBE_CONVERSATION"
+  | "SUBSCRIBED_CONVERSATION" | "UNSUBSCRIBED_CONVERSATION"
+  // System
+  | "NOTIFICATION" | "PRESENCE" | "DASHBOARD_UPDATE"
+  | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE"
+  | "LIVE_ACTIVITY" | "CAISSE_UPDATE" | "HR_UPDATE" | "TONTINE_UPDATE"
+  | "ACCOUNTING_UPDATE" | "OPERATIONS_UPDATE" | "SETTINGS_UPDATE"
+  | "RBAC_UPDATE" | "AGENCE_UPDATE" | "EMPLOYE_UPDATE" | "LOYALTY_UPDATE"
+  | "REALTIME_EVENT" | "SUBSCRIBED" | "UNSUBSCRIBED" | "COMPTE_UPDATE"
+  | "MAINTENANCE_UPDATE" | "SESSION_TIMEOUT" | "SESSION_RISK_ALERT" | "FORCE_LOGOUT"
+  | "BALANCE_UPDATED";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -41,6 +57,7 @@ const MAX_RECONNECT_DELAY = 30000; // 30 seconds
 const BUFFERABLE_TYPES: MessageType[] = [
   'CHAT_MESSAGE',
   'TYPING',
+  'TYPING_V2',
   'LOCATION_UPDATE',
 ];
 
@@ -462,9 +479,24 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // Ledger events from outbox worker - dispatch as custom event
          // Individual components subscribe via useRealTimeSubscription hook
          window.dispatchEvent(new CustomEvent('realtime-event', { detail: message.payload }));
-         
+
          // Auto-invalidate relevant queries based on aggregate type
-         const { aggregateType, aggregateId } = message.payload;
+         const { aggregateType, aggregateId, eventType, data } = message.payload;
+
+         // Dispatch balance-updated for balance-related events to sync with useBalance hooks
+         if (['SOLDE_COMPTE_CHANGE', 'CREDIT_SOLDE_CHANGE', 'SESSION_CAISSE_CHANGE'].includes(eventType)) {
+           const balanceUpdatePayload = {
+             entityType: aggregateType as 'compte' | 'credit' | 'session_caisse',
+             entityId: aggregateId,
+             newBalance: Number(data?.nouveauSolde || data?.nouveauSoldeTheorique || 0),
+             previousBalance: 0, // Not always available from outbox
+             delta: 0,
+             mouvementRef: data?.mouvementId || '',
+             sourceModule: 'REALTIME_EVENT',
+             timestamp: new Date().toISOString(),
+           };
+           window.dispatchEvent(new CustomEvent('balance-updated', { detail: balanceUpdatePayload }));
+         }
          if (aggregateType === 'compte') {
            debounceInvalidate(['compte', aggregateId]);
            debounceInvalidate(['transactions', aggregateId]);
@@ -546,6 +578,46 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                  authService.logout();
                  window.location.reload();
              }, 1500);
+         }
+         break;
+
+      case "BALANCE_UPDATED":
+         // Unified balance update handler - invalidates relevant queries based on entityType
+         const { entityType, entityId, newBalance } = message.payload;
+
+         // Dispatch custom event for components that need direct updates
+         window.dispatchEvent(new CustomEvent('balance-updated', { detail: message.payload }));
+
+         // Invalidate relevant queries based on entity type
+         switch (entityType) {
+           case 'compte':
+             debounceInvalidate(['compte-balance', entityId]);
+             debounceInvalidate(['comptes-epargne']);
+             debounceInvalidate(['dashboard-stats']);
+             break;
+           case 'caisse':
+           case 'session_caisse':
+             debounceInvalidate(['session-caisse']);
+             debounceInvalidate(['session-caisse', 'active']);
+             debounceInvalidate(['operations-caisse']);
+             debounceInvalidate(['dashboard-stats']);
+             break;
+           case 'credit':
+             debounceInvalidate(['credits']);
+             debounceInvalidate(['credit', entityId]);
+             debounceInvalidate(['dashboard-stats']);
+             break;
+           case 'tontine':
+             debounceInvalidate(['/api/tontines']);
+             debounceInvalidate(['tontine', entityId]);
+             break;
+           case 'coffre':
+             debounceInvalidate(['coffre-stats']);
+             debounceInvalidate(['dashboard-stats']);
+             break;
+           case 'caisse_agent':
+             debounceInvalidate(['caisse-agent', entityId]);
+             break;
          }
          break;
     }

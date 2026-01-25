@@ -58,7 +58,24 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW_MS);
 
 type GlobalMessage = {
-  type: "CHAT_MESSAGE" | "NOTIFICATION" | "TYPING" | "PRESENCE" | "PRESENCE_UPDATE" | "READ_RECEIPT" | "DASHBOARD_UPDATE" | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "LIVE_ACTIVITY" | "REALTIME_EVENT" | "OPERATIONS_UPDATE" | "TONTINE_UPDATE" | "CAISSE_UPDATE" | "COMPTE_UPDATE" | "EMPLOYE_UPDATE" | "RBAC_UPDATE" | "HR_UPDATE" | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT" | "MAINTENANCE_UPDATE" | "SETTINGS_UPDATE" | "FORCE_LOGOUT" | "ACCOUNTING_UPDATE" | "AGENCE_UPDATE" | "LOYALTY_UPDATE" | "OPENING_REQUEST_CREATED" | "OPENING_REQUEST_VALIDATED" | "OPENING_REQUEST_REJECTED" | "REFUND_PENDING_CAISSE" | "REFUND_PAID";
+  type:
+    // Legacy messaging (v1)
+    | "CHAT_MESSAGE" | "TYPING" | "READ_RECEIPT"
+    // Messaging V2 - Conversations
+    | "CHAT_MESSAGE_V2" | "TYPING_V2" | "READ_UPDATE"
+    | "CONVERSATION_UPDATE" | "MESSAGE_REACTION" | "MESSAGE_DELETED" | "MESSAGE_EDITED"
+    // System
+    | "NOTIFICATION" | "PRESENCE" | "PRESENCE_UPDATE" | "DASHBOARD_UPDATE"
+    | "LOCATION_UPDATE" | "USER_LOCATION" | "CREDIT_UPDATE" | "CLIENT_UPDATE"
+    | "LIVE_ACTIVITY" | "REALTIME_EVENT" | "OPERATIONS_UPDATE" | "TONTINE_UPDATE"
+    | "CAISSE_UPDATE" | "COMPTE_UPDATE" | "EMPLOYE_UPDATE" | "RBAC_UPDATE" | "HR_UPDATE"
+    | "SESSION_TIMEOUT" | "SESSION_FORCE_CLOSED" | "SESSION_RISK_ALERT"
+    | "MAINTENANCE_UPDATE" | "SETTINGS_UPDATE" | "FORCE_LOGOUT"
+    | "ACCOUNTING_UPDATE" | "AGENCE_UPDATE" | "LOYALTY_UPDATE"
+    | "OPENING_REQUEST_CREATED" | "OPENING_REQUEST_VALIDATED" | "OPENING_REQUEST_REJECTED"
+    | "REFUND_PENDING_CAISSE" | "REFUND_PAID"
+    // Balance updates (unified source of truth)
+    | "BALANCE_UPDATED";
   payload: any;
 };
 
@@ -346,7 +363,7 @@ export function setupWebSocket(server: Server) {
          }
          
          if (data.type === 'TYPING') {
-           // Forward typing status to receiver
+           // Legacy: Forward typing status to receiver (DM only)
            const { receiverId, isTyping } = data.payload;
            const userSockets = clients.get(receiverId);
            if (userSockets) {
@@ -358,6 +375,56 @@ export function setupWebSocket(server: Server) {
                  }));
                }
              });
+           }
+         }
+
+         // V2: Typing by conversationId (broadcast to all participants via subscription)
+         if (data.type === 'TYPING_V2') {
+           const { conversationId, isTyping } = data.payload;
+           // Broadcast to conversation subscribers
+           const channel = `conversation:${conversationId}`;
+           const channelSubs = subscriptions.get(channel);
+           if (channelSubs) {
+             channelSubs.forEach((client) => {
+               // Don't send back to the sender
+               if (client.readyState === WebSocket.OPEN && (client as any).userId !== userId) {
+                 client.send(JSON.stringify({
+                   type: "TYPING_V2",
+                   payload: { conversationId, userId, isTyping }
+                 }));
+               }
+             });
+           }
+         }
+
+         // V2: Subscribe to a conversation (for real-time updates)
+         if (data.type === 'SUBSCRIBE_CONVERSATION') {
+           const { conversationId } = data.payload;
+           if (conversationId && typeof conversationId === 'string') {
+             const channel = `conversation:${conversationId}`;
+             if (!subscriptions.has(channel)) {
+               subscriptions.set(channel, new Set());
+             }
+             subscriptions.get(channel)?.add(ws);
+
+             // Track subscriptions on the WebSocket for cleanup
+             if (!(ws as any).subscriptions) {
+               (ws as any).subscriptions = new Set<string>();
+             }
+             (ws as any).subscriptions.add(channel);
+
+             ws.send(JSON.stringify({ type: 'SUBSCRIBED_CONVERSATION', conversationId }));
+           }
+         }
+
+         // V2: Unsubscribe from a conversation
+         if (data.type === 'UNSUBSCRIBE_CONVERSATION') {
+           const { conversationId } = data.payload;
+           if (conversationId && typeof conversationId === 'string') {
+             const channel = `conversation:${conversationId}`;
+             subscriptions.get(channel)?.delete(ws);
+             (ws as any).subscriptions?.delete(channel);
+             ws.send(JSON.stringify({ type: 'UNSUBSCRIBED_CONVERSATION', conversationId }));
            }
          }
 
@@ -487,6 +554,22 @@ export function setupWebSocket(server: Server) {
         stats[channel] = subs.size;
       });
       return stats;
+    },
+    // V2: Broadcast to all subscribers of a conversation
+    broadcastToConversation: (conversationId: string, message: GlobalMessage, excludeUserId?: string) => {
+      const channel = `conversation:${conversationId}`;
+      const channelSubs = subscriptions.get(channel);
+      if (channelSubs) {
+        channelSubs.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            // Optionally exclude a specific user (e.g., the sender)
+            if (excludeUserId && (client as any).userId === excludeUserId) {
+              return;
+            }
+            client.send(JSON.stringify(message));
+          }
+        });
+      }
     }
   };
 }

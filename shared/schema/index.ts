@@ -9,6 +9,7 @@ export * from "./finance";
 export * from "./tontines";
 export * from "./coffre";
 export * from "./messages";
+export * from "./conversations";
 export * from "./operations";
 export * from "./bourse";
 export * from "./transferts";

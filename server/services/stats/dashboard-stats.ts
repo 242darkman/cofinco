@@ -58,6 +58,8 @@ export async function getGlobalStats(agenceId?: string): Promise<DashboardStats>
   ] = await Promise.all([
 
     // A. ENCAISSE (Coffres + Caisses - calculé dynamiquement)
+    // RÈGLE COHÉRENCE: Utiliser UNIQUEMENT montantFermetureTheorique comme source de vérité
+    // Le montantFermetureDeclare peut diverger (écart non résolu) et ne doit pas être utilisé
     Promise.all([
       // Somme Coffres (solde du coffre est mis à jour lors des transferts)
       db.select({
@@ -65,22 +67,22 @@ export async function getGlobalStats(agenceId?: string): Promise<DashboardStats>
       }).from(coffresForts)
       .where(withCoffreAgence()),
 
-      // Somme Caisses - Calcul dynamique en temps réel:
-      // 1. Sessions actives: montant_fermeture_theorique (mis à jour à chaque opération)
-      // 2. Sessions fermées: montant de fermeture déclaré (dernière session par caisse)
-      // Note: On utilise une sous-requête pour obtenir le solde réel de chaque caisse
+      // Somme Caisses - Calcul dynamique en temps réel via montantFermetureTheorique
+      // IMPORTANT: Toujours utiliser montantFermetureTheorique, jamais montantFermetureDeclare
+      // pour garantir la cohérence avec les soldes affichés ailleurs dans l'application
       db.execute(sql`
         SELECT COALESCE(SUM(solde_reel), 0) as total FROM (
           SELECT DISTINCT ON (c.id)
-            CASE
-              -- Session active: utiliser montant_fermeture_theorique (solde temps réel)
-              WHEN s.closed_at IS NULL THEN COALESCE(CAST(s.montant_fermeture_theorique AS DECIMAL), CAST(s.montant_ouverture AS DECIMAL), 0)
-              -- Dernière session fermée: utiliser montant déclaré ou théorique
-              ELSE COALESCE(CAST(s.montant_fermeture_declare AS DECIMAL), CAST(s.montant_fermeture_theorique AS DECIMAL), 0)
-            END as solde_reel
+            COALESCE(
+              -- Toujours utiliser montant_fermeture_theorique comme source de vérité
+              CAST(s.montant_fermeture_theorique AS DECIMAL),
+              CAST(s.montant_ouverture AS DECIMAL),
+              0
+            ) as solde_reel
           FROM caisses c
           LEFT JOIN sessions_caisse s ON s.caisse_id = c.id
-          WHERE 1=1 ${isAllAgences ? sql`` : sql`AND c.agence_id = ${agenceId}`}
+          WHERE c.deleted_at IS NULL
+            ${isAllAgences ? sql`` : sql`AND c.agence_id = ${agenceId}`}
           ORDER BY c.id, s.closed_at DESC NULLS FIRST
         ) sub
       `)

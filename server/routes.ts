@@ -10,6 +10,7 @@ import { hrRouter } from "./routes/hr";
 import { registerMobileMoneyRoutes } from "./mobile-money-service";
 import { registerStockMarketRoutes } from "./stock-market-service";
 import { registerMessagesRoutes } from "./routes/messages";
+import { registerConversationsRoutes } from "./routes/conversations";
 import { createServer, type Server } from "http";
 import { setupWebSocket, setWsInstance } from "./ws-server";
 import { registerAccountingRoutes } from "./routes/accounting";
@@ -36,6 +37,7 @@ import storageRouter from "./routes/storage";
 import { regularisationRouter } from "./routes/regularisation";
 import { paymentsRouter } from "./routes/payments";
 import { paymentsTestRouter } from "./routes/payments-test";
+import balancesRouter from "./routes/balances";
 
 export function registerRoutes(app: Express): Server {
   // Apply Maintenance Middleware globally
@@ -60,6 +62,9 @@ export function registerRoutes(app: Express): Server {
   // Storage routes (unified)
   app.use("/api/storage", storageRouter);
 
+  // Balances routes (unified source of truth)
+  app.use("/api/balances", balancesRouter);
+
   // Register modular routes
   registerAuthRoutes(app);
   registerClientRoutes(app);
@@ -68,7 +73,8 @@ export function registerRoutes(app: Express): Server {
   registerTontineRoutes(app);
   registerOperationsRoutes(app); // Agents, prospection
   registerDashboardRoutes(app); // Dashboard statistics
-  registerMessagesRoutes(app); // Messaging System
+  registerMessagesRoutes(app); // Messaging System (Legacy v1)
+  registerConversationsRoutes(app); // Messaging System V2 (Conversations)
   registerNotificationsRoutes(app); // Notifications System (caisse + general)
   registerPushRoutes(app); // Push Notifications (Web Push API)
   app.use("/api/hr", hrRouter); // HR Module

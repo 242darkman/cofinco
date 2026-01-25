@@ -8,7 +8,7 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { StatutConge, STATUT_CONGE_LABELS } from '@shared/enum/status-constants';
 import { useHrRealtime, useHrSyncStatus } from '../../hooks/hr/useHrRealtime';
 import { useQuery } from '@tanstack/react-query';
-import { apiRequest } from '../../lib/queryClient';
+import { api } from '../../lib/api-client';
 
 interface LeaveBalance {
   employeId: string;
@@ -68,9 +68,9 @@ export default function CongesManager({
   const { statusText, statusColor, lastUpdateTime, isConnected } = useHrSyncStatus();
 
   // Fetch leave balance for current employee
-  const { data: leaveBalance } = useQuery<{ data: LeaveBalance }>({
+  const { data: leaveBalance } = useQuery<{ success: boolean; data: LeaveBalance }>({
     queryKey: ['/api/hr/conges/balance', currentEmployeId],
-    queryFn: () => apiRequest(`/api/hr/conges/balance/${currentEmployeId}`),
+    queryFn: () => api.get<{ success: boolean; data: LeaveBalance }>(`/api/hr/conges/balance/${currentEmployeId}`),
     enabled: !!currentEmployeId,
     staleTime: 30000,
   });
