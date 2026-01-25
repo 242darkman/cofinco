@@ -228,8 +228,8 @@ export default function AdminActivityLogs() {
   );
 
   return (
-    <div className="space-y-4">
-      <Card variant="default" padding="none" className="overflow-hidden">
+    <div className="h-full flex flex-col space-y-2">
+      <Card variant="default" padding="none" className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Header & Controls */}
         <div className="p-4 border-b border-edge bg-surface-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -376,8 +376,8 @@ export default function AdminActivityLogs() {
             <p className="text-sm">Aucun log trouvé pour ces critères</p>
           </div>
         ) : (
-           <div className="bg-surface-base min-h-[400px] flex flex-col">
-             <div className="flex-1">
+           <div className="bg-surface-base flex-1 flex flex-col overflow-hidden min-h-0">
+             <div className="flex-1 overflow-y-auto custom-scrollbar">
                <ResponsiveTable
                 data={paginatedLogs}
                 columns={tableColumns}

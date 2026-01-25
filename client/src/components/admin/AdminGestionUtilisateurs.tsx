@@ -143,8 +143,8 @@ export default function AdminGestionUtilisateurs() {
   }, [searchTerm]);
 
   return (
-    <div className="space-y-4">
-      <Card variant="default" padding="none" className="overflow-hidden">
+    <div className="h-full flex flex-col space-y-2">
+      <Card variant="default" padding="none" className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Mobile-First Header */}
         <div className="p-4 border-b border-edge bg-surface-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -187,7 +187,7 @@ export default function AdminGestionUtilisateurs() {
         ) : (
           <>
             {/* Scrollable Table Container */}
-            <div className="overflow-auto max-h-[400px] custom-scrollbar">
+            <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
               <ResponsiveTable
                 data={paginatedUsers}
                 columns={[

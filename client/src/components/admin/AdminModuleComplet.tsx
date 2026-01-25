@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin, MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock, AlertTriangle, ShieldCheck, LayoutGrid, UserCog } from 'lucide-react';
-import { Button, Card, ConfirmDialog } from '../ui';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin, 
+  MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock, 
+  AlertTriangle, ShieldCheck, LayoutGrid, UserCog, Lock, ChevronLeft, ChevronRight 
+} from 'lucide-react';
+import { Button, ConfirmDialog } from '../ui';
 
 // Hooks
 import { useModules } from '../../hooks/admin/useModules';
@@ -49,6 +53,11 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const [selectedUserId, setSelectedUserId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmMessage, setConfirmMessage] = useState('');
+  
+  // Navigation Scroll State
+  const scrollContainerRef = useRef<HTMLElement>(null);
+  const [showLeftShadow, setShowLeftShadow] = useState(false);
+  const [showRightShadow, setShowRightShadow] = useState(false);
 
   // Hooks
   const { modules } = useModules();
@@ -114,6 +123,52 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
       return () => clearTimeout(timer);
     }
   }, [confirmMessage]);
+  
+  // Scroll Management
+  const checkScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setShowLeftShadow(scrollLeft > 0);
+      setShowRightShadow(scrollLeft < scrollWidth - clientWidth - 5); // tolerance
+    }
+  };
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, []);
+
+  // Scroll active tab into view + Check arrows on tab change
+  useEffect(() => {
+    // Small delay to ensure render
+    setTimeout(() => {
+        checkScroll();
+        const activeEl = document.getElementById(`admin-tab-${activeTab}`);
+        if (activeEl && scrollContainerRef.current) {
+             const container = scrollContainerRef.current;
+             const { left: activeLeft, right: activeRight } = activeEl.getBoundingClientRect();
+             const { left: containerLeft, right: containerRight } = container.getBoundingClientRect();
+             
+             // If element is out of view, scroll it in
+             if (activeLeft < containerLeft) {
+                 container.scrollBy({ left: activeLeft - containerLeft - 100, behavior: 'smooth' });
+             } else if (activeRight > containerRight) {
+                 container.scrollBy({ left: activeRight - containerRight + 100, behavior: 'smooth' });
+             }
+        }
+    }, 100);
+  }, [activeTab]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 200;
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   const handleRoleChange = (role: SystemRole) => setSelectedRole(role);
   const handleToggleRolePermission = async (_role: string, permCode: string) => {
@@ -186,174 +241,206 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const activeRolePermissionsCount = (permissions || []).filter(p => singleRoleHasPermission(p.code)).length;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <Card variant="default" padding="none" className="overflow-hidden">
-        {/* Header - Compact & Mobile-First */}
-        <div className="bg-surface-muted/50 p-4 border-b border-edge">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
-              <Shield className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-2xl font-bold text-content-primary">Administration</h2>
-              <p className="text-xs sm:text-sm text-content-muted line-clamp-1">Gestion complète système</p>
-            </div>
-          </div>
+    <div className="flex flex-col h-full overflow-hidden bg-slate-900">
+      {/* TOP NAVIGATION BAR */}
+      <header className="shrink-0 bg-slate-950 border-b border-slate-800 flex items-center h-14 px-4 gap-4 sticky top-0 z-20">
+        {/* Title / Brand */}
+        <div className="flex items-center gap-2 shrink-0 pr-4 border-r border-slate-800">
+           <div className="w-8 h-8 bg-indigo-600/20 rounded-lg flex items-center justify-center">
+              <Shield className="w-4 h-4 text-indigo-500" />
+           </div>
+           <div className="hidden md:block">
+             <h2 className="text-sm font-bold text-slate-100 leading-none">Admin</h2>
+             <p className="text-[9px] text-slate-500 uppercase tracking-wider leading-none mt-0.5">Système</p>
+           </div>
         </div>
 
-        <div className="p-2 sm:p-4">
-          {/* Navigation Grid - Compact on Mobile */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
-            {ADMIN_TABS.filter(tab => {
-              if (!tab.permission) return true;
-              const [module, action] = tab.permission.split('.');
-              return authService.hasPermission(module, action || 'view');
-            }).map((tab) => {
-              const Icon = iconMap[tab.icon] || Shield;
-              const isActive = activeTab === tab.id;
-              const isDisabled = 'disabled' in tab && tab.disabled;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => !isDisabled && setActiveTab(tab.id)}
-                  disabled={isDisabled}
-                  title={isDisabled ? 'Fonctionnalité bientôt disponible' : tab.label}
-                  className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-300 h-20 sm:h-24 relative overflow-hidden group ${
-                    isDisabled
-                      ? 'bg-surface-muted/50 text-content-muted border-edge opacity-50 cursor-not-allowed'
-                      : isActive
-                      ? 'bg-primary text-white border-primary shadow-lg shadow-primary/25 scale-[1.02] ring-2 ring-primary/20 ring-offset-2 ring-offset-surface-base'
-                      : 'bg-surface-base text-content-secondary border-edge hover:border-primary/50 hover:bg-surface-muted'
-                  }`}
+        {/* Scrollable Navigation Area */}
+        <div className="flex-1 relative overflow-hidden flex items-center group/nav">
+           
+           {/* Left Shadow / Button */}
+           <div className={`absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-slate-950 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showLeftShadow ? 'opacity-100' : 'opacity-0'}`} />
+            {showLeftShadow && (
+                <button 
+                  onClick={() => scroll('left')}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-slate-800/80 hover:bg-slate-700 text-slate-300 p-1 rounded-full shadow-lg backdrop-blur-sm transition-all animate-in fade-in zoom-in-50"
                 >
-                  {isActive && !isDisabled && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50" />
-                  )}
-                  {isDisabled && (
-                    <div className="absolute top-1 right-1 text-[8px] bg-amber-500/20 text-amber-400 px-1 rounded">Bientôt</div>
-                  )}
-                  <Icon 
-                    size={20} 
-                    className={`transition-transform duration-300 ${isDisabled ? 'text-content-muted' : isActive ? 'text-white scale-110' : 'text-primary/70 group-hover:scale-110 group-hover:text-primary'}`} 
-                  />
-                  <span className={`text-[10px] sm:text-xs font-semibold text-center leading-tight ${isActive && !isDisabled ? 'text-blue-50' : ''}`}>
-                    {tab.label}
-                  </span>
+                    <ChevronLeft size={16} />
                 </button>
-              );
-            })}
-          </div>
-
-          {/* Pro Separator */}
-          <div className="relative py-4 flex items-center justify-center">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-edge"></div>
-            </div>
-            <div className="relative flex justify-center">
-               <span className="bg-surface-base px-3 text-xs font-medium text-content-muted uppercase tracking-widest border border-edge rounded-full py-0.5">
-                 {ADMIN_TABS.find(t => t.id === activeTab)?.label || 'Module'}
-               </span>
-            </div>
-          </div>
-
-          {/* Content Area */}
-          <div className="bg-surface-base rounded-xl border border-edge p-0 sm:p-1 min-h-[400px]">
-            {activeTab === 'dashboard' && <AdminDashboard />}
-            {activeTab === 'profils' && <AdminGestionProfils />}
-            {activeTab === 'users' && <AdminGestionUtilisateurs />}
-            {activeTab === 'logs' && <AdminActivityLogs />}
-            {activeTab === 'sessions' && <AdminSessionsManager />}
-            {activeTab === 'agences' && <AdminGestionAgences />}
-            {activeTab === 'zones' && <AdminGestionZones />}
-            {activeTab === 'tontines' && <AdminTontinesGestion />}
-            {activeTab === 'caisses' && <AdminGestionCaisses />}
-            {activeTab === 'credits' && <AdminCreditsGestion />}
-            {activeTab === 'codes' && <AdminCaisseAccessCodes onClose={() => setActiveTab('dashboard')} />}
-            {activeTab === 'maintenance' && <AdminMaintenanceMode />}
-            {activeTab === 'settings' && <AdminSystemSettings />}
-            {activeTab === 'sms' && <AdminSmsSettings />}
-            {activeTab === 'updates' && <AdminVersionInfo />}
-            {activeTab === 'regularisation' && <RegularizationDashboard />}
-            {activeTab === 'client-credentials' && <AdminClientCredentials />}
-
-            {activeTab === 'roles' && (
-              <div className="space-y-4">
-                {/* Access Management Sub-Navigation - Premium Segmented Control */}
-                <div className="flex justify-center mb-6">
-                  {/* Segmented Control */}
-                  <div className="inline-flex p-1.5 bg-slate-950/50 border border-slate-800/60 rounded-full backdrop-blur-sm shadow-xl shadow-black/20">
-                    {[
-                      { id: 'roles' as const, label: 'Par Rôle', icon: ShieldCheck },
-                      { id: 'modules' as const, label: 'Vue Globale', icon: LayoutGrid },
-                      { id: 'users' as const, label: 'Exceptions', icon: UserCog },
-                    ].map((tab) => {
-                      const isActive = accessViewMode === tab.id;
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => setAccessViewMode(tab.id)}
-                          className={`
-                            relative flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ease-out
-                            ${isActive 
-                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25 ring-1 ring-white/10' 
-                              : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }
-                          `}
-                        >
-                          <tab.icon className={`w-4 h-4 ${isActive ? 'text-indigo-100' : 'text-slate-500'}`} />
-                          <span>{tab.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {accessViewMode === 'roles' && (
-                  <RolesPermissionsManager
-                    modules={modules}
-                    permissions={permissions}
-                    selectedRole={selectedRole}
-                    onRoleChange={handleRoleChange}
-                    roleHasPermission={(_role, code) => selectedRole === SystemRole.ADMIN ? true : singleRoleHasPermission(code)}
-                    toggleRolePermission={handleToggleRolePermission}
-                    activePermissionsCount={selectedRole === SystemRole.ADMIN ? (permissions?.length || 0) : activeRolePermissionsCount}
-                    confirmMessage={confirmMessage}
-                  />
-                )}
-
-                {accessViewMode === 'modules' && (
-                  <ModulePermissionsView
-                    modules={modules}
-                    permissions={permissions}
-                    searchTerm={searchTerm}
-                    onSearchChange={setSearchTerm}
-                    roleHasPermission={allRolesHasPermission}
-                    selectedRole={selectedRole}
-                  />
-                )}
-
-                {accessViewMode === 'users' && (
-                  <UserCustomPermissionsManager
-                    users={users}
-                    permissions={permissions}
-                    selectedUserId={selectedUserId}
-                    onUserChange={setSelectedUserId}
-                    userPermissions={userPermissions}
-                    getUserDisplayName={getUserDisplayName}
-                    getUserPermissionStatus={getUserPermissionStatus}
-                    toggleUserPermission={handleToggleUserPermission}
-                    onActivateAll={handleActivateAll}
-                    onBlockAll={handleBlockAll}
-                    onResetPermissions={handleResetPermissions}
-                    activePermissionsCount={countActivePermissions()}
-                    confirmMessage={confirmMessage}
-                  />
-                )}
-              </div>
             )}
-          </div>
+
+            {/* Scroll Container */}
+            <nav 
+                ref={scrollContainerRef}
+                onScroll={checkScroll}
+                className="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth px-2"
+            >
+               {ADMIN_TABS.filter(tab => {
+                  if (!tab.permission) return true;
+                  const [module, action] = tab.permission.split('.');
+                  return authService.hasPermission(module, action || 'view');
+                }).map((tab) => {
+                  const Icon = iconMap[tab.icon] || Shield;
+                  const isActive = activeTab === tab.id;
+                  const isDisabled = 'disabled' in tab && tab.disabled;
+                  
+                  return (
+                    <button
+                      key={tab.id}
+                      id={`admin-tab-${tab.id}`}
+                      onClick={() => !isDisabled && setActiveTab(tab.id)}
+                      disabled={isDisabled}
+                      className={`
+                        flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 border border-transparent
+                        ${isActive 
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20 border-indigo-500/50' 
+                          : isDisabled 
+                            ? 'opacity-40 cursor-not-allowed text-slate-600' 
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800 hover:border-slate-700'
+                        }
+                      `}
+                    >
+                      <Icon size={14} className={isActive ? "text-indigo-100" : "text-slate-500"} />
+                      <span>{tab.label}</span>
+                      {isDisabled && <Lock size={10} className="ml-1" />}
+                    </button>
+                  );
+                })}
+            </nav>
+
+            {/* Right Shadow / Button */}
+            <div className={`absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-slate-950 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showRightShadow ? 'opacity-100' : 'opacity-0'}`} />
+            {showRightShadow && (
+                <button 
+                  onClick={() => scroll('right')}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-slate-800/80 hover:bg-slate-700 text-slate-300 p-1 rounded-full shadow-lg backdrop-blur-sm transition-all animate-in fade-in zoom-in-50"
+                >
+                    <ChevronRight size={16} />
+                </button>
+            )}
         </div>
-      </Card>
+      </header>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 overflow-hidden relative bg-slate-900">
+        <div className="h-full overflow-hidden p-2 md:p-3 flex flex-col">
+           <div className="w-full h-full flex flex-col">
+              
+              {/* Optional Section Header if needed, or streamlined */}
+              {activeTab !== 'dashboard' && (
+                <div className="mb-3 shrink-0">
+                    <h1 className="text-base font-bold text-white flex items-center gap-2">
+                      {iconMap[ADMIN_TABS.find(t => t.id === activeTab)?.icon || 'Shield'] 
+                         ? React.createElement(iconMap[ADMIN_TABS.find(t => t.id === activeTab)?.icon || 'Shield'], { size: 18, className: "text-indigo-500" })
+                         : <Shield className="text-indigo-500" size={18} />
+                      }
+                      {ADMIN_TABS.find(t => t.id === activeTab)?.label}
+                    </h1>
+                </div>
+              )}
+
+              {/* Component Render */}
+              <div className="flex-1 relative overflow-hidden flex flex-col">
+                  {activeTab === 'dashboard' && <AdminDashboard />}
+                  {activeTab === 'profils' && <AdminGestionProfils />}
+                  {activeTab === 'users' && <AdminGestionUtilisateurs />}
+                  {activeTab === 'logs' && <AdminActivityLogs />}
+                  {activeTab === 'sessions' && <AdminSessionsManager />}
+                  {activeTab === 'agences' && <AdminGestionAgences />}
+                  {activeTab === 'zones' && <AdminGestionZones />}
+                  {activeTab === 'tontines' && <AdminTontinesGestion />}
+                  {activeTab === 'caisses' && <AdminGestionCaisses />}
+                  {activeTab === 'credits' && <AdminCreditsGestion />}
+                  {activeTab === 'codes' && <AdminCaisseAccessCodes onClose={() => setActiveTab('dashboard')} />}
+                  {activeTab === 'maintenance' && <AdminMaintenanceMode />}
+                  {activeTab === 'settings' && <AdminSystemSettings />}
+                  {activeTab === 'sms' && <AdminSmsSettings />}
+                  {activeTab === 'updates' && <AdminVersionInfo />}
+                  {activeTab === 'regularisation' && <RegularizationDashboard />}
+                  {activeTab === 'client-credentials' && <AdminClientCredentials />}
+
+                  {activeTab === 'roles' && (
+                    <div className="flex flex-col h-full overflow-hidden space-y-4">
+                      <div className="border-b border-slate-800 pb-2 shrink-0">
+                        <div className="flex items-center gap-4">
+                            <span className="text-sm text-slate-400 font-medium">Vue :</span>
+                            <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+                              {[
+                                { id: 'roles' as const, label: 'Par Rôle', icon: ShieldCheck },
+                                { id: 'modules' as const, label: 'Vue Globale', icon: LayoutGrid },
+                                { id: 'users' as const, label: 'Exceptions', icon: UserCog },
+                              ].map((tab) => {
+                                const isActive = accessViewMode === tab.id;
+                                return (
+                                  <button
+                                    key={tab.id}
+                                    onClick={() => setAccessViewMode(tab.id)}
+                                    className={`
+                                      flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all
+                                      ${isActive 
+                                        ? 'bg-slate-800 text-white shadow-sm border border-slate-700' 
+                                        : 'text-slate-500 hover:text-slate-300'
+                                      }
+                                    `}
+                                  >
+                                    <tab.icon size={12} />
+                                    <span>{tab.label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 overflow-hidden relative">
+                        {accessViewMode === 'roles' && (
+                            <RolesPermissionsManager
+                            modules={modules}
+                            permissions={permissions}
+                            selectedRole={selectedRole}
+                            onRoleChange={handleRoleChange}
+                            roleHasPermission={(_role, code) => selectedRole === SystemRole.ADMIN ? true : singleRoleHasPermission(code)}
+                            toggleRolePermission={handleToggleRolePermission}
+                            activePermissionsCount={selectedRole === SystemRole.ADMIN ? (permissions?.length || 0) : activeRolePermissionsCount}
+                            confirmMessage={confirmMessage}
+                            />
+                        )}
+
+                        {accessViewMode === 'modules' && (
+                            <ModulePermissionsView
+                            modules={modules}
+                            permissions={permissions}
+                            searchTerm={searchTerm}
+                            onSearchChange={setSearchTerm}
+                            roleHasPermission={allRolesHasPermission}
+                            selectedRole={selectedRole}
+                            />
+                        )}
+
+                        {accessViewMode === 'users' && (
+                            <UserCustomPermissionsManager
+                            users={users}
+                            permissions={permissions}
+                            selectedUserId={selectedUserId}
+                            onUserChange={setSelectedUserId}
+                            userPermissions={userPermissions}
+                            getUserDisplayName={getUserDisplayName}
+                            getUserPermissionStatus={getUserPermissionStatus}
+                            toggleUserPermission={handleToggleUserPermission}
+                            onActivateAll={handleActivateAll}
+                            onBlockAll={handleBlockAll}
+                            onResetPermissions={handleResetPermissions}
+                            activePermissionsCount={countActivePermissions()}
+                            confirmMessage={confirmMessage}
+                            />
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </div>
+           </div>
+        </div>
+      </main>
 
       <ConfirmDialog
         isOpen={confirmState.isOpen}
