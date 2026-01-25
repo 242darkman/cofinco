@@ -41,69 +41,66 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
     setIsEditing(false);
   };
 
-  // --- MODE ÉDITION (Corrigé) ---
+  // --- MODE ÉDITION (Compact) ---
   if (isEditing) {
     return (
-      <div className="animate-in fade-in zoom-in-95 duration-200 bg-slate-900/50 p-2 -m-2 rounded-xl border border-indigo-500/20">
-        {/* 1. Label au-dessus */}
-        <label className="block text-xs font-medium text-indigo-400 mb-1.5 ml-1">
+      <div className="animate-in fade-in zoom-in-95 duration-200 bg-slate-900/50 p-1.5 -m-1.5 rounded-lg border border-indigo-500/20">
+        <label className="block text-[10px] font-medium text-indigo-400 mb-1 ml-1">
           {label}
         </label>
         
-        {/* 2. Ligne de contrôle (Input + Boutons alignés) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div className="relative flex-1">
             <input 
               type={type}
-              className="w-full h-10 bg-slate-950 border border-indigo-500 rounded-lg pl-3 pr-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className="w-full h-8 bg-slate-950 border border-indigo-500 rounded-md pl-2 pr-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/20 transition-all"
               value={tempValue}
               onChange={e => setTempValue(e.target.value)}
               autoFocus
-              placeholder={placeholder || `Entrez ${label.toLowerCase()}...`}
+              placeholder={placeholder || `...`}
             />
           </div>
           
-          {/* Boutons d'action (Carrés parfaits h-10 w-10) */}
           <button 
             onClick={handleSave}
             disabled={saving}
-            className="h-10 w-10 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg transition-colors shadow-lg shadow-emerald-900/20 disabled:opacity-50"
+            className="h-8 w-8 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-md transition-colors shadow-sm disabled:opacity-50"
             title="Valider"
           >
-            {saving ? <LoadingSpinner size="sm" /> : <Check size={18} strokeWidth={3} />}
+            {saving ? <LoadingSpinner size="sm" /> : <Check size={14} strokeWidth={3} />}
           </button>
           
           <button 
             onClick={handleCancel}
-            className="h-10 w-10 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg border border-slate-700 transition-colors"
+            className="h-8 w-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-md border border-slate-700 transition-colors"
             title="Annuler"
           >
-            <X size={18} />
+            <X size={14} />
           </button>
         </div>
       </div>
     );
   }
 
-  // --- MODE LECTURE (Amélioré) ---
+  // --- MODE LECTURE (Compact) ---
   return (
-    <div className="group flex items-center justify-between p-3 hover:bg-slate-800/50 rounded-xl transition-colors border border-transparent hover:border-slate-800/50 cursor-default">
-      <div className="flex items-center gap-4 overflow-hidden">
-        <div className="flex-shrink-0 p-2.5 bg-slate-950 rounded-lg text-slate-400 border border-slate-800 group-hover:border-slate-700 group-hover:text-indigo-400 transition-colors">
-          <Icon size={18} />
+    <div className="group flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-slate-800/50 cursor-default -mx-2">
+      <div className="flex items-center gap-3 overflow-hidden">
+        <div className="flex-shrink-0 p-1.5 bg-slate-950 rounded-md text-slate-400 border border-slate-800 group-hover:border-slate-700 group-hover:text-indigo-400 transition-colors">
+          <Icon size={14} />
         </div>
         <div className="min-w-0">
-          <div className="text-xs text-slate-500 font-medium mb-0.5">{label}</div>
-          <div className="text-sm font-medium text-slate-200 truncate">{value || 'Non renseigné'}</div>
+          <div className="text-[10px] text-slate-500 font-medium leading-none mb-0.5">{label}</div>
+          <div className="text-xs font-medium text-slate-200 truncate leading-tight">{value || 'Non renseigné'}</div>
         </div>
       </div>
       
       {editable && (
         <button 
           onClick={() => setIsEditing(true)} 
-          className="opacity-0 group-hover:opacity-100 p-2 text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 rounded-lg transition-all transform scale-90 group-hover:scale-100"
+          className="opacity-0 group-hover:opacity-100 p-1.5 text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 rounded transition-all transform scale-90 group-hover:scale-100"
         >
-          <PenLine size={18} />
+          <PenLine size={14} />
         </button>
       )}
     </div>
@@ -119,10 +116,10 @@ interface ReadOnlyFieldProps {
 
 function ReadOnlyField({ label, value, highlight }: ReadOnlyFieldProps) {
   return (
-    <div>
-      <div className="text-[10px] text-slate-500">{label}</div>
-      <div className={`text-xs font-medium ${highlight ? 'text-emerald-400' : 'text-slate-300'}`}>
-        {value || <span className="text-slate-600">—</span>}
+    <div className="flex flex-col">
+      <div className="text-[9px] text-slate-500 uppercase tracking-wider">{label}</div>
+      <div className={`text-xs font-semibold truncate ${highlight ? 'text-emerald-400' : 'text-slate-300'}`}>
+        {value || <span className="text-slate-700">—</span>}
       </div>
     </div>
   );
@@ -144,9 +141,10 @@ interface PinFormProps {
 interface CaissePinManagerProps {
   hasPin?: boolean;
   onPinConfigured: () => void;
+  isCashier: boolean; 
 }
 
-function CaissePinManager({ hasPin, onPinConfigured }: CaissePinManagerProps) {
+function CaissePinManager({ hasPin, onPinConfigured, isCashier }: CaissePinManagerProps) {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ currentPassword: '', newPin: '', confirmPin: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -158,11 +156,11 @@ function CaissePinManager({ hasPin, onPinConfigured }: CaissePinManagerProps) {
     setError('');
 
     if (formData.newPin !== formData.confirmPin) {
-      setError('Les PIN ne correspondent pas');
+      setError('PINs différents');
       return;
     }
     if (!/^\d{6}$/.test(formData.newPin)) {
-      setError('Le PIN doit contenir exactement 6 chiffres');
+      setError('6 chiffres requis');
       return;
     }
 
@@ -177,30 +175,25 @@ function CaissePinManager({ hasPin, onPinConfigured }: CaissePinManagerProps) {
       setShowForm(false);
       onPinConfigured();
     } catch (err: any) {
-      setError(handleApiError(err, 'Erreur PIN'));
+      setError(handleApiError(err, 'Erreur'));
     } finally {
       setLoading(false);
     }
   }, [formData, onPinConfigured]);
+  
+  if (!isCashier) {
+       return (
+        <div className="flex items-center gap-2 text-[10px] text-slate-500 bg-slate-900/50 p-2 rounded border border-slate-800">
+          <Info size={12} className="shrink-0" />
+          <span>PIN Caisse non requis pour ce rôle.</span>
+        </div>
+       );
+  }
 
-  if (!hasPin) {
-    return (
-      <div className={`p-2.5 rounded-lg border ${showForm ? 'bg-slate-950 border-slate-700' : 'bg-amber-900/20 border-amber-500/30'}`}>
-        {!showForm ? (
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <CreditCard size={14} className="text-amber-400" />
-              <span className="text-xs text-amber-300">PIN Caisse non configuré</span>
-            </div>
-            <button
-              onClick={() => setShowForm(true)}
-              className="text-[10px] bg-amber-500 hover:bg-amber-400 text-black font-bold px-2 py-1 rounded transition-colors"
-            >
-              Configurer
-            </button>
-          </div>
-        ) : (
-          <PinForm
+  if (showForm) {
+      return (
+        <div className="p-2 rounded-lg border bg-slate-950 border-slate-700">
+           <PinForm
             formData={formData}
             setFormData={setFormData}
             showPassword={showPassword}
@@ -210,38 +203,29 @@ function CaissePinManager({ hasPin, onPinConfigured }: CaissePinManagerProps) {
             onSubmit={handleSubmit}
             onCancel={() => setShowForm(false)}
           />
-        )}
-      </div>
-    );
+        </div>
+      );
   }
 
   return (
-    <div className={`p-2.5 rounded-lg border ${showForm ? 'bg-slate-950 border-slate-700' : 'bg-slate-950 border-slate-800'}`}>
-      {!showForm ? (
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <CreditCard size={14} className="text-emerald-400" />
-            <span className="text-xs text-emerald-400">PIN Caisse actif</span>
-          </div>
-          <button
+    <div className={`flex items-center justify-between p-2 rounded-lg border ${!hasPin ? 'bg-amber-900/10 border-amber-500/20' : 'bg-slate-900 border-slate-800'}`}>
+       <div className="flex items-center gap-2">
+            <CreditCard size={14} className={hasPin ? "text-emerald-400" : "text-amber-400"} />
+            <div className="flex flex-col">
+                 <span className={`text-[10px] font-bold ${hasPin ? "text-emerald-400" : "text-amber-400"}`}>
+                     {hasPin ? 'PIN Actif' : 'PIN Inactif'}
+                 </span>
+                 <span className="text-[9px] text-slate-500 leading-none">Accès caisse</span>
+            </div>
+       </div>
+       <button
             onClick={() => setShowForm(true)}
-            className="text-[10px] text-slate-400 hover:text-white px-2 py-1 border border-slate-700 rounded hover:bg-slate-800 transition-colors"
-          >
-            Modifier
-          </button>
-        </div>
-      ) : (
-        <PinForm
-          formData={formData}
-          setFormData={setFormData}
-          showPassword={showPassword}
-          setShowPassword={setShowPassword}
-          loading={loading}
-          error={error}
-          onSubmit={handleSubmit}
-          onCancel={() => setShowForm(false)}
-        />
-      )}
+            className={`text-[10px] px-2 py-1 rounded border transition-colors ${hasPin 
+                ? 'text-slate-400 border-slate-700 hover:bg-slate-800' 
+                : 'text-amber-900 bg-amber-500 hover:bg-amber-400 border-amber-500 font-bold'}`}
+       >
+            {hasPin ? 'Modifier' : 'Créer'}
+       </button>
     </div>
   );
 }
@@ -250,20 +234,18 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
   return (
     <form onSubmit={onSubmit} className="space-y-2">
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded p-1.5 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
-          <p className="text-[10px] text-red-400">{error}</p>
+        <div className="text-[9px] text-red-400 bg-red-900/20 p-1 rounded">
+          {error}
         </div>
       )}
 
-      <div>
-        <div className="relative">
+      <div className="relative">
           <input
             type={showPassword ? 'text' : 'password'}
             value={formData.currentPassword}
             onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-            className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs focus:border-indigo-500 outline-none pr-7"
-            placeholder="Mot de passe de connexion"
+            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-xs focus:border-indigo-500 outline-none pr-7 h-7"
+            placeholder="Mise de passe actuel"
             required
           />
           <button
@@ -271,10 +253,8 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
           >
-            {showPassword ? <EyeOff size={12} /> : <Eye size={12} />}
+            {showPassword ? <EyeOff size={10} /> : <Eye size={10} />}
           </button>
-        </div>
-        <p className="text-[9px] text-slate-500 mt-0.5 pl-1">Votre mot de passe de session COFIN&CO-M</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -282,7 +262,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
           type="password"
           value={formData.newPin}
           onChange={(e) => setFormData({ ...formData, newPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-          className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none"
+          className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none h-7"
           placeholder="Nouveau"
           maxLength={6}
           inputMode="numeric"
@@ -292,7 +272,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
           type="password"
           value={formData.confirmPin}
           onChange={(e) => setFormData({ ...formData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-          className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none"
+          className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none h-7"
           placeholder="Confirmer"
           maxLength={6}
           inputMode="numeric"
@@ -304,17 +284,17 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
         <button
           type="submit"
           disabled={loading}
-          className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+          className="flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1 h-6"
         >
-          {loading ? <LoadingSpinner size="sm" /> : <Check size={12} />}
+          {loading ? <LoadingSpinner size="sm" /> : <Check size={10} />}
           OK
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded transition-colors"
+          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded transition-colors h-6"
         >
-          <X size={12} />
+          <X size={10} />
         </button>
       </div>
     </form>
@@ -348,13 +328,12 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validation
     if (!file.type.startsWith('image/')) {
-      toast.error('Fichier invalide. Sélectionnez une image.');
+      toast.error('Fichier invalide');
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image trop volumineuse (max 2 Mo)');
+      toast.error('Max 2 Mo');
       return;
     }
 
@@ -371,31 +350,25 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
         body: formData
       });
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Échec upload');
-      }
+      if (!response.ok) throw new Error('Échec upload');
 
       const { key } = await response.json();
-
-      // Mettre à jour le profil avec le chemin relatif (pas l'URL complète)
       const success = await updateField('photoProfile', key);
       if (success) {
-        toast.success('Photo de profil mise à jour');
+        toast.success('Photo mise à jour');
         reloadProfile();
-        onUserUpdate?.(); // Rafraîchir les données dans App.tsx pour sync header
+        onUserUpdate?.(); 
       }
     } catch (err: any) {
       toast.error(handleApiError(err, 'Erreur upload'));
     } finally {
       setUploadingPhoto(false);
-      // Reset input pour permettre de re-sélectionner le même fichier
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [updateField, reloadProfile, onUserUpdate]);
 
   const handleDeletePhoto = useCallback(async () => {
-    if (!confirm('Supprimer votre photo de profil ?')) return;
+    if (!confirm('Supprimer votre photo ?')) return;
 
     setUploadingPhoto(true);
     try {
@@ -403,7 +376,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
       if (success) {
         toast.success('Photo supprimée');
         reloadProfile();
-        onUserUpdate?.(); // Rafraîchir les données dans App.tsx pour sync header
+        onUserUpdate?.();
       }
     } catch (err: any) {
       toast.error(handleApiError(err, 'Erreur suppression'));
@@ -423,28 +396,27 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
   if (!user) {
     return (
       <div className="text-center py-12">
-        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
-          <User size={40} className="text-slate-500" />
+        <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+          <User size={32} className="text-slate-500" />
         </div>
-        <h3 className="text-xl font-bold text-white mb-2">Session expirée</h3>
-        <p className="text-slate-400">Veuillez vous reconnecter pour accéder à votre profil.</p>
+        <h3 className="font-bold text-white mb-1">Non connecté</h3>
+        <p className="text-slate-400 text-xs text-center px-4">Reconnectez-vous.</p>
       </div>
     );
   }
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   const formatMoney = (amount?: number) => {
     if (amount === undefined || amount === null) return null;
-    return new Intl.NumberFormat('fr-FR').format(amount) + ' XAF';
+    return new Intl.NumberFormat('fr-FR').format(amount) + ' F';
   };
 
   return (
-    <div className="text-white p-4 md:p-6">
-      {/* Input file caché */}
+    <div className="text-white p-2 md:p-3 max-w-5xl mx-auto">
       <input
         ref={fileInputRef}
         type="file"
@@ -454,71 +426,55 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
       />
 
       {/* HEADER COMPACT */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative group">
+      <div className="flex items-center gap-3 mb-4 bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+        <div className="relative group shrink-0">
           {user.photoProfile ? (
             <img
               src={resolveStorageUrl(user.photoProfile)}
               alt={getFullName()}
-              className="w-14 h-14 rounded-full border-2 border-indigo-500 object-cover"
+              className="w-10 h-10 rounded-full border border-indigo-500 object-cover"
             />
           ) : (
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold border-2 border-indigo-400">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold border border-indigo-400">
               {getInitials()}
             </div>
           )}
-          {/* Bouton changer photo */}
           <button
             onClick={handlePhotoClick}
             disabled={uploadingPhoto}
-            className="absolute -bottom-0.5 -right-0.5 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50"
-            title="Changer la photo"
+            className="absolute -bottom-1 -right-1 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
-            {uploadingPhoto ? (
-              <LoadingSpinner size="sm" />
-            ) : (
-              <Camera size={10} className="text-slate-300" />
-            )}
+             <Camera size={8} className="text-slate-300" />
           </button>
-          {/* Bouton supprimer photo (visible au hover si photo existe) */}
-          {user.photoProfile && !uploadingPhoto && (
-            <button
-              onClick={handleDeletePhoto}
-              className="absolute -top-0.5 -right-0.5 bg-rose-600 p-1 rounded-full border border-rose-500 hover:bg-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-              title="Supprimer la photo"
-            >
-              <Trash2 size={10} className="text-white" />
-            </button>
-          )}
         </div>
-        <div>
-          <h1 className="text-xl font-bold">{getFullName()}</h1>
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20 text-[10px] font-bold uppercase">
-              {getRoleLabel(user.role)}
-            </span>
-            {user.agence && <span className="text-xs">• {user.agence}</span>}
+        <div className="min-w-0">
+          <h1 className="text-base font-bold truncate leading-tight">{getFullName()}</h1>
+          <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+             <span className="text-indigo-400 font-medium text-[10px] uppercase">
+               {getRoleLabel(user.role)}
+             </span>
+             {user.agence && <span className="opacity-50">• {user.agence}</span>}
           </div>
         </div>
       </div>
 
-      {/* BENTO GRID - COMPACT */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* BENTO GRID - DENSE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
         {/* 1. CARTE IDENTITÉ */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
-          <h3 className="text-sm font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
-            <User size={16} className="text-indigo-400" />
-            Informations Personnelles
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-2 flex flex-col">
+          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
+            <User size={14} className="text-indigo-400" />
+            Identité
           </h3>
 
-          <div className="space-y-0.5">
+          <div className="flex-1 space-y-0.5">
             <EditableField
               label="Téléphone"
               value={user.telephone}
               icon={Smartphone}
               onSave={(val) => updateField('telephone', val)}
               type="tel"
-              placeholder="+242 06 000 0000"
+              placeholder="+242..."
             />
             <EditableField
               label="Email"
@@ -526,93 +482,86 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
               icon={Mail}
               onSave={(val) => updateField('email', val)}
               type="email"
-              placeholder="email@exemple.com"
+              placeholder="@..."
             />
             <EditableField
               label="Adresse"
               value={user.adresse}
               icon={MapPin}
               onSave={(val) => updateField('adresse', val)}
-              placeholder="Votre adresse"
+              placeholder="Ville, Quartier..."
             />
           </div>
 
-          {/* Username inline */}
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
-            <UserCircle size={14} className="text-slate-500" />
-            <span className="text-xs text-slate-500">@{user.username}</span>
+          <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800">
+            <UserCircle size={12} className="text-slate-600" />
+            <span className="text-[10px] text-slate-600">@{user.username}</span>
           </div>
         </div>
 
         {/* 2. CARTE RH */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-3">
           <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-            <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-300">
-              <Building2 size={16} className="text-emerald-400" />
-              Données RH
+            <h3 className="text-xs font-semibold flex items-center gap-2 text-slate-300">
+              <Building2 size={14} className="text-emerald-400" />
+              RH & Contrat
             </h3>
-            <Lock size={12} className="text-slate-600" />
+            <div className={user.matricule ? "text-emerald-500" : "text-amber-500"}>
+                 <div className="w-1.5 h-1.5 rounded-full bg-current" />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          <div className="grid grid-cols-2 gap-3">
             <ReadOnlyField label="Matricule" value={user.matricule} />
             <ReadOnlyField label="Poste" value={user.poste} />
             <ReadOnlyField label="Département" value={user.departement} />
             <ReadOnlyField label="Contrat" value={user.typeContrat} />
-            <ReadOnlyField label="Embauche" value={formatDate(user.dateEmbauche)} />
+            <div className="col-span-2">
+               <ReadOnlyField label="Date d'embauche" value={formatDate(user.dateEmbauche)} />
+            </div>
           </div>
 
-          {/* Info si pas de données RH */}
-          {!user.matricule && !user.poste && (
-            <div className="flex items-center gap-2 text-[10px] text-slate-500 pt-2">
-              <Info size={12} className="shrink-0" />
-              <span>Données RH non renseignées.</span>
-            </div>
-          )}
-
-          {/* Section Paie */}
           {canViewSalary() && user.salaireBase !== undefined && (
             <div className="pt-2 border-t border-slate-800">
-              <ReadOnlyField label="Salaire Base" value={formatMoney(user.salaireBase)} highlight />
+              <div className="flex justify-between items-end">
+                   <span className="text-[9px] text-slate-500 uppercase tracking-wider">Salaire Base</span>
+                   <span className="text-sm font-mono font-bold text-emerald-400">{formatMoney(user.salaireBase)}</span>
+              </div>
             </div>
           )}
         </div>
 
-        {/* 3. CARTE SÉCURITÉ (Fusionnée) */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
-          <h3 className="text-sm font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
-            <Shield size={16} className="text-rose-400" />
+        {/* 3. CARTE SÉCURITÉ */}
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-3">
+          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
+            <Shield size={14} className="text-rose-400" />
             Sécurité
           </h3>
 
-          {/* Mot de passe */}
-          <div className="flex justify-between items-center p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-            <div className="flex items-center gap-2">
-              <Key size={14} className="text-slate-500" />
-              <span className="text-xs text-slate-300">Mot de passe</span>
+          <div className="space-y-3">
+            {/* Mot de passe */}
+            <div className="flex justify-between items-center p-2 bg-slate-950 rounded-lg border border-slate-800">
+                <div className="flex items-center gap-2">
+                <Key size={14} className="text-slate-500" />
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-medium text-slate-300">Mot de passe</span>
+                </div>
+                </div>
+                <button
+                onClick={() => setShowPasswordModal(true)}
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-medium px-2 py-1 border border-slate-700 rounded hover:bg-slate-800 transition-colors"
+                >
+                Modifier
+                </button>
             </div>
-            <button
-              onClick={() => setShowPasswordModal(true)}
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium px-2 py-1 border border-slate-700 rounded hover:bg-slate-800 transition-colors"
-            >
-              Changer
-            </button>
-          </div>
 
-          {/* PIN Caisse */}
-          {isCashier() && (
+            {/* PIN Caisse */}
             <CaissePinManager
-              hasPin={user.hasCaissePin}
-              onPinConfigured={reloadProfile}
+                hasPin={user.hasCaissePin}
+                onPinConfigured={reloadProfile}
+                isCashier={isCashier()}
             />
-          )}
-
-          {!isCashier() && (
-            <div className="flex items-center gap-2 text-[10px] text-slate-500">
-              <Info size={12} className="shrink-0" />
-              <span>PIN Caisse réservé aux caissiers.</span>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
