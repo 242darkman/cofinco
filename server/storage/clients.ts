@@ -559,9 +559,13 @@ export async function getClientTags(clientId: string): Promise<(ClientTag & { ta
   return rows.map(r => ({ ...r.clientTag, tag: r.tag }));
 }
 
-export async function addClientTag(entry: InsertClientTag): Promise<ClientTag> {
+export async function addClientTag(entry: InsertClientTag): Promise<ClientTag & { tag: Tag }> {
     const [ct] = await db.insert(clientTags).values(entry).returning();
-    return ct;
+
+    // Récupérer le tag complet pour le retourner avec l'assignation
+    const [tag] = await db.select().from(tags).where(eq(tags.id, entry.tagId));
+
+    return { ...ct, tag };
 }
 
 export async function removeClientTag(clientId: string, tagId: string): Promise<boolean> {

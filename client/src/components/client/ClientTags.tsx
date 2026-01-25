@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Plus, X, Check, Hash, Activity, Search, AlertTriangle } from 'lucide-react';
+import { Tag, Plus, X, Hash, Search } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 interface TagType {
@@ -84,36 +84,41 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
 
   const handleAssignTag = async (tagId: string) => {
     try {
-      const res = await fetch('/api/client-tags', {
+      const res = await fetch(`/api/clients/${clientId}/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId,
-          tagId
-        }),
+        body: JSON.stringify({ tagId }),
         credentials: 'include'
       });
-      
+
       if (!res.ok) throw new Error('Erreur assignation tag');
       const assignment = await res.json();
 
-      setClientTags([...clientTags, assignment]);
-      logActivity(clientId, 'tag_assigned', `Tag assigné: ${assignment.tag?.name || 'Inconnu'}`);
+      // S'assurer que l'objet tag est présent
+      if (assignment && assignment.tag) {
+        setClientTags(prev => [...prev, assignment]);
+        logActivity(clientId, 'tag_assigned', `Tag assigné: ${assignment.tag.name}`);
+      } else {
+        // Rafraîchir les tags si la réponse n'inclut pas le tag complet
+        await fetchClientTags();
+        const tag = allTags.find(t => t.id === tagId);
+        logActivity(clientId, 'tag_assigned', `Tag assigné: ${tag?.name || 'Inconnu'}`);
+      }
     } catch (error) {
       console.error('Erreur assignation tag:', error);
     }
   };
 
-  const handleRemoveTag = async (assignmentId: string, tagName: string) => {
+  const handleRemoveTag = async (tagId: string, tagName: string) => {
     try {
-      const res = await fetch(`/api/client-tags/${assignmentId}`, {
+      const res = await fetch(`/api/clients/${clientId}/tags/${tagId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
 
       if (!res.ok) throw new Error('Erreur suppression tag');
 
-      setClientTags(clientTags.filter(t => t.id !== assignmentId));
+      setClientTags(prev => prev.filter(t => t.tagId !== tagId));
       logActivity(clientId, 'tag_removed', `Tag retiré: ${tagName}`);
     } catch (error) {
       console.error('Erreur suppression tag:', error);
@@ -135,13 +140,12 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
     }
   };
 
-  const logActivity = async (clientId: string, type: string, description: string) => {
+  const logActivity = async (clientIdParam: string, type: string, description: string) => {
     try {
-      await fetch('/api/client-activities', {
+      await fetch(`/api/clients/${clientIdParam}/activities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientId,
           type,
           description,
           metadata: {}
@@ -153,13 +157,15 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
     }
   };
 
-  const unassignedTags = allTags.filter(t => !clientTags.some(ct => ct.tagId === t.id));
+  // Filtrer les tags client valides (avec tag non null)
+  const validClientTags = clientTags.filter(ct => ct && ct.tag && ct.tagId);
+  const unassignedTags = allTags.filter(t => t && t.id && !validClientTags.some(ct => ct.tagId === t.id));
   const filteredTags = unassignedTags.filter(t => (t.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className={`space-y-4 ${compact ? '!space-y-2' : ''}`}>
       <div className="flex flex-wrap gap-2">
-        {clientTags.map(ct => (
+        {validClientTags.map(ct => (
           <span
             key={ct.id}
             className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition border border-transparent ${compact ? 'text-[10px] px-2 py-0' : ''}`}
@@ -169,13 +175,13 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
             {ct.tag.name}
             {!compact && canDeleteTags && (
                 <button
-                onClick={() => handleRemoveTag(ct.id, ct.tag.name)}
+                onClick={() => handleRemoveTag(ct.tagId, ct.tag.name)}
                 className="hover:bg-black/20 rounded-full p-0.5 ml-0.5"
                 >
                 <X size={12} />
                 </button>
             )}
-            
+
           </span>
         ))}
         
@@ -184,7 +190,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
               onClick={() => setShowTagModal(true)}
               className="px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] flex items-center gap-1 transition border border-dashed border-slate-600 hover:border-slate-500 hover:text-slate-300"
             >
-              <Plus size={10} /> {clientTags.length === 0 ? 'Tags' : ''}
+              <Plus size={10} /> {validClientTags.length === 0 ? 'Tags' : ''}
             </button>
         ) : (
             <button
