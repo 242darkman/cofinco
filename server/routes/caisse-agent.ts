@@ -91,10 +91,18 @@ const listOperationsQuerySchema = z.object({
 /**
  * GET /api/caisse-agent/operations-terrain/pending/count
  * Récupère le nombre d'opérations en attente (SUBMITTED)
+ * Admin/Superviseur: toutes les agences
+ * Autres: uniquement leur agence de rattachement
  */
 caisseAgentRouter.get("/operations-terrain/pending/count", async (req, res) => {
   try {
-    const result = await operationService.getPendingOperationsCount();
+    const user = (req as any).user;
+
+    if (!user) {
+      return res.status(401).json({ error: "Non authentifié" });
+    }
+
+    const result = await operationService.getPendingOperationsCount(user.id, user.role, user.agenceId);
     res.json(result);
   } catch (error: any) {
     console.error("Erreur stats pending count:", error);
@@ -354,14 +362,16 @@ caisseAgentRouter.post(
 /**
  * GET /api/caisse-agent/operations-terrain
  * Liste les opérations avec filtres et pagination
+ * Admin/Superviseur: toutes les agences
+ * Autres: uniquement leur agence de rattachement
  */
 caisseAgentRouter.get(
   "/operations-terrain",
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const user = (req as any).user;
 
-      if (!userId) {
+      if (!user) {
         return res.status(401).json({ error: "Non authentifié" });
       }
 
@@ -379,7 +389,7 @@ caisseAgentRouter.get(
         dateTo: parsed.data.dateTo ? new Date(parsed.data.dateTo) : undefined,
       };
 
-      const result = await operationService.getOperations(filters);
+      const result = await operationService.getOperations(filters, user.id, user.role, user.agenceId);
 
       res.json({
         operations: result.operations,

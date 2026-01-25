@@ -1153,16 +1153,12 @@ export function registerFinanceRoutes(app: Express) {
 
           const client = await storage.getClient(demande.clientId);
           if (client) {
-             // Vérification stricte de l'agence (ID ou Nom legacy)
-             // On compare l'agence de la session avec l'agence du client
              const sessionAgenceId = activeSession.agenceId;
              const clientAgenceId = client.agenceId;
 
              if (sessionAgenceId && clientAgenceId && sessionAgenceId !== clientAgenceId) {
                  return res.status(403).json({ message: "Le client est affilié à une autre agence. Encaissement refusé." });
-             } 
-             
-             // Legacy fallback removed: agenceId is now the source of truth.
+             }
           }
 
           const result = await storage.payerFraisEngagement({
@@ -1580,11 +1576,10 @@ export function registerFinanceRoutes(app: Express) {
           });
       }
 
-      // Map decision to standardized enum value (handle both EN and legacy FR values)
       const decisionLower = decision?.toLowerCase?.() || decision;
-      const statutEnquete = (decisionLower === 'approved' || decisionLower === 'approuve')
+      const statutEnquete = decisionLower === 'approved'
         ? StatutEnquete.APPROVED
-        : (decisionLower === 'rejected' || decisionLower === 'rejete')
+        : decisionLower === 'rejected'
           ? StatutEnquete.REJECTED
           : StatutEnquete.REDUCED;
 
@@ -2401,8 +2396,7 @@ export function registerFinanceRoutes(app: Express) {
 
             // Side Effects (Loyalty, WS) - Kept outside transaction critical path for now or could be moved to events
             try {
-                 // Loyalty Points - Check if it's a savings deposit operation (EN or FR legacy)
-                const isSavingsDeposit = ['DEPOSIT_SAVINGS', 'SAVINGS_DEPOSIT', 'Dépôt épargne', 'Versement Épargne', 'Dépôt Épargne'].includes(parsed.typeOperation);
+                const isSavingsDeposit = ['DEPOSIT_SAVINGS', 'SAVINGS_DEPOSIT'].includes(parsed.typeOperation);
                 if (parsed.clientId && isSavingsDeposit && parsed.montant) {
                     const points = Math.floor(Number(parsed.montant) / 1000);
                     await storage.addLoyaltyPoints(

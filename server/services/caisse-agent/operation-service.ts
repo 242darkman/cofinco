@@ -457,18 +457,25 @@ export class OperationService {
 
   /**
    * Liste les opérations avec filtres et pagination
+   * Admin/Superviseur: toutes les agences
+   * Autres rôles: uniquement leur agence de rattachement
    */
-  async getOperations(filters: {
-    agentId?: string;
-    clientId?: string;
-    caisseAgentId?: string;
-    statut?: "SUBMITTED" | "APPROVED" | "SETTLED" | "REJECTED" | "CANCELLED";
-    type?: "COLLECT_CASH" | "SETTLEMENT_CASH";
-    dateFrom?: Date;
-    dateTo?: Date;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ operations: OperationTerrainWithRelations[]; total: number }> {
+  async getOperations(
+    filters: {
+      agentId?: string;
+      clientId?: string;
+      caisseAgentId?: string;
+      statut?: "SUBMITTED" | "APPROVED" | "SETTLED" | "REJECTED" | "CANCELLED";
+      type?: "COLLECT_CASH" | "SETTLEMENT_CASH";
+      dateFrom?: Date;
+      dateTo?: Date;
+      limit?: number;
+      offset?: number;
+    },
+    userId?: string,
+    userRole?: string,
+    agenceId?: string | null
+  ): Promise<{ operations: OperationTerrainWithRelations[]; total: number }> {
     const conditions = [];
 
     if (filters.agentId) {
@@ -493,22 +500,72 @@ export class OperationService {
       conditions.push(lte(operationsTerrain.submittedAt, filters.dateTo));
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    // Filtre par agence si non-admin
+    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPERVISEUR';
+    const needsAgencyFilter = !isAdmin && agenceId;
 
-    // Count total
-    const [countResult] = await db
-      .select({ count: count() })
-      .from(operationsTerrain)
-      .where(whereClause);
+    let baseQuery;
+    if (needsAgencyFilter) {
+      // Join avec employes pour filtrer par agence
+      baseQuery = db
+        .select({
+          operation: operationsTerrain,
+        })
+        .from(operationsTerrain)
+        .innerJoin(agentsTerrain, eq(operationsTerrain.agentId, agentsTerrain.id))
+        .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+        .where(
+          and(
+            eq(employes.agenceId, agenceId!),
+            conditions.length > 0 ? and(...conditions) : undefined
+          )
+        );
+    } else {
+      baseQuery = db
+        .select()
+        .from(operationsTerrain)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+    }
+
+    // Count total avec même filtre
+    let countResult;
+    if (needsAgencyFilter) {
+      const [result] = await db
+        .select({ count: count() })
+        .from(operationsTerrain)
+        .innerJoin(agentsTerrain, eq(operationsTerrain.agentId, agentsTerrain.id))
+        .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+        .where(
+          and(
+            eq(employes.agenceId, agenceId!),
+            conditions.length > 0 ? and(...conditions) : undefined
+          )
+        );
+      countResult = result;
+    } else {
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      const [result] = await db
+        .select({ count: count() })
+        .from(operationsTerrain)
+        .where(whereClause);
+      countResult = result;
+    }
 
     // Fetch operations
-    const operations = await db
-      .select()
-      .from(operationsTerrain)
-      .where(whereClause)
-      .orderBy(desc(operationsTerrain.submittedAt))
-      .limit(filters.limit || 50)
-      .offset(filters.offset || 0);
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const operations = needsAgencyFilter
+      ? await baseQuery
+          .orderBy(desc(operationsTerrain.submittedAt))
+          .limit(filters.limit || 50)
+          .offset(filters.offset || 0)
+          .then(results => results.map(r => r.operation))
+      : await db
+          .select()
+          .from(operationsTerrain)
+          .where(whereClause)
+          .orderBy(desc(operationsTerrain.submittedAt))
+          .limit(filters.limit || 50)
+          .offset(filters.offset || 0);
 
     // Enrichir avec les relations (version simplifiée pour la liste)
     // Note: agentsTerrain -> employes -> users pour nom/prenom
@@ -606,13 +663,48 @@ export class OperationService {
 
   /**
    * Récupère le nombre d'opérations en attente de validation
+   * Admin/Superviseur: toutes les agences
+   * Autres rôles: uniquement leur agence de rattachement
    */
-  async getPendingOperationsCount(): Promise<{ count: number }> {
+  async getPendingOperationsCount(
+    userId?: string,
+    userRole?: string,
+    agenceId?: string | null
+  ): Promise<{ count: number }> {
+    // Si pas de user, retourner 0 (ne devrait pas arriver car endpoint protégé)
+    if (!userId) {
+      return { count: 0 };
+    }
+
+    // Admin et Superviseur voient toutes les opérations
+    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPERVISEUR';
+
+    if (isAdmin) {
+      const [result] = await db
+        .select({ val: count() })
+        .from(operationsTerrain)
+        .where(eq(operationsTerrain.statut, "SUBMITTED"));
+
+      return { count: Number(result?.val || 0) };
+    }
+
+    // Pour les autres rôles, filtrer par agence via l'agent
+    if (!agenceId) {
+      return { count: 0 };
+    }
+
     const [result] = await db
       .select({ val: count() })
       .from(operationsTerrain)
-      .where(eq(operationsTerrain.statut, "SUBMITTED"));
-    
+      .innerJoin(agentsTerrain, eq(operationsTerrain.agentId, agentsTerrain.id))
+      .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+      .where(
+        and(
+          eq(operationsTerrain.statut, "SUBMITTED"),
+          eq(employes.agenceId, agenceId)
+        )
+      );
+
     return { count: Number(result?.val || 0) };
   }
 }

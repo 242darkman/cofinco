@@ -73,6 +73,7 @@ export default function AgentValidations() {
   // State
   const [operations, setOperations] = useState<OperationTerrainWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [agences, setAgences] = useState<Agence[]>([]);
   
   // Filters
@@ -105,33 +106,66 @@ export default function AgentValidations() {
   const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.SUPERVISEUR;
 
   useEffect(() => {
-    loadData();
+    loadData(false); // Initial load
+
+    // Polling interval to refresh data every 30 seconds (background refresh)
+    const intervalId = setInterval(() => {
+      loadData(true); // Background refresh
+    }, 30000);
+
+    // Listen for operation events to refresh immediately (background refresh)
+    const handleOperationEvent = (event: CustomEvent) => {
+      const { type } = event.detail || {};
+      if (type && ['OPERATION_TERRAIN_CREATED', 'OPERATION_TERRAIN_APPROVED', 'OPERATION_TERRAIN_REJECTED', 'BULK_APPROVE'].includes(type)) {
+        loadData(true); // Background refresh
+      }
+    };
+
+    window.addEventListener('operation-update', handleOperationEvent as EventListener);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('operation-update', handleOperationEvent as EventListener);
+    };
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isBackgroundRefresh = false) => {
+    // Only show loading spinner on initial load, not on background refreshes
+    if (!isBackgroundRefresh) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
     try {
       const opsPromise = caisseAgentApi.listOperations({ statut: StatutOperationTerrain.SUBMITTED });
       const agencesPromise = isAdmin ? agencesApi.getAgences() : Promise.resolve([]);
-      
+
       const [opsResponse, agencesResponse] = await Promise.all([opsPromise, agencesPromise]);
-      
+
       // Handle pagination wrapper or array
       const opsData = Array.isArray(opsResponse) ? opsResponse : opsResponse.data || [];
       setOperations(opsData);
-      
+
       if (Array.isArray(agencesResponse)) {
         setAgences(agencesResponse);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      toast({
-        title: t('erreur'),
-        description: "Impossible de charger les données.",
-        variant: 'destructive',
-      });
+      // Only show error toast on initial load, not on background refresh
+      if (!isBackgroundRefresh) {
+        toast({
+          title: t('erreur'),
+          description: "Impossible de charger les données.",
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!isBackgroundRefresh) {
+        setLoading(false);
+      } else {
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -154,7 +188,7 @@ export default function AgentValidations() {
           description: `${selectedIds.size} opérations validées avec succès.`,
         });
         setSelectedIds(new Set());
-        loadData();
+        loadData(true);
         
         // Update badge
         window.dispatchEvent(new CustomEvent('operation-update', { 
@@ -202,8 +236,8 @@ export default function AgentValidations() {
     setDetailModalOpen(false);
     setPendingApprovalId(null);
     setPendingApprovalOp(null);
-    loadData();
-    
+    loadData(true);
+
     window.dispatchEvent(new CustomEvent('operation-update', { 
         detail: { type: 'OPERATION_TERRAIN_APPROVED', id: pendingApprovalId } 
     }));
@@ -234,8 +268,8 @@ export default function AgentValidations() {
       });
       setRejectModalOpen(false);
       setDetailModalOpen(false);
-      loadData();
-      
+      loadData(true);
+
       window.dispatchEvent(new CustomEvent('operation-update', { 
           detail: { type: 'OPERATION_TERRAIN_REJECTED', id: rejectOperationId } 
       }));
@@ -293,13 +327,13 @@ export default function AgentValidations() {
         </div>
         
         <div className="flex items-center gap-2">
-            <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={loadData}
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadData(false)}
                 disabled={loading || processing}
                 icon={RefreshCw}
-                className={loading ? 'animate-spin' : ''}
+                className={loading || isRefreshing ? 'animate-spin' : ''}
             >
                 Actualiser
             </Button>

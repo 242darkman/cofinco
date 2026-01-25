@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Menu, X, LogOut, Lock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { maintenanceApi, caisseAgentApi, creditRefundsApi } from '../../lib/api-client';
+import { maintenanceApi, creditRefundsApi } from '../../lib/api-client';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
 import { usePermissionsContext } from '../../contexts/PermissionsContext';
 import { isAdminRole } from '@shared/types/roles';
+import { useOperationsBadge } from '../../hooks/useOperationsBadge';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -34,23 +35,10 @@ export default function PlatformSidebarContent({
 
   // Maintenance Status State
   const [lockedModules, setLockedModules] = useState<Set<string>>(new Set());
-  const [pendingValidationsCount, setPendingValidationsCount] = useState<number>(0);
   const [pendingRefundsCount, setPendingRefundsCount] = useState<number>(0);
 
-  // Fetch Pending Validations Count
-  const fetchPendingCount = async () => {
-    try {
-      if (canAccessRoute(getRouteByKey('agentValidations')!, userRole)) {
-        const result = await caisseAgentApi.countPendingOperations();
-        if (result && typeof result.count === 'number') {
-          setPendingValidationsCount(result.count);
-        }
-      }
-    } catch (error) {
-       // Silent error for dashboard counters
-       console.error("Dashboard counter error:", error);
-    }
-  };
+  // Use real-time operations badge hook
+  const { pendingCount: pendingValidationsCount } = useOperationsBadge();
 
   // Fetch Pending Refunds Count (Restitutions Frais)
   const fetchPendingRefundsCount = async () => {
@@ -85,7 +73,6 @@ export default function PlatformSidebarContent({
     };
 
     fetchStatus();
-    fetchPendingCount();
     fetchPendingRefundsCount();
 
     // Real-time Updates Listener
@@ -115,18 +102,12 @@ export default function PlatformSidebarContent({
         });
     };
 
-    const handleOperationUpdate = () => {
-      // Refresh count when operations change status
-      fetchPendingCount();
-    };
-
     const handleRefundUpdate = () => {
       // Refresh refund count when refunds change status
       fetchPendingRefundsCount();
     };
 
     window.addEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
-    window.addEventListener('operation-update', handleOperationUpdate as EventListener);
     window.addEventListener('refund-update', handleRefundUpdate as EventListener);
 
     // Polling interval for refunds (every 30 seconds) as backup
@@ -134,7 +115,6 @@ export default function PlatformSidebarContent({
 
     return () => {
         window.removeEventListener('maintenance-update', handleMaintenanceUpdate as EventListener);
-        window.removeEventListener('operation-update', handleOperationUpdate as EventListener);
         window.removeEventListener('refund-update', handleRefundUpdate as EventListener);
         clearInterval(refundPollInterval);
     };
