@@ -41,7 +41,7 @@ export default function AdminGestionUtilisateurs() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(8);
+  const [pageSize, setPageSize] = useState(6);
 
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -145,31 +145,30 @@ export default function AdminGestionUtilisateurs() {
   return (
     <div className="h-full flex flex-col space-y-2">
       <Card variant="default" padding="none" className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Mobile-First Header */}
-        <div className="p-3 border-b border-edge bg-surface-muted/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5 text-blue-400" />
+        {/* Mobile-First Header - ULTRA COMPACT INLINE */}
+        <div className="p-2 border-b border-edge bg-surface-muted/30 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-blue-400" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-content-primary">Utilisateurs</h2>
-                <p className="text-xs text-content-muted">Gestion des comptes ({filteredUsers.length})</p>
+                <h2 className="text-sm sm:text-base font-bold text-content-primary">Utilisateurs</h2>
+                <p className="text-[10px] text-content-muted">Gestion des comptes ({filteredUsers.length})</p>
               </div>
             </div>
-            {/* Button removed to prevent incomplete account creation. Use Profils/Personnel page instead. */}
-          </div>
 
-          {/* Search Bar */}
-          <div className="mt-2 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={16} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher (nom, rôle...)"
-              className="w-full pl-9 pr-4 py-1.5 bg-surface-base border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
-            />
+            {/* Search Bar - Inline */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-content-muted" size={14} />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full pl-8 pr-3 py-1 bg-surface-base border border-edge rounded-md text-content-primary placeholder-content-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-xs"
+              />
+            </div>
           </div>
         </div>
 
@@ -186,8 +185,8 @@ export default function AdminGestionUtilisateurs() {
           </div>
         ) : (
           <>
-            {/* Scrollable Table Container */}
-            <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
+            {/* Scrollable Table Container - HIDDEN SCROLLBAR FOR NO SCROLL EFFECT */}
+            <div className="flex-1 overflow-hidden min-h-0">
               <ResponsiveTable
                 data={paginatedUsers}
                 columns={[
@@ -196,16 +195,16 @@ export default function AdminGestionUtilisateurs() {
                     label: 'Utilisateur',
                     primary: true,
                     format: (_: any, user: User) => (
-                      <div className="flex items-center gap-3 py-1">
+                      <div className="flex items-center gap-2 py-0.5">
                         {getPhotoUrl(user) ? (
-                          <img src={getPhotoUrl(user)} alt={getDisplayName(user)} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-edge shadow-sm" />
+                          <img src={getPhotoUrl(user)} alt={getDisplayName(user)} className="w-8 h-8 rounded-full object-cover border border-edge shadow-sm" />
                         ) : (
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-surface-muted rounded-full flex items-center justify-center border border-edge">
-                            <Users size={18} className="text-content-muted" />
+                          <div className="w-8 h-8 bg-surface-muted rounded-full flex items-center justify-center border border-edge">
+                            <Users size={14} className="text-content-muted" />
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-content-primary truncate max-w-[120px] sm:max-w-xs">{getDisplayName(user)}</p>
+                          <p className="text-xs font-semibold text-content-primary truncate max-w-[100px] sm:max-w-xs">{getDisplayName(user)}</p>
                           <p className="text-[10px] text-content-muted truncate">@{user.username}</p>
                         </div>
                       </div>
@@ -217,7 +216,7 @@ export default function AdminGestionUtilisateurs() {
                     format: (role: string) => {
                       const style = getRoleBadgeStyle(role);
                       return (
-                        <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium border whitespace-nowrap w-[160px] text-center transition-colors ${style.classes}`}>
+                        <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-medium border whitespace-nowrap w-[140px] text-center transition-colors ${style.classes}`}>
                           {style.label}
                         </span>
                       );
@@ -230,8 +229,8 @@ export default function AdminGestionUtilisateurs() {
                       const style = getStatusBadgeStyle(status);
                       const isActif = status === StatutUser.ACTIVE;
                       return (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium border min-w-[90px] justify-center transition-colors ${style.classes}`}>
-                          {isActif ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border min-w-[80px] justify-center transition-colors ${style.classes}`}>
+                          {isActif ? <CheckCircle size={10} /> : <XCircle size={10} />}
                           {style.label}
                         </span>
                       );
@@ -239,7 +238,7 @@ export default function AdminGestionUtilisateurs() {
                   }
                 ]}
                 actions={(user: User) => (
-                  <>
+                  <div className="flex items-center gap-1">
                     {canEditUsers && (
                       <>
                         {/* PIN Caisse - uniquement pour les non-clients (employés, caissiers, etc.) */}
@@ -249,7 +248,7 @@ export default function AdminGestionUtilisateurs() {
                             variant="ghost"
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); setPinUser(user); setShowPinModal(true); }}
-                            className="text-warning hover:bg-warning/10"
+                            className="text-warning hover:bg-warning/10 h-7 w-7"
                             title="PIN"
                             aria-label="Définir PIN Caisse"
                           />
@@ -259,7 +258,7 @@ export default function AdminGestionUtilisateurs() {
                           variant="ghost"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); setEditingUser(user); setShowModal(true); }}
-                          className="text-primary hover:bg-primary/10"
+                          className="text-primary hover:bg-primary/10 h-7 w-7"
                           title="Modifier"
                           aria-label="Modifier utilisateur"
                         />
@@ -271,14 +270,14 @@ export default function AdminGestionUtilisateurs() {
                         variant="ghost"
                         size="sm"
                         onClick={(e) => { e.stopPropagation(); handleDelete(user.id); }}
-                        className="text-danger hover:bg-danger/10"
+                        className="text-danger hover:bg-danger/10 h-7 w-7"
                         title="Supprimer"
                         aria-label="Supprimer utilisateur"
                       />
                     )}
-                  </>
+                  </div>
                 )}
-                emptyMessage="Aucun utilisateur trouvé"
+                emptyMessage="Aucun utilisateur"
                 loading={loading}
                 mobileBreakpoint="md"
               />
