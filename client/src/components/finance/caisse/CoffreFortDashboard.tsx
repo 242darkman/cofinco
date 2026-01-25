@@ -551,33 +551,33 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
 
   return (
-    <div className="space-y-3 pt-2">
-      <div className="sticky top-[3.5rem] lg:top-0 z-40 -mx-4 px-4 py-2 bg-slate-950/80 backdrop-blur-md border-b border-white/5 transition-all duration-200">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-              <div className="bg-blue-600/20 p-2 rounded-xl">
-                 <Vault className="w-6 h-6 text-blue-500" />
+    <div className="flex flex-col h-full overflow-hidden pt-1 space-y-2">
+      <div className="shrink-0 z-40 px-1 py-1 bg-slate-950/80 backdrop-blur-md border-b border-white/5">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-2">
+          <div className="flex items-center gap-3">
+              <div className="bg-blue-600/20 p-1.5 rounded-lg">
+                 <Vault className="w-5 h-5 text-blue-500" />
               </div>
                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-white">Coffre-Fort</h2>
-                  <p className="text-xs text-slate-400 hidden sm:block">Gestion centralisée des fonds</p>
+                  <h2 className="text-lg font-bold tracking-tight text-white">Coffre-Fort</h2>
+                  <p className="text-[10px] text-slate-400 hidden sm:block">Gestion centralisée des fonds</p>
                </div>
                
                {canConfigure && (
                   <Button 
                       variant="outline" 
                       size="sm" 
-                      className="ml-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hidden lg:flex"
+                      className="ml-2 h-7 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hidden lg:flex"
                       onClick={() => setShowProvisionModal(true)}
                   >
-                      <ArrowDownRight size={14} className="mr-2" />
+                      <ArrowDownRight size={12} className="mr-1.5" />
                       Approvisionner
                   </Button>
                )}
           </div>
           
-          <div className="w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
-             <div className="flex space-x-1 bg-slate-900/50 p-1 rounded-xl border border-white/5">
+          <div className="overflow-x-auto scrollbar-hide">
+             <div className="flex space-x-1 bg-slate-900/50 p-0.5 rounded-lg border border-white/5">
                 {[
                   { id: 'operations', label: 'Transferts', icon: ArrowRightLeft, short: 'Ops' },
                   { id: 'intercoffres', label: 'Inter-Coffres', icon: Vault, short: 'Inter' },
@@ -589,13 +589,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                    key={tab.id}
                    onClick={() => setActiveTab(tab.id)}
                    className={`
-                      relative flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap
+                      relative flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap
                       ${activeTab === tab.id 
                         ? 'text-white bg-blue-600/90 shadow-lg shadow-blue-900/20' 
                         : 'text-slate-400 hover:text-white hover:bg-white/5'}
                    `}
                  >
-                   <tab.icon size={16} className={activeTab === tab.id ? 'animate-in zoom-in-50 duration-200' : ''} />
+                   <tab.icon size={14} className={activeTab === tab.id ? 'animate-in zoom-in-50 duration-200' : ''} />
                    <span className="hidden sm:inline">{tab.label}</span>
                    <span className="sm:hidden">{tab.short}</span>
                  </button>
@@ -605,220 +605,223 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         </div>
       </div>
 
-      {activeTab === 'admin' ? (
-        <CoffreAdminPanel agenceId={agenceId} />
-      ) : activeTab === 'supervision' ? (
-        <TreasurySupervision />
-      ) : activeTab === 'intercoffres' ? (
-        <TransfertInterCoffresModule
-          onBack={() => setActiveTab('operations')}
-          userAgenceId={agenceId}
-        />
-      ) : activeTab === 'historique' ? (
-         <CoffreFortHistorique agenceId={agenceId} />
-      ) : (
-        <>
-        {/* Header Stats */}
-      {/* Header Stats - Compact */}
-      <div className="grid grid-cols-3 gap-2">
-         <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Solde Coffre</span>
-            <div className="flex items-center gap-2">
-               <Wallet className="text-blue-500" size={16} />
-               <div className="text-lg font-black text-white">{isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}</div>
-            </div>
-         </div>
-         <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">En Attente</span>
-            <div className="flex items-center gap-2">
-               <Clock className="text-amber-500" size={16} />
-               <div className="text-lg font-black text-white">{pendingCount + (pendingOpeningRequests?.length || 0)}</div>
-            </div>
-         </div>
-         <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col justify-center">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Mouvements J</span>
-            <div className="flex items-center gap-2">
-               <ArrowRightLeft className="text-emerald-500" size={16} />
-               <div className="text-lg font-black text-white">{todayVolume.toLocaleString()} FCFA</div>
-            </div>
-         </div>
-      </div>
-
-      {/* Pending Opening Requests Section - New Secure Workflow */}
-      {(pendingOpeningRequests?.length > 0 || isLoadingOpeningRequests) && (
-        <Card className="overflow-hidden bg-gradient-to-br from-amber-500/5 to-orange-500/5 border-amber-500/30">
-          <div className="p-3 border-b border-amber-500/20 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-500/20">
-                <KeyRound className="w-4 h-4 text-amber-400" />
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                  Ouverture de Caisse
-                  {pendingOpeningRequests?.length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold animate-pulse">
-                      {pendingOpeningRequests.length}
-                    </span>
-                  )}
-                </h3>
-                <p className="text-slate-400 text-xs">Caissiers en attente de dotation</p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchOpeningRequests()}
-              disabled={isLoadingOpeningRequests}
-              className="h-8 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-            >
-              <Loader2
-                size={12}
-                className={`mr-2 ${isLoadingOpeningRequests ? 'animate-spin' : ''}`}
-              />
-              Actualiser
-            </Button>
-          </div>
-
-          {isLoadingOpeningRequests ? (
-            <div className="p-4 text-center">
-              <Loader2 className="w-6 h-6 animate-spin text-amber-400 mx-auto" />
-              <p className="text-slate-400 mt-1 text-xs">Chargement...</p>
-            </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-1 custom-scrollbar space-y-3">
+          {activeTab === 'admin' ? (
+            <CoffreAdminPanel agenceId={agenceId} />
+          ) : activeTab === 'supervision' ? (
+            <TreasurySupervision />
+          ) : activeTab === 'intercoffres' ? (
+            <TransfertInterCoffresModule
+              onBack={() => setActiveTab('operations')}
+              userAgenceId={agenceId}
+            />
+          ) : activeTab === 'historique' ? (
+             <CoffreFortHistorique agenceId={agenceId} />
           ) : (
-            <div className="divide-y divide-amber-500/10">
-              {pendingOpeningRequests.map((request: any) => (
-                <div
-                  key={request.transfert?.id || request.session?.id}
-                  className="p-2 hover:bg-amber-500/5 transition-colors"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                    {/* Request Info */}
-                    <div className="flex items-start gap-2">
-                      <div className="p-2 rounded-xl bg-slate-800 border border-slate-700">
-                        <User className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-sm">
-                            {request.caissierNom || request.transfert?.requestedByNom || 'Caissier'}
-                          </span>
-                          <span className="text-slate-500 text-xs gap-1 flex items-center">
-                             • {request.caisseNom || request.transfert?.caisseDestinationNom || 'Caisse'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="text-amber-400 font-bold">
-                            {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} FCFA
-                          </span>
-                          {request.soldeVeille > 0 && (
-                            <span className="text-slate-500">
-                              (+{Number(request.soldeVeille).toLocaleString()} veille)
-                            </span>
-                          )}
-                        </div>
-                        {request.fundsRequestedAt && (
-                          <span className="text-[10px] text-slate-500 block">
-                            {format(new Date(request.fundsRequestedAt), "dd/MM HH:mm", { locale: fr })}
+            <>
+            {/* Header Stats - Compact */}
+            <div className="grid grid-cols-3 gap-2">
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 flex flex-col justify-center">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Solde Coffre</span>
+                  <div className="flex items-center gap-1.5">
+                     <Wallet className="text-blue-500" size={14} />
+                     <div className="text-base font-bold text-white max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
+                        {isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}
+                     </div>
+                  </div>
+               </div>
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 flex flex-col justify-center">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">En Attente</span>
+                  <div className="flex items-center gap-1.5">
+                     <Clock className="text-amber-500" size={14} />
+                     <div className="text-base font-bold text-white">{pendingCount + (pendingOpeningRequests?.length || 0)}</div>
+                  </div>
+               </div>
+               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 flex flex-col justify-center">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Mouvements J</span>
+                  <div className="flex items-center gap-1.5">
+                     <ArrowRightLeft className="text-emerald-500" size={14} />
+                     <div className="text-base font-bold text-white">{todayVolume.toLocaleString()} FCFA</div>
+                  </div>
+               </div>
+            </div>
+
+            {/* Pending Opening Requests Section - New Secure Workflow */}
+            {(pendingOpeningRequests?.length > 0 || isLoadingOpeningRequests) && (
+              <Card className="overflow-hidden bg-gradient-to-br from-amber-500/5 to-orange-500/5 border-amber-500/30">
+                <div className="p-2 border-b border-amber-500/20 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded-lg bg-amber-500/20">
+                      <KeyRound className="w-3 h-3 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-xs flex items-center gap-2">
+                        Ouverture de Caisse
+                        {pendingOpeningRequests?.length > 0 && (
+                          <span className="px-1.5 py-0 rounded-full bg-amber-500 text-white text-[9px] font-bold animate-pulse">
+                            {pendingOpeningRequests.length}
                           </span>
                         )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 ml-auto">
-                      {canValidate && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-7 px-3 text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
-                            onClick={() => setConfirmAction({
-                              type: 'validate-opening',
-                              transfert: {
-                                id: request.transfert?.id,
-                                montant: request.montantDemande || request.transfert?.montant,
-                                caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                caissierNom: request.caissierNom || request.transfert?.requestedByNom,
-                                requestedByNom: request.transfert?.requestedByNom
-                              }
-                            })}
-                            disabled={actionLoading === request.transfert?.id}
-                          >
-                            {actionLoading === request.transfert?.id ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle2 size={12} className="mr-1" />
-                                Valider
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-7 px-3 text-[10px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
-                            onClick={() => setConfirmAction({
-                              type: 'reject-opening',
-                              transfert: {
-                                id: request.transfert?.id,
-                                montant: request.montantDemande || request.transfert?.montant,
-                                caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                caissierNom: request.caissierNom || request.transfert?.requestedByNom,
-                                requestedByNom: request.transfert?.requestedByNom
-                              }
-                            })}
-                            disabled={actionLoading === request.transfert?.id}
-                          >
-                            <XCircle size={12} className="mr-1" />
-                            Rejeter
-                          </Button>
-                        </>
-                      )}
-                      {!canValidate && (
-                        <span className="text-[10px] text-slate-500 italic flex items-center gap-1">
-                          <Clock size={10} />
-                          En attente
-                        </span>
-                      )}
+                      </h3>
+                      <p className="text-slate-400 text-[10px]">Caissiers en attente de dotation</p>
                     </div>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchOpeningRequests()}
+                    disabled={isLoadingOpeningRequests}
+                    className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                  >
+                    <Loader2
+                      size={10}
+                      className={`mr-1 ${isLoadingOpeningRequests ? 'animate-spin' : ''}`}
+                    />
+                    Actualiser
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
 
-      <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-        <div className="p-3 border-b border-slate-800 flex justify-between items-center">
-             <div className="flex items-center gap-2">
-                <ArrowRightLeft className="text-blue-500" size={16} />
-                <h3 className="font-bold text-white text-sm">Transferts</h3>
-             </div>
-             <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => refetch()}
-                disabled={isRefetchingTransferts}
-                className="transition-all duration-200"
-             >
-                <Loader2 
-                    size={14} 
-                    className={`mr-2 ${isRefetchingTransferts ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
-                />
-                {isRefetchingTransferts ? 'Actualisation...' : 'Actualiser'}
-             </Button>
-        </div>
-        
-        <ResponsiveTable 
-            data={transferts}
-            columns={columns}
-            emptyMessage="Aucune demande de transfert en cours."
-            density="compact"
-        />
-      </Card>
-      </>
-      )}
+                {isLoadingOpeningRequests ? (
+                  <div className="p-2 text-center">
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-400 mx-auto" />
+                    <p className="text-slate-400 mt-1 text-[10px]">Chargement...</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-amber-500/10">
+                    {pendingOpeningRequests.map((request: any) => (
+                      <div
+                        key={request.transfert?.id || request.session?.id}
+                        className="p-2 hover:bg-amber-500/5 transition-colors"
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          {/* Request Info */}
+                          <div className="flex items-start gap-2">
+                            <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700">
+                              <User className="w-3 h-3 text-slate-400" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-white text-xs">
+                                  {request.caissierNom || request.transfert?.requestedByNom || 'Caissier'}
+                                </span>
+                                <span className="text-slate-500 text-[10px] gap-1 flex items-center">
+                                   • {request.caisseNom || request.transfert?.caisseDestinationNom || 'Caisse'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px]">
+                                <span className="text-amber-400 font-bold">
+                                  {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} FCFA
+                                </span>
+                                {request.soldeVeille > 0 && (
+                                  <span className="text-slate-500">
+                                    (+{Number(request.soldeVeille).toLocaleString()} veille)
+                                  </span>
+                                )}
+                              </div>
+                              {request.fundsRequestedAt && (
+                                <span className="text-[9px] text-slate-500 block">
+                                  {format(new Date(request.fundsRequestedAt), "dd/MM HH:mm", { locale: fr })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 ml-auto">
+                            {canValidate && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-6 px-2 text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                                  onClick={() => setConfirmAction({
+                                    type: 'validate-opening',
+                                    transfert: {
+                                      id: request.transfert?.id,
+                                      montant: request.montantDemande || request.transfert?.montant,
+                                      caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                      caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                      requestedByNom: request.transfert?.requestedByNom
+                                    }
+                                  })}
+                                  disabled={actionLoading === request.transfert?.id}
+                                >
+                                  {actionLoading === request.transfert?.id ? (
+                                    <Loader2 size={10} className="animate-spin" />
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 size={10} className="mr-1" />
+                                      Valid.
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-6 px-2 text-[9px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                                  onClick={() => setConfirmAction({
+                                    type: 'reject-opening',
+                                    transfert: {
+                                      id: request.transfert?.id,
+                                      montant: request.montantDemande || request.transfert?.montant,
+                                      caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
+                                      caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                      requestedByNom: request.transfert?.requestedByNom
+                                    }
+                                  })}
+                                  disabled={actionLoading === request.transfert?.id}
+                                >
+                                  <XCircle size={10} className="mr-1" />
+                                  Rej.
+                                </Button>
+                              </>
+                            )}
+                            {!canValidate && (
+                              <span className="text-[9px] text-slate-500 italic flex items-center gap-1">
+                                <Clock size={10} />
+                                En attente
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
+              <div className="p-2 border-b border-slate-800 flex justify-between items-center">
+                   <div className="flex items-center gap-2">
+                      <ArrowRightLeft className="text-blue-500" size={14} />
+                      <h3 className="font-bold text-white text-xs">Transferts</h3>
+                   </div>
+                   <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => refetch()}
+                      disabled={isRefetchingTransferts}
+                      className="h-7 px-2 text-[10px] text-slate-400 hover:text-white"
+                   >
+                      <Loader2 
+                          size={12} 
+                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-blue-400' : 'text-slate-400'}`} 
+                      />
+                      Act.
+                   </Button>
+              </div>
+              
+              <ResponsiveTable 
+                  data={transferts}
+                  columns={columns}
+                  emptyMessage="Aucune demande de transfert en cours."
+                  density="compact"
+              />
+            </Card>
+            </>
+          )}
+      </div>
 
       {/* Dialogue de confirmation pour les actions */}
       <ConfirmDialog
