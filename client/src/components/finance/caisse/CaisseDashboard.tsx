@@ -447,13 +447,13 @@ export default function CaisseDashboard({
   };
 
   // Calcul des entrées/sorties en utilisant les helpers centralisés
-  const totalEntrees = transactions
-    .filter(t => isIncomingOperation(t.type_operation))
-    .reduce((sum, t) => sum + toNumber(t.montant), 0);
+  const entreesOps = transactions.filter(t => isIncomingOperation(t.type_operation));
+  const sortiesOps = transactions.filter(t => isOutgoingOperation(t.type_operation));
 
-  const totalSorties = transactions
-    .filter(t => isOutgoingOperation(t.type_operation))
-    .reduce((sum, t) => sum + toNumber(t.montant), 0);
+  const totalEntrees = entreesOps.reduce((sum, t) => sum + toNumber(t.montant), 0);
+  const totalSorties = sortiesOps.reduce((sum, t) => sum + toNumber(t.montant), 0);
+  const nbEntrees = entreesOps.length;
+  const nbSorties = sortiesOps.length;
 
   // Use montant_ouverture (the actual DB field) with fallback to solde_initial for backwards compatibility
   // When no session is active, show available balance from assigned caisse
@@ -887,28 +887,46 @@ export default function CaisseDashboard({
       {/* Top Session Stats - Compact View */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <StatCard
-             title="Solde de Session" 
-             value={soldeActuel}
+             title="Solde de Session"
+             value={`${formattedMoney(soldeActuel)} FCFA`}
              icon={Wallet}
              color="primary"
-             subtitle={currentSession ? `Initial: ${formattedMoney(toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial))} F` : (availableBalance > 0 ? "Fonds disponibles" : "Session Fermée")}
+             subtitle={currentSession ? `Initial: ${formattedMoney(toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial))} FCFA` : (availableBalance > 0 ? "Fonds disponibles" : "Session Fermée")}
+             trend={(() => {
+               if (!currentSession) return undefined;
+               const initial = toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial);
+               if (initial <= 0) return undefined;
+               const variation = Math.round(((soldeActuel - initial) / initial) * 100);
+               return variation >= 0 ? `+${variation}%` : `${variation}%`;
+             })()}
+             trendUp={currentSession ? soldeActuel >= toNumber((currentSession as any).montant_ouverture || currentSession.solde_initial) : undefined}
              className="shadow-sm"
           />
           <StatCard
-             title="Entrées" 
-             value={totalEntrees}
+             title="Entrées"
+             value={`${formattedMoney(totalEntrees)} FCFA`}
              icon={ArrowDownRight}
              color="success"
-             trend="+0%"
-             trendUp={true}
+             subtitle={nbEntrees > 0 ? `${nbEntrees} opération${nbEntrees > 1 ? 's' : ''}` : undefined}
+             trend={(() => {
+               const totalFlux = totalEntrees + totalSorties;
+               if (totalFlux <= 0) return undefined;
+               return `${Math.round((totalEntrees / totalFlux) * 100)}% du flux`;
+             })()}
+             trendUp={totalEntrees > 0}
              className="shadow-sm"
           />
            <StatCard
-             title="Sorties" 
-             value={totalSorties}
+             title="Sorties"
+             value={`${formattedMoney(totalSorties)} FCFA`}
              icon={ArrowUpRight}
-             color="warning" 
-             trend="-0%"
+             color="warning"
+             subtitle={nbSorties > 0 ? `${nbSorties} opération${nbSorties > 1 ? 's' : ''}` : undefined}
+             trend={(() => {
+               const totalFlux = totalEntrees + totalSorties;
+               if (totalFlux <= 0) return undefined;
+               return `${Math.round((totalSorties / totalFlux) * 100)}% du flux`;
+             })()}
              trendUp={false}
              className="shadow-sm"
           />

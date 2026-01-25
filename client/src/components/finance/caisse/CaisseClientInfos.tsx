@@ -8,8 +8,8 @@ import { Card, Button, Badge } from '@/components/ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
-import { formatClientName } from '@/lib/format';
-import { clientSearchApi } from '@/lib/api-client';
+import { formatClientName, resolveStorageUrl } from '@/lib/format';
+import { clientSearchApi, compteEpargneApi } from '@/lib/api-client';
 
 interface SecurityLimits {
   daily: { limit: number, used: number, remaining: number };
@@ -25,7 +25,11 @@ interface Client {
   telephone: string;
   email?: string;
   photoProfile?: string;
+  photoUrl?: string;
+  photo_url?: string;
   kycStatus: string;
+  segment?: string;
+  agence_nom?: string;
   soldeEpargne?: number;
   epargneTotal?: number;
   epargne_total?: number;
@@ -52,16 +56,25 @@ export default function CaisseClientInfos() {
   
   const canEditLimits = hasPermission('clients', 'edit') || hasPermission('caisse', 'manage');
 
-  // Fetch Full Client Details
+  // Fetch Full Client Details (avec refresh périodique pour KYC temps réel)
   const { data: client, isLoading: loadingClient } = useQuery({
     queryKey: ['clients', selectedClientId],
     queryFn: async () => {
       if (!selectedClientId) return null;
-      const res = await fetch(`/api/clients/${selectedClientId}`);
-      if (!res.ok) throw new Error('Client introuvable loading');
+      const res = await fetch(`/api/clients/${selectedClientId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Client introuvable');
       return res.json();
     },
-    enabled: !!selectedClientId
+    enabled: !!selectedClientId,
+    refetchInterval: 15000, // Rafraîchir toutes les 15s pour KYC et données client
+  });
+
+  // Fetch client accounts for balance breakdown
+  const { data: clientAccounts = [] } = useQuery({
+    queryKey: ['comptes', 'client', selectedClientId],
+    queryFn: () => compteEpargneApi.getByClient(selectedClientId!),
+    enabled: !!selectedClientId,
+    refetchInterval: 30000,
   });
 
   // Recent Transactions (Mocked or fetched if endpoint exists)
@@ -182,7 +195,18 @@ export default function CaisseClientInfos() {
   };
 
   const limits = client?.security_limits;
-  const balance = client ? (client.epargneTotal || client.epargne_total || 0) : 0;
+
+  // Calculer le solde total et la répartition par type de compte
+  const accountBreakdown = clientAccounts.reduce((acc: Record<string, number>, compte: any) => {
+    const type = compte.typeCompte || compte.type_compte || 'Autre';
+    const solde = Number(compte.soldeCourant || compte.solde_courant || 0);
+    acc[type] = (acc[type] || 0) + solde;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const balance = clientAccounts.length > 0
+    ? clientAccounts.reduce((sum: number, c: any) => sum + Number(c.soldeCourant || c.solde_courant || 0), 0)
+    : (client ? Number(client.epargneTotal || client.epargne_total || 0) : 0);
   
   // Risk Level Simulation (Mock)
   const getRiskLevel = (status: string) => {
@@ -237,8 +261,8 @@ export default function CaisseClientInfos() {
                              <div className="flex items-start gap-4 mb-4">
                                 <div className="relative">
                                     <div className="w-14 h-14 rounded-full bg-slate-800 border border-slate-700 overflow-hidden">
-                                        {client.photoProfile || client.photo_url ? (
-                                            <img src={client.photoProfile || client.photo_url} alt="Client" className="w-full h-full object-cover" />
+                                        {(client.photoProfile || client.photoUrl || client.photo_url) ? (
+                                            <img src={resolveStorageUrl(client.photoProfile || client.photoUrl || client.photo_url)} alt="Client" className="w-full h-full object-cover" />
                                         ) : (
                                             <User className="w-full h-full p-3 text-slate-500" />
                                         )}
@@ -249,8 +273,13 @@ export default function CaisseClientInfos() {
                                     <h2 className="text-base font-bold text-white truncate leading-tight mb-1">
                                         {formatClientName(client.nom, client.prenom)}
                                     </h2>
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="neutral" className="text-[10px] h-5 bg-slate-800 border-slate-700" value={client.id} />
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {client.segment && (
+                                            <Badge variant="neutral" className="text-[10px] h-5 bg-slate-800 border-slate-700" value={client.segment} />
+                                        )}
+                                        {client.agence_nom && (
+                                            <Badge variant="neutral" className="text-[10px] h-5 bg-slate-800 border-slate-700" value={client.agence_nom} />
+                                        )}
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${risk?.bgBadge} ${risk?.text}`}>
                                             {risk?.label}
                                         </span>
@@ -381,8 +410,30 @@ export default function CaisseClientInfos() {
                             {new Intl.NumberFormat('fr-FR').format(balance)}
                             <span className="text-2xl text-slate-600 font-medium ml-2">FCFA</span>
                          </h1>
+                         {/* Répartition par compte */}
+                         {clientAccounts.length > 0 && (
+                           <div className="flex flex-wrap gap-3 mt-3">
+                             {clientAccounts.map((compte: any) => {
+                               const type = compte.typeCompte || compte.type_compte || 'Autre';
+                               const solde = Number(compte.soldeCourant || compte.solde_courant || 0);
+                               const numero = compte.numeroCompte || compte.numero_compte || '';
+                               const label = type === 'SAVINGS' ? 'Épargne' : type === 'CURRENT' ? 'Courant' : type === 'BLOCKED' ? 'Bloqué' : type;
+                               const color = type === 'SAVINGS' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                            : type === 'CURRENT' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                                            : type === 'BLOCKED' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                                            : 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+                               return (
+                                 <div key={compte.id} className={`px-3 py-1.5 rounded-lg border text-xs ${color}`}>
+                                   <span className="font-medium">{label}</span>
+                                   <span className="ml-2 font-bold font-mono">{new Intl.NumberFormat('fr-FR').format(solde)}</span>
+                                   {numero && <span className="ml-1 opacity-60 text-[10px]">({numero.slice(-8)})</span>}
+                                 </div>
+                               );
+                             })}
+                           </div>
+                         )}
                      </div>
-                     <div className="flex gap-3 w-full md:w-auto">
+                     <div className="flex gap-3 w-full md:w-auto shrink-0">
                         <button
                             onClick={() => openTransactionModal('Dépôt')}
                             className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20 active:scale-95 transition-all flex items-center justify-center gap-2"
