@@ -7,6 +7,7 @@ interface SwitchProps {
   className?: string;
   'data-testid'?: string;
   ariaLabel?: string;
+  size?: 'sm' | 'md';
 }
 
 export default function Switch({
@@ -16,7 +17,25 @@ export default function Switch({
   className = '',
   'data-testid': testId,
   ariaLabel,
+  size = 'md',
 }: SwitchProps) {
+  const sizeClasses = {
+    sm: {
+      button: 'h-5 w-9',
+      span: 'h-3.5 w-3.5',
+      translate: 'translate-x-5',
+      translateOff: 'translate-x-0.5'
+    },
+    md: {
+      button: 'h-7 w-12',
+      span: 'h-5 w-5',
+      translate: 'translate-x-6',
+      translateOff: 'translate-x-1'
+    }
+  };
+
+  const currentSize = sizeClasses[size] || sizeClasses.md;
+
   return (
     <button
       type="button"
@@ -26,7 +45,7 @@ export default function Switch({
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}
       className={`
-        relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+        relative inline-flex ${currentSize.button} items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         ${checked ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${className}
@@ -35,8 +54,8 @@ export default function Switch({
     >
       <span
         className={`
-          inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
-          ${checked ? 'translate-x-6' : 'translate-x-1'}
+          inline-block ${currentSize.span} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+          ${checked ? currentSize.translate : currentSize.translateOff}
         `}
       />
     </button>

@@ -81,21 +81,21 @@ const ConfigSection = ({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-card transition-all duration-200 shadow-sm hover:shadow-md">
+    <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-card transition-all duration-200 shadow-sm hover:shadow-md h-fit">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
+        className="w-full flex items-center justify-between p-3 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
-            <Icon className="h-5 w-5" />
+          <div className="p-1.5 bg-primary/10 rounded-md text-primary shrink-0">
+            <Icon className="h-4 w-4" />
           </div>
           <div>
-            <div className="font-semibold text-lg">{title}</div>
-            {description && <div className="text-sm text-muted-foreground font-normal mt-0.5">{description}</div>}
+            <div className="font-semibold text-sm">{title}</div>
+            {description && <div className="text-xs text-muted-foreground font-normal mt-0.5 line-clamp-1">{description}</div>}
           </div>
         </div>
-        {isOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+        {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
       
       <AnimatePresence>
@@ -106,7 +106,7 @@ const ConfigSection = ({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="p-5 space-y-6 border-t border-slate-100 dark:border-slate-800">
+            <div className="p-3 space-y-4 border-t border-slate-100 dark:border-slate-800">
               {children}
             </div>
           </motion.div>
@@ -130,15 +130,15 @@ const ConfigToggle = ({
   onChange: (val: boolean) => void;
   scope?: 'global' | 'guichet' | 'audit';
 }) => (
-  <div className="flex items-center justify-between py-2">
-    <div className="space-y-0.5 pr-4">
-      <label className="text-base font-medium flex items-center">
+  <div className="flex items-center justify-between py-1.5">
+    <div className="space-y-0.5 pr-4 flex-1">
+      <label className="text-sm font-medium flex items-center">
         {label}
         {scope && <ScopeBadge type={scope} />}
       </label>
-      <div className="text-xs text-muted-foreground leading-snug">{description}</div>
+      <div className="text-[10px] text-muted-foreground leading-snug">{description}</div>
     </div>
-    <Switch checked={checked} onChange={onChange} />
+    <Switch checked={checked} onChange={onChange} size="sm" />
   </div>
 );
 
@@ -236,243 +236,235 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-20">
+    <div className="flex flex-col h-full overflow-y-auto px-1 pb-24 space-y-3 custom-scrollbar">
       
-      {/* Header Warning */}
-      <div className="bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex gap-4 items-start">
-        <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full shrink-0">
-            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500" />
+      {/* Header Warning - Compact */}
+      <div className="bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex gap-3 items-center shrink-0">
+        <div className="p-1.5 bg-amber-100 dark:bg-amber-900/50 rounded-full shrink-0">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
         </div>
-        <div>
-          <h4 className="font-semibold text-amber-800 dark:text-amber-400">Zone d'administration sensible</h4>
-          <p className="text-sm text-amber-700 dark:text-amber-500 mt-1 leading-relaxed">
-            Les modifications appliquées ici impactent immédiatement toutes les opérations de coffre et de transfert pour cette agence.
-          </p>
+        <div className="flex-1">
+          <h4 className="font-semibold text-sm text-amber-800 dark:text-amber-400 flex items-center gap-2">
+            Zone d'administration sensible
+          </h4>
         </div>
       </div>
 
-      {/* 1. Sécurité & Workflow */}
-      <ConfigSection 
-        title="Sécurité et Workflow" 
-        icon={ShieldAlert} 
-        defaultOpen
-        description="Gérez les accès, les horaires et les règles de validation"
-      >
-        <ConfigToggle 
-            label="Double Validation"
-            description="Exiger une validation par un supérieur pour les montants importants"
-            checked={config.separationInitiateurValideur}
-            onChange={(c) => setConfig(p => ({ ...p, separationInitiateurValideur: c }))}
-            scope="guichet"
-        />
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            <FormField 
-                label="Seuil Double Validation (FCFA)"
-                name="seuilDoubleValidation"
-                type="number"
-                value={config.seuilDoubleValidation}
-                onChange={(e) => setConfig(p => ({ ...p, seuilDoubleValidation: Number(e.target.value) }))}
-                helperText={<span className="flex items-center gap-2 mt-1">
-                  <ScopeBadge type="guichet" />
-                  <span>Validation requise au-delà de ce montant</span>
-                </span>}
-            />
-            <FormField 
-                label="Tentatives Max / Jour"
-                name="tentativesMax"
-                type="number"
-                value={config.tentativesMaxParJour}
-                onChange={(e) => setConfig(p => ({ ...p, tentativasMaxParJour: Number(e.target.value) }))}
-                helperText={<span className="flex items-center gap-2 mt-1">
-                   <ScopeBadge type="global" />
-                   <span>Blocage automatique après X échecs</span>
-                </span>}
-            />
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-8">
+        {/* 1. Sécurité & Workflow */}
+        <ConfigSection 
+          title="Sécurité et Workflow" 
+          icon={ShieldAlert} 
+          defaultOpen
+          description="Contrôle d'accès et validation"
+        >
+          <ConfigToggle 
+              label="Double Validation"
+              description="Validation par supérieur requise"
+              checked={config.separationInitiateurValideur}
+              onChange={(c) => setConfig(p => ({ ...p, separationInitiateurValideur: c }))}
+              scope="guichet"
+          />
+          
+          <div className="grid grid-cols-2 gap-3 pt-1">
+              <FormField 
+                  label="Seuil Double Val. (FCFA)"
+                  name="seuilDoubleValidation"
+                  type="number"
+                  value={config.seuilDoubleValidation}
+                  onChange={(e) => setConfig(p => ({ ...p, seuilDoubleValidation: Number(e.target.value) }))}
+                  className="mb-0"
+              />
+              <FormField 
+                  label="Tentatives Max / Jour"
+                  name="tentativesMax"
+                  type="number"
+                  value={config.tentativesMaxParJour}
+                  onChange={(e) => setConfig(p => ({ ...p, tentativasMaxParJour: Number(e.target.value) }))}
+                  className="mb-0"
+              />
+          </div>
 
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-            <h5 className="font-medium mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="w-4 h-4" /> Horaires d'Ouverture <ScopeBadge type="global" />
-            </h5>
-            <div className="flex gap-4 mb-4">
-                <div className="flex-1">
-                    <label className="text-xs font-semibold mb-1 block">Ouverture</label>
-                    <input 
-                        type="time" 
-                        value={config.horairesOuverture.debut}
-                        onChange={(e) => setConfig(p => ({ ...p, horairesOuverture: { ...p.horairesOuverture, debut: e.target.value } }))}
-                        className="w-full p-2 rounded-md border bg-background"
-                    />
-                </div>
-                <div className="flex-1">
-                    <label className="text-xs font-semibold mb-1 block">Fermeture</label>
-                    <input 
-                        type="time" 
-                        value={config.horairesOuverture.fin}
-                        onChange={(e) => setConfig(p => ({ ...p, horairesOuverture: { ...p.horairesOuverture, fin: e.target.value } }))}
-                        className="w-full p-2 rounded-md border bg-background"
-                    />
-                </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-                {DAYS.map(day => (
-                    <button
-                        key={day}
-                        onClick={() => toggleDay(day)}
-                        className={cn(
-                            "px-3 py-1.5 rounded-full text-xs font-medium transition-all text-white", // Increased specificity for text color
-                            config.joursOuvrables.includes(day) 
-                                ? "bg-primary shadow-sm hover:bg-primary/90" 
-                                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200"
-                        )}
-                        style={config.joursOuvrables.includes(day) ? { color: 'white' } : {}} // Forced inline style fallback
-                    >
-                        {day.slice(0, 3)}
-                    </button>
-                ))}
-            </div>
-        </div>
-      </ConfigSection>
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <h5 className="font-medium mb-2 flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider">
+                  Horaires d'Ouverture
+              </h5>
+              <div className="flex gap-2 mb-3">
+                  <div className="flex-1">
+                      <input 
+                          type="time" 
+                          value={config.horairesOuverture.debut}
+                          onChange={(e) => setConfig(p => ({ ...p, horairesOuverture: { ...p.horairesOuverture, debut: e.target.value } }))}
+                          className="w-full p-1.5 text-xs rounded-md border bg-background"
+                      />
+                  </div>
+                  <div className="flex-1">
+                      <input 
+                          type="time" 
+                          value={config.horairesOuverture.fin}
+                          onChange={(e) => setConfig(p => ({ ...p, horairesOuverture: { ...p.horairesOuverture, fin: e.target.value } }))}
+                          className="w-full p-1.5 text-xs rounded-md border bg-background"
+                      />
+                  </div>
+              </div>
+              
+              <div className="flex flex-wrap gap-1.5">
+                  {DAYS.map(day => (
+                      <button
+                          key={day}
+                          onClick={() => toggleDay(day)}
+                          className={cn(
+                              "px-2 py-1 rounded text-[10px] font-medium transition-all",
+                              config.joursOuvrables.includes(day) 
+                                  ? "bg-primary text-primary-foreground shadow-sm" 
+                                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200"
+                          )}
+                      >
+                          {day.slice(0, 3)}
+                      </button>
+                  ))}
+              </div>
+          </div>
+        </ConfigSection>
 
-      {/* 2. Limites Financières */}
-      <ConfigSection 
-        title="Limites Financières" 
-        icon={Coins}
-        description="Plafonds et montants autorisés pour les transferts"
-      >
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField 
-                label="Montant Min par Transfert"
-                name="minTransfert"
-                type="number"
-                value={config.montantMinTransfert}
-                onChange={(e) => setConfig(p => ({ ...p, montantMinTransfert: Number(e.target.value) }))}
-                helperText={<div className="flex items-center gap-2 mt-1"><ScopeBadge type="guichet" /></div>}
-            />
-             <FormField 
-                label="Montant Max par Transfert"
-                name="maxTransfert"
-                type="number"
-                placeholder="Illimité"
-                value={config.montantMaxTransfert || ''}
-                onChange={(e) => setConfig(p => ({ ...p, montantMaxTransfert: e.target.value ? Number(e.target.value) : null }))}
-                helperText={<div className="flex items-center gap-2 mt-1"><ScopeBadge type="guichet" /></div>}
-            />
-             <FormField 
-                label="Plafond Journalier Sortant"
-                name="plafondOut"
-                type="number"
-                placeholder="Illimité"
-                value={config.plafondJournalierSortant || ''}
-                onChange={(e) => setConfig(p => ({ ...p, plafondJournalierSortant: e.target.value ? Number(e.target.value) : null }))}
-                helperText={<div className="flex items-center gap-2 mt-1"><ScopeBadge type="global" /> <span>Tous débits confondus</span></div>}
-            />
-             <FormField 
-                label="Plafond Journalier Entrant"
-                name="plafondIn"
-                type="number"
-                placeholder="Illimité"
-                value={config.plafondJournalierEntrant || ''}
-                onChange={(e) => setConfig(p => ({ ...p, plafondJournalierEntrant: e.target.value ? Number(e.target.value) : null }))}
-                helperText={<div className="flex items-center gap-2 mt-1"><ScopeBadge type="global" /> <span>Tous crédits confondus</span></div>}
-            />
-         </div>
-      </ConfigSection>
+        {/* 2. Limites Financières */}
+        <ConfigSection 
+          title="Limites Financières" 
+          icon={Coins}
+          description="Plafonds et seuils"
+          defaultOpen
+        >
+           <div className="grid grid-cols-2 gap-3">
+              <FormField 
+                  label="Min par Transfert"
+                  name="minTransfert"
+                  type="number"
+                  value={config.montantMinTransfert}
+                  onChange={(e) => setConfig(p => ({ ...p, montantMinTransfert: Number(e.target.value) }))}
+                  className="mb-0"
+              />
+               <FormField 
+                  label="Max par Transfert"
+                  name="maxTransfert"
+                  type="number"
+                  placeholder="Illimité"
+                  value={config.montantMaxTransfert || ''}
+                  onChange={(e) => setConfig(p => ({ ...p, montantMaxTransfert: e.target.value ? Number(e.target.value) : null }))}
+                  className="mb-0"
+              />
+               <FormField 
+                  label="Plafond Sortant /Jour"
+                  name="plafondOut"
+                  type="number"
+                  placeholder="Illimité"
+                  value={config.plafondJournalierSortant || ''}
+                  onChange={(e) => setConfig(p => ({ ...p, plafondJournalierSortant: e.target.value ? Number(e.target.value) : null }))}
+                  className="mb-0"
+              />
+               <FormField 
+                  label="Plafond Entrant /Jour"
+                  name="plafondIn"
+                  type="number"
+                  placeholder="Illimité"
+                  value={config.plafondJournalierEntrant || ''}
+                  onChange={(e) => setConfig(p => ({ ...p, plafondJournalierEntrant: e.target.value ? Number(e.target.value) : null }))}
+                  className="mb-0"
+              />
+           </div>
+        </ConfigSection>
 
-      {/* 3. Alertes et Surveillance */}
-      <ConfigSection 
-        title="Alertes et Seuils" 
-        icon={Bell}
-        description="Configuration des niveaux d'alerte sur le solde"
-      >
-         <ConfigToggle 
-            label="Alertes Email"
-            description="Envoyer des emails aux administrateurs en cas d'alerte critique"
-            checked={config.alerteEmailActif}
-            onChange={(c) => setConfig(p => ({ ...p, alerteEmailActif: c }))}
-            scope="global"
-         />
+        {/* 3. Alertes et Surveillance */}
+        <ConfigSection 
+          title="Alertes et Seuils" 
+          icon={Bell}
+          description="Niveaux d'alerte solde"
+          defaultOpen
+        >
+           <ConfigToggle 
+              label="Alertes Email"
+              description="Notifier les admins"
+              checked={config.alerteEmailActif}
+              onChange={(c) => setConfig(p => ({ ...p, alerteEmailActif: c }))}
+              scope="global"
+           />
 
-         <div className="grid grid-cols-1 gap-6 pt-2">
-            <div>
-                 <label className="text-sm font-medium mb-2 block text-amber-600">Seuil d'Alerte Basse (Orange)</label>
-                 <div className="flex gap-4 items-center">
-                    <input 
-                        type="range" min="0" max="10000000" step="100000"
-                        value={config.seuilSoldeMin}
-                        onChange={(e) => setConfig(p => ({ ...p, seuilSoldeMin: Number(e.target.value) }))}
-                        className="flex-1 h-2 bg-amber-100 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <span className="font-mono text-sm w-32 text-right">{config.seuilSoldeMin.toLocaleString()} FCFA</span>
-                 </div>
-            </div>
+           <div className="space-y-3 pt-1">
+              <div>
+                   <label className="text-xs font-medium mb-1.5 block text-amber-600 flex justify-between">
+                      <span>Seuil Alerte (Orange)</span>
+                      <span className="font-mono">{config.seuilSoldeMin.toLocaleString()} F</span>
+                   </label>
+                   <input 
+                       type="range" min="0" max="10000000" step="100000"
+                       value={config.seuilSoldeMin}
+                       onChange={(e) => setConfig(p => ({ ...p, seuilSoldeMin: Number(e.target.value) }))}
+                       className="w-full h-1.5 bg-amber-100 rounded-lg appearance-none cursor-pointer"
+                   />
+              </div>
 
-            <div>
-                 <label className="text-sm font-medium mb-2 block text-red-600">Seuil Critique (Rouge)</label>
-                 <div className="flex gap-4 items-center">
-                    <input 
-                        type="range" min="0" max="5000000" step="50000"
-                        value={config.seuilSoldeCritique}
-                        onChange={(e) => setConfig(p => ({ ...p, seuilSoldeCritique: Number(e.target.value) }))}
-                        className="flex-1 h-2 bg-red-100 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <span className="font-mono text-sm w-32 text-right">{config.seuilSoldeCritique.toLocaleString()} FCFA</span>
-                 </div>
-            </div>
-         </div>
-      </ConfigSection>
+              <div>
+                   <label className="text-xs font-medium mb-1.5 block text-red-600 flex justify-between">
+                      <span>Seuil Critique (Rouge)</span>
+                      <span className="font-mono">{config.seuilSoldeCritique.toLocaleString()} F</span>
+                   </label>
+                   <input 
+                       type="range" min="0" max="5000000" step="50000"
+                       value={config.seuilSoldeCritique}
+                       onChange={(e) => setConfig(p => ({ ...p, seuilSoldeCritique: Number(e.target.value) }))}
+                       className="w-full h-1.5 bg-red-100 rounded-lg appearance-none cursor-pointer"
+                   />
+              </div>
+           </div>
+        </ConfigSection>
 
-      {/* 4. Audit et Conformité */}
-      <ConfigSection 
-        title="Audit et Conformité" 
-        icon={FileCheck}
-        description="Traçabilité et règles de conformité"
-      >
-        <ConfigToggle 
-            label="Justificatif Obligatoire"
-            description="Exiger un document joint pour tout mouvement sortant"
-            checked={config.justificatifObligatoire}
-            onChange={(c) => setConfig(p => ({ ...p, justificatifObligatoire: c }))}
-            scope="guichet"
-        />
-        <ConfigToggle 
-            label="Double Comptage"
-            description="Exiger la validation de deux personnes pour les inventaires"
-            checked={config.comptageDoublePersonne}
-            onChange={(c) => setConfig(p => ({ ...p, comptageDoublePersonne: c }))}
-            scope="audit"
-        />
-         <div className="pt-2">
-            <FormField 
-                label="Billetage obligatoire si montant >"
-                name="billetageLimit"
-                type="number"
-                placeholder="Toujours optionnel"
-                value={config.billetageObligatoireSiMontantSup || ''}
-                onChange={(e) => setConfig(p => ({ ...p, billetageObligatoireSiMontantSup: e.target.value ? Number(e.target.value) : null }))}
-                helperText={<div className="flex items-center gap-2 mt-1">
-                   <ScopeBadge type="audit" />
-                   <span>Exiger le détail des billets pour les gros montants</span>
-                </div>}
-            />
-         </div>
-      </ConfigSection>
+        {/* 4. Audit et Conformité */}
+        <ConfigSection 
+          title="Audit et Conformité" 
+          icon={FileCheck}
+          description="Traçabilité"
+          defaultOpen
+        >
+          <ConfigToggle 
+              label="Justificatif Obligatoire"
+              description="Doc joint requis (Sortie)"
+              checked={config.justificatifObligatoire}
+              onChange={(c) => setConfig(p => ({ ...p, justificatifObligatoire: c }))}
+              scope="guichet"
+          />
+          <ConfigToggle 
+              label="Double Comptage"
+              description="Inventaire à 2 personnes"
+              checked={config.comptageDoublePersonne}
+              onChange={(c) => setConfig(p => ({ ...p, comptageDoublePersonne: c }))}
+              scope="audit"
+          />
+           <div className="pt-1">
+              <FormField 
+                  label="Billetage obligatoire si >"
+                  name="billetageLimit"
+                  type="number"
+                  placeholder="Optionnel"
+                  value={config.billetageObligatoireSiMontantSup || ''}
+                  onChange={(e) => setConfig(p => ({ ...p, billetageObligatoireSiMontantSup: e.target.value ? Number(e.target.value) : null }))}
+                  className="mb-0"
+              />
+           </div>
+        </ConfigSection>
+      </div>
 
-       {/* Floating Save Button on Mobile, regular on Desktop if preferred, but here sticky bottom is nice */}
-       <div className="fixed bottom-6 left-0 right-0 px-4 md:static md:p-0 flex justify-center z-50 pointer-events-none">
+       {/* Floating Save Button */}
+       <div className="fixed bottom-4 right-4 z-50">
             <Button 
                 onClick={handleSave} 
                 className={cn(
-                    "shadow-xl rounded-full px-8 py-6 text-lg font-semibold pointer-events-auto transition-transform active:scale-95",
+                    "shadow-xl rounded-full px-6 py-3 h-auto text-sm font-semibold transition-transform active:scale-95 bg-primary hover:bg-primary/90 text-primary-foreground",
                     saving ? "opacity-80" : "hover:scale-105"
                 )}
                 disabled={saving || loading}
                 isLoading={saving}
             >
-                <Save className="mr-2 h-5 w-5" />
-                Enregistrer la configuration
+                <Save className="mr-2 h-4 w-4" />
+                Enregistrer
             </Button>
        </div>
 

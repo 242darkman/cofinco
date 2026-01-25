@@ -5,8 +5,8 @@ import {
   Search, Calendar, RefreshCcw, ChevronLeft, ChevronRight, X
 } from 'lucide-react';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Legend, Area
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { Card, Button, Badge } from '../ui';
 import { api } from '../../lib/api-client';
@@ -216,311 +216,290 @@ export function TreasurySupervision() {
   const isPositive = globalGrowth >= 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Supervision Trésorerie</h1>
-          <p className="text-muted-foreground">Vue temps réel des fonds disponibles ({globalStats?.breakdown.length} agences connectées).</p>
+    <div className="flex flex-col h-full space-y-2 overflow-hidden animate-in fade-in duration-500 pt-1">
+      {/* 1. Header & Actions - Compact */}
+      <div className="shrink-0 flex items-center justify-between px-1">
+        <div className="flex items-center gap-3">
+             <div className="bg-primary/20 p-2 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-primary" />
+             </div>
+             <div>
+                <h1 className="text-lg font-bold tracking-tight">Supervision Trésorerie</h1>
+                <p className="text-[10px] text-muted-foreground">Vue temps réel ({globalStats?.breakdown.length} agences)</p>
+             </div>
         </div>
         <div className="flex items-center gap-2">
              {selectedAgencies.length > 0 && (
-                 <Button variant="outline" size="sm" onClick={() => setSelectedAgencies([])} className="mr-2">
-                     <X size={14} className="mr-2"/>
-                     Réinitialiser vue
+                 <Button variant="outline" size="sm" onClick={() => setSelectedAgencies([])} className="h-7 text-xs mr-1">
+                     <X size={12} className="mr-1"/>
+                     Reset
                  </Button>
              )}
-            <Button variant="ghost" size="sm" onClick={() => refetchGlobal()} icon={RefreshCcw}>
-            Actualiser
+            <Button variant="ghost" size="sm" onClick={() => refetchGlobal()} className="h-7 w-7 p-0 rounded-full">
+               <RefreshCcw size={14} />
             </Button>
         </div>
       </div>
 
-      {/* Global Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Total Cash */}
-        <Card className="col-span-1 md:col-span-2 relative overflow-hidden bg-gradient-to-br from-card to-background border-primary/20">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <DollarSign size={180} />
-          </div>
-          <div className="p-6 relative z-10">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">Trésorerie Globale Réseau</h3>
-            <div className="flex items-baseline gap-3">
-              <span className="text-5xl md:text-6xl font-black font-mono tracking-tighter text-foreground">
-                {formatCurrency(globalStats?.globalBalance || 0)} 
-              </span>
-              <span className="text-xl font-semibold text-muted-foreground opacity-70">FCFA</span>
-            </div>
-            
-            <div className={`inline-flex items-center gap-2 mt-5 text-sm font-bold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-              <div className={`flex items-center px-2.5 py-1 rounded-full ${isPositive ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                {isPositive ? <TrendingUp size={16} className="mr-1.5" /> : <TrendingDown size={16} className="mr-1.5" />}
-                {Math.abs(globalGrowth).toFixed(2)}%
-              </div>
-              <span className="text-muted-foreground font-medium italic opacity-60">evolution sur 24h</span>
-            </div>
-          </div>
-        </Card>
+      {/* 2. Main Scrollable Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1 space-y-4 pb-4">
+          
+          {/* Top Stats Row - Compact */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
+             <Card className="relative overflow-hidden bg-gradient-to-r from-blue-900/40 to-slate-900/40 border-blue-500/20 p-3 flex items-center justify-between">
+                <div>
+                   <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-0.5">Trésorerie Globale</p>
+                   <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black font-mono tracking-tighter text-foreground">
+                        {formatCurrency(globalStats?.globalBalance || 0)} 
+                      </span>
+                      <span className="text-sm font-medium text-muted-foreground">FCFA</span>
+                   </div>
+                </div>
+                <div className={`flex flex-col items-end ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                   <div className={`flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${isPositive ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                     {isPositive ? <TrendingUp size={14} className="mr-1" /> : <TrendingDown size={14} className="mr-1" />}
+                     {Math.abs(globalGrowth).toFixed(2)}%
+                   </div>
+                   <span className="text-[10px] text-muted-foreground opacity-60 mt-0.5">24h</span>
+                </div>
+             </Card>
 
-        {/* Agency Summary */}
-        <Card className="flex flex-col justify-center p-6 bg-slate-900/[0.02] dark:bg-slate-900/40">
-           <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                 <Building2 size={24} />
-              </div>
-              <div>
-                 <h3 className="text-sm font-medium text-muted-foreground">Solde Moyen / Agence</h3>
-                 <span className="text-2xl font-bold">
-                    {globalStats?.breakdown.length ? 
-                        Math.round((globalStats.globalBalance / globalStats.breakdown.length)).toLocaleString() 
-                        : 0} 
-                    <span className="text-xs text-muted-foreground ml-1">FCFA</span>
-                </span>
-              </div>
-           </div>
-        </Card>
-      </div>
+             <Card className="bg-slate-900/20 border-slate-800 p-3 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                     <Building2 size={20} />
+                  </div>
+                  <div>
+                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Solde Moyen / Agence</p>
+                     <span className="text-xl font-bold text-foreground">
+                        {globalStats?.breakdown.length ? 
+                            Math.round((globalStats.globalBalance / globalStats.breakdown.length)).toLocaleString() 
+                            : 0} 
+                        <span className="text-xs text-muted-foreground ml-1 font-normal">FCFA</span>
+                    </span>
+                  </div>
+             </Card>
+          </div>
 
-      {/* Evolution Chart (Interactive) */}
-      <Card className="p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h3 className="font-bold text-lg flex items-center gap-2">
-                <Calendar size={20} className="text-primary" />
-                {getChartTitle()}
-            </h3>
-            {selectedAgencies.length === 0 ? (
-                <p className="text-sm text-muted-foreground mt-1">Sélectionnez une ou deux agences ci-dessous pour filtrer ce graphique.</p>
-            ) : (
-                <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedAgencies.map(id => {
+          {/* Chart Section - Enhanced Visuals */}
+          <Card className="p-4 shadow-sm border-slate-800 bg-slate-950/30">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm flex items-center gap-2 text-slate-200">
+                      <Calendar size={16} className="text-primary" />
+                      {getChartTitle()}
+                  </h3>
+                   {selectedAgencies.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 ml-2">
+                            {selectedAgencies.map(id => {
+                                const agence = globalStats?.breakdown.find(a => a.agenceId === id);
+                                return (
+                                    <div 
+                                        key={id} 
+                                        className="flex items-center gap-1 px-2 py-0.5 bg-slate-800 rounded-full border border-slate-700"
+                                    >
+                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getAgencyColor(id) }} />
+                                        <span className="text-[10px] font-medium text-slate-300">{agence?.agenceNom || 'Agence'}</span>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); toggleAgency(id); }}
+                                            className="ml-1 text-slate-500 hover:text-white"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                   )}
+              </div>
+              {isLoadingChart && <div className="text-[10px] text-muted-foreground animate-pulse">Mise à jour...</div>}
+            </div>
+
+            <div className="h-[320px] w-full">
+              {isLoadingChart ? (
+                <ChartSkeleton />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData || []} margin={{ top: 10, right: 0, left: 10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
+                      </linearGradient>
+                      {selectedAgencies.map(id => (
+                          <linearGradient key={`grad-${id}`} id={`color-${id}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={getAgencyColor(id)} stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor={getAgencyColor(id)} stopOpacity={0.05}/>
+                          </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(val) => {
+                          const d = new Date(val);
+                          return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+                      }}
+                      stroke="transparent"
+                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 500 }}
+                      tickLine={false}
+                      axisLine={false}
+                      dy={10}
+                      minTickGap={30}
+                    />
+                    <YAxis 
+                      domain={['auto', 'auto']}
+                      tickFormatter={(val) => {
+                          if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+                          return `${(val / 1000).toFixed(0)}k`;
+                      }}
+                      stroke="transparent"
+                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 500 }}
+                      tickLine={false}
+                      axisLine={false}
+                      dx={-5}
+                      width={45} 
+                    />
+                    <Tooltip 
+                      content={
+                        <CustomTooltip 
+                            agencyMap={globalStats?.breakdown.reduce((acc, a) => {
+                                acc[a.agenceId] = a.agenceNom;
+                                return acc;
+                            }, {} as Record<string, string>) || {}}
+                        />
+                      }
+                      cursor={{ stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    />
+                    <Legend 
+                       wrapperStyle={{ paddingTop: '10px' }}
+                       iconType="circle"
+                       formatter={(value) => <span className="text-xs text-slate-400 font-medium ml-1">{value}</span>}
+                    />
+                    
+                    {selectedAgencies.length === 0 ? (
+                      <Area 
+                        type="monotone" 
+                        dataKey="balance" 
+                        name="Flux Global"
+                        stroke="#3b82f6" 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorBalance)" 
+                        activeDot={{ r: 4, strokeWidth: 0, stroke: '#fff' }}
+                      />
+                    ) : (
+                      selectedAgencies.map((id) => {
                         const agence = globalStats?.breakdown.find(a => a.agenceId === id);
                         return (
-                            <div 
-                                key={id} 
-                                className="flex items-center gap-1.5 px-3 py-1 bg-secondary rounded-full border border-border group transition-all hover:border-primary/50"
-                            >
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getAgencyColor(id) }} />
-                                <span className="text-xs font-semibold">{agence?.agenceNom || 'Agence'}</span>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); toggleAgency(id); }}
-                                    className="ml-1 p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                    <X size={12} />
-                                </button>
-                            </div>
-                        );
-                    })}
-                    <span className="text-xs text-muted-foreground self-center ml-2 italic">Max 2 agences</span>
-                </div>
-            )}
-          </div>
-          {isLoadingChart && <div className="text-xs text-muted-foreground animate-pulse">Mise à jour graphique...</div>}
-        </div>
-
-        <div className="h-[350px] w-full">
-          {isLoadingChart ? (
-            <ChartSkeleton />
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData || []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.3} />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={(val) => {
-                      const d = new Date(val);
-                      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-                  }}
-                  stroke="transparent"
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
-                  tickLine={false}
-                  axisLine={false}
-                  dy={10}
-                  minTickGap={40}
-                  padding={{ left: 10, right: 10 }}
-                />
-                <YAxis 
-                  tickFormatter={(val) => {
-                      if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
-                      if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
-                      return val.toString();
-                  }}
-                  stroke="transparent"
-                  tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 500 }}
-                  tickLine={false}
-                  axisLine={false}
-                  dx={-5}
-                />
-                <Tooltip 
-                  content={
-                    <CustomTooltip 
-                        agencyMap={globalStats?.breakdown.reduce((acc, a) => {
-                            acc[a.agenceId] = a.agenceNom;
-                            return acc;
-                        }, {} as Record<string, string>) || {}}
-                    />
-                  }
-                />
-                <Legend 
-                   wrapperStyle={{ paddingTop: '20px' }}
-                   content={(props) => {
-                       const { payload } = props;
-                       if (!payload) return null;
-                       return (
-                           <div className="flex overflow-x-auto pb-2 scrollbar-hide gap-4 px-2 justify-center sm:justify-start">
-                               {payload.map((entry: any, index: number) => (
-                                   <div key={`item-${index}`} className="flex items-center gap-1.5 whitespace-nowrap">
-                                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                                       <span className="text-xs font-medium text-muted-foreground">{entry.value}</span>
-                                   </div>
-                               ))}
-                           </div>
-                       );
-                   }}
-                />
-                
-                {selectedAgencies.length === 0 ? (
-                  <Line 
-                    type="monotone" 
-                    dataKey="balance" 
-                    name="Trésorerie Globale"
-                    stroke="#3b82f6" 
-                    strokeWidth={4}
-                    dot={false}
-                    activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
-                    animationDuration={1500}
-                  />
-                ) : (
-                  selectedAgencies.map((id) => {
-                    const agence = globalStats?.breakdown.find(a => a.agenceId === id);
-                    return (
-                      <Line
-                        key={id}
-                        type="monotone"
-                        dataKey={id}
-                        name={agence?.agenceNom || 'Agence'}
-                        stroke={getAgencyColor(id)}
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                        animationDuration={1000}
-                      />
-                    );
-                  })
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </Card>
-
-      {/* Agency Grid (Paginated) */}
-      <div className="space-y-4">
-         <div className="flex flex-col sm:flex-row justify-between items-center bg-card p-4 rounded-xl border gap-4 shadow-sm">
-             <div className="flex items-center gap-3">
-                 <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                    <Building2 className="w-5 h-5" />
-                 </div>
-                 <div>
-                    <h3 className="font-semibold text-foreground">Agences du Réseau</h3>
-                    <p className="text-xs text-muted-foreground">{filteredAgencies.length} agences trouvées</p>
-                 </div>
-             </div>
-             
-             <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Filtrer par nom ou ville..."
-                  className="w-full pl-9 pr-4 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                />
-             </div>
-         </div>
-
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {paginatedAgencies.map((agency: TreasuryStats['breakdown'][0]) => {
-               const isSelected = selectedAgencies.includes(agency.agenceId);
-               return (
-               <Card 
-                    key={agency.agenceId} 
-                    className={cn(
-                        "cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-md group relative overflow-hidden",
-                        isSelected ? "ring-2 ring-primary border-primary bg-primary/[0.02]" : "hover:border-primary/50"
-                    )}
-                    onClick={() => toggleAgency(agency.agenceId)}
-               >
-                   {/* Selection Indicator */}
-                   {isSelected && (
-                       <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: getAgencyColor(agency.agenceId) }} />
-                   )}
-
-                  <div className="p-5">
-                      <div className="flex justify-between items-start mb-4">
-                          <div className={cn(
-                              "p-2 rounded-lg transition-colors",
-                              isSelected ? "bg-primary text-primary-foreground" : "bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-primary/10 group-hover:text-primary"
-                          )}>
-                              <Building2 className="w-4 h-4" />
-                          </div>
-                          <Badge 
-                            value={agency.solde > 0 ? 'Actif' : 'Vide'} 
-                            variant={agency.solde > 0 ? 'success' : 'neutral'} 
-                            className="text-xs"
+                          <Area
+                            key={id}
+                            type="monotone"
+                            dataKey={id}
+                            name={agence?.agenceNom || 'Agence'}
+                            stroke={getAgencyColor(id)}
+                            strokeWidth={3}
+                            fillOpacity={1}
+                            fill={`url(#color-${id})`}
+                            activeDot={{ r: 4, strokeWidth: 0, stroke: '#fff' }}
                           />
-                      </div>
-                      
-                      <h4 className="font-semibold text-base mb-1 truncate">{agency.agenceNom}</h4>
-                      <p className="text-xs text-muted-foreground mb-4 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700"></span>
-                          {agency.ville || 'Non localisé'}
-                      </p>
-                      
-                      <div className="pt-3 border-t border-border mt-auto">
-                          <div className="text-xl font-bold font-mono text-primary flex items-baseline gap-1">
-                              {agency.solde.toLocaleString()} 
-                              <span className="text-xs font-sans text-muted-foreground font-normal">FCFA</span>
+                        );
+                      })
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </Card>
+
+          {/* Agency Grid & Filter */}
+          <div className="space-y-3">
+             <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/20 p-2 rounded-lg border border-slate-800/50 gap-3">
+                 <div className="flex items-center gap-2">
+                     <Building2 className="w-4 h-4 text-slate-500" />
+                     <span className="text-xs font-semibold text-slate-300">Réseau d'agences</span>
+                     <Badge value={filteredAgencies.length} variant="neutral" size="sm" className="h-5" />
+                 </div>
+                 
+                 <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Filtrer..."
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-md focus:outline-none focus:border-primary/50 text-slate-200"
+                      value={searchTerm}
+                      onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                    />
+                 </div>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {paginatedAgencies.map((agency: TreasuryStats['breakdown'][0]) => {
+                   const isSelected = selectedAgencies.includes(agency.agenceId);
+                   return (
+                   <Card 
+                        key={agency.agenceId} 
+                        className={cn(
+                            "cursor-pointer transition-all duration-200 hover:bg-slate-800/50 group relative overflow-hidden border-slate-800",
+                            isSelected ? "ring-1 ring-primary border-primary bg-primary/[0.05]" : "hover:border-slate-700"
+                        )}
+                        onClick={() => toggleAgency(agency.agenceId)}
+                   >
+                       {isSelected && (
+                           <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: getAgencyColor(agency.agenceId) }} />
+                       )}
+
+                      <div className="p-3">
+                          <div className="flex justify-between items-center mb-2">
+                              <h4 className="font-semibold text-sm truncate text-slate-200">{agency.agenceNom}</h4>
+                              <Badge 
+                                value={agency.solde > 0 ? 'Actif' : 'Vide'} 
+                                variant={agency.solde > 0 ? 'success' : 'neutral'} 
+                                size="sm"
+                                className="text-[10px] h-5"
+                              />
+                          </div>
+                          
+                          <div className="flex items-end justify-between">
+                              <p className="text-[10px] text-slate-500 flex items-center gap-1 truncate max-w-[50%]">
+                                  {agency.ville || '—'}
+                              </p>
+                              <div className="text-sm font-bold font-mono text-white">
+                                  {agency.solde.toLocaleString()} <span className="text-[10px] font-sans text-slate-500 font-normal">F</span>
+                              </div>
                           </div>
                       </div>
-                  </div>
-               </Card>
-            )})}
-            
-            {filteredAgencies.length === 0 && (
-                <div className="col-span-full py-16 text-center text-muted-foreground bg-card/50 rounded-xl border border-dashed flex flex-col items-center">
-                    <Search size={32} className="mb-3 opacity-20" />
-                    <p>Aucune agence trouvée pour "{searchTerm}"</p>
-                </div>
-            )}
-         </div>
-
-         {/* Pagination */}
-         {totalPages > 1 && (
-             <div className="flex justify-center items-center gap-2 mt-8 pt-4">
-                 <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    icon={ChevronLeft}
-                 >
-                    Précédent
-                 </Button>
-                 <span className="text-sm font-medium text-muted-foreground px-4">
-                    Page <span className="text-foreground">{page}</span> sur {totalPages}
-                 </span>
-                 <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                 >
-                    Suivant
-                    <ChevronRight size={14} className="ml-2" />
-                 </Button>
+                   </Card>
+                )})}
              </div>
-         )}
+
+             {/* Pagination */}
+             {totalPages > 1 && (
+                 <div className="flex justify-center items-center gap-2 pt-2">
+                     <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="h-7 w-7 p-0"
+                     >
+                        <ChevronLeft size={14} />
+                     </Button>
+                     <span className="text-xs font-medium text-slate-500">
+                        {page}/{totalPages}
+                     </span>
+                     <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="h-7 w-7 p-0"
+                     >
+                        <ChevronRight size={14} />
+                     </Button>
+                 </div>
+             )}
+          </div>
       </div>
     </div>
   );
