@@ -21,10 +21,12 @@ export async function getAllUsers(): Promise<User[]> {
 
 export async function createUser(insertUser: InsertUser): Promise<User> {
   // Normaliser nom (UPPERCASE) et prénom (Capitalize)
+  // mustChangePassword=true par défaut pour forcer le changement au premier login
   const normalizedData = {
     ...insertUser,
     nom: normalizeNom(insertUser.nom),
     prenom: normalizePrenom(insertUser.prenom),
+    mustChangePassword: insertUser.mustChangePassword ?? true,
   };
 
   const [user] = await db.insert(users).values(normalizedData).returning();
