@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Lock, Check, X, AlertCircle } from 'lucide-react';
+import { Lock, Check, X, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import FormField from '../ui/FormField';
@@ -23,7 +23,11 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [currentPasswordError, setCurrentPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { settings: securitySettings } = useSecuritySettings();
 
   const passwordRequirements = useMemo(() => {
@@ -70,6 +74,7 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setCurrentPasswordError('');
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       setError('Veuillez remplir tous les champs');
@@ -102,12 +107,19 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Erreur lors du changement de mot de passe');
+        const errorMsg = data.message || data.error || 'Erreur lors du changement de mot de passe';
+        // Detect wrong current password from server response
+        if (/invalid current password|mot de passe actuel/i.test(errorMsg)) {
+          setCurrentPasswordError('Mot de passe actuel incorrect');
+        } else {
+          setError(errorMsg);
+        }
+        return;
       }
 
       onPasswordChanged();
     } catch (err: any) {
-      setError(err.error);
+      setError(err.message || 'Erreur lors du changement de mot de passe');
     } finally {
       setLoading(false);
     }
@@ -123,7 +135,7 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
       showCloseButton={false}
       closeOnBackdrop={false}
       closeOnEsc={false}
-      size="sm"
+      size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
@@ -133,38 +145,68 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
           </div>
         )}
 
-        <FormField
-          label="Mot de passe actuel"
-          name="currentPassword"
-          type="password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          placeholder="Mot de passe actuel"
-          required
-          autoFocus
-        />
+        <div>
+          <FormField
+            label="Mot de passe actuel"
+            name="currentPassword"
+            type={showCurrentPassword ? 'text' : 'password'}
+            value={currentPassword}
+            onChange={(e) => { setCurrentPassword(e.target.value); setCurrentPasswordError(''); }}
+            placeholder="Mot de passe actuel"
+            required
+            autoFocus
+            rightIcon={showCurrentPassword ? Eye : EyeOff}
+            onRightIconClick={() => setShowCurrentPassword(!showCurrentPassword)}
+          />
+          {currentPasswordError && (
+            <div className="flex items-center gap-1.5 mt-1 px-1 text-red-400">
+              <AlertCircle size={12} className="flex-shrink-0" />
+              <span className="text-xs">{currentPasswordError}</span>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <FormField
             label="Nouveau mot de passe"
             name="newPassword"
-            type="password"
+            type={showNewPassword ? 'text' : 'password'}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="Nouveau mot de passe"
             required
+            rightIcon={showNewPassword ? Eye : EyeOff}
+            onRightIconClick={() => setShowNewPassword(!showNewPassword)}
           />
 
           <FormField
             label="Confirmer le mot de passe"
             name="confirmPassword"
-            type="password"
+            type={showConfirmPassword ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Confirmer le mot de passe"
             required
+            rightIcon={showConfirmPassword ? Eye : EyeOff}
+            onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
           />
         </div>
+
+        {/* Password match feedback */}
+        {confirmPassword.length > 0 && (
+          <div className={`flex items-center gap-1.5 px-1 ${newPassword === confirmPassword ? 'text-green-400' : 'text-red-400'}`}>
+            {newPassword === confirmPassword ? (
+              <Check size={12} />
+            ) : (
+              <X size={12} />
+            )}
+            <span className="text-xs">
+              {newPassword === confirmPassword
+                ? 'Mots de passe identiques'
+                : 'Les mots de passe ne correspondent pas'}
+            </span>
+          </div>
+        )}
 
         {/* Password Requirements - compact inline */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
