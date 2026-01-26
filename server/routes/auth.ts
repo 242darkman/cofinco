@@ -5,7 +5,7 @@ import { storage } from "../storage";
 import { loginUser, registerUser, requireAuth, hashPassword, comparePasswords } from "../auth";
 import { attachAbility, requireAbility, requireResetPassword } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
-import { logAudit, logLoginAttempt, isAccountLocked, validatePassword, getPasswordRequirements, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
+import { logAudit, logLoginAttempt, getLoginLockoutInfo, validatePassword, getPasswordRequirements, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
 import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions, isSessionValid, markSessionInactive, markUserSessionsInactive, sessionGuard } from "../session-tracker";
 import { getPermissionsForUser } from "../services/permissions-service";
 import { z } from "zod";
@@ -172,22 +172,38 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      if (await isAccountLocked(username)) {
+      const lockoutInfo = await getLoginLockoutInfo(username);
+
+      if (lockoutInfo.locked) {
         await logLoginAttempt(username, req, false, "account_locked");
-        return res.status(403).json({ message: "Account is locked due to too many failed attempts. Please try again later." });
+        return res.status(403).json({
+          message: "Compte verrouillé suite à trop de tentatives échouées.",
+          locked: true,
+          retryAfterSeconds: lockoutInfo.retryAfterSeconds,
+          lockedUntil: lockoutInfo.lockedUntil,
+        });
       }
 
       const user = await loginUser(username, password);
-      
+
       if (!user) {
-        // Log failed attempt
         await logLoginAttempt(username, req, false, "invalid_credentials");
-        return res.status(401).json({ message: "Invalid username or password" });
+        // Recalculer après enregistrement de la tentative
+        const updatedInfo = await getLoginLockoutInfo(username);
+        return res.status(401).json({
+          message: "Identifiant ou mot de passe incorrect",
+          remainingAttempts: updatedInfo.remainingAttempts,
+          ...(updatedInfo.locked ? {
+            locked: true,
+            retryAfterSeconds: updatedInfo.retryAfterSeconds,
+            lockedUntil: updatedInfo.lockedUntil,
+          } : {}),
+        });
       }
 
       if (user.statut !== StatutUser.ACTIVE) {
         await logLoginAttempt(username, req, false, "account_disabled");
-        return res.status(403).json({ message: "Account disabled" });
+        return res.status(403).json({ message: "Compte désactivé. Contactez un administrateur." });
       }
 
       // Success

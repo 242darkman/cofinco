@@ -1,7 +1,7 @@
 import { db } from './db';
 import { auditLogs, loginAttempts, InsertAuditLog, InsertLoginAttempt, securitySettings } from '@shared/schema';
 import { Request } from 'express';
-import { eq, and, gte, lte, desc, sql, count } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm';
 
 export async function logAudit(
   req: Request,
@@ -103,6 +103,60 @@ export async function isAccountLocked(username: string, maxAttempts: number = 5)
   // Account is only locked if there are maxAttempts failures within the 15-minute window
   // The window automatically expires after 15 minutes (checked in getRecentFailedAttempts)
   return failedAttempts >= maxAttempts;
+}
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_WINDOW_MINUTES = 15;
+
+/**
+ * Retourne les infos de verrouillage pour un utilisateur :
+ * - locked: si le compte est verrouillé
+ * - failedAttempts: nombre de tentatives échouées dans la fenêtre
+ * - remainingAttempts: tentatives restantes avant verrouillage
+ * - lockedUntil: date de fin du verrouillage (ISO string)
+ * - retryAfterSeconds: secondes avant de pouvoir réessayer
+ */
+export async function getLoginLockoutInfo(username: string): Promise<{
+  locked: boolean;
+  failedAttempts: number;
+  remainingAttempts: number;
+  lockedUntil: string | null;
+  retryAfterSeconds: number;
+}> {
+  const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MINUTES * 60 * 1000);
+
+  try {
+    // Compter les tentatives échouées et récupérer la plus ancienne
+    const attempts = await db
+      .select({ createdAt: loginAttempts.createdAt })
+      .from(loginAttempts)
+      .where(
+        and(
+          eq(loginAttempts.username, username),
+          eq(loginAttempts.success, false),
+          gte(loginAttempts.createdAt, windowStart)
+        )
+      )
+      .orderBy(asc(loginAttempts.createdAt));
+
+    const failedAttempts = attempts.length;
+    const locked = failedAttempts >= MAX_LOGIN_ATTEMPTS;
+    const remainingAttempts = Math.max(0, MAX_LOGIN_ATTEMPTS - failedAttempts);
+
+    if (locked && attempts.length > 0) {
+      // Le verrouillage expire quand la 1ère tentative sort de la fenêtre
+      const earliestAttempt = attempts[0].createdAt!;
+      const lockedUntil = new Date(earliestAttempt.getTime() + LOCKOUT_WINDOW_MINUTES * 60 * 1000);
+      const retryAfterSeconds = Math.max(0, Math.ceil((lockedUntil.getTime() - Date.now()) / 1000));
+
+      return { locked, failedAttempts, remainingAttempts, lockedUntil: lockedUntil.toISOString(), retryAfterSeconds };
+    }
+
+    return { locked, failedAttempts, remainingAttempts, lockedUntil: null, retryAfterSeconds: 0 };
+  } catch (error) {
+    console.error('Lockout info check error:', error);
+    return { locked: false, failedAttempts: 0, remainingAttempts: MAX_LOGIN_ATTEMPTS, lockedUntil: null, retryAfterSeconds: 0 };
+  }
 }
 
 export async function clearLoginAttemptsOnSuccess(username: string): Promise<void> {

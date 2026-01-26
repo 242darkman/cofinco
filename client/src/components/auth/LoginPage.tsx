@@ -5,10 +5,12 @@ import {
   LogIn,
   AlertCircle,
   Shield,
+  ShieldAlert,
   Building2,
   CheckCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { authService, type User as UserType } from '../../lib/auth';
@@ -41,6 +43,8 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
   const [successUser, setSuccessUser] = useState<UserType | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showSessionExpiredBanner, setShowSessionExpiredBanner] = useState(!!sessionExpiredMessage);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -65,6 +69,29 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
     }
   }, [loginSuccess, successUser, onLoginSuccess]);
 
+  // Countdown pour le verrouillage — auto-clear quand il atteint 0
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutSeconds(prev => {
+        if (prev <= 1) {
+          setError('');
+          setRemainingAttempts(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutSeconds > 0]);
+
+  const formatCountdown = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m > 0) return `${m} min ${s.toString().padStart(2, '0')} sec`;
+    return `${s} sec`;
+  };
+
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => setShake(false), 500);
@@ -73,6 +100,9 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setRemainingAttempts(null);
+
+    if (lockoutSeconds > 0) return; // Bloqué — ne pas soumettre
 
     if (!username || !password) {
       setError(t('remplirTousChamps') || 'Veuillez remplir tous les champs');
@@ -81,33 +111,39 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
     }
 
     setLoading(true);
-    
-    // Add artificial delay if response is too fast for better UX
     const startTime = Date.now();
-    
+
     try {
       const user = await authService.login(username, password);
-      
+
       const elapsed = Date.now() - startTime;
-      const minDelay = 600; // Minimum 600ms loading
-      
-      if (elapsed < minDelay) {
-        await new Promise(resolve => setTimeout(resolve, minDelay - elapsed));
-      }
+      if (elapsed < 600) await new Promise(r => setTimeout(r, 600 - elapsed));
 
       if (user) {
         setLoading(false);
         setLoginSuccess(true);
         setSuccessUser(user);
-      } else {
-        setError(t('identifiantsInvalides') || 'Identifiants invalides');
-        triggerShake();
-        setLoading(false);
       }
     } catch (err: any) {
-      console.error('Login error:', err);
-      const message = err?.error || t('erreurConnexion') || 'Erreur de connexion. Veuillez réessayer.';
-      setError(message);
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 600) await new Promise(r => setTimeout(r, 600 - elapsed));
+
+      // Compte verrouillé (403 ou 401 avec locked:true après la 5e tentative)
+      if (err?.data?.locked) {
+        setLockoutSeconds(err.data.retryAfterSeconds || 900);
+        setRemainingAttempts(0);
+        setError('Compte verrouillé suite à trop de tentatives échouées.');
+      } else if (err?.status === 401) {
+        // Identifiants invalides — afficher les tentatives restantes
+        const remaining = err.data?.remainingAttempts;
+        setRemainingAttempts(remaining ?? null);
+        setError(err.message || 'Identifiant ou mot de passe incorrect');
+      } else if (err?.status === 403) {
+        setError(err.message || 'Accès refusé');
+      } else {
+        setError(t('erreurConnexion') || 'Erreur de connexion. Veuillez réessayer.');
+      }
+
       triggerShake();
       setLoading(false);
     }
@@ -345,32 +381,67 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                     exit={{ opacity: 0, x: -20 }}
                   >
                     <AnimatePresence>
-                      {error && (
+                      {(error || lockoutSeconds > 0) && (
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
-                          animate={{ 
-                            opacity: 1, 
+                          animate={{
+                            opacity: 1,
                             height: 'auto',
-                            x: shake ? [0, -10, 10, -10, 10, 0] : 0 
+                            x: shake ? [0, -10, 10, -10, 10, 0] : 0
                           }}
                           exit={{ opacity: 0, height: 0 }}
-                          transition={{ 
+                          transition={{
                             x: { type: 'tween', duration: 0.4 },
                             default: { duration: 0.3 }
                           }}
-                          className="group relative overflow-hidden bg-red-500/10 border border-red-500/40 rounded-xl p-4 mb-5 flex items-start gap-4"
+                          className={`group relative overflow-hidden rounded-xl p-4 mb-5 flex items-start gap-4 ${
+                            lockoutSeconds > 0
+                              ? 'bg-amber-500/10 border border-amber-500/40'
+                              : 'bg-red-500/10 border border-red-500/40'
+                          }`}
                           data-testid="status-error"
                         >
-                          <div className="absolute inset-0 bg-red-500/5 animate-pulse" />
-                          <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/10">
-                            <AlertCircle className="text-red-400 drop-shadow-md" size={20} />
-                          </div>
-                          <div className="relative flex-1 py-0.5">
-                             <h4 className="text-red-400 font-bold text-sm mb-0.5">Erreur de connexion</h4>
-                             <p className="text-red-300/90 text-sm leading-relaxed" data-testid="text-error-message">
-                              {error}
-                             </p>
-                          </div>
+                          {lockoutSeconds > 0 ? (
+                            <>
+                              <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/20 to-amber-600/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/10">
+                                <ShieldAlert className="text-amber-400 drop-shadow-md" size={20} />
+                              </div>
+                              <div className="relative flex-1 py-0.5">
+                                <h4 className="text-amber-400 font-bold text-sm mb-1">Compte temporairement verrouillé</h4>
+                                <p className="text-amber-300/90 text-sm leading-relaxed mb-2">
+                                  Trop de tentatives échouées. Veuillez patienter avant de réessayer.
+                                </p>
+                                <div className="flex items-center gap-2 text-amber-300">
+                                  <Clock size={14} className="animate-pulse" />
+                                  <span className="text-sm font-mono font-semibold">{formatCountdown(lockoutSeconds)}</span>
+                                </div>
+                                <div className="mt-2 w-full bg-amber-900/30 rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className="h-full bg-amber-500/60 rounded-full transition-all duration-1000"
+                                    style={{ width: `${Math.max(0, (lockoutSeconds / 900) * 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="absolute inset-0 bg-red-500/5 animate-pulse" />
+                              <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/10">
+                                <AlertCircle className="text-red-400 drop-shadow-md" size={20} />
+                              </div>
+                              <div className="relative flex-1 py-0.5">
+                                <h4 className="text-red-400 font-bold text-sm mb-0.5">Erreur de connexion</h4>
+                                <p className="text-red-300/90 text-sm leading-relaxed" data-testid="text-error-message">
+                                  {error}
+                                </p>
+                                {remainingAttempts !== null && remainingAttempts <= 2 && remainingAttempts > 0 && (
+                                  <p className="text-amber-400 text-xs mt-1.5 font-medium">
+                                    Attention : {remainingAttempts} tentative{remainingAttempts > 1 ? 's' : ''} restante{remainingAttempts > 1 ? 's' : ''} avant verrouillage
+                                  </p>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -408,12 +479,17 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                         size="lg"
                         fullWidth
                         isLoading={loading}
+                        disabled={lockoutSeconds > 0}
                         icon={!loading ? LogIn : undefined}
                         iconPosition="left"
                         data-testid="button-submit"
                         className="transition-all duration-300 active:scale-[0.98]"
                       >
-                        {loading ? (t('connexionEnCours') || 'Connexion en cours...') : (t('seConnecter') || 'Se connecter')}
+                        {lockoutSeconds > 0
+                          ? `Verrouillé (${formatCountdown(lockoutSeconds)})`
+                          : loading
+                            ? (t('connexionEnCours') || 'Connexion en cours...')
+                            : (t('seConnecter') || 'Se connecter')}
                       </Button>
                     </form>
                   </motion.div>

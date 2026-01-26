@@ -113,7 +113,9 @@ class AuthService {
       return user;
     } catch (error: any) {
       console.error('Login error:', error);
-      return null;
+      // Propager l'erreur pour que le LoginPage puisse afficher le bon feedback
+      // (lockout, tentatives restantes, compte désactivé, etc.)
+      throw error;
     }
   }
 
