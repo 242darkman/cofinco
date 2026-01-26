@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, DollarSign, Calendar, CreditCard, Building, Smartphone, ArrowRight, AlertCircle, CheckCircle, Clock, Banknote, FileCheck, RefreshCw, Phone, Hash, Wallet, AlertTriangle, Loader2, Search } from 'lucide-react';
+import { X, User, DollarSign, Calendar, CreditCard, Building, Smartphone, ArrowRight, AlertCircle, CheckCircle, Clock, Banknote, FileCheck, RefreshCw, Phone, Hash, Wallet, AlertTriangle, Loader2, Search, Percent } from 'lucide-react';
 import { clientApi, compteEpargneApi, transactionEpargneApi } from '../../../lib/api-client';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -725,6 +725,23 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     <p className="text-xs text-amber-400 mt-2">
                       Aucun produit disponible pour ce type de compte.
                     </p>
+                  )}
+                  {selectedProduit && (
+                    <div className="mt-3 bg-slate-700/40 border border-slate-600/50 rounded-lg p-3 flex items-center gap-3">
+                      <div className={`rounded-full p-2 ${selectedProduitRate > 0 ? 'bg-emerald-500/15' : 'bg-slate-600/30'}`}>
+                        <Percent size={16} className={selectedProduitRate > 0 ? 'text-emerald-400' : 'text-slate-400'} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-400">Taux d'intérêt appliqué</p>
+                        <p className={`text-lg font-bold ${selectedProduitRate > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                          {selectedProduitRate.toFixed(1)}% <span className="text-xs font-normal text-slate-500">/ an</span>
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider">Produit</p>
+                        <p className="text-xs text-slate-300 font-medium">{selectedProduit.nom || selectedProduit.code}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
 

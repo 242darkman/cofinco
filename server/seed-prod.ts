@@ -569,22 +569,23 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
   results.push({ table: 'tags', action: 'created', count: TAGS_DATA.length });
 
   // Durées Suggérées - delete+insert (config only)
+  // Enum values: DAILY, WEEKLY, MONTHLY, BI_MONTHLY, QUARTERLY / DAY, WEEK, MONTH
   await db.delete(dureesSuggerees);
   await db.insert(dureesSuggerees).values([
-    { frequence: 'Journalier', dureeValeur: 15, dureeUnite: 'Jour', estRecommandee: false, ordre: 0, actif: true, label: '15 jours' },
-    { frequence: 'Journalier', dureeValeur: 30, dureeUnite: 'Jour', estRecommandee: true, ordre: 1, actif: true, label: '30 jours' },
-    { frequence: 'Journalier', dureeValeur: 60, dureeUnite: 'Jour', estRecommandee: false, ordre: 2, actif: true, label: '60 jours' },
-    { frequence: 'Journalier', dureeValeur: 90, dureeUnite: 'Jour', estRecommandee: false, ordre: 3, actif: true, label: '90 jours' },
-    { frequence: 'Hebdomadaire', dureeValeur: 1, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '1 mois' },
-    { frequence: 'Hebdomadaire', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '3 mois' },
-    { frequence: 'Hebdomadaire', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '6 mois' },
-    { frequence: 'Mensuel', dureeValeur: 3, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '3 mois' },
-    { frequence: 'Mensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '6 mois' },
-    { frequence: 'Mensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: false, ordre: 2, actif: true, label: '12 mois' },
-    { frequence: 'Bimensuel', dureeValeur: 6, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '6 mois' },
-    { frequence: 'Bimensuel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '12 mois' },
-    { frequence: 'Trimestriel', dureeValeur: 12, dureeUnite: 'Mois', estRecommandee: false, ordre: 0, actif: true, label: '12 mois' },
-    { frequence: 'Trimestriel', dureeValeur: 24, dureeUnite: 'Mois', estRecommandee: true, ordre: 1, actif: true, label: '24 mois' },
+    { frequence: 'DAILY', dureeValeur: 15, dureeUnite: 'DAY', estRecommandee: false, ordre: 0, actif: true, label: '15 jours' },
+    { frequence: 'DAILY', dureeValeur: 30, dureeUnite: 'DAY', estRecommandee: true, ordre: 1, actif: true, label: '30 jours' },
+    { frequence: 'DAILY', dureeValeur: 60, dureeUnite: 'DAY', estRecommandee: false, ordre: 2, actif: true, label: '60 jours' },
+    { frequence: 'DAILY', dureeValeur: 90, dureeUnite: 'DAY', estRecommandee: false, ordre: 3, actif: true, label: '90 jours' },
+    { frequence: 'WEEKLY', dureeValeur: 1, dureeUnite: 'MONTH', estRecommandee: false, ordre: 0, actif: true, label: '1 mois' },
+    { frequence: 'WEEKLY', dureeValeur: 3, dureeUnite: 'MONTH', estRecommandee: true, ordre: 1, actif: true, label: '3 mois' },
+    { frequence: 'WEEKLY', dureeValeur: 6, dureeUnite: 'MONTH', estRecommandee: false, ordre: 2, actif: true, label: '6 mois' },
+    { frequence: 'MONTHLY', dureeValeur: 3, dureeUnite: 'MONTH', estRecommandee: false, ordre: 0, actif: true, label: '3 mois' },
+    { frequence: 'MONTHLY', dureeValeur: 6, dureeUnite: 'MONTH', estRecommandee: true, ordre: 1, actif: true, label: '6 mois' },
+    { frequence: 'MONTHLY', dureeValeur: 12, dureeUnite: 'MONTH', estRecommandee: false, ordre: 2, actif: true, label: '12 mois' },
+    { frequence: 'BI_MONTHLY', dureeValeur: 6, dureeUnite: 'MONTH', estRecommandee: false, ordre: 0, actif: true, label: '6 mois' },
+    { frequence: 'BI_MONTHLY', dureeValeur: 12, dureeUnite: 'MONTH', estRecommandee: true, ordre: 1, actif: true, label: '12 mois' },
+    { frequence: 'QUARTERLY', dureeValeur: 12, dureeUnite: 'MONTH', estRecommandee: false, ordre: 0, actif: true, label: '12 mois' },
+    { frequence: 'QUARTERLY', dureeValeur: 24, dureeUnite: 'MONTH', estRecommandee: true, ordre: 1, actif: true, label: '24 mois' },
   ] as any);
   results.push({ table: 'dureesSuggerees', action: 'created', count: 14 });
 
@@ -1510,12 +1511,17 @@ async function seedProd() {
     console.log('═══════════════════════════════════════════════════════════════');
 
     if (!report.success) {
+      await pool.end();
       process.exit(1);
     }
+
+    await pool.end();
+    process.exit(0);
 
   } catch (error) {
     console.error('\n❌ FATAL ERROR:', error);
     report.errors.push(String(error));
+    await pool.end().catch(() => {});
     process.exit(1);
   }
 }

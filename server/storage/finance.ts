@@ -570,8 +570,30 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
   
   export async function getComptesByClient(clientId: string): Promise<Compte[]> {
-    const results = await db.select().from(comptes).where(eq(comptes.clientId, clientId));
-    return results.map(c => enrichCompteData(c));
+    const results = await db
+      .select({ compte: comptes, produit: produitsCompte })
+      .from(comptes)
+      .leftJoin(produitsCompte, eq(comptes.produitId, produitsCompte.id))
+      .where(eq(comptes.clientId, clientId));
+
+    return results.map(({ compte, produit }) => {
+      const produitInfo = produit
+        ? {
+            id: produit.id,
+            code: produit.code,
+            nom: produit.nom,
+            typeCompte: produit.typeCompte,
+            tauxInteret: Number(produit.tauxInteret || 0),
+            taux_interet: Number(produit.tauxInteret || 0),
+          }
+        : null;
+
+      return {
+        ...enrichCompteData(compte),
+        produit: produitInfo,
+        taux_interet: produitInfo?.tauxInteret ?? undefined,
+      } as any;
+    });
   }
   
   export async function getAllComptes(filter: { agence?: string } = {}): Promise<Compte[]> {

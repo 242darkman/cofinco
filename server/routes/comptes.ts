@@ -1237,12 +1237,13 @@ export function registerComptesRoutes(app: Express) {
           numero_compte: compte.numeroCompte || compte.numero_compte,
           montant_initial: parseFloat(compte.soldeCourant || compte.solde_courant || '0'),
           montant_actuel: parseFloat(compte.soldeCourant || compte.solde_courant || '0'),
-          taux_interet: 0, // Not applicable for blocked accounts in this schema
+          taux_interet: Number(compte.produit?.tauxInteret || compte.produit?.taux_interet || compte.taux_interet || 0),
           date_ouverture: compte.createdAt || compte.created_at,
           date_echeance: compte.blocageFin || compte.blocage_fin || null,
           duree_mois: 0,
           statut: compte.statut,
           clients: compte.clients,
+          produit: compte.produit || null,
         }));
 
         res.json(addSnakeCaseAliasesDeep(comptesTransformed));
@@ -1274,14 +1275,16 @@ export function registerComptesRoutes(app: Express) {
         const client = await storage.getClient(compte.clientId);
         
         // Structure alignée avec CompteBloqueDetail.tsx
-        // Note: tauxInteret et description ne sont pas dans la table comptes,
-        // ils viendraient de produitsCompte si un produit est lié
+        // tauxInteret récupéré depuis le produit lié (via getCompte qui fait le LEFT JOIN)
+        const compteAny = compte as any;
+        const tauxFromProduit = Number(compteAny.produit?.tauxInteret || compteAny.produit?.taux_interet || compteAny.taux_interet || 0);
+
         const transformed = {
           id: compte.id,
           numero_compte: compte.numeroCompte,
           montant_initial: parseFloat(compte.soldeCourant || '0'),
           montant_actuel: parseFloat(compte.soldeCourant || '0'),
-          taux_interet: 0, // TODO: récupérer depuis produit si compte.produitId existe
+          taux_interet: tauxFromProduit,
           date_ouverture: compte.createdAt,
           date_echeance: compte.blocageFin || null,
           duree_mois: compte.blocageFin
@@ -1295,6 +1298,7 @@ export function registerComptesRoutes(app: Express) {
              prenom: client.prenom,
              phone: client.telephone,
           } : null,
+          produit: compteAny.produit || null,
           description: compte.blocageMotif || null // Use blocageMotif as description
         };
 
