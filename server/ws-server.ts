@@ -117,7 +117,12 @@ type GlobalMessage = {
     // VIREMENTS PROGRAMMÉS
     // =============================================
     | "SCHEDULED_TRANSFER_UPDATED" | "SCHEDULED_TRANSFER_EXECUTED"
-    | "SCHEDULED_TRANSFERS_BATCH_COMPLETED";
+    | "SCHEDULED_TRANSFERS_BATCH_COMPLETED"
+
+    // =============================================
+    // MIGRATION D'AGENCE
+    // =============================================
+    | "MIGRATION_PROGRESS" | "MIGRATION_STATUS";
 
   payload: any;
 };

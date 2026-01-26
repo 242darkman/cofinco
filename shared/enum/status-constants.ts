@@ -28,6 +28,7 @@ export type TypeAgenceType = (typeof TypeAgence)[keyof typeof TypeAgence];
 export const StatutAgence = {
   ACTIVE: "ACTIVE",
   INACTIVE: "INACTIVE",
+  CLOSING_PENDING: "CLOSING_PENDING",
   CLOSED: "CLOSED",
 } as const;
 
@@ -37,6 +38,7 @@ export type StatutAgenceType = (typeof StatutAgence)[keyof typeof StatutAgence];
 export const STATUT_AGENCE_LABELS: Record<StatutAgenceType, string> = {
   [StatutAgence.ACTIVE]: "Actif",
   [StatutAgence.INACTIVE]: "Inactif",
+  [StatutAgence.CLOSING_PENDING]: "En fermeture",
   [StatutAgence.CLOSED]: "Fermé",
 };
 

@@ -828,6 +828,28 @@ export function registerAgencesRoutes(app: Express) {
     }
   });
 
+  // POST /api/agences/migrations/:id/rollback - Rollback d'une migration complétée
+  app.post("/api/agences/migrations/:id/rollback", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).session?.userId;
+      const ipAddress = req.ip;
+
+      const result = await agencyMigrationService.rollbackMigration(id, { userId, ipAddress });
+
+      await logAudit(req, "MIGRATE_ROLLBACK", "agency_migrations", id, { report: result.report });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Erreur POST /api/agences/migrations/:id/rollback:", error);
+      if (error instanceof MigrationError) {
+        const status = error.code === "NOT_FOUND" ? 404 : error.code === "ROLLBACK_EXPIRED" ? 410 : 400;
+        return res.status(status).json({ error: error.message, code: error.code, details: error.details });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/agences/migrations/:id/status - Statut de migration
   app.get("/api/agences/migrations/:id/status", requireAuth, async (req, res) => {
     try {

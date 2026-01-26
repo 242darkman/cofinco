@@ -21,13 +21,45 @@ export const MIGRATION_STATUS = {
 } as const;
 
 /**
- * Statuts possibles pour l'agence source pendant la migration
+ * Statuts possibles pour l'agence source pendant la migration.
+ * Aligné avec StatutAgence de status-constants.ts.
  */
 export const AGENCY_MIGRATION_MODE = {
-  ACTIVE: "Actif",                   // Fonctionnement normal
-  CLOSING_PENDING: "En fermeture",   // Migration planifiée, lecture seule
-  CLOSED: "Fermé"                    // Fermée définitivement
+  ACTIVE: "ACTIVE",
+  CLOSING_PENDING: "CLOSING_PENDING",
+  CLOSED: "CLOSED",
 } as const;
+
+/**
+ * Types d'entités trackés dans les entity logs de migration
+ */
+export const MIGRATION_ENTITY_TYPE = {
+  CLIENT: "CLIENT",
+  COMPTE: "COMPTE",
+  CREDIT: "CREDIT",
+  DEMANDE_CREDIT: "DEMANDE_CREDIT",
+  TONTINE: "TONTINE",
+  EMPLOYE: "EMPLOYE",
+  MOUVEMENT_FINANCIER: "MOUVEMENT_FINANCIER",
+  SESSION_CAISSE: "SESSION_CAISSE",
+  OPERATION_CAISSE: "OPERATION_CAISSE",
+  CAISSE: "CAISSE",
+  REMBOURSEMENT: "REMBOURSEMENT",
+  ENQUETE_CREDIT: "ENQUETE_CREDIT",
+  COFFRE_FORT: "COFFRE_FORT",
+  VIREMENT_PROGRAMME: "VIREMENT_PROGRAMME",
+  MEMBRE_TONTINE: "MEMBRE_TONTINE",
+  CONTRIBUTION_TONTINE: "CONTRIBUTION_TONTINE",
+  TONTINE_CYCLE: "TONTINE_CYCLE",
+  TONTINE_TURN: "TONTINE_TURN",
+  TONTINE_SCHEDULE: "TONTINE_SCHEDULE",
+  TONTINE_RULESET: "TONTINE_RULESET",
+  DOSSIER_CREDIT: "DOSSIER_CREDIT",
+  TRANSFERT_COFFRE_CAISSE: "TRANSFERT_COFFRE_CAISSE",
+  TREASURY_TRANSFER: "TREASURY_TRANSFER",
+} as const;
+
+export type MigrationEntityType = (typeof MIGRATION_ENTITY_TYPE)[keyof typeof MIGRATION_ENTITY_TYPE];
 
 /**
  * Table principale des migrations d'agence
@@ -257,6 +289,24 @@ export interface MigrationVolumetry {
   tontines: number;
   employes: number;
   sessionsCaisse: number;
+  mouvementsFinanciers: number;
+  operationsCaisse: number;
+  virementsProgrammes: number;
+  dossiersCredit: number;
+  membresTontine: number;
+  contributionsTontine: number;
+  tontineCycles: number;
+  tontineTurns: number;
+  tontineSchedules: number;
+  tontineRulesets: number;
+  transfertsCoffreCaisse: number;
+}
+
+export interface MigrationOptions {
+  includeArchived?: boolean;       // Inclure les entités archivées (default: false)
+  includeCancelled?: boolean;      // Inclure les entités annulées (default: false)
+  batchSize?: number;              // Taille de batch pour les entity logs (default: 500)
+  snapshotFields?: "minimal" | "full"; // Niveau de détail du snapshot (default: "minimal")
 }
 
 export interface MigrationFinancials {

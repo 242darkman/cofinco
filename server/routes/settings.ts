@@ -290,6 +290,11 @@ export function registerSettingsRoutes(app: Express) {
     const { confirmation } = req.body;
 
     try {
+      // Production guard — this endpoint is destructive and must never run in production
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({ message: "Opération interdite en production." });
+      }
+
       // Validate confirmation
       if (confirmation !== 'REINITIALISER_AGENCE') {
         return res.status(400).json({
@@ -319,78 +324,122 @@ export function registerSettingsRoutes(app: Express) {
         'critical'
       );
 
-      // Perform filtered deletion by agence_id
-      // Use session_replication_role to bypass FK constraints temporarily
-      await db.execute(sql`SET session_replication_role = 'replica'`);
-
-      // Delete child records first (those without direct agence_id but linked via parent)
-      await db.execute(sql`
-        DELETE FROM contributions_tontine WHERE membre_id IN (
-          SELECT id FROM membres_tontine WHERE tontine_id IN (
+      // Atomic reset within a single transaction — FK-safe deletion order (children first)
+      await db.transaction(async (tx) => {
+        // 1. Tontine sub-tables (deepest children first)
+        await tx.execute(sql`
+          DELETE FROM tontine_distribution_requests WHERE turn_id IN (
+            SELECT id FROM tontine_turns WHERE cycle_id IN (
+              SELECT id FROM tontine_cycles WHERE agence_id = ${agenceId}
+            )
+          )
+        `);
+        await tx.execute(sql`
+          DELETE FROM tontine_turn_audit WHERE turn_id IN (
+            SELECT id FROM tontine_turns WHERE cycle_id IN (
+              SELECT id FROM tontine_cycles WHERE agence_id = ${agenceId}
+            )
+          )
+        `);
+        await tx.execute(sql`DELETE FROM tontine_distributions WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM tontine_schedules WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM tontine_turns WHERE cycle_id IN (
+          SELECT id FROM tontine_cycles WHERE agence_id = ${agenceId}
+        )`);
+        await tx.execute(sql`DELETE FROM tontine_cycles WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM tontine_rulesets WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM tontine_penalites WHERE tontine_id IN (
+          SELECT id FROM tontines WHERE agence_id = ${agenceId}
+        )`);
+        await tx.execute(sql`DELETE FROM tontine_alertes WHERE tontine_id IN (
+          SELECT id FROM tontines WHERE agence_id = ${agenceId}
+        )`);
+        await tx.execute(sql`DELETE FROM tontine_plans WHERE tontine_id IN (
+          SELECT id FROM tontines WHERE agence_id = ${agenceId}
+        )`);
+        await tx.execute(sql`DELETE FROM tontine_regles WHERE tontine_id IN (
+          SELECT id FROM tontines WHERE agence_id = ${agenceId}
+        )`);
+        await tx.execute(sql`
+          DELETE FROM contributions_tontine WHERE membre_id IN (
+            SELECT id FROM membres_tontine WHERE tontine_id IN (
+              SELECT id FROM tontines WHERE agence_id = ${agenceId}
+            )
+          )
+        `);
+        await tx.execute(sql`
+          DELETE FROM membres_tontine WHERE tontine_id IN (
             SELECT id FROM tontines WHERE agence_id = ${agenceId}
           )
-        )
-      `);
-      await db.execute(sql`
-        DELETE FROM membres_tontine WHERE tontine_id IN (
-          SELECT id FROM tontines WHERE agence_id = ${agenceId}
-        )
-      `);
-      await db.execute(sql`DELETE FROM tontines WHERE agence_id = ${agenceId}`);
+        `);
+        await tx.execute(sql`DELETE FROM tontines WHERE agence_id = ${agenceId}`);
 
-      // Savings-related
-      await db.execute(sql`
-        DELETE FROM transactions_epargne WHERE compte_epargne_id IN (
-          SELECT id FROM comptes_epargne WHERE agence_id = ${agenceId}
-        )
-      `);
-      await db.execute(sql`
-        DELETE FROM plans_epargne WHERE compte_epargne_id IN (
-          SELECT id FROM comptes_epargne WHERE agence_id = ${agenceId}
-        )
-      `);
-      await db.execute(sql`DELETE FROM comptes_epargne WHERE agence_id = ${agenceId}`);
-
-      // Credit-related
-      await db.execute(sql`
-        DELETE FROM remboursements WHERE credit_id IN (
-          SELECT id FROM credits WHERE agence_id = ${agenceId}
-        )
-      `);
-      await db.execute(sql`
-        DELETE FROM enquetes_credit WHERE credit_id IN (
-          SELECT id FROM credits WHERE agence_id = ${agenceId}
-        )
-      `);
-      await db.execute(sql`DELETE FROM credits WHERE agence_id = ${agenceId}`);
-
-      // Caisse-related
-      await db.execute(sql`
-        DELETE FROM operations_caisse WHERE session_id IN (
-          SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId}
-        )
-      `);
-      await db.execute(sql`
-        DELETE FROM comptage_billets WHERE shift_id IN (
-          SELECT id FROM shifts_caisse WHERE session_id IN (
+        // 2. Caisse-related (deepest children first)
+        await tx.execute(sql`
+          DELETE FROM operations_caisse WHERE session_id IN (
             SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId}
           )
-        )
-      `);
-      await db.execute(sql`
-        DELETE FROM shifts_caisse WHERE session_id IN (
-          SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId}
-        )
-      `);
-      await db.execute(sql`DELETE FROM sessions_caisse WHERE agence_id = ${agenceId}`);
+        `);
+        await tx.execute(sql`
+          DELETE FROM comptage_billets WHERE shift_id IN (
+            SELECT id FROM shifts_caisse WHERE session_id IN (
+              SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId}
+            )
+          )
+        `);
+        await tx.execute(sql`
+          DELETE FROM shifts_caisse WHERE session_id IN (
+            SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId}
+          )
+        `);
+        await tx.execute(sql`DELETE FROM sessions_caisse WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM transferts_coffre_caisse WHERE agence_id = ${agenceId}`);
 
-      // Clients (main data)
-      await db.execute(sql`DELETE FROM clients WHERE agence_id = ${agenceId}`);
+        // 3. Credit-related (children first)
+        await tx.execute(sql`
+          DELETE FROM remboursements WHERE credit_id IN (
+            SELECT id FROM credits WHERE agence_id = ${agenceId}
+          )
+        `);
+        await tx.execute(sql`
+          DELETE FROM enquetes_credit WHERE credit_id IN (
+            SELECT id FROM credits WHERE agence_id = ${agenceId}
+          )
+        `);
+        await tx.execute(sql`DELETE FROM dossiers_credit WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM credits WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM demandes_credit WHERE agence_id = ${agenceId}`);
 
-      // Unassign employees from this agency (don't delete them, just remove assignment)
-      await db.execute(sql`UPDATE employes SET agence_id = NULL WHERE agence_id = ${agenceId}`);
+        // 4. Savings-related
+        await tx.execute(sql`
+          DELETE FROM transactions_epargne WHERE compte_epargne_id IN (
+            SELECT id FROM comptes_epargne WHERE agence_id = ${agenceId}
+          )
+        `);
+        await tx.execute(sql`
+          DELETE FROM plans_epargne WHERE compte_epargne_id IN (
+            SELECT id FROM comptes_epargne WHERE agence_id = ${agenceId}
+          )
+        `);
+        await tx.execute(sql`DELETE FROM comptes_epargne WHERE agence_id = ${agenceId}`);
 
-      await db.execute(sql`SET session_replication_role = 'origin'`);
+        // 5. Financial records
+        await tx.execute(sql`DELETE FROM virements_programmes WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`DELETE FROM mouvements_financiers WHERE agence_id = ${agenceId}`);
+
+        // 6. Comptes (bank accounts) — after mouvements, before clients
+        await tx.execute(sql`DELETE FROM comptes WHERE agence_id = ${agenceId}`);
+
+        // 7. Clients
+        await tx.execute(sql`DELETE FROM clients WHERE agence_id = ${agenceId}`);
+
+        // 8. Reset coffre & caisse balances (don't delete, just zero out)
+        await tx.execute(sql`UPDATE coffres_forts SET solde = '0', updated_at = NOW() WHERE owner_id = ${agenceId}`);
+        await tx.execute(sql`UPDATE caisses SET solde = '0', updated_at = NOW() WHERE agence_id = ${agenceId}`);
+
+        // 9. Unassign employees (don't delete them)
+        await tx.execute(sql`UPDATE employes SET agence_id = NULL, updated_at = NOW() WHERE agence_id = ${agenceId}`);
+      });
 
       // Notify
       const wsInstance = getWsInstance();
