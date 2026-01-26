@@ -112,7 +112,8 @@ export default function ProspectionForm({ agentId, onClose, onSuccess }: Prospec
         observations: formData.observations,
         priorite: formData.priorite,
         photoUrl: formData.photo_url,
-        statut: 'NEW'
+        statut: 'NEW',
+        tempEntityId: tempProspectionIdRef.current,
       };
       
       await prospectionApi.create(prospectionData);

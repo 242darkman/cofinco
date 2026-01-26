@@ -215,6 +215,7 @@ export default function AdminGestionProfils() {
         typeCompte: 'employe', // Marqué comme employé potentiel
         canLogin: true,
         statut: StatutUser.ACTIVE,
+        tempEntityId: tempUserIdRef.current,
       });
 
       // Attribuer le rôle via l'API userRoles si le user a été créé

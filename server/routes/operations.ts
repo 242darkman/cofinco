@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema } from "@shared/schema";
+import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
@@ -7,6 +7,9 @@ import { Actions, Subjects } from "@shared/ability";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep, parsePagination, paginateResponse } from "./utils";
 import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { getWsInstance } from "../ws-server";
+import { StorageService } from "../services/storage-service";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
 
 export function registerOperationsRoutes(app: Express) {
   // Agents
@@ -64,16 +67,46 @@ export function registerOperationsRoutes(app: Express) {
   // Create prospection (roles: admin, chef, terrain, superviseur)
   app.post("/api/prospections", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.OPERATION_TERRAIN), async (req, res) => {
       const data = normalizeKeysDeep(req.body);
-      const parsed = insertProspectionSchema.parse(data);
-      const prospection = await storage.createProspection(parsed);
+      // Capture tempEntityId before schema parsing (insertProspectionSchema strips unknown fields)
+      const tempEntityId = (data as any).tempEntityId || (data as any).temp_entity_id;
 
-      // Notify
-      const wsInstance = getWsInstance();
-      if (wsInstance) {
-          wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'prospection_new', id: prospection.id } });
+      try {
+        const parsed = insertProspectionSchema.parse(data);
+        const prospection = await storage.createProspection(parsed);
+
+        // Relocate files from temp UUID to real entity ID
+        if (tempEntityId && tempEntityId !== prospection.id) {
+          try {
+            const keyMapping = await StorageService.relocateEntityFiles('prospection', tempEntityId, prospection.id);
+
+            if (keyMapping.size > 0 && prospection.photoUrl && keyMapping.has(prospection.photoUrl)) {
+              await db.update(prospections)
+                .set({ photoUrl: keyMapping.get(prospection.photoUrl)! })
+                .where(eq(prospections.id, prospection.id));
+            }
+
+            await StorageService.deleteEntityFiles('prospection', tempEntityId);
+          } catch (relocateError) {
+            console.error(`⚠️ File relocation failed for prospection ${prospection.id}:`, relocateError);
+          }
+        }
+
+        // Notify
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'prospection_new', id: prospection.id } });
+        }
+
+        res.json(addSnakeCaseAliasesDeep(prospection));
+      } catch (error) {
+        // Cleanup temp files if creation failed
+        if (tempEntityId) {
+          StorageService.deleteEntityFiles('prospection', tempEntityId)
+            .catch(err => console.error("Cleanup temp files failed:", err));
+        }
+        console.error("Create prospection error:", error);
+        res.status(500).json({ message: "Erreur lors de la création de la prospection" });
       }
-
-      res.json(addSnakeCaseAliasesDeep(prospection));
   });
 
   // Visites

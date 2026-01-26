@@ -439,7 +439,9 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         telephone: trimmedTelephone || null,
         role: formData.role,
         statut: formData.statut,
-        photoProfile: formData.photoProfile || null
+        photoProfile: formData.photoProfile || null,
+        // Send temp entity ID so the server can relocate uploaded files
+        ...(initialData ? {} : { tempEntityId: tempUserIdRef.current }),
       };
 
       if (formData.password && formData.password.trim()) {

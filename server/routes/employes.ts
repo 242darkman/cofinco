@@ -11,6 +11,7 @@ import { requireAuth, hashPassword } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
+import { StorageService } from "../services/storage-service";
 
 // Helper pour accepter string ou number et convertir en number
 const numericString = z.union([z.number(), z.string()]).transform((val) => {
@@ -69,6 +70,8 @@ const createEmployeWithUserSchema = z.object({
   // Agent Terrain specific fields (optional, used when role === AGENT_TERRAIN)
   zonesAffectation: z.array(z.string()).optional(),
   objectifMensuel: z.string().optional(),
+  // UUID temporaire utilisé pour les uploads avant la création de l'entité
+  tempEntityId: z.string().uuid().optional().nullable(),
 });
 
 const updateEmployeWithUserSchema = z.object({
@@ -334,6 +337,24 @@ export function registerEmployesRoutes(app: Express) {
         });
       }
 
+      // Relocate files from temp UUID to real entity ID
+      const tempEntityId = data.tempEntityId;
+      if (tempEntityId && tempEntityId !== result.employe.id) {
+        try {
+          const keyMapping = await StorageService.relocateEntityFiles('employe', tempEntityId, result.employe.id);
+
+          if (keyMapping.size > 0 && result.user.photoProfile && keyMapping.has(result.user.photoProfile)) {
+            await db.update(users)
+              .set({ photoProfile: keyMapping.get(result.user.photoProfile)! })
+              .where(eq(users.id, result.user.id));
+          }
+
+          await StorageService.deleteEntityFiles('employe', tempEntityId);
+        } catch (relocateError) {
+          console.error(`⚠️ File relocation failed for employe ${result.employe.id}:`, relocateError);
+        }
+      }
+
       await logAudit(
         req,
         "CREATE_EMPLOYE",
@@ -360,6 +381,12 @@ export function registerEmployesRoutes(app: Express) {
       res.status(201).json(employeWithUser);
 
     } catch (error) {
+      // Cleanup temp files if creation failed
+      const tempId = req.body?.tempEntityId || req.body?.temp_entity_id;
+      if (tempId) {
+        StorageService.deleteEntityFiles('employe', tempId)
+          .catch(err => console.error("Cleanup temp files failed:", err));
+      }
       console.error("Error creating employe:", error);
       res.status(500).json({ message: "Erreur lors de la création de l'employé" });
     }

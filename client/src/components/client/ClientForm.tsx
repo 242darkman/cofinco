@@ -415,16 +415,18 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         const documentsArray = Object.values(uploadedDocs).filter((doc): doc is UploadedDocument => doc !== null);
 
         // Create final form data with structured documents
-        const finalData: ClientFormData = {
+        const finalData: any = {
           ...formData,
           documents: documentsArray,
           // Also keep legacy photoUrl for backwards compatibility
           photoUrl: documentsArray.length > 0
             ? JSON.stringify(documentsArray.map(d => d.documentUrl))
             : '',
+          // Send temp entity ID so the server can relocate uploaded files
+          ...(client ? {} : { tempEntityId: tempClientIdRef.current }),
         };
 
-        await onSave(finalData as any);
+        await onSave(finalData);
         setTimeout(() => setIsSubmitting(false), 2000);
       } catch (error) {
         console.error("Save failed", error);

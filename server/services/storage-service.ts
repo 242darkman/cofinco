@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CopyObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
   PutBucketPolicyCommand,
@@ -564,6 +565,67 @@ export class StorageService {
     }
 
     return { publicDeleted, privateDeleted };
+  }
+
+  // ============================================
+  // RELOCATION D'ENTITÉ (TEMP ID → REAL ID)
+  // ============================================
+
+  /**
+   * Déplace tous les fichiers d'une entité d'un ancien ID vers un nouvel ID.
+   * Utilisé après la création d'une entité pour relocaliser les fichiers
+   * uploadés sous un UUID temporaire vers le vrai ID de l'entité.
+   *
+   * @param entityType - Type d'entité (client, user, employe, prospection)
+   * @param oldEntityId - Ancien ID (UUID temporaire)
+   * @param newEntityId - Nouvel ID (vrai UUID de l'entité)
+   * @returns Map<oldKey, newKey> pour mettre à jour les références en BDD
+   */
+  static async relocateEntityFiles(
+    entityType: StorageEntityType,
+    oldEntityId: string,
+    newEntityId: string
+  ): Promise<Map<string, string>> {
+    const keyMapping = new Map<string, string>();
+
+    if (oldEntityId === newEntityId) return keyMapping;
+
+    for (const bucket of [PUBLIC_BUCKET, PRIVATE_BUCKET]) {
+      const oldKeys = await this.listEntityFiles(bucket, entityType, oldEntityId);
+
+      for (const oldKey of oldKeys) {
+        const newKey = oldKey.replace(
+          `/${entityType}/${oldEntityId}/`,
+          `/${entityType}/${newEntityId}/`
+        );
+
+        try {
+          // Copy to new location
+          await s3Client.send(new CopyObjectCommand({
+            Bucket: bucket,
+            CopySource: `${bucket}/${oldKey}`,
+            Key: newKey,
+          }));
+
+          // Delete old object
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: bucket,
+            Key: oldKey,
+          }));
+
+          keyMapping.set(oldKey, newKey);
+        } catch (error: any) {
+          console.error(`Failed to relocate ${oldKey} → ${newKey}:`, error?.message);
+          // Continue with other files
+        }
+      }
+    }
+
+    if (keyMapping.size > 0) {
+      console.log(`📦 Relocated ${keyMapping.size} files for ${entityType}: ${oldEntityId} → ${newEntityId}`);
+    }
+
+    return keyMapping;
   }
 
   /**

@@ -826,6 +826,46 @@ export function registerClientRoutes(app: Express) {
 
         const createdClient = await storage.createClient(clientData);
 
+        // Relocate files from temp UUID to real entity ID
+        const tempEntityId = clientData.tempEntityId;
+        if (tempEntityId && tempEntityId !== createdClient.id) {
+          try {
+            const keyMapping = await StorageService.relocateEntityFiles('client', tempEntityId, createdClient.id);
+
+            if (keyMapping.size > 0) {
+              // Update users.photoProfile if path changed
+              if (createdClient.userId) {
+                const [currentUser] = await db.select({ photoProfile: users.photoProfile })
+                  .from(users).where(eq(users.id, createdClient.userId));
+
+                if (currentUser?.photoProfile && keyMapping.has(currentUser.photoProfile)) {
+                  await db.update(users)
+                    .set({ photoProfile: keyMapping.get(currentUser.photoProfile)! })
+                    .where(eq(users.id, createdClient.userId));
+                }
+              }
+
+              // Update clients.documents JSONB array
+              if (createdClient.documents && Array.isArray(createdClient.documents)) {
+                const updatedDocs = (createdClient.documents as any[]).map(doc => {
+                  if (doc.documentUrl && keyMapping.has(doc.documentUrl)) {
+                    return { ...doc, documentUrl: keyMapping.get(doc.documentUrl) };
+                  }
+                  return doc;
+                });
+                await db.update(clients)
+                  .set({ documents: updatedDocs })
+                  .where(eq(clients.id, createdClient.id));
+              }
+            }
+
+            // Cleanup any remaining temp files
+            await StorageService.deleteEntityFiles('client', tempEntityId);
+          } catch (relocateError) {
+            console.error(`⚠️ File relocation failed for client ${createdClient.id}:`, relocateError);
+          }
+        }
+
         // Récupérer le client complet avec les données fusionnées (nom, prenom depuis users)
         const client = await storage.getClient(createdClient.id);
         if (!client) {
@@ -893,6 +933,14 @@ export function registerClientRoutes(app: Express) {
             type_marche_nom: 'Standard' // Default for now, or fetch if needed
         }));
       } catch (e) {
+        // Cleanup temp files if creation failed (not on validation errors)
+        if (!(e instanceof z.ZodError)) {
+          const tempId = req.body?.tempEntityId || req.body?.temp_entity_id;
+          if (tempId) {
+            StorageService.deleteEntityFiles('client', tempId)
+              .catch(err => console.error("Cleanup temp files failed:", err));
+          }
+        }
         if (e instanceof z.ZodError) return res.status(400).json(e);
         console.error("Create client error:", e);
         res.status(500).json({ message: "Create client failed" });

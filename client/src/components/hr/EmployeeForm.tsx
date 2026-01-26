@@ -314,6 +314,8 @@ export default function EmployeeForm({
       agenceId: agenceId,
       modeCalculPaie: modeCalculPaie,
       jobPositionId: selectedJobPositionId, // Poste lié au département
+      // Send temp entity ID so the server can relocate uploaded files
+      ...(editingEmploye ? {} : { tempEntityId: tempEmployeIdRef.current }),
     };
 
     const result = await onSave(enrichedData as any);

@@ -13,6 +13,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db";
 import { StatutUser } from "@shared/enum/status-constants";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { StorageService } from "../services/storage-service";
 
 /**
  * Récupérer le caissePin d'un utilisateur depuis la table employes.
@@ -593,6 +594,9 @@ export function registerAuthRoutes(app: Express) {
   });
 
   app.post("/api/auth/register", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
+    // Capture tempEntityId before schema parsing (insertUserSchema strips unknown fields)
+    const tempEntityId = req.body?.tempEntityId || req.body?.temp_entity_id;
+
     try {
       const normalizedBody = normalizeUserPayload(req.body);
 
@@ -607,17 +611,34 @@ export function registerAuthRoutes(app: Express) {
       if (!parsed.success) {
         return res.status(400).json(parsed.error);
       }
-      
+
       if (!parsed.data.username) {
         return res.status(400).json({ message: "Username is required" });
       }
-      
+
       const existingUser = await storage.getUserByUsername(parsed.data.username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
       const user = await registerUser(parsed.data as any);
+
+      // Relocate files from temp UUID to real user ID
+      if (tempEntityId && tempEntityId !== user.id) {
+        try {
+          const keyMapping = await StorageService.relocateEntityFiles('user', tempEntityId, user.id);
+
+          if (keyMapping.size > 0 && user.photoProfile && keyMapping.has(user.photoProfile)) {
+            await db.update(users)
+              .set({ photoProfile: keyMapping.get(user.photoProfile)! })
+              .where(eq(users.id, user.id));
+          }
+
+          await StorageService.deleteEntityFiles('user', tempEntityId);
+        } catch (relocateError) {
+          console.error(`⚠️ File relocation failed for user ${user.id}:`, relocateError);
+        }
+      }
 
       // Architecture V3: Le rôle sera attribué via userRoles, pas dans user
       await logAudit(
@@ -632,6 +653,11 @@ export function registerAuthRoutes(app: Express) {
 
       res.status(201).json(user);
     } catch (error) {
+      // Cleanup temp files if creation failed
+      if (tempEntityId) {
+        StorageService.deleteEntityFiles('user', tempEntityId)
+          .catch(err => console.error("Cleanup temp files failed:", err));
+      }
       console.error("Register error:", error);
       res.status(500).json({ message: "Registration failed" });
     }

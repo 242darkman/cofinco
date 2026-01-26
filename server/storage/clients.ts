@@ -87,6 +87,8 @@ export const createClientApiSchema = z.object({
   agenceId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
   agentReferentId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
   statut: z.string().optional().default(StatutUser.ACTIVE),
+  // UUID temporaire utilisé pour les uploads avant la création de l'entité
+  tempEntityId: z.string().uuid().optional().nullable(),
 });
 
 export type CreateClientApiInput = z.infer<typeof createClientApiSchema>;
