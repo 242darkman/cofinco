@@ -116,20 +116,20 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
   return (
     <Modal
       isOpen={true}
-      onClose={() => {}} 
+      onClose={() => {}}
       title="Changement de mot de passe requis"
       subtitle="Pour des raisons de sécurité, vous devez changer votre mot de passe avant de continuer."
       variant="danger"
       showCloseButton={false}
       closeOnBackdrop={false}
       closeOnEsc={false}
-      size="md"
+      size="sm"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-start gap-2">
-            <AlertCircle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
-            <p className="text-red-400 text-sm">{error}</p>
+          <div className="px-3 py-2 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+            <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+            <p className="text-red-400 text-xs">{error}</p>
           </div>
         )}
 
@@ -139,47 +139,47 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
           type="password"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
-          placeholder="Votre mot de passe actuel"
+          placeholder="Mot de passe actuel"
           required
           autoFocus
         />
 
-        <FormField
-          label="Nouveau mot de passe"
-          name="newPassword"
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          placeholder="Votre nouveau mot de passe"
-          required
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <FormField
+            label="Nouveau mot de passe"
+            name="newPassword"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Nouveau mot de passe"
+            required
+          />
 
-        <FormField
-          label="Confirmer le mot de passe"
-          name="confirmPassword"
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="Retapez le nouveau mot de passe"
-          required
-        />
+          <FormField
+            label="Confirmer le mot de passe"
+            name="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirmer le mot de passe"
+            required
+          />
+        </div>
 
-        {/* Password Requirements */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-          <p className="text-sm font-semibold text-slate-300 mb-3">
-            Critères de sécurité :
-          </p>
-          <div className="space-y-2">
+        {/* Password Requirements - compact inline */}
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
+          <p className="text-xs font-semibold text-slate-300 mb-1.5">Critères de sécurité</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
             {requirements.map(req => {
               const met = checkRequirement(newPassword, req.key);
               return (
-                <div key={req.key} className="flex items-center gap-2">
+                <div key={req.key} className="flex items-center gap-1.5">
                   {met ? (
-                    <Check size={16} className="text-green-400" />
+                    <Check size={12} className="text-green-400" />
                   ) : (
-                    <X size={16} className="text-slate-500" />
+                    <X size={12} className="text-slate-500" />
                   )}
-                  <span className={`text-sm ${met ? 'text-green-400' : 'text-slate-400'}`}>
+                  <span className={`text-xs ${met ? 'text-green-400' : 'text-slate-400'}`}>
                     {req.label}
                   </span>
                 </div>
@@ -199,7 +199,7 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
           {loading ? 'Changement en cours...' : 'Changer le mot de passe'}
         </Button>
 
-        <p className="text-xs text-slate-400 text-center mt-4">
+        <p className="text-[11px] text-slate-500 text-center">
           Ce changement est obligatoire pour accéder à l'application
         </p>
       </form>

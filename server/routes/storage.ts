@@ -3,7 +3,7 @@ import multer from 'multer';
 import { StorageService } from '../services/storage-service';
 import { requireAuth } from '../auth';
 import { db } from '../db';
-import { clients, documents } from '@shared/schema';
+import { clients } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import {
@@ -168,26 +168,6 @@ router.get('/documents/:id/view', requireAuth, async (req, res) => {
 
     let objectKey: string | null = null;
     let ownerId: string | null = null;
-
-    // Chercher dans la table documents
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (isUuid) {
-      const [document] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
-      if (document) {
-        objectKey = document.objectPath || null;
-        if (document.referenceType === 'client' && document.referenceId) {
-          const [client] = await db
-            .select({ userId: clients.userId })
-            .from(clients)
-            .where(eq(clients.id, document.referenceId))
-            .limit(1);
-          ownerId = client?.userId || null;
-        }
-        if (!ownerId && document.uploadedBy) {
-          ownerId = document.uploadedBy;
-        }
-      }
-    }
 
     // Chercher dans les documents JSONB des clients
     if (!objectKey) {

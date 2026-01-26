@@ -44,24 +44,27 @@
  *    res.json(response); // Includes caslRules and permissionsMap
  */
 
-// Types
+// Types (values)
 export {
   Actions,
   Subjects,
+  PERMISSION_CODE_MAPPINGS,
+  normalizePermissionCode,
+  parsePermissionCode,
+} from './types';
+
+// Types (type-only)
+export type {
   Action,
   Subject,
   AppAbility,
   AppAbilityRule,
   AbilityResponse,
   PermissionMapping,
-  PERMISSION_CODE_MAPPINGS,
-  normalizePermissionCode,
-  parsePermissionCode,
 } from './types';
 
-// Ability builder
+// Ability builder (values)
 export {
-  AbilityContext,
   buildAbilityForUser,
   createAbilityFromRules,
   getAbilityForUser,
@@ -69,6 +72,9 @@ export {
   canDisburse,
   DISBURSEMENT_PERMISSION_FALLBACKS,
 } from './ability';
+
+// Ability builder (type-only)
+export type { AbilityContext } from './ability';
 
 // Middleware
 export {
