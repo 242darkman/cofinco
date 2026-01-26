@@ -2416,8 +2416,8 @@ export async function provisionCoffreWithLedger(data: {
             montant: data.montant,
             sens: "CREDIT", // Money IN
             agenceId: data.agenceId,
-            typePaiement: "Approvisionnement coffre" as any,
-            methodePaiement: "Autre", 
+            typePaiement: "SAFE_SUPPLY",
+            methodePaiement: "OTHER",
             metadata: {
                 description: data.description || data.motif || "Approvisionnement Externe",
                 motif: data.motif,
