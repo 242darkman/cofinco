@@ -53,6 +53,7 @@ export default function RessourcesHumaines() {
   const {
     employes,
     loading,
+    fetchEmployes,
     getStats,
     filterEmployes,
     createEmploye,
@@ -176,6 +177,7 @@ export default function RessourcesHumaines() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             getStatutColor={getStatutColor}
+            onRefresh={fetchEmployes}
           />
         );
 

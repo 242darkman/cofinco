@@ -6,7 +6,7 @@ import { compteEpargneApi, sessionCaisseApi } from '../../../lib/api-client';
 import EpargneAccountForm from './EpargneAccountForm';
 import EpargneTransactionForm from './EpargneTransactionForm';
 import AccountDetailSlideOver from './AccountDetailSlideOver';
-import AccountsList from './AccountsList';
+import AccountsList, { ACCOUNT_STATUS_FILTER_OPTIONS } from './AccountsList';
 import EpargneInterestCalculator from './EpargneInterestCalculator';
 import EpargneSavingsGoals from './EpargneSavingsGoals';
 import ComptesBloquesSection from '../operations/ComptesBloquesSection';
@@ -16,7 +16,7 @@ import TabGroup from '../../ui/TabGroup';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
 import { getAccountBalance } from '../../../lib/account-config';
 import { computeSessionStatus } from '../../../lib/format';
-import { TypeCompte, type TypeCompteType, StatutCompte } from '@shared/enum/status-constants';
+import { TypeCompte, type TypeCompteType, StatutCompte, type StatutCompteType } from '@shared/enum/status-constants';
 import { AccountActivationModal } from '../caisse/AccountActivationModal';
 import { caisseKeys } from '../../../lib/query-keys';
 
@@ -38,7 +38,7 @@ interface Compte {
     prenom?: string;
     phone?: string;
     telephone?: string;
-    photo?: string;
+    photoUrl?: string;
   } | null;
 }
 
@@ -58,6 +58,8 @@ export default function Epargnes({ activeView }: EpargnesProps) {
   const [interestCompte, setInterestCompte] = useState<Compte | null>(null);
   const [goalsCompte, setGoalsCompte] = useState<Compte | null>(null);
   const [activeTab, setActiveTab] = useState<TypeCompteType>(TypeCompte.CURRENT);
+  const [statusFilter, setStatusFilter] = useState<StatutCompteType | 'all'>('all');
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   // État pour le modal d'activation de compte
   const [activationAccount, setActivationAccount] = useState<{
     id: string;
@@ -374,10 +376,44 @@ export default function Epargnes({ activeView }: EpargnesProps) {
                         className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 pl-8 pr-3 py-1.5 text-xs transition-all"
                       />
                   </div>
-                  <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                        statusFilter !== 'all'
+                          ? 'text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30'
+                          : 'text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                    >
                       <Filter size={12} />
-                      <span className="hidden sm:inline">Tous les statuts</span>
-                  </button>
+                      <span className="hidden sm:inline">
+                        {ACCOUNT_STATUS_FILTER_OPTIONS.find(o => o.value === statusFilter)?.label || 'Tous les statuts'}
+                      </span>
+                    </button>
+                    {showStatusDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowStatusDropdown(false)} />
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100">
+                          {ACCOUNT_STATUS_FILTER_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                setStatusFilter(option.value);
+                                setShowStatusDropdown(false);
+                              }}
+                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                                statusFilter === option.value
+                                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
           </div>
@@ -393,6 +429,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
                   data={comptes}
                   type={activeTab === TypeCompte.SAVINGS ? TypeCompte.SAVINGS : TypeCompte.CURRENT}
                   loading={loading}
+                  statusFilter={statusFilter}
                   onManage={(c) => setDetailCompteId(c.id)}
                   onTransaction={handleTransaction}
                 />

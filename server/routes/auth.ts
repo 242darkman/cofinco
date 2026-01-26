@@ -830,7 +830,13 @@ export function registerAuthRoutes(app: Express) {
 
   // Audit Logs
   app.get("/api/audit-logs", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
-    const logs = await getAuditLogs();
+    const { userId, action, resource, limit } = req.query;
+    const logs = await getAuditLogs({
+      userId: typeof userId === 'string' ? userId : undefined,
+      action: typeof action === 'string' ? action : undefined,
+      resource: typeof resource === 'string' ? resource : undefined,
+      limit: typeof limit === 'string' ? parseInt(limit, 10) : undefined,
+    });
     res.json(logs);
   });
 

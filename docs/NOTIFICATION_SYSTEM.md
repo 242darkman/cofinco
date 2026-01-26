@@ -274,6 +274,33 @@ Configuration dans `sms_provider_settings` :
 }
 ```
 
+### Webhook Delivery Receipt
+
+MTN peut envoyer un callback lorsqu'un SMS est delivre ou echoue :
+
+```
+POST /api/webhooks/mtn/sms-delivery
+```
+
+Payload attendu (MTN API v2) :
+```json
+{
+  "deliveryInfoNotification": {
+    "deliveryInfo": {
+      "address": "tel:+242065000000",
+      "deliveryStatus": "DeliveredToTerminal"
+    },
+    "callbackData": "<correlationId>"
+  }
+}
+```
+
+Status de delivery supportes :
+- `DeliveredToTerminal` / `DeliveredToNetwork` -> job marque SENT
+- `DeliveryImpossible` / `DeliveryUncertain` -> job marque FAILED
+
+Securite : si `MTN_SMS_WEBHOOK_SECRET` est configure, le header `X-MTN-Signature` est verifie via HMAC-SHA256.
+
 ## Troubleshooting
 
 ### Les notifications ne sont pas envoyees

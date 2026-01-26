@@ -18,6 +18,7 @@ interface EmployesListProps {
   onEdit: (employe: Employe) => void;
   onDelete: (id: string) => void;
   getStatutColor: (statut: string) => string;
+  onRefresh?: () => void;
 }
 
 export default function EmployesList({
@@ -27,7 +28,8 @@ export default function EmployesList({
   onSearchChange,
   onEdit,
   onDelete,
-  getStatutColor
+  getStatutColor,
+  onRefresh
 }: EmployesListProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
@@ -431,12 +433,16 @@ export default function EmployesList({
 
       {/* DRAWER / FICHE PROFIL */}
       {selectedEmployee && (
-        <EmployeeProfileDrawer 
-           employee={selectedEmployee} 
+        <EmployeeProfileDrawer
+           employee={selectedEmployee}
            onClose={() => setSelectedEmployee(null)}
            onEdit={(emp) => {
              setSelectedEmployee(null);
              onEdit(emp);
+           }}
+           onRefresh={() => {
+             setSelectedEmployee(null);
+             onRefresh?.();
            }}
         />
       )}

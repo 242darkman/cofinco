@@ -3,6 +3,7 @@ import { StatutUser } from '@shared/enum/status-constants';
 
 export interface Employe {
   id: string;
+  userId: string;
   matricule: string;
   nom: string;
   prenom: string;
@@ -86,6 +87,7 @@ export function useEmployes() {
       // On aplatit les données pour correspondre au type Employe attendu par le composant
       const flattenedData = (data || []).map((item: any) => ({
         id: item.id,
+        userId: item.userId,
         matricule: item.matricule,
         // Utiliser les données du jobPosition/department si disponibles, sinon fallback sur les anciens champs
         poste: item.jobPosition?.name || item.poste || '',

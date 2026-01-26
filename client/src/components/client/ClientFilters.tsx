@@ -1,24 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { SearchInput, Button, SelectField } from '../ui';
+import { X, Filter } from 'lucide-react';
+import { SearchInput } from '../ui';
 import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
 
 export interface ClientFiltersState {
   searchTerm: string;
-  statut: string;
+  status: string;
   segment: string;
 }
 
 interface ClientFiltersProps {
   onFilterChange: (filters: ClientFiltersState) => void;
-  initialFilters?: ClientFiltersState;
+  initialFilters?: Partial<ClientFiltersState>;
   className?: string;
 }
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'Statut' },
+  { value: StatutClient.ACTIVE, label: STATUT_CLIENT_LABELS.ACTIVE },
+  { value: StatutClient.INACTIVE, label: STATUT_CLIENT_LABELS.INACTIVE },
+  { value: StatutClient.SUSPENDED, label: STATUT_CLIENT_LABELS.SUSPENDED },
+  { value: StatutClient.DELETED, label: STATUT_CLIENT_LABELS.DELETED },
+];
+
+const SEGMENT_OPTIONS = [
+  { value: 'all', label: 'Segment' },
+  { value: 'STANDARD', label: 'Standard' },
+  { value: 'PREMIUM', label: 'Premium' },
+  { value: 'VIP', label: 'VIP' },
+  { value: 'RISQUE', label: 'Risqué' },
+];
 
 export default function ClientFilters({ onFilterChange, initialFilters, className = '' }: ClientFiltersProps) {
   const [filters, setFilters] = useState<ClientFiltersState>({
     searchTerm: '',
-    statut: 'all',
+    status: 'all',
     segment: 'all',
     ...initialFilters
   });
@@ -39,99 +55,71 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       ...filters,
       searchTerm: debouncedSearch
     });
-  }, [filters.statut, filters.segment, debouncedSearch]);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters(prev => ({ ...prev, searchTerm: e.target.value }));
-  };
-
-  // Handler for clear button in SearchInput
-  const handleSearchClear = () => {
-    setFilters(prev => ({ ...prev, searchTerm: '' }));
-  };
-
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters(prev => ({ ...prev, statut: e.target.value }));
-  };
-
-  const handleSegmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters(prev => ({ ...prev, segment: e.target.value }));
-  };
+  }, [filters.status, filters.segment, debouncedSearch]);
 
   const clearFilters = () => {
-    setFilters({
-      searchTerm: '',
-      statut: 'all',
-      segment: 'all'
-    });
+    setFilters({ searchTerm: '', status: 'all', segment: 'all' });
   };
 
-  const hasActiveFilters = filters.statut !== 'all' || filters.segment !== 'all';
+  const hasActiveFilters = filters.status !== 'all' || filters.segment !== 'all';
+  const activeCount = (filters.status !== 'all' ? 1 : 0) + (filters.segment !== 'all' ? 1 : 0);
 
   return (
-    <div className={`space-y-3 ${className}`}>
-      <div className="flex items-center gap-2 w-full">
-        {/* Search Input - Flexible */}
-        <div className="flex-1 min-w-[200px]">
-          <SearchInput
-            value={filters.searchTerm}
-            onChange={handleSearchChange}
-            onClear={handleSearchClear}
-            placeholder="Rechercher un client..."
-            className="w-full h-8 text-xs"
-          />
-        </div>
-
-        {/* Status Filter - Fixed Width */}
-        <div className="w-[140px]">
-          <SelectField
-            label=""
-            name="statut"
-            value={filters.statut}
-            onChange={handleStatusChange}
-            options={[
-              { value: 'all', label: 'Tous les statuts' },
-              { value: StatutClient.ACTIVE, label: STATUT_CLIENT_LABELS.ACTIVE },
-              { value: StatutClient.SUSPENDED, label: STATUT_CLIENT_LABELS.SUSPENDED },
-              { value: StatutClient.INACTIVE, label: STATUT_CLIENT_LABELS.INACTIVE }
-            ]}
-            className="mb-0 [&>select]:h-8 [&>select]:text-xs [&>select]:py-0"
-            containerClassName="!mb-0"
-            placeholder={undefined} // Remove placeholder option for clearer selection
-          />
-        </div>
-
-        {/* Segment Filter - Fixed Width */}
-        <div className="w-[140px]">
-          <SelectField
-            label=""
-            name="segment"
-            value={filters.segment}
-            onChange={handleSegmentChange}
-            options={[
-              { value: 'all', label: 'Tous les segments' },
-              { value: 'VIP', label: 'VIP' },
-              { value: 'Premium', label: 'Premium' },
-              { value: 'Standard', label: 'Standard' }
-            ]}
-            className="mb-0 [&>select]:h-8 [&>select]:text-xs [&>select]:py-0"
-            containerClassName="!mb-0"
-            placeholder={undefined}
-          />
-        </div>
-
-        {/* Clear Button */}
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={X}
-            onClick={clearFilters}
-            className="text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 h-8 w-8 p-0 flex items-center justify-center shrink-0"
-            title="Effacer les filtres"
-          />
-        )}
+    <div className={`flex items-center gap-1.5 w-full ${className}`}>
+      {/* Search */}
+      <div className="flex-1 min-w-0">
+        <SearchInput
+          value={filters.searchTerm}
+          onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
+          onClear={() => setFilters(prev => ({ ...prev, searchTerm: '' }))}
+          placeholder="Rechercher un client..."
+          className="w-full"
+        />
       </div>
+
+      {/* Status filter */}
+      <select
+        value={filters.status}
+        onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+        className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-blue-500/30 ${
+          filters.status !== 'all'
+            ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'
+            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+        }`}
+        style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")` }}
+      >
+        {STATUS_OPTIONS.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.value === 'all' ? 'Tous les statuts' : opt.label}</option>
+        ))}
+      </select>
+
+      {/* Segment filter */}
+      <select
+        value={filters.segment}
+        onChange={(e) => setFilters(prev => ({ ...prev, segment: e.target.value }))}
+        className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-blue-500/30 ${
+          filters.segment !== 'all'
+            ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'
+            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+        }`}
+        style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")` }}
+      >
+        {SEGMENT_OPTIONS.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.value === 'all' ? 'Tous les segments' : opt.label}</option>
+        ))}
+      </select>
+
+      {/* Active filter indicator + clear */}
+      {hasActiveFilters && (
+        <button
+          onClick={clearFilters}
+          className="h-10 sm:h-11 px-2.5 flex items-center gap-1 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg transition-colors shrink-0"
+          title="Effacer les filtres"
+        >
+          <X size={12} />
+          <span>{activeCount}</span>
+        </button>
+      )}
     </div>
   );
 }

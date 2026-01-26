@@ -42,7 +42,7 @@ interface Compte {
     prenom?: string;
     phone?: string;
     telephone?: string;
-    photo?: string;
+    photoUrl?: string;
   } | null;
 }
 
@@ -104,7 +104,7 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
             const clientName = formatClientName(account.clients?.nom, account.clients?.prenom);
             const initials = getInitials(account.clients?.nom || '?', account.clients?.prenom);
             const avatarColor = getAvatarColor(clientName || 'Inconnu');
-            const photoUrl = resolveStorageUrl(account.clients?.photo);
+            const photoUrl = resolveStorageUrl(account.clients?.photoUrl);
 
             return (
               <div className="flex items-center gap-3 min-w-0">

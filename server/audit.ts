@@ -139,7 +139,24 @@ export async function getAuditLogs(
   }
 ): Promise<any[]> {
   try {
-    let query = db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt));
+    const conditions = [];
+
+    if (filters?.userId) {
+      conditions.push(eq(auditLogs.userId, filters.userId));
+    }
+    if (filters?.action) {
+      conditions.push(eq(auditLogs.action, filters.action));
+    }
+    if (filters?.resource) {
+      conditions.push(eq(auditLogs.resource, filters.resource));
+    }
+    if (filters?.statut) {
+      conditions.push(eq(auditLogs.statut, filters.statut));
+    }
+
+    let query = conditions.length > 0
+      ? db.select().from(auditLogs).where(and(...conditions)).orderBy(desc(auditLogs.createdAt))
+      : db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt));
 
     if (filters?.limit) {
       query = query.limit(filters.limit) as any;

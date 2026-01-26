@@ -928,7 +928,14 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
     results.push({ table: 'emailProviderSettings', action: 'skipped', count: 0, details: 'exists' });
   }
 
-  // 2. MTN SMS Provider (disabled by default)
+  // 2. MTN SMS Provider — auto-enabled if env vars are set
+  const mtnClientId = process.env.MTN_SMS_CLIENT_ID || '';
+  const mtnClientSecret = process.env.MTN_SMS_CLIENT_SECRET || '';
+  const mtnSenderId = process.env.MTN_SMS_SENDER_ID || 'COFIN';
+  const mtnTokenUrl = process.env.MTN_SMS_TOKEN_URL || 'https://api.mtn.com/v1/oauth/access_token/accesstoken?grant_type=client_credentials';
+  const mtnBaseUrl = process.env.MTN_SMS_BASE_URL || 'https://api.mtn.com/v2/messages/sms/outbound';
+  const mtnHasCredentials = !!(mtnClientId && mtnClientSecret);
+
   const [existingMtn] = await db.select().from(smsProviderSettings)
     .where(eq(smsProviderSettings.providerName, 'mtn'));
   if (!existingMtn) {
@@ -937,18 +944,35 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       providerName: 'mtn',
       apiKey: '',
       apiUrl: 'https://api.mtn.com',
-      senderId: 'COFIN',
-      enabled: false,
-      isPrimary: false,
-      isActive: false,
+      senderId: mtnSenderId,
+      enabled: mtnHasCredentials,
+      isPrimary: mtnHasCredentials,
+      isActive: mtnHasCredentials,
       settings: {
-        clientId: '',
-        clientSecret: '',
-        tokenUrl: 'https://api.mtn.com/v1/oauth/access_token/accesstoken?grant_type=client_credentials',
-        smsBaseUrl: 'https://api.mtn.com/v2/messages/sms/outbound',
+        clientId: mtnClientId,
+        clientSecret: mtnClientSecret,
+        tokenUrl: mtnTokenUrl,
+        smsBaseUrl: mtnBaseUrl,
       },
     });
-    results.push({ table: 'smsProviderSettings (MTN)', action: 'created', count: 1 });
+    results.push({ table: 'smsProviderSettings (MTN)', action: 'created', count: 1, details: mtnHasCredentials ? 'enabled (credentials from env)' : 'disabled (no credentials)' });
+  } else if (mtnHasCredentials && !existingMtn.isActive) {
+    // Update existing entry with env credentials if not yet active
+    await db.update(smsProviderSettings)
+      .set({
+        senderId: mtnSenderId,
+        enabled: true,
+        isPrimary: true,
+        isActive: true,
+        settings: {
+          clientId: mtnClientId,
+          clientSecret: mtnClientSecret,
+          tokenUrl: mtnTokenUrl,
+          smsBaseUrl: mtnBaseUrl,
+        },
+      })
+      .where(eq(smsProviderSettings.providerName, 'mtn'));
+    results.push({ table: 'smsProviderSettings (MTN)', action: 'updated', count: 1, details: 'activated with env credentials' });
   } else {
     results.push({ table: 'smsProviderSettings (MTN)', action: 'skipped', count: 0, details: 'exists' });
   }

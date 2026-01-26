@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Send, Globe, MapPin, Users, Calculator, CreditCard, Banknote, 
-  Clock, CheckCircle2, AlertCircle, ArrowRight, Building2, Smartphone,
-  X, Search, Star, Shield, Zap, TrendingDown, Wallet, History,
-  FileText, Phone, Mail, User, ChevronRight, RefreshCw, Landmark, 
-  DollarSign, Euro, Coins, Earth, AlertTriangle
+import {
+  Send, Globe, MapPin, Users, Calculator, CreditCard,
+  Clock, CheckCircle2, AlertCircle, ArrowRight, Building2,
+  X, Search, Shield, Zap, TrendingDown, Wallet, History,
+  FileText, Phone, Mail, User, ChevronRight, RefreshCw,
+  Coins, AlertTriangle
 } from 'lucide-react';
 import { Button, Card, Badge, TabGroup, StatCard, Modal, ResponsiveTable, FormField, SelectField } from '../../ui';
 import TransactionFlow from './TransactionFlow';
@@ -473,7 +473,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
 export default function TransfertArgent() {
   const [showCalculator, setShowCalculator] = useState(false);
   const [showNewTransfer, setShowNewTransfer] = useState<'local' | 'international' | null>(null);
-  const [activeTab, setActiveTab] = useState<'send' | 'history' | 'rates'>('send');
+  const [activeTab, setActiveTab] = useState<'send' | 'history'>('send');
 
   const recentTransfers = [
     { id: 'TRF001', recipient: 'Marie Ngouabi', country: 'RD Congo', amount: 150000, received: 610.5, currency: 'CDF', status: 'completed', date: '15/12/2024' },
@@ -514,11 +514,10 @@ export default function TransfertArgent() {
 
       <TabGroup
         activeTab={activeTab}
-        onTabChange={(key) => setActiveTab(key as 'send' | 'history' | 'rates')}
+        onTabChange={(key) => setActiveTab(key as 'send' | 'history')}
         tabs={[
           { key: 'send', label: 'Envoyer', icon: Send },
           { key: 'history', label: 'Historique', icon: History },
-          { key: 'rates', label: 'Tarifs', icon: TrendingDown },
         ]}
         variant="pills"
         size="sm"
@@ -544,110 +543,6 @@ export default function TransfertArgent() {
               />
             </div>
           </Card>
-        )}
-
-        {activeTab === 'rates' && (
-          <div className="h-full overflow-y-auto custom-scrollbar space-y-6 pr-2">
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
-              <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                <TrendingDown className="text-emerald-400" size={18} />
-                Grille Tarifaire Transferts Locaux
-              </h3>
-              <div className="grid md:grid-cols-3 gap-3">
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-1">
-                    <Banknote className="text-emerald-400" size={18} />
-                  </div>
-                  <h4 className="text-white text-sm font-bold">Espèces</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">500 XAF fixe + 0.5%</p>
-                </div>
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-1">
-                    <Smartphone className="text-emerald-400" size={18} />
-                  </div>
-                  <h4 className="text-white text-sm font-bold">Mobile Money</h4>
-                  <p className="text-emerald-400 text-xs mt-0.5 font-bold">200 XAF fixe + 0.3%</p>
-                </div>
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center mb-1">
-                    <Landmark className="text-blue-400" size={18} />
-                  </div>
-                  <h4 className="text-white text-sm font-bold">Virement bancaire</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">1,000 XAF fixe + 0.8%</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
-              <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                <Globe className="text-blue-400" size={18} />
-                Grille Tarifaire Transferts Internationaux
-              </h3>
-              <div className="grid md:grid-cols-4 gap-3">
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center mb-1">
-                    <Globe className="text-amber-400" size={18} />
-                  </div>
-                  <h4 className="text-white text-sm font-bold">Afrique</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">2,500 XAF + 1.5%</p>
-                </div>
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center mb-1">
-                    <Euro className="text-blue-400" size={18} />
-                  </div>
-                  <h4 className="text-white text-sm font-bold">Europe</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">5,000 XAF + 2.0%</p>
-                </div>
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center mb-1">
-                    <DollarSign className="text-emerald-400" size={18} />
-                  </div>
-                  <h4 className="text-white text-sm font-bold">Amérique</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">6,000 XAF + 2.5%</p>
-                </div>
-                <div className="bg-slate-700/50 rounded-xl p-3">
-                  <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center mb-1">
-                    <Earth className="text-purple-400" size={18} />
-                  </div>
-                  <h4 className="text-white text-sm font-bold">Asie & MO</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">7,000 XAF + 3.0%</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4">
-              <h3 className="text-base font-bold text-emerald-400 mb-3 flex items-center gap-2">
-                <Star size={18} />
-                Comparaison marché
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-emerald-500/30">
-                      <th className="px-2 py-2 text-left text-emerald-300">Service</th>
-                      <th className="px-2 py-2 text-center text-emerald-300">Frais</th>
-                      <th className="px-2 py-2 text-center text-emerald-300">Délai</th>
-                      <th className="px-2 py-2 text-center text-emerald-300">Momo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="bg-emerald-500/10">
-                      <td className="px-2 py-2 text-white font-bold">COFIN</td>
-                      <td className="px-2 py-2 text-center text-emerald-400 font-bold">1.5% - 3%</td>
-                      <td className="px-2 py-2 text-center text-white">Direct</td>
-                      <td className="px-2 py-2 text-center"><CheckCircle2 className="text-emerald-400 mx-auto" size={14} /></td>
-                    </tr>
-                    <tr className="border-t border-slate-700">
-                      <td className="px-2 py-2 text-slate-400">Western Union</td>
-                      <td className="px-2 py-2 text-center text-red-400">5% - 10%</td>
-                      <td className="px-2 py-2 text-center text-slate-400">1-3j</td>
-                      <td className="px-2 py-2 text-center text-slate-500">-</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
         )}
       </div>
 

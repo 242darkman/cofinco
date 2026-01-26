@@ -651,4 +651,88 @@ export class StorageService {
       private: privateKeys.length,
     };
   }
+
+  /**
+   * Liste tous les fichiers d'une entité avec métadonnées
+   */
+  static async getEntityFiles(
+    entityType: StorageEntityType,
+    entityId: string
+  ): Promise<Array<{ key: string; name: string; url: string | null; bucket: 'public' | 'private'; size?: number; lastModified?: Date }>> {
+    const files: Array<{ key: string; name: string; url: string | null; bucket: 'public' | 'private'; size?: number; lastModified?: Date }> = [];
+
+    // Public files
+    for (const [_, config] of Object.entries(STORAGE_CONFIG) as [string, { bucket: string; basePath: string }][]) {
+      if (config.bucket === 'public') {
+        const prefix = `${config.basePath}/${entityType}/${entityId}/`;
+        try {
+          let continuationToken: string | undefined;
+          do {
+            const response = await s3Client.send(new ListObjectsV2Command({
+              Bucket: PUBLIC_BUCKET,
+              Prefix: prefix,
+              ContinuationToken: continuationToken,
+            }));
+            if (response.Contents) {
+              for (const obj of response.Contents) {
+                if (obj.Key) {
+                  files.push({
+                    key: obj.Key,
+                    name: obj.Key.split('/').pop() || obj.Key,
+                    url: this.getPublicUrl(obj.Key),
+                    bucket: 'public',
+                    size: obj.Size,
+                    lastModified: obj.LastModified,
+                  });
+                }
+              }
+            }
+            continuationToken = response.NextContinuationToken;
+          } while (continuationToken);
+        } catch (error: any) {
+          if (error?.name !== 'NoSuchBucket') {
+            console.warn(`Error listing public files for ${prefix}:`, error?.message);
+          }
+        }
+      }
+    }
+
+    // Private files
+    for (const [_, config] of Object.entries(STORAGE_CONFIG) as [string, { bucket: string; basePath: string }][]) {
+      if (config.bucket === 'private') {
+        const prefix = `${config.basePath}/${entityType}/${entityId}/`;
+        try {
+          let continuationToken: string | undefined;
+          do {
+            const response = await s3Client.send(new ListObjectsV2Command({
+              Bucket: PRIVATE_BUCKET,
+              Prefix: prefix,
+              ContinuationToken: continuationToken,
+            }));
+            if (response.Contents) {
+              for (const obj of response.Contents) {
+                if (obj.Key) {
+                  files.push({
+                    key: obj.Key,
+                    name: obj.Key.split('/').pop() || obj.Key,
+                    url: null, // Private files need signed URL
+                    bucket: 'private',
+                    size: obj.Size,
+                    lastModified: obj.LastModified,
+                  });
+                }
+              }
+            }
+            continuationToken = response.NextContinuationToken;
+          } while (continuationToken);
+        } catch (error: any) {
+          if (error?.name !== 'NoSuchBucket') {
+            console.warn(`Error listing private files for ${prefix}:`, error?.message);
+          }
+        }
+      }
+    }
+
+    return files;
+  }
 }

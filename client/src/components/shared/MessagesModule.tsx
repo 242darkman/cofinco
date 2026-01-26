@@ -3,6 +3,7 @@ import { MessageCircle, Send, Search, Clock, CheckCheck, Paperclip, Smile, MoreV
 import { Card, Badge, SearchInput, IconButton, Button } from '../ui';
 import { useConversations, useChat, useSendMessage, useSearchUsers } from '../../hooks/useMessages';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { resolveStorageUrl } from '../../lib/format';
 
 /**
  * Formate un timestamp de message de manière intelligente :
@@ -40,12 +41,26 @@ function formatMessageTime(dateInput: string | Date): string {
   }
 }
 
-export default function MessagesModule() {
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (parts[0]?.[0] || '?').toUpperCase();
+}
+
+interface MessagesModuleProps {
+  initialChatUserId?: string;
+  initialChatUserName?: string;
+  initialChatUserPhoto?: string | null;
+}
+
+export default function MessagesModule({ initialChatUserId, initialChatUserName, initialChatUserPhoto }: MessagesModuleProps) {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [selectedContactInfo, setSelectedContactInfo] = useState<{name: string, role?: string, agence?: string, photo?: string | null} | null>(null);
+  const initialChatHandled = useRef(false);
+
   // Real-time hooks
   const { onlineUsers, typingUsers, sendTyping } = useWebSocket();
   const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
@@ -55,6 +70,18 @@ export default function MessagesModule() {
   const { data: messages, isLoading: loadingMessages } = useChat(selectedConversation);
   const { mutate: sendMessage, isPending: sending } = useSendMessage();
   const { data: searchResults } = useSearchUsers(searchQuery);
+
+  // Auto-open conversation when navigating from another module
+  useEffect(() => {
+    if (initialChatUserId && !initialChatHandled.current) {
+      initialChatHandled.current = true;
+      setSelectedConversation(initialChatUserId);
+      setShowMobileChat(true);
+      if (initialChatUserName) {
+        setSelectedContactInfo({ name: initialChatUserName, photo: initialChatUserPhoto });
+      }
+    }
+  }, [initialChatUserId, initialChatUserName, initialChatUserPhoto]);
 
   const handleSendMessage = () => {
     if (messageInput.trim() && selectedConversation) {
@@ -84,21 +111,19 @@ export default function MessagesModule() {
     }
   };
 
-  // Store selected contact info for header display (especially useful for new conversations from search)
-  const [selectedContactInfo, setSelectedContactInfo] = useState<{name: string, role?: string, agence?: string} | null>(null);
-
-  const handleSelectConversation = (id: string, name?: string, role?: string, agence?: string) => {
+  const handleSelectConversation = (id: string, name?: string, role?: string, agence?: string, photo?: string | null) => {
     setSelectedConversation(id);
     setSearchQuery(''); // Close search results
     setShowMobileChat(true);
-    
+
     // Store contact info for display in header
     if (name) {
-      setSelectedContactInfo({ name, role, agence });
+      setSelectedContactInfo({ name, role, agence, photo });
     } else {
       // Find from conversations if available
       const conv = conversations?.find(c => c.partnerId === id);
-      setSelectedContactInfo(conv ? { name: conv.partnerName } : null);
+      const convPhoto = (conv as any)?.partner_avatar || (conv as any)?.partnerAvatar || null;
+      setSelectedContactInfo(conv ? { name: conv.partnerName, photo: convPhoto } : null);
     }
   };
 
@@ -184,16 +209,20 @@ export default function MessagesModule() {
                return (
                 <button
                   key={id}
-                  onClick={() => handleSelectConversation(id, name, role || undefined, agence || undefined)}
+                  onClick={() => handleSelectConversation(id, name, role || undefined, agence || undefined, avatar || undefined)}
                   className={`w-full p-4 border-b border-slate-700/50 transition text-left group
                     ${selectedConversation === id ? 'bg-blue-600/20 border-l-2 border-l-blue-500' : 'hover:bg-slate-700/30'}
                   `}
                 >
                   <div className="flex items-start gap-3">
                     <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-                        {name?.charAt(0)}
-                      </div>
+                      {avatar ? (
+                        <img src={resolveStorageUrl(avatar)} alt={name} className="w-12 h-12 rounded-full object-cover shadow-lg shadow-blue-500/20" />
+                      ) : (
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
+                          {getInitials(name || '')}
+                        </div>
+                      )}
                       {isOnline && (
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-800 rounded-full shadow-sm"></div>
                       )}
@@ -249,14 +278,25 @@ export default function MessagesModule() {
                 />
                 
                 {/* Avatar with online indicator */}
-                <div className="relative flex-shrink-0">
-                   <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-                     {selectedContactInfo?.name?.charAt(0) || conversations?.find((c: any) => (c.partner_id || c.partnerId) === selectedConversation)?.partnerName?.charAt(0) || "?"}
-                   </div>
-                   {onlineUsers.has(selectedConversation) && (
-                     <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-800 rounded-full"></div>
-                   )}
-                </div>
+                {(() => {
+                  const conv = conversations?.find((c: any) => (c.partner_id || c.partnerId) === selectedConversation);
+                  const headerPhoto = selectedContactInfo?.photo || (conv as any)?.partner_avatar || (conv as any)?.partnerAvatar || null;
+                  const headerName = selectedContactInfo?.name || (conv as any)?.partnerName || (conv as any)?.partner_name || '';
+                  return (
+                    <div className="relative flex-shrink-0">
+                      {headerPhoto ? (
+                        <img src={resolveStorageUrl(headerPhoto)} alt={headerName} className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover shadow-lg shadow-blue-500/20" />
+                      ) : (
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
+                          {getInitials(headerName || '?')}
+                        </div>
+                      )}
+                      {onlineUsers.has(selectedConversation) && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-800 rounded-full"></div>
+                      )}
+                    </div>
+                  );
+                })()}
                 
                 {/* Contact info */}
                 <div className="min-w-0 flex-1">

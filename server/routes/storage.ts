@@ -429,6 +429,31 @@ router.delete('/entity/:entityType/:entityId', requireAuth, async (req, res) => 
 });
 
 /**
+ * GET /api/storage/entity/:entityType/:entityId/files
+ * Liste les fichiers d'une entité avec métadonnées
+ */
+router.get('/entity/:entityType/:entityId/files', requireAuth, async (req, res) => {
+  try {
+    const { entityType, entityId } = req.params;
+
+    const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine'];
+    if (!validEntityTypes.includes(entityType as StorageEntityType)) {
+      return res.status(400).json({ error: 'entityType invalide' });
+    }
+
+    const files = await StorageService.getEntityFiles(
+      entityType as StorageEntityType,
+      entityId
+    );
+
+    res.json({ entityType, entityId, files });
+  } catch (error: any) {
+    console.error('Entity files list error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/storage/entity/:entityType/:entityId/count
  * Compte les fichiers d'une entité
  */

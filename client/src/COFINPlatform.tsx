@@ -177,6 +177,18 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     }, 300);
   };
 
+  // Global navigation event listener (cross-module navigation)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.module) {
+        handleModuleChange(detail.module, detail.subModule, detail.data);
+      }
+    };
+    window.addEventListener('navigate-module', handler);
+    return () => window.removeEventListener('navigate-module', handler);
+  }, []);
+
 
 
   const handleQuickAction = (action: string) => {
@@ -334,7 +346,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
       case 'messages':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Messages" />}>
-            <MessagesModule />
+            <MessagesModule initialChatUserId={moduleData?.chatUserId} initialChatUserName={moduleData?.chatUserName} initialChatUserPhoto={moduleData?.chatUserPhoto} />
           </Suspense>
         );
       case 'agentValidations':
