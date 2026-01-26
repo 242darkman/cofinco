@@ -193,11 +193,11 @@ export function registerMessagesRoutes(app: Express) {
           ne(users.id, req.user.id),
           eq(users.canLogin, true), // Only users who can login
           sql`(
-            username ILIKE ${`%${query}%`} OR
-            nom ILIKE ${`%${query}%`} OR
-            COALESCE(prenom, '') ILIKE ${`%${query}%`} OR
-            (nom || ' ' || COALESCE(prenom, '')) ILIKE ${`%${query}%`} OR
-            (COALESCE(prenom, '') || ' ' || nom) ILIKE ${`%${query}%`}
+            ${users.username} ILIKE ${`%${query}%`} OR
+            ${users.nom} ILIKE ${`%${query}%`} OR
+            COALESCE(${users.prenom}, '') ILIKE ${`%${query}%`} OR
+            (${users.nom} || ' ' || COALESCE(${users.prenom}, '')) ILIKE ${`%${query}%`} OR
+            (COALESCE(${users.prenom}, '') || ' ' || ${users.nom}) ILIKE ${`%${query}%`}
           )`
         )
       )
