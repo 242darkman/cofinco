@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Camera, RefreshCw, Check, AlertCircle, X, Loader2, User, FileText } from 'lucide-react';
-import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { useEntityUpload } from '../../hooks/useEntityUpload';
+import type { StorageFileType, StorageEntityType } from '@shared/config/storage-paths';
 import { useImageCompression } from '../../hooks/useImageCompression';
 import { useSecureDocument } from '../../hooks/useSecureDocument';
 
@@ -38,6 +39,14 @@ interface SmartDocumentUploadProps {
   watermarkIcon?: 'front' | 'back' | 'scan' | 'none';
   /** Custom CTA text for empty state */
   ctaText?: string;
+  /** Entity-based upload params */
+  fileType?: StorageFileType;
+  entityType?: StorageEntityType;
+  entityId?: string;
+  /** Deferred upload mode — stores file locally without uploading (for entity creation flows) */
+  deferUpload?: boolean;
+  /** Called with the (compressed) file when deferUpload is true */
+  onFileSelected?: (file: File) => void;
 }
 
 type UploadState = 'empty' | 'loading' | 'success' | 'error';
@@ -131,6 +140,11 @@ export function SmartDocumentUpload({
   aspectRatio = 'auto',
   watermarkIcon = 'scan',
   ctaText,
+  fileType,
+  entityType,
+  entityId,
+  deferUpload = false,
+  onFileSelected,
 }: SmartDocumentUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadState, setUploadState] = useState<UploadState>(existingDocument ? 'success' : 'empty');
@@ -141,10 +155,11 @@ export function SmartDocumentUpload({
   const [isPdfFile, setIsPdfFile] = useState(false);
   const [isNewlyUploaded, setIsNewlyUploaded] = useState(false);
 
-  // Hooks
-  const { uploadFile, isUploading } = useMinIOUpload({
-    path: isPrivate ? 'kyc' : 'profiles',
-    isPublic: !isPrivate,
+  // Hooks — entity-based upload
+  const { uploadFile, isUploading } = useEntityUpload({
+    fileType: fileType || (isPrivate ? 'kyc' : 'profile'),
+    entityType: entityType || 'client',
+    entityId: entityId || '',
     onError: (err) => {
       setUploadState('error');
       setErrorMessage(err.message || 'Upload failed');
@@ -265,6 +280,35 @@ export function SmartDocumentUpload({
         setProgress(50);
       }
 
+      // Track if this is a PDF (can't preview as image)
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+      // Defer mode: store file locally without uploading (entity not yet created)
+      if (deferUpload) {
+        setProgress(80);
+        onFileSelected?.(fileToUpload);
+
+        const tempDocument: UploadedDocument = {
+          id: crypto.randomUUID(),
+          documentType,
+          documentName: file.name,
+          documentUrl: preview || '',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          isPrivate,
+        };
+
+        setIsPdfFile(isPdf);
+        setIsNewlyUploaded(true);
+        setCurrentDocument(tempDocument);
+        setUploadState('success');
+        setProgress(100);
+        if (isPdf) setLocalPreview(null);
+        triggerHaptic();
+        onUploadComplete(tempDocument);
+        return;
+      }
+
       // Upload
       setProgress(60);
       const objectKeyOrUrl = await uploadFile(fileToUpload);
@@ -286,20 +330,17 @@ export function SmartDocumentUpload({
         isPrivate,
       };
 
-      // Track if this is a PDF (can't preview as image)
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       setIsPdfFile(isPdf);
       setIsNewlyUploaded(true);
-      
+
       setCurrentDocument(newDocument);
       setUploadState('success');
       setProgress(100);
-      
+
       // Keep local preview for images, clear for PDFs
       if (isPdf) {
         setLocalPreview(null);
       }
-      // For images, keep the localPreview to display immediately
 
       // Haptic feedback on success
       triggerHaptic();
@@ -313,7 +354,7 @@ export function SmartDocumentUpload({
       setLocalPreview(null);
       setIsPdfFile(false);
     }
-  }, [validateFile, createPreview, shouldCompress, compressImage, uploadFile, documentType, isPrivate, onUploadComplete, triggerHaptic]);
+  }, [validateFile, createPreview, shouldCompress, compressImage, uploadFile, documentType, isPrivate, onUploadComplete, triggerHaptic, deferUpload, onFileSelected]);
 
   // Handle input change
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -656,6 +697,12 @@ interface DocumentUploadGridProps {
   onDocumentChange: (type: DocumentType, doc: UploadedDocument | null) => void;
   isPrivate?: boolean;
   className?: string;
+  /** Entity-based upload params */
+  fileType?: StorageFileType;
+  entityType?: StorageEntityType;
+  entityId?: string;
+  deferUpload?: boolean;
+  onFileSelected?: (file: File, docType: DocumentType) => void;
 }
 
 export function DocumentUploadGrid({
@@ -663,6 +710,11 @@ export function DocumentUploadGrid({
   onDocumentChange,
   isPrivate = true,
   className = '',
+  fileType,
+  entityType,
+  entityId,
+  deferUpload,
+  onFileSelected,
 }: DocumentUploadGridProps) {
   return (
     <div className={`grid grid-cols-2 gap-3 ${className}`}>
@@ -673,6 +725,11 @@ export function DocumentUploadGrid({
           documentType={doc.type}
           existingDocument={doc.existing}
           isPrivate={isPrivate}
+          fileType={fileType}
+          entityType={entityType}
+          entityId={entityId}
+          deferUpload={deferUpload}
+          onFileSelected={onFileSelected ? (file) => onFileSelected(file, doc.type) : undefined}
           onUploadComplete={(uploaded) => onDocumentChange(doc.type, uploaded)}
           onRemove={() => onDocumentChange(doc.type, null)}
         />

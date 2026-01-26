@@ -3,7 +3,7 @@ import { Camera, Eye, EyeOff, Key, Upload, X, Users, Shield, User as UserIcon, M
 import { Button, Modal, FormField, SelectField } from '../../ui';
 import CameraCapture from '../../shared/CameraCapture';
 import { toast } from '../../../lib/toast';
-import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
+import { useEntityUpload } from '../../../hooks/useEntityUpload';
 import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 import PasswordStrengthIndicator from '../../auth/PasswordStrengthIndicator';
@@ -91,9 +91,11 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
     };
   }, [securitySettings]);
 
-  const { uploadFile, isUploading } = useMinIOUpload({
-    path: 'profiles',
-    isPublic: true,
+  const tempUserIdRef = useRef(crypto.randomUUID());
+  const { uploadFile, isUploading } = useEntityUpload({
+    fileType: 'profile',
+    entityType: 'user',
+    entityId: initialData?.id || tempUserIdRef.current,
     onError: (err: any) => toast.error(`Erreur upload: ${err.message}`)
   });
 

@@ -4,7 +4,7 @@ import { Card, Badge, Skeleton } from '../ui';
 import { FileUploadZone } from '../ui/FileUploadZone';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { useSecureDocument } from '../../hooks/useSecureDocument';
 
 // Helper to detect image URLs
@@ -216,9 +216,10 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   const canVerifyDocuments = isAdmin || hasPermission('kyc', 'approve') || hasPermission('admin', 'manage');
   const canDeleteDocuments = hasPermission('clients', 'edit') || hasPermission('kyc', 'delete');
 
-  const { uploadFile } = useMinIOUpload({
-    path: 'kyc', 
-    isPublic: false, 
+  const { uploadFile } = useEntityUpload({
+    fileType: 'kyc',
+    entityType: 'client',
+    entityId: clientId,
     onError: (err: Error) => console.error("Upload error", err)
   });
 

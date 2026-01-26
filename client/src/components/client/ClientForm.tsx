@@ -1,5 +1,5 @@
 import type { ClientWithIdentity } from '@shared/schema';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion, Briefcase, Calendar, DollarSign, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
@@ -11,7 +11,7 @@ import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '.
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole, SystemRole } from '@shared/types/roles';
 import { agenceApi, employeApi } from '../../lib/api-client';
-import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl } from '../../lib/format';
 import { StatutClient, StatutAgence } from '@shared/enum/status-constants';
 
@@ -431,10 +431,12 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     }));
   }, []);
 
-  // MinIO Hook for profile photo
-  const { uploadFile: uploadProfile } = useMinIOUpload({
-    path: 'profiles',
-    isPublic: true,
+  // Entity upload for profile photo
+  const tempClientIdRef = useRef(crypto.randomUUID());
+  const { uploadFile: uploadProfile } = useEntityUpload({
+    fileType: 'profile',
+    entityType: 'client',
+    entityId: client?.id || tempClientIdRef.current,
     onError: (err) => console.error("Profile upload error", err)
   });
 

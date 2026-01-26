@@ -9,8 +9,13 @@ import { SystemRole, normalizeRole } from '@shared/types/roles';
 import {
   StorageFileType,
   StorageEntityType,
+  STORAGE_CONFIG,
   isPublicFileType
 } from '@shared/config/storage-paths';
+
+// Derive valid types from config — single source of truth
+const validFileTypes = Object.keys(STORAGE_CONFIG) as StorageFileType[];
+const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine', 'prospection'];
 
 const router = Router();
 
@@ -91,66 +96,6 @@ router.get('/files/:key(*)', async (req, res) => {
 // ============================================
 // ROUTES AUTHENTIFIÉES
 // ============================================
-
-/**
- * POST /api/storage/upload
- * Upload direct via backend
- * Retourne TOUJOURS { key, url } avec key = object key
- */
-router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Aucun fichier fourni' });
-    }
-
-    const { path = 'misc', isPublic = 'false' } = req.body;
-    const isPublicBool = isPublic === 'true' || isPublic === true;
-
-    // Upload et récupération de l'object key (jamais l'URL)
-    const key = await StorageService.uploadFile(req.file, path, isPublicBool);
-
-    // Construire l'URL pour les fichiers publics
-    const url = isPublicBool ? StorageService.getPublicUrl(key) : null;
-
-    res.json({
-      success: true,
-      key,        // Object key (à stocker en DB)
-      url,        // URL complète pour affichage (null si privé)
-    });
-  } catch (error: any) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * POST /api/storage/presigned-url
- * Get presigned URL for direct client upload
- */
-router.post('/presigned-url', requireAuth, async (req, res) => {
-  try {
-    const { filename, contentType, path = 'misc', isPublic = false } = req.body;
-
-    if (!filename || !contentType) {
-      return res.status(400).json({ error: 'filename et contentType requis' });
-    }
-
-    const result = await StorageService.getPresignedUploadUrl(
-      filename,
-      contentType,
-      path,
-      isPublic
-    );
-
-    res.json({
-      uploadUrl: result.uploadUrl,
-      key: result.objectKey,  // Renommé pour cohérence
-    });
-  } catch (error: any) {
-    console.error('Presigned URL error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 /**
  * GET /api/storage/documents/:id/view
@@ -286,8 +231,8 @@ router.post('/entity/upload', requireAuth, upload.single('file'), async (req, re
     }
 
     // Validation des types
-    const validFileTypes: StorageFileType[] = ['profile', 'kyc', 'credit', 'employe', 'tontine', 'misc'];
-    const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine'];
+    // validFileTypes/validEntityTypes defined at module top from STORAGE_CONFIG
+    // validEntityTypes defined at module top
 
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: `fileType invalide. Valeurs possibles: ${validFileTypes.join(', ')}` });
@@ -338,8 +283,8 @@ router.post('/entity/presigned-url', requireAuth, async (req, res) => {
     }
 
     // Validation des types
-    const validFileTypes: StorageFileType[] = ['profile', 'kyc', 'credit', 'employe', 'tontine', 'misc'];
-    const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine'];
+    // validFileTypes/validEntityTypes defined at module top from STORAGE_CONFIG
+    // validEntityTypes defined at module top
 
     if (!validFileTypes.includes(fileType)) {
       return res.status(400).json({ error: `fileType invalide` });
@@ -387,7 +332,7 @@ router.delete('/entity/:entityType/:entityId', requireAuth, async (req, res) => 
 
     const { entityType, entityId } = req.params;
 
-    const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine'];
+    // validEntityTypes defined at module top
     if (!validEntityTypes.includes(entityType as StorageEntityType)) {
       return res.status(400).json({ error: 'entityType invalide' });
     }
@@ -416,7 +361,7 @@ router.get('/entity/:entityType/:entityId/files', requireAuth, async (req, res) 
   try {
     const { entityType, entityId } = req.params;
 
-    const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine'];
+    // validEntityTypes defined at module top
     if (!validEntityTypes.includes(entityType as StorageEntityType)) {
       return res.status(400).json({ error: 'entityType invalide' });
     }
@@ -441,7 +386,7 @@ router.get('/entity/:entityType/:entityId/count', requireAuth, async (req, res) 
   try {
     const { entityType, entityId } = req.params;
 
-    const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine'];
+    // validEntityTypes defined at module top
     if (!validEntityTypes.includes(entityType as StorageEntityType)) {
       return res.status(400).json({ error: 'entityType invalide' });
     }

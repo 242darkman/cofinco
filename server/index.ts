@@ -89,7 +89,7 @@ app.use("/api/credits", sensitiveOpsLimiter);
 app.use("/api/remboursements", sensitiveOpsLimiter);
 app.use("/api/transactions-epargne", sensitiveOpsLimiter);
 app.use("/api/transferts", sensitiveOpsLimiter);
-app.use("/api/storage/upload", uploadLimiter);
+app.use("/api/storage/entity/upload", uploadLimiter);
 
 app.use(
   express.json({

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { LocationDisplay } from '../../common/LocationDisplay';
 import { formatClientName } from '../../../lib/format';
 import { clientApi } from '../../../lib/api-client';
-import { useMinIOUpload } from '../../../hooks/useMinIOUpload';
+import { useEntityUpload } from '../../../hooks/useEntityUpload';
 import { StatutClient } from '@shared/enum/status-constants';
 interface Client {
   id: string;
@@ -118,9 +118,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     documents_justificatifs: [] as string[],
   });
 
-  const { uploadFile: uploadActivityPhoto, isUploading: isUploadingPhoto } = useMinIOUpload({
-    path: 'credit-investigations',
-    isPublic: true // Must be public to display in UI
+  const { uploadFile: uploadActivityPhoto, isUploading: isUploadingPhoto } = useEntityUpload({
+    fileType: 'investigation',
+    entityType: 'client',
+    entityId: formData.client_id || clientId || '',
   });
 
   useEffect(() => {

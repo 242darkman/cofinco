@@ -252,3 +252,33 @@ export function useCreditDocUpload(
     onSuccess: onSuccess ? (result) => onSuccess(result.key) : undefined,
   });
 }
+
+/**
+ * Hook simplifié pour upload de photos d'enquête crédit
+ */
+export function useInvestigationUpload(
+  creditId: string,
+  onSuccess?: (key: string) => void
+) {
+  return useEntityUpload({
+    fileType: 'investigation',
+    entityType: 'credit',
+    entityId: creditId,
+    onSuccess: onSuccess ? (result) => onSuccess(result.key) : undefined,
+  });
+}
+
+/**
+ * Hook simplifié pour upload de photos de prospection
+ */
+export function useProspectionUpload(
+  prospectionId: string,
+  onSuccess?: (key: string) => void
+) {
+  return useEntityUpload({
+    fileType: 'prospection',
+    entityType: 'prospection',
+    entityId: prospectionId,
+    onSuccess: onSuccess ? (result) => onSuccess(result.key) : undefined,
+  });
+}

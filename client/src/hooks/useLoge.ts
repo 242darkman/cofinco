@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useUpload } from '@/hooks/use-upload';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEntityUpload } from '@/hooks/useEntityUpload';
 import { Folder, Image, Video, Music, Archive, FileText, File } from 'lucide-react';
 
 export interface Document {
@@ -73,13 +73,27 @@ export function useLoge() {
   const [authError, setAuthError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const { uploadFile, isUploading, progress } = useUpload({
-    onSuccess: (response) => {
-      if (response.objectPath) {
-        createDocumentRecord(response.objectPath, response.metadata);
+  const pendingFileRef = useRef<File | null>(null);
+  const { uploadFile: entityUploadFile, isUploading, progress } = useEntityUpload({
+    fileType: 'misc',
+    entityType: 'user',
+    entityId: 'loge',
+    onSuccess: (result) => {
+      const file = pendingFileRef.current;
+      if (file && result.key) {
+        createDocumentRecord(result.key, {
+          name: file.name,
+          contentType: file.type,
+          size: file.size,
+        });
       }
-    }
+      pendingFileRef.current = null;
+    },
   });
+  const uploadFile = useCallback(async (file: File) => {
+    pendingFileRef.current = file;
+    return entityUploadFile(file);
+  }, [entityUploadFile]);
 
   useEffect(() => {
     const logeToken = sessionStorage.getItem('logeToken');

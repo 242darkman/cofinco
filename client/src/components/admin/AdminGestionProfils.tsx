@@ -74,6 +74,7 @@ export default function AdminGestionProfils() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const tempUserIdRef = React.useRef(crypto.randomUUID());
 
   /* Permissions Management Hooks */
   const { permissions: adminPermissions } = useAdminPermissions();
@@ -291,12 +292,11 @@ export default function AdminGestionProfils() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('fileType', 'profile');
+      formData.append('entityType', 'user');
+      formData.append('entityId', tempUserIdRef.current);
 
-      // Upload directly to storage server
-      formData.append('path', 'profiles');
-      formData.append('isPublic', 'true');
-
-      const response = await fetch('/api/storage/upload', {
+      const response = await fetch('/api/storage/entity/upload', {
         method: 'POST',
         body: formData,
         credentials: 'include',

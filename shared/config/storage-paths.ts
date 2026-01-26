@@ -11,17 +11,19 @@
  * Types de fichiers supportés
  */
 export type StorageFileType =
-  | 'profile'      // Photos de profil (avatars)
-  | 'kyc'          // Documents KYC (pièces d'identité, justificatifs)
-  | 'credit'       // Documents de crédit
-  | 'employe'      // Documents employés (contrats, fiches de paie)
-  | 'tontine'      // Documents tontine
-  | 'misc';        // Fichiers divers
+  | 'profile'        // Photos de profil (avatars)
+  | 'kyc'            // Documents KYC (pièces d'identité, justificatifs)
+  | 'credit'         // Documents de crédit
+  | 'employe'        // Documents employés (contrats, fiches de paie)
+  | 'tontine'        // Documents tontine
+  | 'investigation'  // Photos enquêtes crédit (activité, terrain)
+  | 'prospection'    // Photos prospections terrain
+  | 'misc';          // Fichiers divers
 
 /**
  * Types d'entités qui peuvent avoir des fichiers
  */
-export type StorageEntityType = 'client' | 'user' | 'employe' | 'credit' | 'tontine';
+export type StorageEntityType = 'client' | 'user' | 'employe' | 'credit' | 'tontine' | 'prospection';
 
 /**
  * Configuration de bucket par type de fichier
@@ -35,6 +37,8 @@ export const STORAGE_CONFIG: Record<StorageFileType, {
   credit: { bucket: 'private', basePath: 'credits' },
   employe: { bucket: 'private', basePath: 'employes' },
   tontine: { bucket: 'private', basePath: 'tontines' },
+  investigation: { bucket: 'public', basePath: 'investigations' },
+  prospection: { bucket: 'private', basePath: 'prospections' },
   misc: { bucket: 'private', basePath: 'misc' },
 };
 
@@ -96,7 +100,7 @@ export function parseStoragePath(path: string): {
 
   if (!fileTypeEntry) return null;
 
-  const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine'];
+  const validEntityTypes: StorageEntityType[] = ['client', 'user', 'employe', 'credit', 'tontine', 'prospection'];
   if (!validEntityTypes.includes(entityType as StorageEntityType)) return null;
 
   return {
@@ -125,13 +129,3 @@ export function getEntityFilesPattern(
   };
 }
 
-/**
- * Mapping des anciens chemins vers les nouveaux
- * Pour la migration progressive
- */
-export const LEGACY_PATH_MAPPINGS: Record<string, { fileType: StorageFileType; entityType: StorageEntityType }> = {
-  'profiles': { fileType: 'profile', entityType: 'user' },
-  'avatars': { fileType: 'profile', entityType: 'user' },
-  'kyc': { fileType: 'kyc', entityType: 'client' },
-  'credit-docs': { fileType: 'credit', entityType: 'credit' },
-};

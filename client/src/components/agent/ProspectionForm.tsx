@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Save, User, Phone, MapPin, Briefcase, DollarSign, FileText, Camera, Image, Video, AlertTriangle, TrendingUp } from 'lucide-react';
 import { prospectionApi } from '../../lib/api-client';
 import { toast } from 'sonner';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { useEntityUpload } from '../../hooks/useEntityUpload';
 
 interface ProspectionFormProps {
   agentId?: string;
@@ -126,9 +126,11 @@ export default function ProspectionForm({ agentId, onClose, onSuccess }: Prospec
     }
   };
 
-  const { uploadFile, isUploading: isUploadingPhoto } = useMinIOUpload({
-    path: 'prospections',
-    isPublic: false,
+  const tempProspectionIdRef = useRef(crypto.randomUUID());
+  const { uploadFile, isUploading: isUploadingPhoto } = useEntityUpload({
+    fileType: 'prospection',
+    entityType: 'prospection',
+    entityId: tempProspectionIdRef.current,
     onError: (err) => toast.error(`Erreur upload: ${err.message}`)
   });
 

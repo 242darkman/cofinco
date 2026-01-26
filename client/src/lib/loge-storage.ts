@@ -42,15 +42,24 @@ export async function saveToLoge(
     // Étape 1: Demander une URL de téléchargement signée
     const fileName = options.nom.includes('.') ? options.nom : `${options.nom}.${getExtensionFromMimeType(file.type)}`;
 
-    const urlResponse = await fetch('/api/storage/presigned-url', {
+    // Map referenceType to valid entity types for structured storage
+    const entityTypeMap: Record<string, string> = {
+      credit: 'credit', client: 'client', tontine: 'tontine',
+      employe: 'employe', user: 'user', prospection: 'prospection',
+    };
+    const entityType = entityTypeMap[options.referenceType || ''] || 'client';
+    const entityId = options.referenceId || 'general';
+
+    const urlResponse = await fetch('/api/storage/entity/presigned-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
         filename: fileName,
         contentType: file.type || 'application/octet-stream',
-        path: options.categorie || 'general',
-        isPublic: options.visibilite === 'public',
+        fileType: 'misc',
+        entityType,
+        entityId,
       })
     });
 

@@ -4,7 +4,7 @@ import { Employe, EmployeFormData } from '../../hooks/hr/useEmployes';
 import { Modal, FormField, SelectField, Button, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
-import { useMinIOUpload } from '../../hooks/useMinIOUpload';
+import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { StatutUser } from '@shared/enum/status-constants';
 import { agenceApi } from '../../lib/api-client';
 import { resolveStorageUrl } from '@/lib/format';
@@ -559,9 +559,11 @@ export default function EmployeeForm({
     onClose();
   }, [onClose]);
 
-  const { uploadFile, isUploading } = useMinIOUpload({
-    path: 'employees',
-    isPublic: true,
+  const tempEmployeIdRef = useRef(crypto.randomUUID());
+  const { uploadFile, isUploading } = useEntityUpload({
+    fileType: 'profile',
+    entityType: 'employe',
+    entityId: editingEmploye?.id || tempEmployeIdRef.current,
     onError: (err) => toast.error(`Erreur upload: ${err.message}`)
   });
 

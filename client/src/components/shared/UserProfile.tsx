@@ -341,10 +341,11 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('path', 'profiles');
-      formData.append('isPublic', 'true');
+      formData.append('fileType', 'profile');
+      formData.append('entityType', 'user');
+      formData.append('entityId', user!.id);
 
-      const response = await fetch('/api/storage/upload', {
+      const response = await fetch('/api/storage/entity/upload', {
         method: 'POST',
         credentials: 'include',
         body: formData
