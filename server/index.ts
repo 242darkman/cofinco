@@ -21,6 +21,7 @@ import {
 } from "./middleware/security";
 import { startOutboxWorker, stopOutboxWorker } from "./services/outbox-worker";
 import { startNotificationWorker } from "./services/notifications/notification-worker";
+import { SmtpEmailProvider } from "./services/notifications/providers/email.provider";
 import { startSessionCleanupCron, stopSessionCleanupCron } from "./cron/session-cleanup";
 import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
 import { startScheduledAccountTransfersCron } from "./cron/scheduled-account-transfers";
@@ -171,6 +172,16 @@ app.use((req, res, next) => {
   // Start the notification delivery worker (SMS/Email queue processor)
   startNotificationWorker();
   log('[NotifWorker] Notification delivery worker started');
+
+  // Verify SMTP email provider connectivity
+  const smtpProvider = new SmtpEmailProvider();
+  smtpProvider.verify().then(({ ok, message }) => {
+    if (ok) {
+      log(`[Email] ${message}`);
+    } else {
+      logWarn(`[Email] ${message}`, 'email');
+    }
+  });
 
   // Start the caisse session cleanup cron job (closes expired sessions, monitors risky ones)
   startSessionCleanupCron();

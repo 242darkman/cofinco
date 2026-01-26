@@ -910,21 +910,49 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
     ];
   }
 
-  // 1. Email Provider Settings (SMTP disabled by default)
+  // 1. Email Provider Settings — auto-enabled if SMTP env vars are set
+  const smtpHost = process.env.SMTP_HOST || '';
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  const smtpUsername = process.env.SMTP_USERNAME || '';
+  const smtpPassword = process.env.SMTP_PASSWORD || '';
+  const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@cofin.co';
+  const smtpFromName = process.env.SMTP_FROM_NAME || 'COFIN&CO-M';
+  const smtpSecure = process.env.SMTP_SECURE === 'true';
+  const smtpHasCredentials = !!(smtpHost && smtpUsername && smtpPassword);
+
   const [existingEmail] = await db.select().from(emailProviderSettings).limit(1);
   if (!existingEmail) {
     await db.insert(emailProviderSettings).values({
       provider: 'SMTP',
-      providerName: 'SMTP par defaut',
-      host: 'smtp.example.com',
-      port: 587,
-      fromEmail: 'noreply@cofin.co',
-      fromName: 'COFIN&CO-M',
-      isActive: false,
+      providerName: smtpHasCredentials ? 'TurboSMTP' : 'SMTP par defaut',
+      host: smtpHost || 'smtp.example.com',
+      port: smtpPort,
+      username: smtpUsername || undefined,
+      password: smtpPassword || undefined,
+      fromEmail: smtpFromEmail,
+      fromName: smtpFromName,
+      isActive: smtpHasCredentials,
       isPrimary: true,
-      secure: false,
+      secure: smtpSecure,
     });
-    results.push({ table: 'emailProviderSettings', action: 'created', count: 1 });
+    results.push({ table: 'emailProviderSettings', action: 'created', count: 1, details: smtpHasCredentials ? 'enabled (credentials from env)' : 'disabled (no credentials)' });
+  } else if (smtpHasCredentials && !existingEmail.isActive) {
+    // Update existing entry with env credentials if not yet active
+    await db.update(emailProviderSettings)
+      .set({
+        providerName: 'TurboSMTP',
+        host: smtpHost,
+        port: smtpPort,
+        username: smtpUsername,
+        password: smtpPassword,
+        fromEmail: smtpFromEmail,
+        fromName: smtpFromName,
+        isActive: true,
+        isPrimary: true,
+        secure: smtpSecure,
+      })
+      .where(eq(emailProviderSettings.id, existingEmail.id));
+    results.push({ table: 'emailProviderSettings', action: 'updated', count: 1, details: 'activated with env credentials' });
   } else {
     results.push({ table: 'emailProviderSettings', action: 'skipped', count: 0, details: 'exists' });
   }
@@ -1120,23 +1148,32 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
   }
   results.push({ table: 'smsTemplates (new)', action: smsCreated > 0 ? 'created' : 'skipped', count: smsCreated, details: `${smsCreated}/${NEW_SMS_TEMPLATES_DATA.length}` });
 
-  // 5. Global Notification Settings
+  // 5. Global Notification Settings — auto-enable email if SMTP is configured
   const [existingSettings] = await db.select().from(notificationSettings)
     .where(isNull(notificationSettings.agenceId)).limit(1);
   if (!existingSettings) {
     await db.insert(notificationSettings).values({
       agenceId: null,
       smsEnabled: true,
-      emailEnabled: false,
+      emailEnabled: smtpHasCredentials,
       pushEnabled: true,
-      fallbackPolicy: 'SMS_ONLY',
+      fallbackPolicy: smtpHasCredentials ? 'EMAIL_THEN_SMS' : 'SMS_ONLY',
       otpChannel: 'SMS',
       otpMaxPerMinute: 3,
       otpMaxPerDay: 20,
       smsQuotaDaily: 1000,
       emailQuotaDaily: 500,
     });
-    results.push({ table: 'notificationSettings', action: 'created', count: 1 });
+    results.push({ table: 'notificationSettings', action: 'created', count: 1, details: smtpHasCredentials ? 'email enabled' : 'email disabled' });
+  } else if (smtpHasCredentials && !existingSettings.emailEnabled) {
+    // Activate email if SMTP credentials are now available
+    await db.update(notificationSettings)
+      .set({
+        emailEnabled: true,
+        fallbackPolicy: 'EMAIL_THEN_SMS',
+      })
+      .where(eq(notificationSettings.id, existingSettings.id));
+    results.push({ table: 'notificationSettings', action: 'updated', count: 1, details: 'email activated' });
   } else {
     results.push({ table: 'notificationSettings', action: 'skipped', count: 0, details: 'exists' });
   }
