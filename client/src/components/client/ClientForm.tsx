@@ -47,6 +47,8 @@ interface ClientFormData {
   employeur?: string | null;
   typeActivite?: string | null;
   revenuMensuel?: string | null;
+  revenuJournalier?: string | null;
+  typeRevenu?: string | null;
   typeMarcheId?: string | null;
   segment?: string | null;
   frequenceCarte?: string | null;
@@ -118,6 +120,8 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     profession: '',
     employeur: '',
     revenuMensuel: '',
+    revenuJournalier: '',
+    typeRevenu: 'Mensuel',
     photoUrl: '',
     photoProfile: '',
     statut: StatutClient.ACTIVE,
@@ -248,6 +252,8 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         profession: c.profession || '',
         employeur: c.employeur || '',
         revenuMensuel: c.revenuMensuel || '',
+        revenuJournalier: c.revenuJournalier || '',
+        typeRevenu: c.typeRevenu || 'Mensuel',
         photoUrl: c.photoUrl || '',
         photoProfile: c.photoProfile || '',
         statut: c.statut,
@@ -346,11 +352,20 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
       }
     }
 
-    // Validation revenu mensuel (positif)
-    if (formData.revenuMensuel) {
-      const revenu = parseFloat(formData.revenuMensuel);
-      if (isNaN(revenu) || revenu < 0) {
-        newErrors.revenuMensuel = 'Le revenu doit être un nombre positif';
+    // Validation revenu (positif)
+    if (formData.typeRevenu === 'Journalier') {
+      if (formData.revenuJournalier) {
+        const revenu = parseFloat(formData.revenuJournalier);
+        if (isNaN(revenu) || revenu < 0) {
+          newErrors.revenuJournalier = 'Le revenu doit être un nombre positif';
+        }
+      }
+    } else {
+      if (formData.revenuMensuel) {
+        const revenu = parseFloat(formData.revenuMensuel);
+        if (isNaN(revenu) || revenu < 0) {
+          newErrors.revenuMensuel = 'Le revenu doit être un nombre positif';
+        }
       }
     }
 
@@ -433,10 +448,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
 
   // Entity upload for profile photo
   const tempClientIdRef = useRef(crypto.randomUUID());
+  const clientEntityId = client?.id || tempClientIdRef.current;
   const { uploadFile: uploadProfile } = useEntityUpload({
     fileType: 'profile',
     entityType: 'client',
-    entityId: client?.id || tempClientIdRef.current,
+    entityId: clientEntityId,
     onError: (err) => console.error("Profile upload error", err)
   });
 
@@ -658,18 +674,94 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
               className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
             />
 
-            <FormField
-              label="Revenu Mensuel (FCFA)"
-              name="revenuMensuel"
-              type="number"
-              icon={DollarSign}
-              value={formData.revenuMensuel || ''}
-              onChange={(e) => handleChange('revenuMensuel', e.target.value)}
-              error={errors.revenuMensuel}
-              placeholder="150000"
-              min="0"
-              className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
-            />
+            <div className="space-y-2">
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Revenu (FCFA)
+              </label>
+              {/* Toggle Mensuel / Journalier */}
+              <div className="flex rounded-lg overflow-hidden border border-slate-300 dark:border-slate-600">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleChange('typeRevenu', 'Mensuel');
+                    // Recalculate: if daily exists, compute monthly
+                    if (formData.revenuJournalier) {
+                      const daily = parseFloat(formData.revenuJournalier);
+                      if (!isNaN(daily) && daily > 0) {
+                        handleChange('revenuMensuel', Math.round(daily * 26).toString());
+                      }
+                    }
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                    formData.typeRevenu !== 'Journalier'
+                      ? 'bg-cyan-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  Mensuel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleChange('typeRevenu', 'Journalier');
+                    // Recalculate: if monthly exists and no daily, compute daily
+                    if (formData.revenuMensuel && !formData.revenuJournalier) {
+                      const monthly = parseFloat(formData.revenuMensuel);
+                      if (!isNaN(monthly) && monthly > 0) {
+                        handleChange('revenuJournalier', Math.round(monthly / 26).toString());
+                      }
+                    }
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                    formData.typeRevenu === 'Journalier'
+                      ? 'bg-cyan-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  Journalier
+                </button>
+              </div>
+
+              {formData.typeRevenu === 'Journalier' ? (
+                <div className="space-y-2">
+                  <FormField
+                    label="Revenu Journalier"
+                    name="revenuJournalier"
+                    type="number"
+                    icon={DollarSign}
+                    value={formData.revenuJournalier || ''}
+                    onChange={(e) => {
+                      const daily = e.target.value;
+                      handleChange('revenuJournalier', daily);
+                      const parsed = parseFloat(daily);
+                      handleChange('revenuMensuel', !isNaN(parsed) && parsed > 0 ? Math.round(parsed * 26).toString() : '');
+                    }}
+                    error={errors.revenuJournalier}
+                    placeholder="5000"
+                    min="0"
+                    className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+                  />
+                  {formData.revenuJournalier && parseFloat(formData.revenuJournalier) > 0 && (
+                    <p className="text-xs text-slate-400">
+                      {parseFloat(formData.revenuJournalier).toLocaleString()} × 26j = <span className="text-cyan-400 font-semibold">{Math.round(parseFloat(formData.revenuJournalier) * 26).toLocaleString()} FCFA/mois</span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <FormField
+                  label="Revenu Mensuel"
+                  name="revenuMensuel"
+                  type="number"
+                  icon={DollarSign}
+                  value={formData.revenuMensuel || ''}
+                  onChange={(e) => handleChange('revenuMensuel', e.target.value)}
+                  error={errors.revenuMensuel}
+                  placeholder="150000"
+                  min="0"
+                  className="bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 focus:ring-blue-500"
+                />
+              )}
+            </div>
 
             <SelectField
               label="Agent Référent"
@@ -774,6 +866,9 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                       documentType="AVATAR"
                       variant="avatar"
                       isPrivate={false}
+                      fileType="profile"
+                      entityType="client"
+                      entityId={clientEntityId}
                       onUploadComplete={handleAvatarUpload}
                       onRemove={() => {
                         handleChange('photoProfile', '');
@@ -872,6 +967,9 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                   documentType="ID_CARD_FRONT"
                   existingDocument={uploadedDocs.ID_CARD_FRONT}
                   isPrivate={true}
+                  fileType="kyc"
+                  entityType="client"
+                  entityId={clientEntityId}
                   aspectRatio="card"
                   watermarkIcon="front"
                   accept="image/png,image/jpeg,image/jpg,application/pdf"
@@ -895,6 +993,9 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                         documentType="ID_CARD_BACK"
                         existingDocument={uploadedDocs.ID_CARD_BACK}
                         isPrivate={true}
+                        fileType="kyc"
+                        entityType="client"
+                        entityId={clientEntityId}
                         aspectRatio="card"
                         watermarkIcon="back"
                         accept="image/png,image/jpeg,image/jpg,application/pdf"
@@ -916,6 +1017,9 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                         documentType="PROOF_OF_ADDRESS"
                         existingDocument={uploadedDocs.PROOF_OF_ADDRESS}
                         isPrivate={true}
+                        fileType="kyc"
+                        entityType="client"
+                        entityId={clientEntityId}
                         aspectRatio="card"
                         watermarkIcon="scan"
                         accept="image/png,image/jpeg,image/jpg,application/pdf"
@@ -943,6 +1047,9 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                       documentType="PROOF_OF_ADDRESS"
                       existingDocument={uploadedDocs.PROOF_OF_ADDRESS}
                       isPrivate={true}
+                      fileType="kyc"
+                      entityType="client"
+                      entityId={clientEntityId}
                       aspectRatio="video"
                       watermarkIcon="scan"
                       accept="image/png,image/jpeg,image/jpg,application/pdf"

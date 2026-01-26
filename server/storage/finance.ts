@@ -358,6 +358,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       ...demande,
       numeroDemande: demande.numeroDemande,
       clients: client ? {
+        id: client.id,
         nom: user?.nom,
         prenom: user?.prenom,
         email: user?.email,
@@ -366,7 +367,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         taux_remboursement: Number(client.tauxRemboursement) || 0,
         credit_total: Number(client.creditTotal) || 0,
         agence: agence?.nom,
-        agenceId: client.agenceId
+        agenceId: client.agenceId,
+        revenuMensuel: client.revenuMensuel,
+        revenuJournalier: client.revenuJournalier,
+        typeRevenu: client.typeRevenu,
       } : undefined
     })) as DemandeCredit[];
   }

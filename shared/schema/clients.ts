@@ -77,7 +77,9 @@ export const clients = pgTable("clients", {
   employeur: text("employeur"),
   typeActivite: text("type_activite"),
   revenuMensuel: numeric("revenu_mensuel"),
-  
+  revenuJournalier: numeric("revenu_journalier"),
+  typeRevenu: text("type_revenu").default("Mensuel"), // 'Mensuel' | 'Journalier'
+
   // KYC Documents
   documents: jsonb("documents"),
 

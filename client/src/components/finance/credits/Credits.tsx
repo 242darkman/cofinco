@@ -974,11 +974,11 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             categorie_activite: selectedDemande.categorie_activite,
             anciennete_activite: selectedDemande.anciennete_activite,
             objet_credit: selectedDemande.objet_credit,
-            // Revenus pré-remplis depuis la demande
-            revenus_mensuels: selectedDemande.revenus_mensuels || selectedDemande.revenu_mensuel,
-            revenu_mensuel: selectedDemande.revenu_mensuel || selectedDemande.revenus_mensuels,
-            revenu_journalier: selectedDemande.revenu_journalier,
-            type_revenu: selectedDemande.type_revenu,
+            // Revenus pré-remplis depuis la demande, fallback vers données client
+            revenus_mensuels: selectedDemande.revenus_mensuels || selectedDemande.revenu_mensuel || selectedDemande.clients?.revenuMensuel,
+            revenu_mensuel: selectedDemande.revenu_mensuel || selectedDemande.revenus_mensuels || selectedDemande.clients?.revenuMensuel,
+            revenu_journalier: selectedDemande.revenu_journalier || selectedDemande.clients?.revenuJournalier,
+            type_revenu: selectedDemande.type_revenu || selectedDemande.clients?.typeRevenu,
             // Charges pré-remplies depuis la demande
             charges_mensuelles: selectedDemande.charges_mensuelles
           } : undefined}
