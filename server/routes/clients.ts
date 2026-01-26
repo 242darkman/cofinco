@@ -7,6 +7,7 @@ import {
   StatutClient,
   TypeCompte,
   MethodePaiement,
+  getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
 
 import { StorageService } from '../services/storage-service';
@@ -685,7 +686,7 @@ export function registerClientRoutes(app: Express) {
             // Create automatic transaction line
             await storage.createTransactionCompte({
                 compteId: accountId,
-                typePaiement: (difference > 0 ? `Dépôt ${currentAccount.typeCompte}` : `Retrait ${currentAccount.typeCompte}`) as any,
+                typePaiement: getTypePaiementForCompte(currentAccount.typeCompte, difference > 0),
                 montant: Math.abs(difference).toString(),
                 soldeApres: parsed.solde.toString(),
                 methodePaiement: MethodePaiement.CASH,

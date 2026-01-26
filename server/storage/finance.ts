@@ -31,6 +31,7 @@ import {
   TypeTransactionEpargne,
   StatutFacture,
   TypeDocument,
+  getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
 
 // ============================================================================
@@ -780,7 +781,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
           methodePaiement: (data.methodePaiement || MethodePaiement.CASH) as any,
           observations: 'Solde initial à la création',
           createdBy: userId,
-          typePaiement: (typeCompteEnum === TypeCompte.CURRENT ? TypeOperationCaisse.DEPOSIT_CURRENT : TypeOperationCaisse.DEPOSIT_SAVINGS) as any,
+          typePaiement: typeCompteEnum === TypeCompte.CURRENT ? "DEPOSIT_CURRENT" : "DEPOSIT_SAVINGS",
         });
       }
 
@@ -1611,10 +1612,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 // All financial operations go through mouvementsFinanciers + evenementsOutbox
 // ============================================================================
 
-import { 
-  executeWithLedger, 
-  updateCompteSolde, 
-  updateCreditSolde, 
+import {
+  executeWithLedger,
+  updateCompteSolde,
+  updateCreditSolde,
   updateSessionSolde,
   updateCaisseSolde,
   createMouvementFinancier,
@@ -1623,6 +1624,12 @@ import {
   type SensMouvement,
   type MouvementFinancier
 } from "../services/ledger";
+import {
+  assertCoffreCanDebit,
+  assertCoffreCanCredit,
+  updateCoffreBalance,
+} from "../services/coffre/coffre-guard";
+import { balanceService } from "../services/balance-service";
 
 /**
  * Create a transaction épargne with full ledger flow
@@ -1651,16 +1658,21 @@ export async function createTransactionCompteWithLedger(data: {
   const [compte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
   if (!compte) throw new Error(`Compte ${data.compteId} not found`);
 
-  // Map typeTransaction to typePaiement for terrain enum (EN values)
-  const typePaiementMap: Record<string, string> = {
-    "DEPOSIT": compte.typeCompte === TypeCompte.CURRENT ? TypeOperationCaisse.DEPOSIT_CURRENT : TypeOperationCaisse.DEPOSIT_SAVINGS,
-    "WITHDRAWAL": compte.typeCompte === TypeCompte.CURRENT ? TypeOperationCaisse.WITHDRAWAL_CURRENT : TypeOperationCaisse.WITHDRAWAL_SAVINGS,
-    "FEE": TypeOperationCaisse.FEE,
-    "ADJUSTMENT": TypeOperationCaisse.ADJUSTMENT,
-    // Interest is essentially a deposit
-    "INTEREST": TypeOperationCaisse.SAVINGS_DEPOSIT, 
-  };
-  const typePaiement = typePaiementMap[data.typeTransaction];
+  // Map typeTransaction to typePaiement terrain enum values
+  const typePaiement = (() => {
+    switch (data.typeTransaction) {
+      case "DEPOSIT":
+        return getTypePaiementForCompte(compte.typeCompte, true);
+      case "WITHDRAWAL":
+        return getTypePaiementForCompte(compte.typeCompte, false);
+      case "FEE":
+        return "ADJUSTMENT" as const;
+      case "ADJUSTMENT":
+        return "ADJUSTMENT" as const;
+      case "INTEREST":
+        return "INTEREST_PAYMENT" as const;
+    }
+  })();
 
   return executeWithLedger(
     "EPARGNE",
@@ -1671,7 +1683,7 @@ export async function createTransactionCompteWithLedger(data: {
       compteId: data.compteId,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
-      typePaiement: typePaiement as any,
+      typePaiement,
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
@@ -1693,7 +1705,7 @@ export async function createTransactionCompteWithLedger(data: {
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId: data.compteId,
         mouvementId: mouvement.id,
-        typePaiement: typePaiement as any,
+        typePaiement,
         montant: data.montant,
         soldeApres: nouveauSolde,
         methodePaiement: data.methodePaiement as any,
@@ -1869,7 +1881,7 @@ export async function createRemboursementWithLedger(data: {
       creditId: data.creditId,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
-      typePaiement: "CREDIT_REPAYMENT" as any,
+      typePaiement: "CREDIT_REPAYMENT",
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
@@ -1951,7 +1963,7 @@ export async function payerFraisEngagement(data: {
       clientId: demande.clientId,
       sessionCaisseId: data.sessionCaisseId,
       methodePaiement: data.methodePaiement,
-      typePaiement: "ENGAGEMENT_FEE" as any,
+      typePaiement: "ENGAGEMENT_FEE",
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
@@ -2428,23 +2440,43 @@ export async function provisionCoffreWithLedger(data: {
             idempotencyKey: data.idempotencyKey
         },
         async (tx, mouvement) => {
-             // 3. Update Safe Balance in coffresForts
-             const currentSolde = parseFloat(targetCoffre.solde || "0");
-             const newSolde = currentSolde + parseFloat(data.montant);
-             
-             await tx.update(coffresForts)
-                 .set({ solde: newSolde.toString(), updatedAt: new Date() })
-                 .where(eq(coffresForts.id, targetCoffre.id));
+             // 3. Guard: verrouille le coffre + vérifie plafond entrant
+             const { soldeBefore } = await assertCoffreCanCredit(
+                 tx, targetCoffre.id, parseFloat(data.montant),
+                 { userId: userId || "system", operationType: "APPROVISIONNEMENT_COFFRE" }
+             );
+
+             // 4. Mise à jour atomique du solde (row déjà verrouillée)
+             const { solde: newSolde } = await updateCoffreBalance(tx, targetCoffre.id, parseFloat(data.montant));
 
              return {
                  result: true,
                  additionalEventData: {
-                     nouveauSoldeCoffre: newSolde.toString()
+                     nouveauSoldeCoffre: newSolde
                  }
              };
         },
         userId
-    ).then(({ mouvement }) => ({ mouvement }));
+    ).then(({ mouvement }) => {
+        // Broadcast coffre balance update for real-time UI
+        try {
+            const montant = parseFloat(data.montant);
+            const previousBalance = parseFloat(targetCoffre.solde || "0");
+            balanceService.broadcastBalanceUpdate({
+                entityType: 'coffre',
+                entityId: targetCoffre.id,
+                agenceId: data.agenceId,
+                newBalance: previousBalance + montant,
+                previousBalance,
+                mouvementRef: mouvement.reference || mouvement.id,
+                sourceModule: 'APPROVISIONNEMENT',
+                typePaiement: 'SAFE_SUPPLY',
+            });
+        } catch (e) {
+            console.error("[BROADCAST] Erreur broadcast provision coffre:", e);
+        }
+        return { mouvement };
+    });
 }
 
 /**
@@ -2480,20 +2512,8 @@ export async function createDecaissementWithLedger(data: {
 
     if (!targetCoffre) throw new Error("Aucun coffre-fort trouvé pour cette agence");
 
-    // 3. Check Balance AVANT la transaction
     const montant = parseFloat(data.montant);
-    const soldeCoffre = parseFloat(targetCoffre.solde || "0");
-
-    if (soldeCoffre < montant) {
-        // Erreur typée avec toutes les informations nécessaires pour le workflow de réapprovisionnement
-        throw new DecaissementInsufficientFundsError(
-            montant,
-            soldeCoffre,
-            targetCoffre.id,
-            targetCoffre.code,
-            targetCoffre.nom
-        );
-    }
+    const coffreId = targetCoffre.id;
 
     return executeWithLedger(
         "CREDIT",
@@ -2509,22 +2529,24 @@ export async function createDecaissementWithLedger(data: {
             referenceExterne: data.numeroCredit,
             metadata: {
                 description: `Décaissement crédit ${data.numeroCredit}`,
-                coffreId: targetCoffre.id,
+                coffreId,
                 coffreCode: targetCoffre.code,
-                soldeCoffreAvant: soldeCoffre
             }
         },
         async (tx, mouvement) => {
-             // 4. Update Account Balance (Credit the user's account)
+             // Guard: acquire lock + verify balance + solde minimum + plafond journalier
+             const { soldeBefore } = await assertCoffreCanDebit(
+                 tx, coffreId, montant,
+                 { userId: userId || "system", operationType: "CREDIT_DISBURSEMENT" }
+             );
+
+             // Update Account Balance (Credit the user's account)
              const nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, parseFloat(data.montant));
 
-             // 5. Debit the Agency Safe (coffresForts)
-             const newSoldeCoffre = soldeCoffre - montant;
-             await tx.update(coffresForts)
-                 .set({ solde: newSoldeCoffre.toString(), updatedAt: new Date() })
-                 .where(eq(coffresForts.id, targetCoffre.id));
+             // Debit the Agency Safe atomically (SQL-native)
+             await updateCoffreBalance(tx, coffreId, -montant);
 
-             // 6. Create Transaction Record (for account history)
+             // Create Transaction Record (for account history)
              await tx.insert(transactionsCompte).values({
                  compteId: data.compteId,
                  mouvementId: mouvement.id,
@@ -2543,7 +2565,25 @@ export async function createDecaissementWithLedger(data: {
              };
         },
         userId
-    ).then(({ result, mouvement }) => ({ credit: result, mouvement }));
+    ).then(({ result, mouvement }) => {
+        // Broadcast coffre balance update for real-time UI
+        try {
+            const previousBalance = parseFloat(targetCoffre.solde || "0");
+            balanceService.broadcastBalanceUpdate({
+                entityType: 'coffre',
+                entityId: coffreId,
+                agenceId: credit.agenceId!,
+                newBalance: previousBalance - montant,
+                previousBalance,
+                mouvementRef: mouvement.reference || mouvement.id,
+                sourceModule: 'CREDIT',
+                typePaiement: 'CREDIT_DISBURSEMENT',
+            });
+        } catch (e) {
+            console.error("[BROADCAST] Erreur broadcast décaissement coffre:", e);
+        }
+        return { credit: result, mouvement };
+    });
 }
 
 /**
@@ -2619,19 +2659,8 @@ export async function processLoanCashPayout(data: {
         throw new Error("Aucun coffre-fort trouvé pour cette agence");
     }
 
-    // 4. Check balance
     const montant = parseFloat(credit.montant);
-    const soldeCoffre = parseFloat(targetCoffre.solde || "0");
-
-    if (soldeCoffre < montant) {
-        throw new DecaissementInsufficientFundsError(
-            montant,
-            soldeCoffre,
-            targetCoffre.id,
-            targetCoffre.code,
-            targetCoffre.nom
-        );
-    }
+    const coffreId = targetCoffre.id;
 
     // Get client info for the ledger entry (need to join with users for nom/prenom)
     const [clientWithUser] = await db.select({
@@ -2642,7 +2671,7 @@ export async function processLoanCashPayout(data: {
     .leftJoin(users, eq(clients.userId, users.id))
     .where(eq(clients.id, credit.clientId));
 
-    // 5. Execute the disbursement with ledger
+    // Execute the disbursement with ledger
     return executeWithLedger(
         "CAISSE",
         {
@@ -2657,27 +2686,29 @@ export async function processLoanCashPayout(data: {
             referenceExterne: data.paymentReference || `LOAN-${credit.numeroCredit}`,
             metadata: {
                 description: `Décaissement prêt ${credit.numeroCredit} - ${clientWithUser?.user?.nom || ''} ${clientWithUser?.user?.prenom || ''}`,
-                coffreId: targetCoffre.id,
+                coffreId,
                 coffreCode: targetCoffre.code,
-                soldeCoffreAvant: soldeCoffre,
                 channel: 'CASH'
             }
         },
         async (tx, mouvement) => {
-            // 6. Debit the Coffre
-            const newSoldeCoffre = soldeCoffre - montant;
-            await tx.update(coffresForts)
-                .set({ solde: newSoldeCoffre.toString(), updatedAt: new Date() })
-                .where(eq(coffresForts.id, targetCoffre.id));
+            // Guard: acquire lock + verify balance + solde minimum + plafond journalier
+            const { soldeBefore } = await assertCoffreCanDebit(
+                tx, coffreId, montant,
+                { userId, operationType: "LOAN_DISBURSEMENT" }
+            );
 
-            // 7. Update session theoretical balance
+            // Debit the Coffre atomically (SQL-native)
+            const { solde: newSoldeCoffre } = await updateCoffreBalance(tx, coffreId, -montant);
+
+            // Update session theoretical balance
             const sessionSoldeTheorique = parseFloat(session.montantFermetureTheorique || "0");
             const newSessionSolde = sessionSoldeTheorique - montant;
             await tx.update(sessionsCaisse)
                 .set({ montantFermetureTheorique: newSessionSolde.toString(), updatedAt: new Date() })
                 .where(eq(sessionsCaisse.id, data.sessionCaisseId));
 
-            // 8. Create caisse operation record
+            // Create caisse operation record
             await tx.insert(operationsCaisse).values({
                 sessionId: data.sessionCaisseId,
                 typeOperation: 'CREDIT_DISBURSEMENT',
@@ -2689,7 +2720,7 @@ export async function processLoanCashPayout(data: {
                 description: `Décaissement prêt ${credit.numeroCredit}`,
             });
 
-            // 9. Update credit to ACTIVE
+            // Update credit to ACTIVE
             const [updatedCredit] = await tx.update(credits)
                 .set({
                     statut: 'ACTIVE' as any,
@@ -2703,22 +2734,37 @@ export async function processLoanCashPayout(data: {
                 .where(eq(credits.id, data.creditId))
                 .returning();
 
-            // 10. Echeancier generation is handled by the remboursement system
-            // No separate echeances table - repayments are tracked via remboursements
-
             return {
                 result: updatedCredit,
                 additionalEventData: {
-                    nouveauSoldeCoffre: newSoldeCoffre.toString()
+                    nouveauSoldeCoffre: newSoldeCoffre
                 }
             };
         },
         userId
-    ).then(({ result, mouvement }) => ({
-        credit: result as Credit,
-        mouvement,
-        echeances: []
-    }));
+    ).then(({ result, mouvement }) => {
+        // Broadcast coffre balance update for real-time UI
+        try {
+            const previousBalance = parseFloat(targetCoffre.solde || "0");
+            balanceService.broadcastBalanceUpdate({
+                entityType: 'coffre',
+                entityId: coffreId,
+                agenceId: credit.agenceId!,
+                newBalance: previousBalance - montant,
+                previousBalance,
+                mouvementRef: mouvement.reference || mouvement.id,
+                sourceModule: 'CAISSE',
+                typePaiement: 'LOAN_DISBURSEMENT',
+            });
+        } catch (e) {
+            console.error("[BROADCAST] Erreur broadcast décaissement caisse coffre:", e);
+        }
+        return {
+            credit: result as Credit,
+            mouvement,
+            echeances: []
+        };
+    });
 }
 
 /**
@@ -2997,12 +3043,8 @@ export async function createCashTransactionWithLedger(data: {
       if (data.compteId && compte) {
         nouveauSoldeCompte = await updateCompteSolde(tx, data.compteId, accountDelta);
 
-        // Déterminer le type de transaction selon le type de compte (EN values)
-        const transType = (accountDelta > 0)
-          ? (compte.typeCompte === TypeCompte.CURRENT ? 'DEPOSIT_CURRENT' :
-             compte.typeCompte === TypeCompte.BLOCKED ? 'DEPOSIT_BLOCKED' : 'DEPOSIT_SAVINGS')
-          : (compte.typeCompte === TypeCompte.CURRENT ? 'WITHDRAWAL_CURRENT' :
-             compte.typeCompte === TypeCompte.BLOCKED ? 'WITHDRAWAL_BLOCKED' : 'WITHDRAWAL_SAVINGS');
+        // Déterminer le type de transaction selon le type de compte
+        const transType = getTypePaiementForCompte(compte.typeCompte, accountDelta > 0);
 
         const validatedUserIdForTx = await validateUserId(tx, userId);
 
@@ -3010,7 +3052,7 @@ export async function createCashTransactionWithLedger(data: {
         const [createdTx] = await tx.insert(transactionsCompte).values({
           compteId: data.compteId,
           mouvementId: mouvement.id,
-          typePaiement: transType as any,
+          typePaiement: transType,
           montant: data.montant,
           soldeApres: nouveauSoldeCompte,
           methodePaiement: data.methodePaiement as any,
@@ -3114,9 +3156,9 @@ export async function validateTransfertWithLedger(
     await tx.insert(operationsCaisse).values({
       sessionId: sessionSource.id,
       mouvementId: mouvementSource.id,
-      typeOperation: "CASH_TRANSFER" as any,
+      typeOperation: "CASH_TRANSFER",
       montant: transfert.montant,
-      methodePaiement: "TRANSFER" as any,
+      methodePaiement: "TRANSFER",
       reference: refSource,
       description: `Transfert émis vers ${sessionDest.caisseId}`,
       createdBy: userId
@@ -3147,9 +3189,9 @@ export async function validateTransfertWithLedger(
     await tx.insert(operationsCaisse).values({
       sessionId: sessionDest.id,
       mouvementId: mouvementDest.id,
-      typeOperation: "CASH_TRANSFER" as any,
+      typeOperation: "CASH_TRANSFER",
       montant: transfert.montant,
-      methodePaiement: "TRANSFER" as any,
+      methodePaiement: "TRANSFER",
       reference: refDest,
       description: `Transfert reçu de ${sessionSource.caisseId}`,
       createdBy: userId

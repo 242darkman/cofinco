@@ -24,6 +24,7 @@ import {
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
 import { getComptesByClient, DecaissementInsufficientFundsError } from "../storage/finance";
+import { isCoffreCaisseError } from "../services/coffre/coffre-errors";
 // State Machine errors for proper error handling
 import { CreditTransitionError } from "@shared/machines/credit-workflow";
 import { DemandeTransitionError } from "@shared/machines/demande-workflow";
@@ -455,6 +456,14 @@ export function registerFinanceRoutes(app: Express) {
         });
       }
 
+      // Guard errors (CoffreInsufficientFunds, CoffreInactif, CoffreSoldeMinimum, CoffrePlafondJournalier, etc.)
+      if (isCoffreCaisseError(error)) {
+        return res.status(error.httpStatus).json({
+          success: false,
+          error: error.data,
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: error.message || "Erreur lors du décaissement"
@@ -585,6 +594,13 @@ export function registerFinanceRoutes(app: Express) {
       console.error("Erreur décaissement caisse:", error);
 
       if (error instanceof DecaissementInsufficientFundsError) {
+        return res.status(error.httpStatus).json({
+          success: false,
+          error: error.data,
+        });
+      }
+
+      if (isCoffreCaisseError(error)) {
         return res.status(error.httpStatus).json({
           success: false,
           error: error.data,

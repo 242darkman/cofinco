@@ -119,7 +119,7 @@ export class InterestSchedulerService {
                     clientId: compte.clientId,
                     compteId: compte.id,
                     methodePaiement: "TRANSFER", // Ou 'Interne'
-                    typePaiement: "INTERETS", 
+                    typePaiement: "INTEREST_PAYMENT",
                     metadata: {
                         observations: "Capitalisation mensuelle des intérêts"
                     }
@@ -140,7 +140,7 @@ export class InterestSchedulerService {
                         .values({
                             compteId: compte.id,
                             mouvementId: mouvement.id,
-                            typePaiement: "INTERETS" as any, // Cast si enum strict, sinon string
+                            typePaiement: "INTEREST_PAYMENT",
                             montant: montantAcrediter.toString(),
                             soldeApres: nouveauSolde,
                             methodePaiement: "TRANSFER",

@@ -14,6 +14,14 @@ import { getWsInstance } from "../../ws-server";
 
 import { updateSessionSolde } from "../ledger";
 import { balanceService } from "../balance-service";
+import {
+  assertCoffreCanDebit,
+  assertCoffreCanCredit,
+  assertCaisseCanDebit,
+  assertCaisseCanCredit,
+  updateCoffreBalance,
+  updateCaisseBalance,
+} from "./coffre-guard";
 
 import type { TransfertCoffreCaisse } from "@shared/schema";
 
@@ -34,28 +42,7 @@ export interface ExecuteTransferResult {
   error?: string;
 }
 
-// Helper to update balance
-async function updateBalance(tx: any, entityType: 'coffre' | 'caisse', id: string, amountChange: number) {
-    if (entityType === 'coffre') {
-        const result = await tx.update(coffresForts)
-            .set({ 
-                solde: sql`${coffresForts.solde} + ${amountChange}`,
-                updatedAt: new Date()
-            })
-            .where(eq(coffresForts.id, id))
-            .returning({ solde: coffresForts.solde });
-        return result[0];
-    } else {
-        const result = await tx.update(caisses)
-            .set({ 
-                solde: sql`${caisses.solde} + ${amountChange}`,
-                updatedAt: new Date()
-            })
-            .where(eq(caisses.id, id))
-            .returning({ solde: caisses.solde });
-        return result[0];
-    }
-}
+// Note: updateBalance removed — use updateCoffreBalance/updateCaisseBalance from coffre-guard.ts
 
 export async function executeTransfertCoffre(
   transfertId: string,
@@ -84,24 +71,40 @@ export async function executeTransfertCoffre(
       throw new Error("ALREADY_EXECUTED: Ce transfert a déjà été exécuté");
     }
 
-    // 4. Récupérer les entités
-    const [coffre] = await tx.select().from(coffresForts).where(eq(coffresForts.id, transfert.coffreId));
-    const [caisse] = await tx.select().from(caisses).where(eq(caisses.id, transfert.caisseId));
-
-    if (!coffre || !caisse) {
-      throw new Error("ENTITY_NOT_FOUND: Coffre ou Caisse introuvable");
-    }
-
-    // Déterminer source et destination
+    // 4. Déterminer direction et montant
     const isCoffreSource = transfert.typeTransfert === "COFFRE_VERS_CAISSE";
-
-    // Vérifier solde source (sauf pour les transferts de clôture qui ont déjà été validés)
     const montant = parseFloat(transfert.montant);
-    const soldeSource = parseFloat((isCoffreSource ? coffre.solde : caisse.solde) || "0");
     const isClosingTransfer = transfert.motif?.includes("Remise de clôture");
+    const guardCtx = { userId: executorId, operationType: "TRANSFERT_COFFRE_CAISSE" };
 
-    if (soldeSource < montant && !isClosingTransfer) {
-      throw new Error(`INSUFFICIENT_FUNDS: Solde insuffisant (disponible: ${soldeSource}, requis: ${montant})`);
+    // 4a. Acquérir les verrous (SELECT FOR UPDATE) et valider les entités
+    // L'ordre d'acquisition est toujours: coffre d'abord, puis caisse (évite les deadlocks)
+    let coffre, caisse;
+    let soldeSource: number;
+
+    if (isCoffreSource) {
+      // COFFRE → CAISSE : coffre débité, caisse créditée
+      const coffreResult = await assertCoffreCanDebit(tx, transfert.coffreId, montant, guardCtx);
+      const caisseResult = await assertCaisseCanCredit(tx, transfert.caisseId, montant, guardCtx);
+      coffre = coffreResult.coffre;
+      caisse = caisseResult.caisse;
+      soldeSource = coffreResult.soldeBefore;
+    } else {
+      // CAISSE → COFFRE : caisse débitée, coffre crédité
+      // Pour les transferts de clôture, on skip la vérification de solde caisse
+      // (le solde a déjà été validé et défini par finalizeClose)
+      const coffreResult = await assertCoffreCanCredit(tx, transfert.coffreId, montant, guardCtx);
+      coffre = coffreResult.coffre;
+      if (isClosingTransfer) {
+        // Fermeture: juste verrouiller la caisse sans vérifier le solde
+        const caisseResult = await assertCaisseCanCredit(tx, transfert.caisseId, montant, guardCtx);
+        caisse = caisseResult.caisse;
+        soldeSource = caisseResult.soldeBefore;
+      } else {
+        const caisseResult = await assertCaisseCanDebit(tx, transfert.caisseId, montant, guardCtx);
+        caisse = caisseResult.caisse;
+        soldeSource = caisseResult.soldeBefore;
+      }
     }
 
     // 5. Générer les références
@@ -212,24 +215,22 @@ export async function executeTransfertCoffre(
         }
     }
 
-    // 9. Mise à jour des Soldes Réels
-    // Note: caisses.solde est maintenant synchronisé par updateSessionSolde quand une session existe
-    // On n'appelle updateBalance('caisse') QUE si updateSessionSolde n'a pas été appelé (fallback)
+    // 9. Mise à jour des Soldes Réels (atomique, rows déjà verrouillées par les guards)
+    // Note: caisses.solde est synchronisé par updateSessionSolde quand une session existe
     const soldeDestAvant = parseFloat((isCoffreSource ? caisse.solde : coffre.solde) || "0");
 
     if (isCoffreSource) {
-        await updateBalance(tx, 'coffre', coffre.id, -montant); // Coffre Debit
+        await updateCoffreBalance(tx, coffre.id, -montant); // Coffre Debit
         // Caisse Credit: seulement si pas de session (fallback)
         if (!sessionSoldeUpdatedForDest) {
-            await updateBalance(tx, 'caisse', caisse.id, montant);
+            await updateCaisseBalance(tx, caisse.id, montant);
         }
     } else {
         // Coffre Credit (toujours)
-        await updateBalance(tx, 'coffre', coffre.id, montant);
+        await updateCoffreBalance(tx, coffre.id, montant);
         // Caisse Debit: seulement si pas de session ET pas transfert de clôture
-        // (les transferts de clôture ont déjà le bon solde via finalizeClose)
         if (!sessionSoldeUpdatedForSource && !isClosingTransfer) {
-            await updateBalance(tx, 'caisse', caisse.id, -montant);
+            await updateCaisseBalance(tx, caisse.id, -montant);
         }
     }
 

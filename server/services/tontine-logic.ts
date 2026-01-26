@@ -451,9 +451,9 @@ export async function processTontineContribution(
       sessionId: sessionCaisseId,
       mouvementId: mouvement.id,
       clientId: clientId, // Lien vers le client pour afficher son nom dans le journal
-      typeOperation: "TONTINE_CONTRIBUTION" as any,
+      typeOperation: "TONTINE_CONTRIBUTION",
       montant: amountTotal.toString(),
-      methodePaiement: "CASH" as any,
+      methodePaiement: "CASH",
       reference: `TON-DISPATCH-${mouvement.reference}`,
       description: `Paiement Tontine Groupé: ${contributionsCreated.length} contribution(s)`,
       createdBy: validatedUserId
@@ -823,7 +823,7 @@ export async function processTontineDistribution(
       sessionId: sessionCaisseId,
       mouvementId: mouvement.id,
       clientId: clientId, // Lien vers le client pour afficher son nom dans le journal
-      typeOperation: "TONTINE_WITHDRAWAL" as any,
+      typeOperation: "TONTINE_WITHDRAWAL",
       montant: montantTotal.toString(),
       methodePaiement: modePaiement as any,
       reference: `TON-DIST-${mouvement.reference}`,

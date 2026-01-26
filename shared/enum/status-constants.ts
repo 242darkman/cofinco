@@ -1937,3 +1937,65 @@ export const NIVEAU_RISQUE_LABELS: Record<NiveauRisqueType, string> = {
   [NiveauRisque.MOYEN]: "Moyen",
   [NiveauRisque.ELEVE]: "Élevé",
 };
+
+// ============================================
+// TYPE PAIEMENT TERRAIN (single source of truth)
+// ============================================
+
+export const TypePaiementTerrain = {
+  // Dépôts
+  DEPOSIT_SAVINGS: "DEPOSIT_SAVINGS",
+  DEPOSIT_CURRENT: "DEPOSIT_CURRENT",
+  DEPOSIT_BLOCKED: "DEPOSIT_BLOCKED",
+  // Retraits
+  WITHDRAWAL_SAVINGS: "WITHDRAWAL_SAVINGS",
+  WITHDRAWAL_CURRENT: "WITHDRAWAL_CURRENT",
+  WITHDRAWAL_BLOCKED: "WITHDRAWAL_BLOCKED",
+  // Crédit
+  CREDIT_REPAYMENT: "CREDIT_REPAYMENT",
+  ENGAGEMENT_FEE: "ENGAGEMENT_FEE",
+  CREDIT_DISBURSEMENT: "CREDIT_DISBURSEMENT",
+  // Tontine
+  TONTINE_CONTRIBUTION: "TONTINE_CONTRIBUTION",
+  TONTINE_WITHDRAWAL: "TONTINE_WITHDRAWAL",
+  // Coffre
+  SAFE_SUPPLY: "SAFE_SUPPLY",
+  SAFE_DEPOSIT: "SAFE_DEPOSIT",
+  // Transferts
+  TRANSFER_IN: "TRANSFER_IN",
+  TRANSFER_OUT: "TRANSFER_OUT",
+  INITIAL_DEPOSIT: "INITIAL_DEPOSIT",
+  INTERNAL_TRANSFER: "INTERNAL_TRANSFER",
+  // Opérations spéciales
+  ADJUSTMENT: "ADJUSTMENT",
+  INTEREST_PAYMENT: "INTEREST_PAYMENT",
+  LIQUIDATION: "LIQUIDATION",
+} as const;
+
+export type TypePaiementTerrainType = (typeof TypePaiementTerrain)[keyof typeof TypePaiementTerrain];
+
+const VALID_TYPE_PAIEMENT_VALUES = new Set<string>(Object.values(TypePaiementTerrain));
+
+/**
+ * Valide et retourne un typePaiement valide.
+ * Lève une erreur si la valeur n'est pas dans l'enum.
+ */
+export function assertValidTypePaiement(value: string): TypePaiementTerrainType {
+  if (!VALID_TYPE_PAIEMENT_VALUES.has(value)) {
+    throw new Error(`Invalid typePaiement: "${value}". Valid values: ${Array.from(VALID_TYPE_PAIEMENT_VALUES).join(", ")}`);
+  }
+  return value as TypePaiementTerrainType;
+}
+
+/**
+ * Mapping typeCompte → typePaiement pour les opérations de dépôt/retrait.
+ */
+export function getTypePaiementForCompte(typeCompte: string, isDeposit: boolean): TypePaiementTerrainType {
+  const map: Record<string, { deposit: TypePaiementTerrainType; withdrawal: TypePaiementTerrainType }> = {
+    SAVINGS: { deposit: TypePaiementTerrain.DEPOSIT_SAVINGS, withdrawal: TypePaiementTerrain.WITHDRAWAL_SAVINGS },
+    CURRENT: { deposit: TypePaiementTerrain.DEPOSIT_CURRENT, withdrawal: TypePaiementTerrain.WITHDRAWAL_CURRENT },
+    BLOCKED: { deposit: TypePaiementTerrain.DEPOSIT_BLOCKED, withdrawal: TypePaiementTerrain.WITHDRAWAL_BLOCKED },
+  };
+  const mapping = map[typeCompte] || map.SAVINGS;
+  return isDeposit ? mapping.deposit : mapping.withdrawal;
+}

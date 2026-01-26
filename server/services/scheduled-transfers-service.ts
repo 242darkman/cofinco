@@ -220,7 +220,7 @@ async function executeCompteTransferInTx(
       compteId: compteSource.id,
       clientId: compteSource.client_id,
       agenceId: compteSource.agence_id || undefined,
-      typePaiement: "INTERNAL_TRANSFER" as any,
+      typePaiement: "INTERNAL_TRANSFER",
       createdBy: createdBy || undefined,
       metadata: {
         type: "VIREMENT_PROGRAMME",
@@ -248,7 +248,7 @@ async function executeCompteTransferInTx(
   await tx.insert(transactionsCompte).values({
     compteId: compteSource.id,
     mouvementId,
-    typePaiement: "TRANSFER_OUT" as any,
+    typePaiement: "TRANSFER_OUT",
     montant: montant.toString(),
     soldeApres: nouveauSoldeSource,
     methodePaiement: "TRANSFER",
@@ -259,7 +259,7 @@ async function executeCompteTransferInTx(
   await tx.insert(transactionsCompte).values({
     compteId: compteDest.id,
     mouvementId,
-    typePaiement: "TRANSFER_IN" as any,
+    typePaiement: "TRANSFER_IN",
     montant: montant.toString(),
     soldeApres: nouveauSoldeDest,
     methodePaiement: "TRANSFER",

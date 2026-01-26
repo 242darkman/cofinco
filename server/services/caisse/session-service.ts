@@ -500,7 +500,7 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
             sourceModule: "CAISSE" as const,
             agenceId: session.agenceId,
             sessionCaisseId: sessionId,
-            typePaiement: "ADJUSTMENT" as any,
+            typePaiement: "ADJUSTMENT",
             methodePaiement: "CASH" as const,
             reference: `ADJ-${sessionId.substring(0, 8)}-${Date.now()}`,
             idempotencyKey: `adj-close-${sessionId}`,

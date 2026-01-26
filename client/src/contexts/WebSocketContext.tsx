@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
+import { formatMoney } from '../lib/format';
 import { useServerHealth } from './ServerHealthContext';
 import {
   balanceKeys,
@@ -677,6 +678,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // Dispatch custom event for components that need direct updates
          window.dispatchEvent(new CustomEvent('balance-updated', { detail: message.payload }));
 
+         // Real-time feedback toast for significant operations
+         const { delta, sourceModule, typePaiement: balanceTypePaiement } = message.payload;
+         if (delta && (entityType === 'coffre' || entityType === 'caisse')) {
+           const label = entityType === 'coffre' ? 'Coffre-fort' : 'Caisse';
+           const direction = delta > 0 ? '+' : '';
+           toast.info(`${label} mis à jour : ${direction}${formatMoney(delta)}`, { duration: 3000 });
+         }
+
          // Invalidate relevant queries using centralized query keys
          // SOURCE UNIQUE: Toutes les invalidations financières passent par ici
          switch (entityType) {
@@ -702,7 +711,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
              debounceInvalidate(tontineKeys.detail(entityId));
              break;
            case 'coffre':
+             debounceInvalidate(coffreKeys.all);
              debounceInvalidate(coffreKeys.stats());
+             debounceInvalidate(coffreKeys.transferts());
              debounceInvalidate(dashboardKeys.stats());
              break;
            case 'caisse_agent':

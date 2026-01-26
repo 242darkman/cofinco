@@ -55,6 +55,7 @@ import {
   type StatutCompteType,
   type TypeCompteType,
   type MotifBlocageType,
+  getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
 
 // Types - Re-export from status-constants for consistency
@@ -306,11 +307,7 @@ export async function createCompte(
 
     // If there's an initial deposit, create mouvement
     if (data.soldeInitial && data.soldeInitial > 0) {
-      const typePaiementMap: Record<TypeCompte, string> = {
-        [TypeCompteEnum.SAVINGS]: "DEPOSIT_SAVINGS",
-        [TypeCompteEnum.CURRENT]: "DEPOSIT_CURRENT",
-        [TypeCompteEnum.BLOCKED]: "DEPOSIT_BLOCKED",
-      };
+      const initialDepositTypePaiement = getTypePaiementForCompte(data.typeCompte, true);
 
       // Create mouvement
       const reference = `EPG-INIT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -326,7 +323,7 @@ export async function createCompte(
           compteId: compte.id,
           agenceId: data.agenceId,
           methodePaiement: "CASH",
-          typePaiement: typePaiementMap[data.typeCompte] as any,
+          typePaiement: initialDepositTypePaiement,
           createdBy: userId,
         })
         .returning();
@@ -335,7 +332,7 @@ export async function createCompte(
       await tx.insert(transactionsCompte).values({
         compteId: compte.id,
         mouvementId: mouvement.id,
-        typePaiement: typePaiementMap[data.typeCompte] as any,
+        typePaiement: initialDepositTypePaiement,
         montant: data.soldeInitial.toString(),
         soldeApres: data.soldeInitial.toString(),
         methodePaiement: "CASH",
@@ -523,7 +520,7 @@ export async function processCompteDepot(
       mouvementId: mouvement.id,
       typeOperation: typePaiement as any,
       montant: montant.toString(),
-      methodePaiement: "CASH" as any,
+      methodePaiement: "CASH",
       reference: `EPG-${mouvement.reference}`,
       description: observations || `Dépôt compte ${typePaiement.replace('DEPOSIT_', '')}`,
       createdBy: validatedUserId,
@@ -701,7 +698,7 @@ export async function processCompteRetrait(
       mouvementId: mouvement.id,
       typeOperation: typePaiement as any,
       montant: montant.toString(),
-      methodePaiement: "CASH" as any,
+      methodePaiement: "CASH",
       reference: `EPG-${mouvement.reference}`,
       description: observations || `Retrait compte ${typePaiement.replace('WITHDRAWAL_', '')}`,
       createdBy: validatedUserId,
@@ -1423,7 +1420,7 @@ export async function createCompteWithInitialDeposit(
         compteId: compte.id, // Linked to the new account
         clientId: data.clientId,
         agenceId: data.agenceId,
-        typePaiement: "INITIAL_DEPOSIT" as any,
+        typePaiement: "INITIAL_DEPOSIT",
         createdBy: userId,
         metadata: { description: `Virement ouverture depuis ${compteSource.numeroCompte}` }
       }).returning();
@@ -1432,7 +1429,7 @@ export async function createCompteWithInitialDeposit(
       await tx.insert(transactionsCompte).values({
         compteId: data.compteSourceId,
         mouvementId: mouvement.id,
-        typePaiement: 'INTERNAL_TRANSFER' as any,
+        typePaiement: 'INTERNAL_TRANSFER',
         montant: data.montantInitial.toString(),
         soldeApres: (soldeSource - data.montantInitial).toString(),
         methodePaiement: 'TRANSFER',
@@ -1452,7 +1449,7 @@ export async function createCompteWithInitialDeposit(
       const [transaction] = await tx.insert(transactionsCompte).values({
         compteId: compte.id,
         mouvementId: mouvement.id,
-        typePaiement: 'INITIAL_DEPOSIT' as any,
+        typePaiement: 'INITIAL_DEPOSIT',
         montant: data.montantInitial.toString(),
         soldeApres: data.montantInitial.toString(),
         methodePaiement: 'TRANSFER',
@@ -1511,7 +1508,7 @@ export async function payerDepotInitialCompte(
       sens: "CREDIT",
       compteId,
       sessionCaisseId: data.sessionCaisseId,
-      typePaiement: "INITIAL_DEPOSIT" as any,
+      typePaiement: "INITIAL_DEPOSIT",
       methodePaiement: "CASH",
       metadata: { description: "Paiement dépôt initial - Activation compte" },
       agenceId: undefined, // Will be inferred or can be passed if needed

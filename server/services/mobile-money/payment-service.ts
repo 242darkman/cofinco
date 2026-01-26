@@ -431,7 +431,7 @@ class PaymentService {
                   clientId: intent.clientId,
                   typeOperation: this.mapToOperationType(intent) as any,
                   montant: amount.toString(),
-                  methodePaiement: MethodePaiement.MOBILE_MONEY as any,
+                  methodePaiement: MethodePaiement.MOBILE_MONEY,
                   reference: `MM-${intent.provider}-${intent.externalRef}`,
                   description: `Paiement Mobile Money ${intent.provider}`,
                   metadata: {
@@ -553,7 +553,7 @@ class PaymentService {
                   clientId: intent.clientId,
                   typeOperation: opType as any,
                   montant: amount.toString(),
-                  methodePaiement: MethodePaiement.MOBILE_MONEY as any,
+                  methodePaiement: MethodePaiement.MOBILE_MONEY,
                   reference: `MM-${intent.provider}-${intent.externalRef}`,
                   description: `Payout Mobile Money ${intent.provider}`,
                   metadata: {

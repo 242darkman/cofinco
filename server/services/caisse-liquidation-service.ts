@@ -15,6 +15,14 @@ import {
 import { coffresForts } from "@shared/schema/coffres-forts";
 import { StatutTransaction, MethodePaiement } from "@shared/enum/status-constants";
 import { eq, and, isNull } from "drizzle-orm";
+import {
+  assertCaisseCanDebit,
+  assertCaisseCanCredit,
+  assertCoffreCanCredit,
+  updateCaisseBalance,
+  updateCoffreBalance,
+} from "./coffre/coffre-guard";
+import { balanceService } from "./balance-service";
 
 export interface LiquidationDestination {
   id: string;
@@ -288,11 +296,29 @@ export class CaisseLiquidationService {
 
       // 3. Exécuter la transaction atomique
       const result = await db.transaction(async (tx) => {
-        // 3a. Créer mouvement DEBIT sur la caisse à supprimer
+        const guardCtx = { userId: params.executedBy, operationType: "LIQUIDATION" };
+
+        // 3a. Lock source caisse + verify balance (amount=0 to just acquire lock)
+        const { soldeBefore: montantTransfert } = await assertCaisseCanDebit(
+          tx, params.caisseId, 0, guardCtx
+        );
+
+        if (montantTransfert <= 0) {
+          throw new Error("La caisse n'a pas de solde à transférer");
+        }
+
+        // 3b. Lock destination
+        if (params.destinationType === 'COFFRE') {
+          await assertCoffreCanCredit(tx, params.destinationId, montantTransfert, guardCtx);
+        } else {
+          await assertCaisseCanCredit(tx, params.destinationId, montantTransfert, guardCtx);
+        }
+
+        // 3c. Créer mouvement DEBIT sur la caisse à supprimer
         const reference = `LIQUIDATION-${Date.now()}`;
-        
+
         const [mouvementDebit] = await tx.insert(mouvementsFinanciers).values({
-          montant: soldeActuel.toString(),
+          montant: montantTransfert.toString(),
           sens: 'DEBIT',
           statut: StatutTransaction.POSTED,
           methodePaiement: MethodePaiement.TRANSFER,
@@ -301,7 +327,7 @@ export class CaisseLiquidationService {
           sourceTable: 'caisses',
           sourceId: params.caisseId,
           agenceId: caisse.agenceId,
-          typePaiement: 'Liquidation Suppression' as any,
+          typePaiement: 'LIQUIDATION',
           createdBy: params.executedBy,
           metadata: {
             description: `Liquidation caisse ${caisse.nom} - Transfert vers ${params.destinationType}`,
@@ -311,9 +337,9 @@ export class CaisseLiquidationService {
           },
         }).returning();
 
-        // 3b. Créer mouvement CREDIT sur la destination
+        // 3d. Créer mouvement CREDIT sur la destination
         const [mouvementCredit] = await tx.insert(mouvementsFinanciers).values({
-          montant: soldeActuel.toString(),
+          montant: montantTransfert.toString(),
           sens: 'CREDIT',
           statut: StatutTransaction.POSTED,
           methodePaiement: MethodePaiement.TRANSFER,
@@ -322,7 +348,7 @@ export class CaisseLiquidationService {
           sourceTable: params.destinationType === 'COFFRE' ? 'coffres_forts' : 'caisses',
           sourceId: params.destinationId,
           agenceId: caisse.agenceId,
-          typePaiement: 'Liquidation Suppression' as any,
+          typePaiement: 'LIQUIDATION',
           createdBy: params.executedBy,
           metadata: {
             description: `Réception liquidation caisse ${caisse.nom}`,
@@ -330,38 +356,17 @@ export class CaisseLiquidationService {
           },
         }).returning();
 
-        // 3c. Mettre à jour le solde de la caisse source à 0
-        await tx.update(caisses)
-          .set({
-            solde: "0",
-            updatedAt: new Date(),
-          })
-          .where(eq(caisses.id, params.caisseId));
+        // 3e. Debit source caisse atomically (full balance)
+        await updateCaisseBalance(tx, params.caisseId, -montantTransfert);
 
-        // 3d. Mettre à jour le solde de la destination
+        // 3f. Credit destination atomically
         if (params.destinationType === 'COFFRE') {
-          const [coffre] = await tx.select().from(coffresForts).where(eq(coffresForts.id, params.destinationId));
-          const nouveauSolde = parseFloat(coffre.solde || "0") + soldeActuel;
-          
-          await tx.update(coffresForts)
-            .set({
-              solde: nouveauSolde.toString(),
-              updatedAt: new Date(),
-            })
-            .where(eq(coffresForts.id, params.destinationId));
+          await updateCoffreBalance(tx, params.destinationId, montantTransfert);
         } else {
-          const [caisseDestination] = await tx.select().from(caisses).where(eq(caisses.id, params.destinationId));
-          const nouveauSolde = parseFloat(caisseDestination.solde || "0") + soldeActuel;
-          
-          await tx.update(caisses)
-            .set({
-              solde: nouveauSolde.toString(),
-              updatedAt: new Date(),
-            })
-            .where(eq(caisses.id, params.destinationId));
+          await updateCaisseBalance(tx, params.destinationId, montantTransfert);
         }
 
-        // 3e. Soft delete de la caisse
+        // 3g. Soft delete de la caisse
         const [deletedCaisse] = await tx.update(caisses)
           .set({
             deletedAt: new Date(),
@@ -374,6 +379,7 @@ export class CaisseLiquidationService {
           mouvementDebit,
           mouvementCredit,
           deletedCaisse,
+          montantTransfert,
         };
       });
 
@@ -385,7 +391,7 @@ export class CaisseLiquidationService {
         payload: {
           caisseId: params.caisseId,
           caisseName: caisse.nom,
-          montantTransfere: soldeActuel.toString(),
+          montantTransfere: result.montantTransfert.toString(),
           destinationType: params.destinationType,
           destinationId: params.destinationId,
           executedBy: params.executedBy,
@@ -394,12 +400,45 @@ export class CaisseLiquidationService {
         },
       });
 
+      // 5. Broadcast balance updates for real-time UI
+      try {
+        const montantTransfert = result.montantTransfert;
+        const previousCaisseBalance = parseFloat(caisse.solde || "0");
+        const ref = result.mouvementDebit.reference || result.mouvementDebit.id;
+
+        // Source caisse (debited to 0)
+        balanceService.broadcastBalanceUpdate({
+          entityType: 'caisse',
+          entityId: params.caisseId,
+          agenceId: caisse.agenceId!,
+          newBalance: 0,
+          previousBalance: previousCaisseBalance,
+          mouvementRef: ref,
+          sourceModule: 'LIQUIDATION',
+          typePaiement: 'LIQUIDATION',
+        });
+
+        // Destination (coffre or caisse, credited)
+        balanceService.broadcastBalanceUpdate({
+          entityType: params.destinationType === 'COFFRE' ? 'coffre' : 'caisse',
+          entityId: params.destinationId,
+          agenceId: caisse.agenceId!,
+          newBalance: 0, // We don't have the exact new balance here, but the invalidation will refetch
+          previousBalance: 0,
+          mouvementRef: result.mouvementCredit.reference || result.mouvementCredit.id,
+          sourceModule: 'LIQUIDATION',
+          typePaiement: 'LIQUIDATION',
+        });
+      } catch (e) {
+        console.error("[BROADCAST] Erreur broadcast liquidation:", e);
+      }
+
       return {
         success: true,
         caisse: result.deletedCaisse,
         mouvementDebit: result.mouvementDebit,
         mouvementCredit: result.mouvementCredit,
-        montantTransfere: soldeActuel.toString(),
+        montantTransfere: result.montantTransfert.toString(),
       };
     } catch (error: any) {
       console.error("Erreur execute liquidation:", error);

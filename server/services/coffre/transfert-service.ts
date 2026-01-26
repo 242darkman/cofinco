@@ -14,6 +14,7 @@ import { eq, and, or, desc, gte, lte, count } from "drizzle-orm";
 import { executeTransfertCoffre } from "./transfer-executor";
 import { TransfertCoffreValidator } from "./transfert-validator";
 import { isAdminRole } from "@shared/types/roles";
+import { getDailyCoffreTotal } from "./coffre-guard";
 
 export class TransfertCoffreService {
   private validator = new TransfertCoffreValidator();
@@ -83,8 +84,22 @@ export class TransfertCoffreService {
         }
         
         // --- CHECK 5: Plafond Journalier (Coûteux, fait en dernier) ---
-        // TODO: Implémenter la vérification du plafond journalier si nécessaire
-        // Cela nécessite d'agréger les transferts du jour pour cette agence
+        const direction = params.typeTransfert === "COFFRE_VERS_CAISSE" ? "DEBIT" : "CREDIT";
+        const plafondField = direction === "DEBIT" ? config.plafondJournalierSortant : config.plafondJournalierEntrant;
+        if (plafondField) {
+            const plafond = parseFloat(plafondField);
+            if (plafond > 0) {
+                const dailyTotal = await getDailyCoffreTotal(db as any, coffreFort.id, direction);
+                if (dailyTotal + params.montant > plafond) {
+                    const label = direction === "DEBIT" ? "sortant" : "entrant";
+                    return {
+                        success: false,
+                        errorCode: "PLAFOND_JOURNALIER_DEPASSE",
+                        error: `Plafond journalier ${label} dépassé (total jour: ${dailyTotal.toLocaleString()} FCFA, demandé: ${params.montant.toLocaleString()} FCFA, plafond: ${plafond.toLocaleString()} FCFA)`,
+                    };
+                }
+            }
+        }
     }
     
     // 2. Récupérer la caisse concernée

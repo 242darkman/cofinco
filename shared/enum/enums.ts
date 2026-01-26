@@ -281,6 +281,10 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "TRANSFER_OUT",
   "INITIAL_DEPOSIT",
   "INTERNAL_TRANSFER",
+  // Ajustements & Opérations spéciales
+  "ADJUSTMENT",
+  "INTEREST_PAYMENT",
+  "LIQUIDATION",
 ]);
 
 // ============================================
