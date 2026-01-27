@@ -6,7 +6,7 @@ import { clientSearchApi, clientApi, creditApi, tontineApi, operationCaisseApi, 
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney, parseMoney } from '../../../lib/format';
 import { sanitizeInput } from '../../../lib/sanitize';
-import { TypeOperationCaisse } from '@shared/enum/status-constants';
+import { TypeOperationCaisse, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { ReceiptData, ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
@@ -384,7 +384,7 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
               id: acc.id,
               type: 'Compte',
               subType: acc.typeCompte,
-              label: acc.typeCompte, // "Epargne", "Courant"
+              label: TYPE_COMPTE_LABELS[acc.typeCompte as TypeCompteType] || acc.typeCompte, // "Compte Épargne", "Compte Courant"
               balance: acc.solde
           });
       });

@@ -1100,7 +1100,7 @@ export default function CaisseDashboard({
                          )}
                          {currentSession?.statut === 'OPEN' && (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
-                                Active
+                                Ouverte
                             </span>
                          )}
                          {currentSession?.statut === 'CLOSING_COUNT' && (

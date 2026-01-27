@@ -67,6 +67,15 @@ const normalizeStatus = (status: string): OperationStatus => {
   return 'SUCCESS';
 };
 
+/** Formats the description to replace internal English terms with French labels */
+const formatDescription = (description: string): string => {
+  if (!description) return '';
+  return description
+    .replace(/\bSAVINGS\b/g, 'ÉPARGNE')
+    .replace(/\bCURRENT\b/g, 'COURANT')
+    .replace(/\bACTIVE\b/g, 'ACTIF');
+};
+
 /** Get status configuration with proper colors and icon */
 const getStatusConfig = (status: string) => {
   const normalized = normalizeStatus(status);
@@ -161,7 +170,7 @@ function MobileTransactionRow({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white truncate">
-                {tx.description || tx.type_operation || tx.type}
+                {formatDescription(tx.description || tx.type_operation || tx.type)}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-slate-500">{timeStr}</span>
@@ -332,7 +341,7 @@ export default function TransactionsList({
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-white truncate">
-                            {tx.description || tx.type_operation || tx.type}
+                            {formatDescription(tx.description || tx.type_operation || tx.type)}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-slate-500">{timeStr}</span>
@@ -406,7 +415,7 @@ export default function TransactionsList({
                         {isCredit ? <ArrowDownLeft size={compactMode ? 10 : 12} /> : <ArrowUpRight size={compactMode ? 10 : 12} />}
                       </div>
                       <span className="text-xs font-medium text-white group-hover:text-cyan-400 transition-colors truncate max-w-[150px] block">
-                        {tx.description || tx.type_operation || tx.type}
+                        {formatDescription(tx.description || tx.type_operation || tx.type)}
                       </span>
                     </div>
                   </td>
