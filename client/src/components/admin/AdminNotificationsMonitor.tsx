@@ -60,6 +60,7 @@ export default function AdminNotificationsMonitor() {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
 
@@ -111,6 +112,23 @@ export default function AdminNotificationsMonitor() {
       console.error('Error retrying dead-letter:', error);
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const handleRetryJob = async (jobId: string) => {
+    setRetryingJobId(jobId);
+    try {
+      const res = await fetch(`/api/notifications/admin/retry-job/${jobId}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Error retrying job:', error);
+    } finally {
+      setRetryingJobId(null);
     }
   };
 
@@ -296,12 +314,13 @@ export default function AdminNotificationsMonitor() {
                 <th className="text-left p-2 font-medium">Tentatives</th>
                 <th className="text-left p-2 font-medium">Erreur</th>
                 <th className="text-left p-2 font-medium">Date</th>
+                <th className="text-left p-2 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {jobs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center text-slate-500 py-6">
+                  <td colSpan={7} className="text-center text-slate-500 py-6">
                     Aucun job trouvé
                   </td>
                 </tr>
@@ -328,6 +347,19 @@ export default function AdminNotificationsMonitor() {
                       {new Date(job.createdAt).toLocaleString('fr-FR', {
                         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
                       })}
+                    </td>
+                    <td className="p-2">
+                      {(job.status === 'DEAD_LETTER' || job.status === 'FAILED') && (
+                        <button
+                          onClick={() => handleRetryJob(job.id)}
+                          disabled={retryingJobId === job.id}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-orange-900/30 text-orange-400 hover:bg-orange-900/50 hover:text-orange-300 disabled:opacity-50 transition-colors"
+                          title="Rejouer ce job"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${retryingJobId === job.id ? 'animate-spin' : ''}`} />
+                          {retryingJobId === job.id ? 'Relance...' : 'Rejouer'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

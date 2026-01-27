@@ -504,6 +504,22 @@ export function registerNotificationsRoutes(app: Express) {
     }
   });
 
+  // POST /api/notifications/admin/retry-job/:id - Retry a single failed/dead-letter job
+  app.post("/api/notifications/admin/retry-job/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.AUDIT_LOG), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { retrySingleJob } = await import("../services/notifications/notification-worker");
+      const retried = await retrySingleJob(id);
+      if (!retried) {
+        return res.status(404).json({ error: "Job non trouvé ou statut non éligible (DEAD_LETTER ou FAILED requis)" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error retrying job:", error);
+      res.status(500).json({ error: "Erreur" });
+    }
+  });
+
   // GET /api/notifications/admin/settings - Read notification settings
   app.get("/api/notifications/admin/settings", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AUDIT_LOG), async (req, res) => {
     try {

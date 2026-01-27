@@ -1,6 +1,6 @@
 import { db } from "../../db";
 import { notificationJobs, notificationDeliveryReceipts } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import {
   renderSmsTemplate,
   renderEmailTemplate,
@@ -328,4 +328,33 @@ export async function retryDeadLetterJobs(): Promise<number> {
     .returning();
 
   return result.length;
+}
+
+/**
+ * Retry a single DEAD_LETTER or FAILED job by ID.
+ * Returns true if the job was found and re-queued, false otherwise.
+ */
+export async function retrySingleJob(jobId: string): Promise<boolean> {
+  const result = await db
+    .update(notificationJobs)
+    .set({
+      status: "QUEUED",
+      attempts: 0,
+      lastError: null,
+      nextAttemptAt: new Date(),
+      lockedAt: null,
+      lockedUntil: null,
+    })
+    .where(
+      and(
+        eq(notificationJobs.id, jobId),
+        or(
+          eq(notificationJobs.status, "DEAD_LETTER"),
+          eq(notificationJobs.status, "FAILED")
+        )
+      )
+    )
+    .returning();
+
+  return result.length > 0;
 }
