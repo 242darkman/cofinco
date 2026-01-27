@@ -42,11 +42,17 @@ export default function EmployesList({
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterContrat, setFilterContrat] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // NEW STATE: replaced simple ID with full state object
+  const [menuState, setMenuState] = useState<{
+    id: string;
+    emp: Employe;
+    position: { top: number; right: number };
+  } | null>(null);
+
   const [selectedEmployee, setSelectedEmployee] = useState<Employe | null>(null);
   const ITEMS_PER_PAGE = 10;
   
-  // Apply filters
+  // ... (keeping existing filters logic) ...
   const filteredEmployes = employes.filter(emp => {
     if (filterStatus !== 'all' && emp.statut !== filterStatus) return false;
     if (filterContrat !== 'all' && emp.typeContrat !== filterContrat) return false;
@@ -58,39 +64,32 @@ export default function EmployesList({
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
-
+  
+  // ... (keeping existing helpers) ...
+  
   // Helper function to generate initials
   const getInitials = (nom: string, prenom: string) => {
     return `${(nom || '').charAt(0)}${(prenom || '').charAt(0)}`.toUpperCase();
   };
 
-  // Helper function to generate gradient colors based on name
   const getGradientColors = (nom: string) => {
     const colors = [
-      'from-slate-700 to-slate-800',
-      'from-blue-600 to-blue-700',
-      'from-indigo-600 to-indigo-700',
-      'from-purple-600 to-purple-700',
-      'from-emerald-600 to-emerald-700',
-      'from-teal-600 to-teal-700',
+      'from-slate-700 to-slate-800', 'from-blue-600 to-blue-700', 'from-indigo-600 to-indigo-700',
+      'from-purple-600 to-purple-700', 'from-emerald-600 to-emerald-700', 'from-teal-600 to-teal-700',
       'from-cyan-600 to-cyan-700',
     ];
     const index = (nom || 'A').charCodeAt(0) % colors.length;
     return colors[index];
   };
 
-  // Helper to translate status to French
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
-      [StatutUser.ACTIVE]: 'Actif',
-      [StatutUser.INACTIVE]: 'Inactif',
-      [StatutUser.SUSPENDED]: 'Suspendu',
-      'Congé': 'Congé'
+      [StatutUser.ACTIVE]: 'Actif', [StatutUser.INACTIVE]: 'Inactif',
+      [StatutUser.SUSPENDED]: 'Suspendu', 'Congé': 'Congé'
     };
     return statusMap[status] || status;
   };
 
-  // Helper to get contract type badge
   const getContractBadge = (typeContrat: string) => {
     const contractColors: Record<string, string> = {
       'CDI': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -102,9 +101,21 @@ export default function EmployesList({
     return contractColors[typeContrat] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
   };
 
-  // Handle row click
   const handleRowClick = (emp: Employe) => {
     setSelectedEmployee(emp);
+  };
+
+  const handleMenuOpen = (e: React.MouseEvent<HTMLButtonElement>, emp: Employe) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuState({
+      id: emp.id,
+      emp: emp,
+      position: {
+        top: rect.bottom + 5,
+        right: window.innerWidth - rect.right
+      }
+    });
   };
 
   return (
@@ -112,78 +123,81 @@ export default function EmployesList({
       
       {/* 2. BARRE D'OUTILS - Compact */}
       <div className="flex flex-col gap-2">
-        <div className="flex flex-col md:flex-row gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-800">
-           <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5" />
-              <input 
-                type="text"
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Rechercher..." 
-                className="w-full bg-slate-950 border border-slate-800 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-indigo-500 focus:outline-none h-9"
-              />
+         {/* ... (keeping component content) ... */}
+         <div className="flex flex-col md:flex-row gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-800">
+            {/* Same Toolbar Content */}
+            <div className="relative flex-1">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5" />
+               <input 
+                 type="text"
+                 value={searchTerm}
+                 onChange={(e) => onSearchChange(e.target.value)}
+                 placeholder="Rechercher..." 
+                 className="w-full bg-slate-950 border border-slate-800 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-indigo-500 focus:outline-none h-9"
+               />
+            </div>
+            <div className="flex gap-2">
+               <button 
+                 onClick={() => setShowSalaries(!showSalaries)}
+                 className="px-3 py-1.5 text-slate-400 hover:text-white border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9"
+               >
+                 {showSalaries ? <EyeOff size={14}/> : <Eye size={14}/>} 
+                 <span className="hidden md:inline">Salaires</span>
+               </button>
+               <button 
+                 onClick={() => setShowFilters(!showFilters)}
+                 className={`px-3 py-1.5 border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9 ${
+                   showFilters ? 'text-indigo-400 border-indigo-500/50' : 'text-slate-400 hover:text-white'
+                 }`}
+               >
+                 <Filter size={14}/> Filtres
+               </button>
+            </div>
+         </div>
+         
+         {/* Filters Panel */}
+         {showFilters && (
+           <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row gap-4">
+             {/* Same Filters Content */}
+             <div className="flex-1">
+               <label className="text-xs text-slate-400 uppercase mb-2 block">Statut</label>
+               <select 
+                 value={filterStatus}
+                 onChange={(e) => setFilterStatus(e.target.value)}
+                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+               >
+                 <option value="all">Tous les statuts</option>
+                 <option value={StatutUser.ACTIVE}>Actif</option>
+                 <option value={StatutUser.INACTIVE}>Inactif</option>
+                 <option value={StatutUser.SUSPENDED}>Suspendu</option>
+                 <option value="Congé">Congé</option>
+               </select>
+             </div>
+             <div className="flex-1">
+               <label className="text-xs text-slate-400 uppercase mb-2 block">Type de contrat</label>
+               <select 
+                 value={filterContrat}
+                 onChange={(e) => setFilterContrat(e.target.value)}
+                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+               >
+                 <option value="all">Tous les contrats</option>
+                 <option value="CDI">CDI</option>
+                 <option value="CDD">CDD</option>
+                 <option value="Stage">Stage</option>
+                 <option value="Freelance">Freelance</option>
+                 <option value="Temporaire">Temporaire</option>
+               </select>
+             </div>
+             <div className="flex items-end">
+               <button
+                 onClick={() => { setFilterStatus('all'); setFilterContrat('all'); }}
+                 className="px-4 py-2 text-slate-400 hover:text-white border border-slate-800 rounded-lg bg-slate-950 text-sm transition-colors"
+               >
+                 Réinitialiser
+               </button>
+             </div>
            </div>
-           <div className="flex gap-2">
-              <button 
-                onClick={() => setShowSalaries(!showSalaries)}
-                className="px-3 py-1.5 text-slate-400 hover:text-white border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9"
-              >
-                {showSalaries ? <EyeOff size={14}/> : <Eye size={14}/>} 
-                <span className="hidden md:inline">Salaires</span>
-              </button>
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className={`px-3 py-1.5 border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9 ${
-                  showFilters ? 'text-indigo-400 border-indigo-500/50' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Filter size={14}/> Filtres
-              </button>
-           </div>
-        </div>
-        
-        {/* Filters Panel */}
-        {showFilters && (
-          <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="text-xs text-slate-400 uppercase mb-2 block">Statut</label>
-              <select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="all">Tous les statuts</option>
-                <option value={StatutUser.ACTIVE}>Actif</option>
-                <option value={StatutUser.INACTIVE}>Inactif</option>
-                <option value={StatutUser.SUSPENDED}>Suspendu</option>
-                <option value="Congé">Congé</option>
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-slate-400 uppercase mb-2 block">Type de contrat</label>
-              <select 
-                value={filterContrat}
-                onChange={(e) => setFilterContrat(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              >
-                <option value="all">Tous les contrats</option>
-                <option value="CDI">CDI</option>
-                <option value="CDD">CDD</option>
-                <option value="Stage">Stage</option>
-                <option value="Freelance">Freelance</option>
-                <option value="Temporaire">Temporaire</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={() => { setFilterStatus('all'); setFilterContrat('all'); }}
-                className="px-4 py-2 text-slate-400 hover:text-white border border-slate-800 rounded-lg bg-slate-950 text-sm transition-colors"
-              >
-                Réinitialiser
-              </button>
-            </div>
-          </div>
-        )}
+         )}
       </div>
 
       {/* 3. TABLEAU PIXEL PERFECT (Desktop) */}
@@ -272,72 +286,18 @@ export default function EmployesList({
                      <StatusBadge status={getStatusLabel(emp.statut)} />
                   </td>
 
-                  {/* 5. ACTIONS (Dropdown Only) */}
+                  {/* 5. ACTIONS (Button Only - Menu Detached) */}
                   <td className="px-4 py-2 align-middle text-right relative">
                      <button 
-                       onClick={(e) => { 
-                         e.stopPropagation(); 
-                         setOpenMenuId(openMenuId === emp.id ? null : emp.id); 
-                       }}
+                       onClick={(e) => handleMenuOpen(e, emp)}
                        className={`p-1.5 rounded-lg transition-colors ${
-                         openMenuId === emp.id 
+                         menuState?.id === emp.id 
                            ? 'bg-indigo-600 text-white' 
                            : 'text-slate-500 hover:text-white hover:bg-slate-700'
                        }`}
                      >
                        <MoreVertical size={14} />
                      </button>
-
-                     {/* DROPDOWN MENU FLOTTANT */}
-                     {openMenuId === emp.id && (
-                       <>
-                         {/* Click outside closer */}
-                         <div 
-                           className="fixed inset-0 z-10" 
-                           onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); }} 
-                         />
-                         
-                         <div className="absolute right-8 top-8 z-20 w-44 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-0.5 animate-in fade-in zoom-in-95 duration-200">
-                           <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-800">
-                             Actions
-                           </div>
-                           
-                           <DropdownItem 
-                             icon={PenLine} 
-                             label="Modifier le profil" 
-                             onClick={(e) => { 
-                               e.stopPropagation(); 
-                               onEdit(emp); 
-                               setOpenMenuId(null); 
-                             }} 
-                           />
-                           <DropdownItem 
-                             icon={FileText} 
-                             label="Voir la fiche" 
-                             onClick={(e) => { 
-                               e.stopPropagation(); 
-                               handleRowClick(emp); 
-                               setOpenMenuId(null); 
-                             }} 
-                           />
-                           
-                           <div className="my-1 border-t border-slate-800" />
-                           
-                           {canDeleteEmployees && (
-                             <DropdownItem 
-                               icon={UserX} 
-                               label="Supprimer" 
-                               color="text-red-500 hover:bg-red-500/10" 
-                               onClick={(e) => { 
-                                 e.stopPropagation(); 
-                                 onDelete(emp.id); 
-                                 setOpenMenuId(null); 
-                               }} 
-                             />
-                           )}
-                         </div>
-                       </>
-                     )}
                   </td>
                 </tr>
               ))
@@ -408,6 +368,7 @@ export default function EmployesList({
         )}
       </div>
 
+
       {/* 5. PAGINATION */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 pb-4 px-2">
@@ -445,6 +406,61 @@ export default function EmployesList({
              onRefresh?.();
            }}
         />
+      )}
+
+      {/* GLOBAL DROPDOWN MENU (Fixed Position) */}
+      {menuState && (
+        <>
+          <div 
+            className="fixed inset-0 z-[60]" 
+            onClick={() => setMenuState(null)} 
+          />
+          <div 
+            className="fixed z-[70] w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 animate-in fade-in zoom-in-95 duration-200"
+            style={{ 
+              top: `${menuState.position.top}px`, 
+              right: `${menuState.position.right}px` 
+            }}
+          >
+            <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-800">
+              Actions
+            </div>
+            
+            <DropdownItem 
+              icon={PenLine} 
+              label="Modifier le profil" 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onEdit(menuState.emp); 
+                setMenuState(null); 
+              }} 
+            />
+            <DropdownItem 
+              icon={FileText} 
+              label="Voir la fiche" 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                handleRowClick(menuState.emp); 
+                setMenuState(null); 
+              }} 
+            />
+            
+            <div className="my-1 border-t border-slate-800" />
+            
+            {canDeleteEmployees && (
+              <DropdownItem 
+                icon={UserX} 
+                label="Supprimer" 
+                color="text-red-500 hover:bg-red-500/10" 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  onDelete(menuState.emp.id); 
+                  setMenuState(null); 
+                }} 
+              />
+            )}
+          </div>
+        </>
       )}
 
     </div>
