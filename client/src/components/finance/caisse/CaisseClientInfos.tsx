@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
 import { formatClientName, resolveStorageUrl } from '@/lib/format';
 import { clientSearchApi, compteEpargneApi } from '@/lib/api-client';
+import CaisseOperationModal from './CaisseOperationModal';
+import type { OperationType } from './hooks/useCaisseOperation';
 
 interface SecurityLimits {
   daily: { limit: number, used: number, remaining: number };
@@ -47,12 +49,9 @@ export default function CaisseClientInfos() {
   const [showEditLimitsModal, setShowEditLimitsModal] = useState(false);
   const [editLimits, setEditLimits] = useState({ daily: 0, weekly: 0, monthly: 0 });
   
-  // Transaction modal state
-  const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [transactionType, setTransactionType] = useState<'Dépôt' | 'Retrait'>('Dépôt');
-  const [transactionAmount, setTransactionAmount] = useState('');
-  const [transactionDescription, setTransactionDescription] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Operation modal state
+  const [operationModalOpen, setOperationModalOpen] = useState(false);
+  const [operationModalType, setOperationModalType] = useState<OperationType>('DEPOT');
   
   const canEditLimits = hasPermission('clients', 'edit') || hasPermission('caisse', 'manage');
 
@@ -108,50 +107,9 @@ export default function CaisseClientInfos() {
     return <Badge variant="neutral" icon={<History size={14} />} value="En attente" />;
   };
 
-  // Transaction mutation
-  const submitTransaction = async () => {
-    if (!selectedClientId || !transactionAmount) return toast.error('Montant requis');
-    
-    const amount = parseFloat(transactionAmount);
-    if (isNaN(amount) || amount <= 0) return toast.error('Montant invalide');
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetch('/api/transactions-epargne', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: selectedClientId,
-          montant: amount,
-          typeTransaction: transactionType === 'Dépôt' ? 'depot' : 'retrait',
-          description: transactionDescription || `${transactionType} client`
-        })
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Erreur transaction');
-      }
-
-      toast.success(`${transactionType} effectué avec succès`);
-      queryClient.invalidateQueries({ queryKey: ['clients', selectedClientId] });
-      queryClient.invalidateQueries({ queryKey: ['transactions', selectedClientId] });
-      
-      setShowTransactionModal(false);
-      setTransactionAmount('');
-      setTransactionDescription('');
-    } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la transaction');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const openTransactionModal = (type: 'Dépôt' | 'Retrait') => {
-    setTransactionType(type);
-    setTransactionAmount('');
-    setTransactionDescription('');
-    setShowTransactionModal(true);
+  const openOperationModal = (type: OperationType) => {
+    setOperationModalType(type);
+    setOperationModalOpen(true);
   };
 
   // Update limits mutation
@@ -445,13 +403,13 @@ export default function CaisseClientInfos() {
                      </div>
                      <div className="flex gap-3 w-full md:w-auto shrink-0">
                         <button
-                            onClick={() => openTransactionModal('Dépôt')}
+                            onClick={() => openOperationModal('DEPOT')}
                             className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-900/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
                             <ArrowDownToLine size={18} /> DÉPÔT
                         </button>
                         <button
-                            onClick={() => openTransactionModal('Retrait')}
+                            onClick={() => openOperationModal('RETRAIT')}
                             className="flex-1 md:flex-none h-12 px-6 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold shadow-lg shadow-rose-900/20 active:scale-95 transition-all flex items-center justify-center gap-2"
                         >
                             <ArrowUpFromLine size={18} /> RETRAIT
@@ -525,71 +483,16 @@ export default function CaisseClientInfos() {
             </Card>
         </div>
       </div>
-      {/* Transaction Modal (Reused Logic) */}
-      {showTransactionModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 max-w-lg w-full p-8 shadow-2xl">
-            <h3 className={`text-2xl font-bold mb-6 flex items-center gap-3 ${transactionType === 'Dépôt' ? 'text-emerald-400' : 'text-rose-400'}`}>
-              <span className={`p-2 rounded-lg ${transactionType === 'Dépôt' ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
-                  {transactionType === 'Dépôt' ? <ArrowDownToLine size={24} /> : <ArrowUpFromLine size={24} />}
-              </span>
-              {transactionType}
-            </h3>
-            
-            <div className="space-y-6">
-              <div>
-                <label className="text-sm font-medium text-slate-400 block mb-2 uppercase tracking-wide">Montant (FCFA)</label>
-                <input
-                  type="number"
-                  className="w-full px-4 py-4 bg-slate-950 border border-slate-700 rounded-xl text-white text-3xl font-mono focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
-                  value={transactionAmount}
-                  onChange={(e) => setTransactionAmount(e.target.value)}
-                  placeholder="0"
-                  min="1"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-400 block mb-2 uppercase tracking-wide">Note (Optionnel)</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:border-cyan-500 outline-none transition-all"
-                  value={transactionDescription}
-                  onChange={(e) => setTransactionDescription(e.target.value)}
-                  placeholder="Motif de l'opération..."
-                />
-              </div>
-
-              {transactionType === 'Retrait' && limits && (
-                 <div className="p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl flex justify-between items-center">
-                    <span className="text-rose-400 text-sm font-medium">Limite disponible</span>
-                    <span className="text-white font-bold font-mono text-lg">{formatMoney(limits.daily.remaining)}</span>
-                 </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-8">
-              <button 
-                onClick={() => setShowTransactionModal(false)}
-                className="px-6 py-4 rounded-xl bg-slate-800 text-slate-300 font-bold hover:bg-slate-700 transition"
-              >
-                Annuler
-              </button>
-              <button 
-                onClick={submitTransaction}
-                disabled={isSubmitting || !transactionAmount}
-                className={`px-6 py-4 rounded-xl text-white font-bold shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    transactionType === 'Dépôt' 
-                    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20' 
-                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-500/20'
-                }`}
-              >
-                {isSubmitting ? 'Traitement...' : 'CONFIRMER'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Operation Modal (Depot / Retrait) */}
+      {client && (
+        <CaisseOperationModal
+          isOpen={operationModalOpen}
+          onClose={() => setOperationModalOpen(false)}
+          operationType={operationModalType}
+          client={client}
+          clientAccounts={clientAccounts}
+          securityLimits={limits}
+        />
       )}
 
       {/* Edit Limits Modal */}
@@ -649,8 +552,4 @@ export default function CaisseClientInfos() {
     </div>
   );
 
-  function formatMoney(amount: number | string | undefined) {
-    const val = Number(amount || 0);
-    return new Intl.NumberFormat('fr-FR').format(val) + ' FCFA';
-  }
 }

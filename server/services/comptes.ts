@@ -392,7 +392,7 @@ export async function createCompte(
 export async function deposerSurCompte(
   data: DepotRetraitData,
   userId?: string
-): Promise<{ transaction: typeof transactionsCompte.$inferSelect; mouvement: MouvementFinancier }> {
+): Promise<{ transaction: typeof transactionsCompte.$inferSelect; mouvement: MouvementFinancier; facture: Facture }> {
   // 1. Get compte
   const [compte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
   if (!compte) {
@@ -542,7 +542,7 @@ export async function processCompteDepot(
 export async function retirerDuCompte(
   data: DepotRetraitData,
   userId?: string
-): Promise<{ transaction: typeof transactionsCompte.$inferSelect; mouvement: MouvementFinancier }> {
+): Promise<{ transaction: typeof transactionsCompte.$inferSelect; mouvement: MouvementFinancier; facture: Facture }> {
   // 1. Get compte
   const [compte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
   if (!compte) {

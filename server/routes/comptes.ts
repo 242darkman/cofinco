@@ -1446,12 +1446,17 @@ export function registerComptesRoutes(app: Express) {
             type: "DASHBOARD_UPDATE",
             payload: {},
           });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "CAISSE_UPDATE",
+            payload: { action: "DEPOT", montant: parsed.montant },
+          });
         }
 
         res.json(
           addSnakeCaseAliasesDeep({
             transaction: result.transaction,
             mouvement_id: result.mouvement.id,
+            facture: result.facture || null,
             message: "Dépôt effectué avec succès",
           })
         );
@@ -1648,12 +1653,17 @@ export function registerComptesRoutes(app: Express) {
             type: "DASHBOARD_UPDATE",
             payload: {},
           });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "CAISSE_UPDATE",
+            payload: { action: "RETRAIT", montant: parsed.montant },
+          });
         }
 
         res.json(
           addSnakeCaseAliasesDeep({
             transaction: result.transaction,
             mouvement_id: result.mouvement.id,
+            facture: result.facture || null,
             message: "Retrait effectué avec succès",
           })
         );
