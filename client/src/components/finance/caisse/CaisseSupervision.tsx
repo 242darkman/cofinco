@@ -168,6 +168,16 @@ export default function CaisseSupervision({
   const closedSessions = sessions.filter((s) => resolveSessionStatus(s) === 'CLOSED');
   const totalEspeces = activeSessions.reduce((acc, s) => acc + getSoldeTheorique(s), 0);
 
+  // Compter les caisses UNIQUES (pas les sessions) — une même caisse ouverte/fermée
+  // plusieurs fois ne doit compter que comme 1
+  const resolveCaisseId = (s: any) => s.caisseId || s.caisse_id;
+  const uniqueActiveCaisseCount = new Set(activeSessions.map(resolveCaisseId)).size;
+  const uniqueClosedTodayCaisseCount = new Set(
+    closedSessions
+      .filter(s => new Date(resolveClosedAt(s) || resolveOpenedAt(s)).toDateString() === new Date().toDateString())
+      .map(resolveCaisseId)
+  ).size;
+
   // Liste des caissiers filtrés
   const caissierRoles = new Set([SystemRole.CAISSIER, SystemRole.ADMIN, SystemRole.SUPERVISEUR]);
   const allCaissiers = users.filter((u) => {
@@ -228,7 +238,7 @@ export default function CaisseSupervision({
 
   // Tabs conditionnels selon les permissions
   const tabs = [
-    { key: 'sessions', label: 'Caisses Ouvertes', icon: Wallet, badge: activeSessions.length },
+    { key: 'sessions', label: 'Caisses Ouvertes', icon: Wallet, badge: uniqueActiveCaisseCount },
     // L'onglet Caissiers est visible uniquement si l'utilisateur a la permission de voir les users
     ...(permissions.canViewUsers ? [{ key: 'caissiers', label: 'Caissiers', icon: User }] : []),
     // { key: 'alertes', label: 'Anomalies', icon: AlertTriangle, badge: 0 }
@@ -441,7 +451,7 @@ export default function CaisseSupervision({
                 {formatMoney(totalEspeces)}
               </div>
               <div className="text-[9px] text-slate-500">
-                {activeSessions.length} caisse{activeSessions.length > 1 ? 's' : ''}
+                {uniqueActiveCaisseCount} caisse{uniqueActiveCaisseCount > 1 ? 's' : ''}
               </div>
             </div>
           </div>
@@ -454,7 +464,7 @@ export default function CaisseSupervision({
               <User size={12} className="text-cyan-400" />
               <span className="text-[9px] text-slate-500 uppercase font-semibold hidden sm:inline">Actifs</span>
             </div>
-            <div className="text-lg sm:text-xl font-bold text-white leading-tight">{activeSessions.length}</div>
+            <div className="text-lg sm:text-xl font-bold text-white leading-tight">{uniqueActiveCaisseCount}</div>
             <div className="text-[9px] text-emerald-400 flex items-center gap-1">
               <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
               En ligne
@@ -470,7 +480,7 @@ export default function CaisseSupervision({
               <span className="text-[9px] text-slate-500 uppercase font-semibold hidden sm:inline">Fermées</span>
             </div>
             <div className="text-lg sm:text-xl font-bold text-white leading-tight">
-              {closedSessions.filter(s => new Date(resolveClosedAt(s) || resolveOpenedAt(s)).toDateString() === new Date().toDateString()).length}
+              {uniqueClosedTodayCaisseCount}
             </div>
             <div className="text-[9px] text-slate-500">Aujourd'hui</div>
           </div>

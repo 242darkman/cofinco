@@ -9,7 +9,7 @@ interface ReportTypeSelectorProps {
 
 export default function ReportTypeSelector({ selectedType, onSelect }: ReportTypeSelectorProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {reportTypes.map((type) => {
         const IconComponent = type.icon;
         const isSelected = selectedType === type.id;
@@ -18,21 +18,32 @@ export default function ReportTypeSelector({ selectedType, onSelect }: ReportTyp
           <button
             key={type.id}
             onClick={() => onSelect(type.id)}
-            className={`p-3 sm:p-4 rounded-xl border text-left transition-all ${
+            className={`group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 ${
               isSelected 
-                ? 'bg-primary/10 border-primary ring-1 ring-primary/50' 
-                : 'bg-surface-base border-edge hover:bg-surface-muted hover:border-primary/30'
+                ? 'bg-indigo-600/10 border-indigo-500/50 shadow-lg shadow-indigo-900/20' 
+                : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
             }`}
           >
-            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mb-2 transition-colors ${
+            {/* Active Indicator Line */}
+            {isSelected && (
+              <div className="absolute inset-x-4 -bottom-px h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_-2px_8px_rgba(99,102,241,0.5)]" />
+            )}
+
+            <div className={`mb-2 p-2 rounded-lg transition-colors ${
               isSelected 
-                ? 'bg-primary text-white shadow-md shadow-primary/30' 
-                : 'bg-surface-muted text-primary'
+                ? 'bg-indigo-500 text-white shadow-inner' 
+                : 'bg-slate-950 text-slate-400 group-hover:text-slate-200 group-hover:bg-slate-900 border border-slate-800'
             }`}>
               <IconComponent size={18} />
             </div>
-            <h3 className="font-semibold text-sm text-content-primary truncate">{type.label}</h3>
-            <p className="text-[10px] sm:text-xs text-content-muted line-clamp-2 mt-0.5">{type.description}</p>
+            
+            <div className="text-center">
+              <h3 className={`text-xs font-bold transition-colors ${
+                isSelected ? 'text-indigo-300' : 'text-slate-300 group-hover:text-white'
+              }`}>
+                {type.label}
+              </h3>
+            </div>
           </button>
         );
       })}
