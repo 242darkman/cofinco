@@ -4,7 +4,7 @@ import { insertTontineSchema, insertMembreTontineSchema, insertContributionTonti
     insertTontineRegleSchema, insertTontinePenaliteSchema, insertTontineDistributionSchema,
     insertTontinePlanSchema,
     tontineCycles, tontineTurns, tontineSchedules, tontineDistributionRequests, tontineTurnAudit,
-    TontinePayoutMethod
+    membresTontine, TontinePayoutMethod
 } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
@@ -14,6 +14,7 @@ import { requireAgenceAccess } from "../middleware";
 import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
 import { getWsInstance } from "../ws-server";
 import tontineProductionService from "../services/tontine-production-service";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { db } from "../db";
 import { eq, and, desc, asc } from "drizzle-orm";
 
@@ -140,6 +141,23 @@ export function registerTontineRoutes(app: Express) {
           wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'membre_added', tontineId: req.params.id } });
       }
 
+      // Domain event: member joined tontine
+      if (membre.clientId) {
+        dispatchDomainEvent({
+          type: "TONTINE_MEMBER_JOINED",
+          data: {
+            tontineId: tontine.id,
+            tontineName: tontine.nom,
+            clientId: membre.clientId,
+            montantCotisation: Number(tontine.montantCotisation || 0),
+            frequence: tontine.frequence || 'Mensuelle',
+            position: membre.position ?? undefined,
+            agenceId: tontine.agenceId ?? undefined,
+          },
+          timestamp: new Date(),
+        });
+      }
+
       res.json(addSnakeCaseAliasesDeep(membre));
   });
 
@@ -193,6 +211,24 @@ export function registerTontineRoutes(app: Express) {
             if (sessionCaisseId) {
                  wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
             }
+        }
+
+        // Domain event: contribution received
+        if (parsed.clientId) {
+          const tontineInfo = await storage.getTontine(parsed.tontineId);
+          dispatchDomainEvent({
+            type: "TONTINE_CONTRIBUTION_RECEIVED",
+            data: {
+              tontineId: parsed.tontineId,
+              tontineName: tontineInfo?.nom || 'Tontine',
+              clientId: parsed.clientId,
+              montant: Number(parsed.montant || 0),
+              tourNumero: parsed.tourNumero ?? undefined,
+              reference: (contrib as any)?.reference,
+              agenceId: tontineInfo?.agenceId ?? undefined,
+            },
+            timestamp: new Date(),
+          });
         }
 
         res.json(addSnakeCaseAliasesDeep(contrib));
@@ -353,6 +389,32 @@ export function registerTontineRoutes(app: Express) {
             cycleId: result.cycleId,
             turnsCount: result.turnsCreated,
           }
+        });
+      }
+
+      // Domain event: cycle started — notify all members
+      const tontineForCycle = await storage.getTontine(req.params.id);
+      if (tontineForCycle) {
+        // Get cycle number from DB
+        const [cycleData] = await db
+          .select({ cycleNumber: tontineCycles.cycleNumber })
+          .from(tontineCycles)
+          .where(eq(tontineCycles.id, result.cycleId))
+          .limit(1);
+
+        dispatchDomainEvent({
+          type: "TONTINE_CYCLE_STARTED",
+          data: {
+            tontineId: req.params.id,
+            tontineName: tontineForCycle.nom,
+            cycleNumber: cycleData?.cycleNumber || 1,
+            startDate: startDate
+              ? new Date(startDate).toLocaleDateString("fr-FR")
+              : new Date().toLocaleDateString("fr-FR"),
+            membersCount: result.turnsCreated || 0,
+            agenceId,
+          },
+          timestamp: new Date(),
         });
       }
 
@@ -680,6 +742,37 @@ export function registerTontineRoutes(app: Express) {
         if (sessionCaisseId) {
           wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
         }
+      }
+
+      // Domain event: distribution paid — look up beneficiary info
+      if (result.status === 'SUCCESS' || result.status === 'PARTIAL') {
+        try {
+          const [distReq] = await db
+            .select()
+            .from(tontineDistributionRequests)
+            .where(eq(tontineDistributionRequests.id, result.requestId))
+            .limit(1);
+          if (distReq) {
+            const tontineForDist = await storage.getTontine(req.params.id);
+            const benefMember = await db.select().from(membresTontine).where(eq(membresTontine.id, distReq.beneficiaryMemberId)).limit(1);
+            const clientId = benefMember[0]?.clientId;
+            if (clientId && tontineForDist) {
+              dispatchDomainEvent({
+                type: "TONTINE_DISTRIBUTION_PAID",
+                data: {
+                  tontineId: req.params.id,
+                  tontineName: tontineForDist.nom,
+                  clientId,
+                  montant: result.netAmount || 0,
+                  reference: result.paymentIntentId || result.requestId.substring(0, 8).toUpperCase(),
+                  payoutMethod: distReq.payoutMethod || 'CASH',
+                  agenceId,
+                },
+                timestamp: new Date(),
+              });
+            }
+          }
+        } catch (e) { /* non-blocking */ }
       }
 
       res.json(addSnakeCaseAliasesDeep(result));

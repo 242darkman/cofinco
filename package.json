@@ -10,15 +10,13 @@
     "start": "NODE_ENV=production node --env-file=.env dist/index.cjs",
     "check": "tsc",
     "db:push": "node --env-file=.env node_modules/drizzle-kit/bin.cjs push",
-    "db:migrate-push": "node --env-file=.env --import tsx scripts/migrate-and-push.ts",
     "db:seed": "node --env-file=.env --import tsx server/seed-prod.ts",
     "db:seed:dry-run": "node --env-file=.env --import tsx server/seed-prod.ts -- --dry-run",
     "db:seed:force": "node --env-file=.env --import tsx server/seed-prod.ts -- --force",
+    "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
+    "db:reset:force": "node --env-file=.env --import tsx scripts/db-reset.ts -- --force",
     "db:validate": "node --env-file=.env --import tsx scripts/validate-seed.ts",
     "audit:integrity": "node --env-file=.env --import tsx scripts/audit-integrity.ts",
-    "audit:dashboard": "node --env-file=.env --import tsx scripts/audit-dashboard-data.ts",
-    "fix:solde-restant": "node --env-file=.env --import tsx scripts/fix-solde-restant.ts",
-    "verify-dashboard": "tsx scripts/verify-dashboard-readiness.ts",
     "test": "vitest"
   },
   "dependencies": {

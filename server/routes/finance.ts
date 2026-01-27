@@ -1625,6 +1625,24 @@ export function registerFinanceRoutes(app: Express) {
               wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'enquete_new', demandeId: parsed.demandeId } });
           }
 
+          // Domain event: investigation assigned
+          if (enquete.demandeId) {
+            const demande = await storage.getDemandeCredit(enquete.demandeId);
+            if (demande) {
+              dispatchDomainEvent({
+                type: "CREDIT_INVESTIGATION_ASSIGNED",
+                data: {
+                  demandeId: enquete.demandeId,
+                  numeroDemande: demande.numeroDemande,
+                  clientId: demande.clientId,
+                  agentName: (parsed as any).agentNom || req.session.user?.nom || 'Agent',
+                  agenceId: req.session.user?.agenceId,
+                },
+                timestamp: new Date(),
+              });
+            }
+          }
+
           res.json(addSnakeCaseAliasesDeep(enquete));
       } catch (error: any) {
           console.error('[Enquete Create Error]', error);
@@ -2954,7 +2972,20 @@ export function registerFinanceRoutes(app: Express) {
        
        // Log Audit
        await logAudit(req, "APPROVE_REFUND", "credit_refund", refund.id, {}, "success", "medium");
-       
+
+       // Domain event: refund approved
+       dispatchDomainEvent({
+         type: "CREDIT_REFUND_APPROVED",
+         data: {
+           refundId: refund.id,
+           reference: refund.id.substring(0, 8).toUpperCase(),
+           clientId: refund.clientId,
+           montant: Number(refund.montantRemboursable || 0),
+           agenceId: refund.agenceId,
+         },
+         timestamp: new Date(),
+       });
+
        res.json(addSnakeCaseAliasesDeep(updated));
      } catch (error: any) {
        res.status(500).json({ message: error.message });
@@ -3143,8 +3174,24 @@ export function registerFinanceRoutes(app: Express) {
        });
 
        const updated = await storage.getCreditRefundRequest(refundId);
+
+       // Domain event: refund paid (ACCOUNT method)
+       if (updated) {
+         dispatchDomainEvent({
+           type: "CREDIT_REFUND_PAID",
+           data: {
+             refundId: updated.id,
+             reference: updated.id.substring(0, 8).toUpperCase(),
+             clientId: updated.clientId,
+             montant: Number(updated.montantRemboursable || 0),
+             agenceId: updated.agenceId,
+           },
+           timestamp: new Date(),
+         });
+       }
+
        res.json(addSnakeCaseAliasesDeep(updated));
-       
+
     } catch (error: any) {
        console.error("Payment Error", error);
        res.status(500).json({ message: error.message });
@@ -3249,6 +3296,22 @@ export function registerFinanceRoutes(app: Express) {
        }
 
        const updated = await storage.getCreditRefundRequest(refundId);
+
+       // Domain event: refund paid (CASH/MOBILE_MONEY via caisse)
+       if (updated) {
+         dispatchDomainEvent({
+           type: "CREDIT_REFUND_PAID",
+           data: {
+             refundId: updated.id,
+             reference: updated.id.substring(0, 8).toUpperCase(),
+             clientId: updated.clientId,
+             montant: Number(updated.montantRemboursable || 0),
+             agenceId: updated.agenceId,
+           },
+           timestamp: new Date(),
+         });
+       }
+
        res.json({
           ...(addSnakeCaseAliasesDeep(updated) as Record<string, unknown>),
           message: 'Paiement validé avec succès. Le remboursement a été effectué.'

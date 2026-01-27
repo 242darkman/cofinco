@@ -23,6 +23,7 @@ import {
   StatutCompte,
   StatutCredit
 } from "@shared/enum/status-constants";
+import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 import {
   processTontineContribution,
   processTontineDistribution,
@@ -340,6 +341,22 @@ export class GlobalTransactionService {
             result = remboursement;
             additionalData.nouveauSoldeCredit = nouveauSoldeCredit;
             additionalData.creditSolde = nouveauSoldeCredit <= 0;
+
+            // Domain event: credit fully paid off
+            if (nouveauSoldeCredit <= 0 && credit.clientId) {
+              dispatchDomainEvent({
+                type: "CREDIT_PAID_OFF",
+                data: {
+                  creditId: credit.id,
+                  numeroCredit: credit.numeroCredit || credit.id,
+                  clientId: credit.clientId,
+                  totalPaid: Number(credit.montant || 0),
+                  agenceId: (credit as any).agenceId,
+                },
+                timestamp: new Date(),
+              });
+            }
+
             break;
           }
 

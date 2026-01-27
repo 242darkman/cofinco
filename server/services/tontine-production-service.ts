@@ -32,6 +32,7 @@ import {
   TontineFrequency,
 } from "@shared/schema";
 import { users, clients, comptes } from "@shared/schema";
+import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 import { eq, and, sql, desc, asc, gte, lte, or, isNull, ne } from "drizzle-orm";
 import { executeWithLedger, type SensMouvement } from "./ledger";
 import accountingPostingService from "./accounting-posting-service";
@@ -1214,6 +1215,41 @@ export async function applyLatePenalties(agenceId: string): Promise<{ applied: n
           updatedAt: new Date(),
         })
         .where(eq(membresTontine.id, member.id));
+
+      // Domain events: overdue + penalty applied
+      if (member.clientId) {
+        const daysOverdue = Math.floor(
+          (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        dispatchDomainEvent({
+          type: "TONTINE_CONTRIBUTION_OVERDUE",
+          data: {
+            tontineId: tontine.id,
+            tontineName: tontine.nom,
+            clientId: member.clientId,
+            montantDu: parseFloat(tontine.montantCotisation || "0"),
+            dueDate: dueDate.toLocaleDateString("fr-FR"),
+            daysOverdue,
+            agenceId,
+          },
+          timestamp: new Date(),
+        });
+
+        dispatchDomainEvent({
+          type: "TONTINE_PENALTY_APPLIED",
+          data: {
+            tontineId: tontine.id,
+            tontineName: tontine.nom,
+            clientId: member.clientId,
+            montantPenalite: penaltyAmount,
+            motif: `Retard de paiement - Période ${schedule.periodNumber}`,
+            lateCount: (member.lateCount || 0) + 1,
+            agenceId,
+          },
+          timestamp: new Date(),
+        });
+      }
 
       // Check if member should be suspended
       const newLateCount = (member.lateCount || 0) + 1;

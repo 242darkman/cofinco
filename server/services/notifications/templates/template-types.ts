@@ -32,6 +32,45 @@ export interface CreditOverdueVars {
   amount: string;
   dueDate: string;
   daysOverdue?: string;
+  creditNumber?: string;
+}
+
+export interface CreditApplicationReceivedVars {
+  clientName: string;
+  amount: string;
+  creditNumber: string;
+  agenceName?: string;
+}
+
+export interface CreditInvestigationAssignedVars {
+  clientName: string;
+  creditNumber: string;
+  agentName?: string;
+}
+
+export interface CreditPaymentReminderVars {
+  clientName: string;
+  amount: string;
+  dueDate: string;
+  creditNumber: string;
+}
+
+export interface CreditPaidOffVars {
+  clientName: string;
+  creditNumber: string;
+  totalPaid: string;
+}
+
+export interface CreditRefundApprovedVars {
+  clientName: string;
+  amount: string;
+  reference: string;
+}
+
+export interface CreditRefundPaidVars {
+  clientName: string;
+  amount: string;
+  reference: string;
 }
 
 // ============================================================================
@@ -118,6 +157,205 @@ export interface TontineReminderVars {
   amount: string;
 }
 
+export interface TontineMemberJoinedVars {
+  clientName: string;
+  tontineName: string;
+  amount: string;
+  frequence: string;
+  position?: string;
+}
+
+export interface TontineContributionReceivedVars {
+  clientName: string;
+  tontineName: string;
+  amount: string;
+  tourNumero?: string;
+  reference?: string;
+}
+
+export interface TontineContributionOverdueVars {
+  clientName: string;
+  tontineName: string;
+  amount: string;
+  dueDate: string;
+  daysOverdue: string;
+}
+
+export interface TontinePenaltyAppliedVars {
+  clientName: string;
+  tontineName: string;
+  montantPenalite: string;
+  motif: string;
+}
+
+export interface TontineDistributionApprovedVars {
+  clientName: string;
+  tontineName: string;
+  amount: string;
+  payoutMethod: string;
+}
+
+export interface TontineDistributionPaidVars {
+  clientName: string;
+  tontineName: string;
+  amount: string;
+  reference: string;
+  payoutMethod: string;
+}
+
+export interface TontineCycleStartedVars {
+  clientName: string;
+  tontineName: string;
+  cycleNumber: string;
+  startDate: string;
+}
+
+// ============================================================================
+// OPERATIONS / SECURITY
+// ============================================================================
+
+export interface TransferRequestedVars {
+  userName: string;
+  amount: string;
+  reference: string;
+  typeTransfert: string;
+}
+
+export interface TransferRejectedVars {
+  userName: string;
+  amount: string;
+  reference: string;
+  reason?: string;
+}
+
+export interface ScheduledTransferExecutedVars {
+  clientName: string;
+  amount: string;
+  fromAccount: string;
+  toAccount: string;
+}
+
+export interface ScheduledTransferFailedVars {
+  clientName: string;
+  amount: string;
+  fromAccount: string;
+  errorMessage: string;
+  retryInfo: string;
+}
+
+export interface HrLeaveRequestedVars {
+  employeeName: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  daysRequested: string;
+}
+
+export interface SessionForceClosedVars {
+  sessionsCount: string;
+  details: string;
+}
+
+// ============================================================================
+// ACCOUNTS / SAVINGS
+// ============================================================================
+
+export interface AccountCreatedVars {
+  clientName: string;
+  accountNumber: string;
+  accountType: string;
+  amount?: string;
+}
+
+export interface AccountActivatedVars {
+  clientName: string;
+  accountNumber: string;
+  accountType: string;
+  amount: string;
+}
+
+export interface AccountDepositVars {
+  clientName: string;
+  accountNumber: string;
+  amount: string;
+  balance: string;
+}
+
+export interface AccountWithdrawalVars {
+  clientName: string;
+  accountNumber: string;
+  amount: string;
+  balance: string;
+}
+
+export interface AccountBlockedVars {
+  clientName: string;
+  accountNumber: string;
+  motif: string;
+  dateFin?: string;
+}
+
+export interface AccountUnblockedVars {
+  clientName: string;
+  accountNumber: string;
+}
+
+export interface AccountClosedVars {
+  clientName: string;
+  accountNumber: string;
+  accountType: string;
+}
+
+export interface InterestCapitalizedVars {
+  clientName: string;
+  accountNumber: string;
+  interestAmount: string;
+  newBalance: string;
+}
+
+// ============================================================================
+// CLIENT / USER / EMPLOYEE LIFECYCLE
+// ============================================================================
+
+export interface ClientWelcomeVars {
+  clientName: string;
+  agenceName?: string;
+  accountNumber?: string;
+}
+
+export interface UserRegisteredVars {
+  userName: string;
+  username: string;
+}
+
+export interface UserPasswordChangedVars {
+  userName: string;
+}
+
+export interface EmployeeWelcomeVars {
+  employeeName: string;
+  matricule: string;
+  username?: string;
+  agenceName?: string;
+}
+
+// ============================================================================
+// OPERATIONS TERRAIN
+// ============================================================================
+
+export interface ProspectionCreatedVars {
+  agentName: string;
+  prospectName: string;
+  location?: string;
+}
+
+export interface PaiementTerrainValidatedVars {
+  clientName: string;
+  amount: string;
+  paymentType: string;
+  reference?: string;
+}
+
 // ============================================================================
 // UNION TYPE for all template variables
 // ============================================================================
@@ -127,6 +365,12 @@ export type TemplateVariables =
   | CreditRejectionVars
   | CreditDisbursementVars
   | CreditOverdueVars
+  | CreditApplicationReceivedVars
+  | CreditInvestigationAssignedVars
+  | CreditPaymentReminderVars
+  | CreditPaidOffVars
+  | CreditRefundApprovedVars
+  | CreditRefundPaidVars
   | OtpCodeVars
   | TransferScheduledVars
   | TransferExecutedVars
@@ -136,4 +380,31 @@ export type TemplateVariables =
   | PasswordResetVars
   | PaymentReminderVars
   | SavingsConfirmedVars
-  | TontineReminderVars;
+  | TontineReminderVars
+  | TontineMemberJoinedVars
+  | TontineContributionReceivedVars
+  | TontineContributionOverdueVars
+  | TontinePenaltyAppliedVars
+  | TontineDistributionApprovedVars
+  | TontineDistributionPaidVars
+  | TontineCycleStartedVars
+  | AccountCreatedVars
+  | AccountActivatedVars
+  | AccountDepositVars
+  | AccountWithdrawalVars
+  | AccountBlockedVars
+  | AccountUnblockedVars
+  | AccountClosedVars
+  | InterestCapitalizedVars
+  | TransferRequestedVars
+  | TransferRejectedVars
+  | ScheduledTransferExecutedVars
+  | ScheduledTransferFailedVars
+  | HrLeaveRequestedVars
+  | SessionForceClosedVars
+  | ClientWelcomeVars
+  | UserRegisteredVars
+  | UserPasswordChangedVars
+  | EmployeeWelcomeVars
+  | ProspectionCreatedVars
+  | PaiementTerrainValidatedVars;

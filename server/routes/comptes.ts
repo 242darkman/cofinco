@@ -31,6 +31,7 @@ import { db } from "../db";
 import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage } from "@shared/enum/status-constants";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 // Validation schemas
 const createCompteSchema = z.object({
@@ -257,6 +258,23 @@ export function registerComptesRoutes(app: Express) {
           "medium"
         );
 
+        // Domain event: account created
+        dispatchDomainEvent({
+          type: "ACCOUNT_CREATED",
+          data: {
+            compteId: result.compte.id,
+            numeroCompte: result.compte.numeroCompte,
+            typeCompte: result.compte.typeCompte,
+            clientId: parsed.clientId,
+            montantInitial: parsed.soldeInitial,
+            modePaiement: parsed.modePaiement,
+            agenceId: parsed.agenceId,
+            createdByUserId: user?.id,
+          },
+          timestamp: new Date(),
+          agenceId: parsed.agenceId,
+        });
+
         // Broadcast pour mise à jour UI
         const wsInstance = getWsInstance();
         if (wsInstance) {
@@ -264,7 +282,7 @@ export function registerComptesRoutes(app: Express) {
             type: "DASHBOARD_UPDATE",
             payload: {},
           });
-          
+
           if (result.facture) {
              // Notifier la facture disponible
           }
@@ -1391,6 +1409,27 @@ export function registerComptesRoutes(app: Express) {
           "medium"
         );
 
+        // Domain event: deposit
+        {
+          const compteInfo = await storage.getCompte(req.params.id);
+          if (compteInfo) {
+            dispatchDomainEvent({
+              type: "ACCOUNT_DEPOSIT",
+              data: {
+                compteId: req.params.id,
+                numeroCompte: compteInfo.numeroCompte,
+                typeCompte: compteInfo.typeCompte,
+                clientId: compteInfo.clientId,
+                montant: parsed.montant,
+                nouveauSolde: result.transaction.soldeApres || compteInfo.soldeCourant,
+                agenceId: compteInfo.agenceId || undefined,
+              },
+              timestamp: new Date(),
+              agenceId: compteInfo.agenceId || undefined,
+            });
+          }
+        }
+
         // Broadcast temps réel (outbox worker gère le reste)
         const wsInstance = getWsInstance();
         if (wsInstance && user?.agence) {
@@ -1466,6 +1505,21 @@ export function registerComptesRoutes(app: Express) {
                 }
             );
             
+            // Domain event: account activated
+            dispatchDomainEvent({
+              type: "ACCOUNT_ACTIVATED",
+              data: {
+                compteId: result.compte.id,
+                numeroCompte: result.compte.numeroCompte,
+                typeCompte: result.compte.typeCompte,
+                clientId: result.compte.clientId,
+                montantDepose: Number(data.montant),
+                agenceId: result.compte.agenceId || undefined,
+              },
+              timestamp: new Date(),
+              agenceId: result.compte.agenceId || undefined,
+            });
+
             // Logs & Broadcast...
             await logAudit(req, "DEPOT_INITIAL", "compte", req.params.id, { montant: data.montant }, "success", "high");
              
@@ -1549,6 +1603,27 @@ export function registerComptesRoutes(app: Express) {
           "success",
           "high"
         );
+
+        // Domain event: withdrawal
+        {
+          const compteInfo = await storage.getCompte(req.params.id);
+          if (compteInfo) {
+            dispatchDomainEvent({
+              type: "ACCOUNT_WITHDRAWAL",
+              data: {
+                compteId: req.params.id,
+                numeroCompte: compteInfo.numeroCompte,
+                typeCompte: compteInfo.typeCompte,
+                clientId: compteInfo.clientId,
+                montant: parsed.montant,
+                nouveauSolde: result.transaction.soldeApres || compteInfo.soldeCourant,
+                agenceId: compteInfo.agenceId || undefined,
+              },
+              timestamp: new Date(),
+              agenceId: compteInfo.agenceId || undefined,
+            });
+          }
+        }
 
         // Broadcast temps réel
         const wsInstance = getWsInstance();
@@ -1643,6 +1718,22 @@ export function registerComptesRoutes(app: Express) {
           "high"
         );
 
+        // Domain event: account blocked
+        dispatchDomainEvent({
+          type: "ACCOUNT_BLOCKED",
+          data: {
+            compteId: compte.id,
+            numeroCompte: compte.numeroCompte,
+            typeCompte: compte.typeCompte,
+            clientId: compte.clientId,
+            motif: parsed.motif,
+            dateFin: parsed.dateFin || undefined,
+            agenceId: compte.agenceId || undefined,
+          },
+          timestamp: new Date(),
+          agenceId: compte.agenceId || undefined,
+        });
+
         res.json(
           addSnakeCaseAliasesDeep({
             ...compte,
@@ -1694,6 +1785,20 @@ export function registerComptesRoutes(app: Express) {
           "success",
           "high"
         );
+
+        // Domain event: account unblocked
+        dispatchDomainEvent({
+          type: "ACCOUNT_UNBLOCKED",
+          data: {
+            compteId: compte.id,
+            numeroCompte: compte.numeroCompte,
+            typeCompte: compte.typeCompte,
+            clientId: compte.clientId,
+            agenceId: compte.agenceId || undefined,
+          },
+          timestamp: new Date(),
+          agenceId: compte.agenceId || undefined,
+        });
 
         // Notification explicite (en plus de l'outbox)
         const wsInstance = getWsInstance();
@@ -1866,6 +1971,20 @@ export function registerComptesRoutes(app: Express) {
           "success",
           "critical"
         );
+
+        // Domain event: account closed
+        dispatchDomainEvent({
+          type: "ACCOUNT_CLOSED",
+          data: {
+            compteId: compte.id,
+            numeroCompte: compte.numeroCompte,
+            typeCompte: compte.typeCompte,
+            clientId: compte.clientId,
+            agenceId: compte.agenceId || undefined,
+          },
+          timestamp: new Date(),
+          agenceId: compte.agenceId || undefined,
+        });
 
         res.json(
           addSnakeCaseAliasesDeep({

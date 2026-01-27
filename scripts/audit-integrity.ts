@@ -295,6 +295,372 @@ const AUDIT_TESTS = [
 
   // TESTS ANTI-FANTÔME supprimés car redondant avec test 2.2 (transactions orphelines)
   // Le schéma actuel n'utilise pas de transaction_id pour grouper les mouvements
+
+  // SECTION 6: INTÉGRITÉ CRÉDITS
+  {
+    section: 'INTÉGRITÉ CRÉDITS',
+    test: '6.1 Crédits avec solde_restant négatif',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, numero_credit, client_id, montant, solde_restant, statut
+      FROM credits
+      WHERE deleted_at IS NULL
+        AND solde_restant::numeric < 0;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ CRÉDITS',
+    test: '6.2 Crédits ACTIVE/LATE avec date_fin passée (non clôturés)',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, numero_credit, client_id, statut, date_fin, solde_restant
+      FROM credits
+      WHERE deleted_at IS NULL
+        AND statut IN ('ACTIVE', 'LATE')
+        AND date_fin IS NOT NULL
+        AND date_fin < NOW() - INTERVAL '7 days';
+    `
+  },
+  {
+    section: 'INTÉGRITÉ CRÉDITS',
+    test: '6.3 Divergence solde_restant vs remboursements effectués (CRITIQUE)',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      WITH remboursements AS (
+        SELECT
+          mf.source_id as credit_id,
+          SUM(mf.montant::numeric) as total_rembourse
+        FROM mouvements_financiers mf
+        WHERE mf.source_module = 'CREDIT_REMBOURSEMENT'
+          AND mf.statut = 'Posté'
+          AND mf.source_id IS NOT NULL
+        GROUP BY mf.source_id
+      )
+      SELECT
+        c.id,
+        c.numero_credit,
+        c.montant::numeric as montant_initial,
+        c.solde_restant::numeric,
+        COALESCE(r.total_rembourse, 0) as total_rembourse,
+        c.montant::numeric - COALESCE(r.total_rembourse, 0) as solde_calcule,
+        c.solde_restant::numeric - (c.montant::numeric - COALESCE(r.total_rembourse, 0)) as ecart
+      FROM credits c
+      LEFT JOIN remboursements r ON c.id = r.credit_id
+      WHERE c.deleted_at IS NULL
+        AND c.statut IN ('ACTIVE', 'LATE', 'PAID')
+        AND ABS(c.solde_restant::numeric - (c.montant::numeric - COALESCE(r.total_rembourse, 0))) > 0.01;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ CRÉDITS',
+    test: '6.4 Crédits ACTIVE sans date de début',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, numero_credit, client_id, statut, date_debut
+      FROM credits
+      WHERE deleted_at IS NULL
+        AND statut IN ('ACTIVE', 'LATE')
+        AND date_debut IS NULL;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ CRÉDITS',
+    test: '6.5 Crédits PAID avec solde_restant > 0',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, numero_credit, client_id, statut, solde_restant
+      FROM credits
+      WHERE deleted_at IS NULL
+        AND statut = 'PAID'
+        AND solde_restant::numeric > 0.01;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ CRÉDITS',
+    test: '6.6 Doublons numero_credit',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT numero_credit, COUNT(*) as nb
+      FROM credits
+      WHERE deleted_at IS NULL
+      GROUP BY numero_credit
+      HAVING COUNT(*) > 1 OR numero_credit IS NULL;
+    `
+  },
+
+  // SECTION 7: INTÉGRITÉ COFFRE-FORT
+  {
+    section: 'INTÉGRITÉ COFFRE-FORT',
+    test: '7.1 Coffres avec solde négatif',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, code, nom, owner_type, solde
+      FROM coffres_forts
+      WHERE solde::numeric < 0;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ COFFRE-FORT',
+    test: '7.2 Transferts inter-coffres IN_TRANSIT depuis > 24h',
+    expectedRowCount: 0,
+    critical: false,
+    query: `
+      SELECT
+        id, reference, montant, type_transfert, statut,
+        coffre_source_id, coffre_destination_id,
+        dispatched_at,
+        EXTRACT(EPOCH FROM (NOW() - dispatched_at))/3600 as heures_en_transit
+      FROM transferts_inter_coffres
+      WHERE statut = 'IN_TRANSIT'
+        AND dispatched_at IS NOT NULL
+        AND dispatched_at < NOW() - INTERVAL '24 hours';
+    `
+  },
+  {
+    section: 'INTÉGRITÉ COFFRE-FORT',
+    test: '7.3 Transferts reçus avec écart non résolu',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT
+        t.id, t.reference, t.montant, t.montant_recu, t.ecart_montant,
+        t.conforme, t.statut
+      FROM transferts_inter_coffres t
+      WHERE t.statut = 'RECEIVED_WITH_DISCREPANCY'
+        AND NOT EXISTS (
+          SELECT 1 FROM taches_regularisation tr
+          WHERE tr.transfert_id = t.id
+            AND tr.statut = 'RESOLVED'
+        );
+    `
+  },
+  {
+    section: 'INTÉGRITÉ COFFRE-FORT',
+    test: '7.4 Réconciliations liaison en attente > 7 jours',
+    expectedRowCount: 0,
+    critical: false,
+    query: `
+      SELECT
+        id, compte_liaison_source_id, compte_liaison_dest_id,
+        montant, date_operation, statut, jours_en_attente
+      FROM reconciliations_liaison
+      WHERE statut = 'PENDING'
+        AND date_operation < NOW() - INTERVAL '7 days';
+    `
+  },
+  {
+    section: 'INTÉGRITÉ COFFRE-FORT',
+    test: '7.5 Transferts RECEIVED sans mouvement destination',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, reference, montant, statut, received_at
+      FROM transferts_inter_coffres
+      WHERE statut IN ('RECEIVED', 'RECEIVED_WITH_DISCREPANCY')
+        AND mouvement_destination_id IS NULL;
+    `
+  },
+
+  // SECTION 8: INTÉGRITÉ TONTINES
+  {
+    section: 'INTÉGRITÉ TONTINES',
+    test: '8.1 Tontines actives avec solde négatif',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, nom, statut, solde, membres_actuels
+      FROM tontines
+      WHERE deleted_at IS NULL
+        AND statut = 'ACTIVE'
+        AND solde::numeric < 0;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ TONTINES',
+    test: '8.2 Divergence solde tontine vs contributions - distributions',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      WITH flux AS (
+        SELECT
+          tontine_id,
+          SUM(CASE WHEN type_operation = 'Versement' AND statut_transaction = 'POSTED' THEN montant::numeric ELSE 0 END) as total_in,
+          SUM(CASE WHEN type_operation = 'Retrait' AND statut_transaction = 'POSTED' THEN montant::numeric ELSE 0 END) as total_out
+        FROM contributions_tontine
+        WHERE deleted_at IS NULL
+        GROUP BY tontine_id
+      ),
+      distributions AS (
+        SELECT
+          tontine_id,
+          SUM(COALESCE(amount_paid, 0)::numeric) as total_distribue
+        FROM tontine_distribution_requests
+        WHERE status = 'SUCCESS'
+        GROUP BY tontine_id
+      )
+      SELECT
+        t.id, t.nom, t.solde::numeric as solde_affiche,
+        COALESCE(f.total_in, 0) - COALESCE(f.total_out, 0) - COALESCE(d.total_distribue, 0) as solde_calcule,
+        t.solde::numeric - (COALESCE(f.total_in, 0) - COALESCE(f.total_out, 0) - COALESCE(d.total_distribue, 0)) as ecart
+      FROM tontines t
+      LEFT JOIN flux f ON t.id = f.tontine_id
+      LEFT JOIN distributions d ON t.id = d.tontine_id
+      WHERE t.deleted_at IS NULL
+        AND t.statut = 'ACTIVE'
+        AND ABS(t.solde::numeric - (COALESCE(f.total_in, 0) - COALESCE(f.total_out, 0) - COALESCE(d.total_distribue, 0))) > 0.01;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ TONTINES',
+    test: '8.3 Contributions postées sans mouvement financier associé',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT ct.id, ct.tontine_id, ct.montant, ct.statut_transaction, ct.mouvement_id
+      FROM contributions_tontine ct
+      LEFT JOIN mouvements_financiers mf ON ct.mouvement_id = mf.id
+      WHERE ct.deleted_at IS NULL
+        AND ct.statut_transaction = 'POSTED'
+        AND ct.mouvement_id IS NOT NULL
+        AND mf.id IS NULL;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ TONTINES',
+    test: '8.4 Doublons idempotency_key contributions tontine',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT idempotency_key, COUNT(*) as nb, ARRAY_AGG(id) as contribution_ids
+      FROM contributions_tontine
+      WHERE idempotency_key IS NOT NULL
+        AND deleted_at IS NULL
+      GROUP BY idempotency_key
+      HAVING COUNT(*) > 1;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ TONTINES',
+    test: '8.5 Cycles OPEN avec pot distribué > pot collecté',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, tontine_id, cycle_number, status,
+        pot_collected::numeric, pot_distributed::numeric,
+        pot_distributed::numeric - pot_collected::numeric as ecart
+      FROM tontine_cycles
+      WHERE status = 'OPEN'
+        AND pot_distributed::numeric > pot_collected::numeric + 0.01;
+    `
+  },
+
+  // SECTION 9: NOTIFICATION JOBS
+  {
+    section: 'NOTIFICATION JOBS',
+    test: '9.1 Jobs bloqués en PROCESSING depuis > 10 min',
+    expectedRowCount: 0,
+    critical: false,
+    query: `
+      SELECT
+        id, channel, template_code, recipient, status,
+        attempts, locked_at,
+        EXTRACT(EPOCH FROM (NOW() - locked_at))/60 as minutes_bloque
+      FROM notification_jobs
+      WHERE status = 'PROCESSING'
+        AND locked_at IS NOT NULL
+        AND locked_at < NOW() - INTERVAL '10 minutes';
+    `
+  },
+  {
+    section: 'NOTIFICATION JOBS',
+    test: '9.2 Jobs en DEAD_LETTER non traités',
+    expectedRowCount: 0,
+    critical: false,
+    query: `
+      SELECT
+        id, channel, template_code, recipient,
+        attempts, max_attempts, last_error,
+        created_at
+      FROM notification_jobs
+      WHERE status = 'DEAD_LETTER'
+      ORDER BY created_at DESC;
+    `
+  },
+  {
+    section: 'NOTIFICATION JOBS',
+    test: '9.3 Jobs QUEUED depuis > 1 heure (pipeline bloqué)',
+    expectedRowCount: 0,
+    critical: false,
+    query: `
+      SELECT
+        id, channel, template_code, recipient, status,
+        created_at,
+        EXTRACT(EPOCH FROM (NOW() - created_at))/60 as minutes_attente
+      FROM notification_jobs
+      WHERE status = 'QUEUED'
+        AND created_at < NOW() - INTERVAL '1 hour';
+    `
+  },
+
+  // SECTION 10: TRANSFERTS
+  {
+    section: 'INTÉGRITÉ TRANSFERTS',
+    test: '10.1 Transferts POSTED sans mouvement financier associé',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT t.id, t.reference, t.montant, t.statut, t.mouvement_id
+      FROM transferts t
+      LEFT JOIN mouvements_financiers mf ON t.mouvement_id = mf.id
+      WHERE t.statut = 'POSTED'
+        AND t.mouvement_id IS NOT NULL
+        AND mf.id IS NULL;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ TRANSFERTS',
+    test: '10.2 Doublons idempotency_key transferts',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT idempotency_key, COUNT(*) as nb, ARRAY_AGG(id) as transfert_ids
+      FROM transferts
+      WHERE idempotency_key IS NOT NULL
+      GROUP BY idempotency_key
+      HAVING COUNT(*) > 1;
+    `
+  },
+  {
+    section: 'INTÉGRITÉ TRANSFERTS',
+    test: '10.3 Transferts PENDING depuis > 24h',
+    expectedRowCount: 0,
+    critical: false,
+    query: `
+      SELECT id, reference, montant, statut, created_at,
+        EXTRACT(EPOCH FROM (NOW() - created_at))/3600 as heures_attente
+      FROM transferts
+      WHERE statut = 'PENDING'
+        AND created_at < NOW() - INTERVAL '24 hours';
+    `
+  },
+  {
+    section: 'INTÉGRITÉ TRANSFERTS',
+    test: '10.4 Transferts avec montant <= 0',
+    expectedRowCount: 0,
+    critical: true,
+    query: `
+      SELECT id, reference, montant, statut, client_id
+      FROM transferts
+      WHERE montant::numeric <= 0;
+    `
+  },
 ];
 
 // ============================================================

@@ -5,6 +5,7 @@ import { eq, and, gt, sql } from "drizzle-orm";
 import { executeWithLedger, updateCompteSolde } from "./ledger";
 import { log } from "../logger";
 import { StatutCompte } from "@shared/enum/status-constants";
+import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 
 export class InterestSchedulerService {
   private dailyJob: ScheduledTask | null = null;
@@ -153,7 +154,22 @@ export class InterestSchedulerService {
                 }
             );
 
-            // Log / Outbox event (optional but good practice)
+            // Domain event: interest capitalized
+            const nouveauSolde = (parseFloat(compte.soldeCourant || "0") + montantAcrediter).toFixed(2);
+            dispatchDomainEvent({
+              type: "INTEREST_CAPITALIZED",
+              data: {
+                compteId: compte.id,
+                numeroCompte: compte.numeroCompte,
+                clientId: compte.clientId,
+                montantInteret: montantAcrediter,
+                nouveauSolde,
+                agenceId: compte.agenceId || undefined,
+              },
+              timestamp: new Date(),
+              agenceId: compte.agenceId || undefined,
+            });
+
             processed++;
         } catch (err) {
             console.error(`Failed to capitalize for account ${compte.id}:`, err);

@@ -10,6 +10,7 @@ import { getWsInstance } from "../ws-server";
 import { StorageService } from "../services/storage-service";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 export function registerOperationsRoutes(app: Express) {
   // Agents
@@ -90,6 +91,21 @@ export function registerOperationsRoutes(app: Express) {
             console.error(`⚠️ File relocation failed for prospection ${prospection.id}:`, relocateError);
           }
         }
+
+        // Domain event: prospection created
+        dispatchDomainEvent({
+          type: "PROSPECTION_CREATED",
+          data: {
+            prospectionId: prospection.id,
+            agentId: parsed.agentId,
+            agentNom: req.session.user?.nom || undefined,
+            userId: req.session.user?.id || undefined,
+            nomProspect: parsed.nomProspect,
+            telephone: parsed.telephoneProspect || undefined,
+            localisation: parsed.localisation || undefined,
+          },
+          timestamp: new Date(),
+        });
 
         // Notify
         const wsInstance = getWsInstance();
@@ -173,11 +189,28 @@ export function registerOperationsRoutes(app: Express) {
 
       const { paiement, mouvement } = await storage.validatePaiementTerrain(id, user?.id || 'system');
 
+      // Domain event: paiement terrain validated
+      dispatchDomainEvent({
+        type: "PAIEMENT_TERRAIN_VALIDATED",
+        data: {
+          paiementId: paiement.id,
+          clientId: paiement.clientId || undefined,
+          agentId: paiement.agentId || undefined,
+          montant: paiement.montant,
+          typePaiement: paiement.typePaiement || "Autre",
+          methodePaiement: paiement.methodePaiement || "CASH",
+          reference: paiement.referenceExterne || undefined,
+          creditId: paiement.creditId || undefined,
+          compteId: paiement.compteId || undefined,
+        },
+        timestamp: new Date(),
+      });
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
           wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'paiement_validated', id: paiement.id } });
-          
+
           if (paiement.clientId) {
             wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: paiement.clientId } });
          }

@@ -9,6 +9,10 @@ export type DomainEventType =
   | "CREDIT_REJECTED"
   | "CREDIT_DISBURSED"
   | "CREDIT_OVERDUE"
+  | "CREDIT_INVESTIGATION_ASSIGNED"
+  | "CREDIT_PAID_OFF"
+  | "CREDIT_REFUND_APPROVED"
+  | "CREDIT_REFUND_PAID"
   // Transfer lifecycle
   | "TRANSFER_REQUESTED"
   | "TRANSFER_VALIDATED"
@@ -21,9 +25,35 @@ export type DomainEventType =
   | "HR_LEAVE_REQUESTED"
   | "HR_LEAVE_APPROVED"
   | "HR_LEAVE_REJECTED"
+  // Tontine lifecycle
+  | "TONTINE_MEMBER_JOINED"
+  | "TONTINE_CONTRIBUTION_RECEIVED"
+  | "TONTINE_CONTRIBUTION_OVERDUE"
+  | "TONTINE_PENALTY_APPLIED"
+  | "TONTINE_DISTRIBUTION_APPROVED"
+  | "TONTINE_DISTRIBUTION_PAID"
+  | "TONTINE_CYCLE_STARTED"
+  // Accounts / Savings
+  | "ACCOUNT_CREATED"
+  | "ACCOUNT_ACTIVATED"
+  | "ACCOUNT_DEPOSIT"
+  | "ACCOUNT_WITHDRAWAL"
+  | "ACCOUNT_BLOCKED"
+  | "ACCOUNT_UNBLOCKED"
+  | "ACCOUNT_CLOSED"
+  | "INTEREST_CAPITALIZED"
   // Auth / Security
   | "USER_PASSWORD_RESET"
-  | "SESSION_FORCE_CLOSED";
+  | "SESSION_FORCE_CLOSED"
+  // Client lifecycle
+  | "CLIENT_CREATED"
+  // User / Employee lifecycle
+  | "USER_REGISTERED"
+  | "USER_PASSWORD_CHANGED"
+  | "EMPLOYEE_CREATED"
+  // Operations terrain
+  | "PROSPECTION_CREATED"
+  | "PAIEMENT_TERRAIN_VALIDATED";
 
 // ============================================================================
 // EVENT DATA INTERFACES
@@ -72,6 +102,112 @@ export interface CreditOverdueData {
   creditIds: string[];
   count: number;
 }
+
+export interface CreditInvestigationAssignedData {
+  demandeId: string;
+  numeroDemande: string;
+  clientId: string;
+  agentName: string;
+  agenceId?: string;
+}
+
+export interface CreditPaidOffData {
+  creditId: string;
+  numeroCredit: string;
+  clientId: string;
+  totalPaid: number;
+  agenceId?: string;
+}
+
+export interface CreditRefundApprovedData {
+  refundId: string;
+  reference: string;
+  clientId: string;
+  montant: number;
+  agenceId?: string;
+}
+
+export interface CreditRefundPaidData {
+  refundId: string;
+  reference: string;
+  clientId: string;
+  montant: number;
+  agenceId?: string;
+}
+
+// Tontine
+
+export interface TontineMemberJoinedData {
+  tontineId: string;
+  tontineName: string;
+  clientId: string;
+  montantCotisation: number;
+  frequence: string;
+  position?: number;
+  agenceId?: string;
+}
+
+export interface TontineContributionReceivedData {
+  tontineId: string;
+  tontineName: string;
+  clientId: string;
+  montant: number;
+  tourNumero?: number;
+  reference?: string;
+  agenceId?: string;
+}
+
+export interface TontineContributionOverdueData {
+  tontineId: string;
+  tontineName: string;
+  clientId: string;
+  montantDu: number;
+  dueDate: string;
+  daysOverdue: number;
+  agenceId?: string;
+}
+
+export interface TontinePenaltyAppliedData {
+  tontineId: string;
+  tontineName: string;
+  clientId: string;
+  montantPenalite: number;
+  motif: string;
+  lateCount: number;
+  agenceId?: string;
+}
+
+export interface TontineDistributionApprovedData {
+  tontineId: string;
+  tontineName: string;
+  clientId: string;
+  montant: number;
+  payoutMethod: string;
+  requestId: string;
+  agenceId?: string;
+}
+
+export interface TontineDistributionPaidData {
+  tontineId: string;
+  tontineName: string;
+  clientId: string;
+  montant: number;
+  reference: string;
+  payoutMethod: string;
+  agenceId?: string;
+}
+
+export interface TontineCycleStartedData {
+  tontineId: string;
+  tontineName: string;
+  cycleNumber: number;
+  startDate: string;
+  endDate?: string;
+  membersCount: number;
+  agenceId?: string;
+}
+
+// Transfer
 
 export interface TransferRequestedData {
   transfertId: string;
@@ -158,6 +294,83 @@ export interface UserPasswordResetData {
   resetByUserId?: string;
 }
 
+// Accounts / Savings
+
+export interface AccountCreatedData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  montantInitial: number;
+  modePaiement: string;
+  agenceId?: string;
+  createdByUserId?: string;
+}
+
+export interface AccountActivatedData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  montantDepose: number;
+  agenceId?: string;
+}
+
+export interface AccountDepositData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  montant: number;
+  nouveauSolde: string;
+  agenceId?: string;
+}
+
+export interface AccountWithdrawalData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  montant: number;
+  nouveauSolde: string;
+  agenceId?: string;
+}
+
+export interface AccountBlockedData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  motif: string;
+  dateFin?: string;
+  agenceId?: string;
+}
+
+export interface AccountUnblockedData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  agenceId?: string;
+}
+
+export interface AccountClosedData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  agenceId?: string;
+}
+
+export interface InterestCapitalizedData {
+  compteId: string;
+  numeroCompte: string;
+  clientId: string;
+  montantInteret: number;
+  nouveauSolde: string;
+  agenceId?: string;
+}
+
 export interface SessionForceClosedData {
   sessions: Array<{
     sessionId: string;
@@ -165,6 +378,75 @@ export interface SessionForceClosedData {
     caissierId?: string;
     hoursInactive: number;
   }>;
+}
+
+// Client lifecycle
+
+export interface ClientCreatedData {
+  clientId: string;
+  clientNom: string;
+  clientPrenom?: string;
+  telephone?: string;
+  email?: string;
+  agenceId?: string;
+  agenceNom?: string;
+  numeroCompte?: string;
+}
+
+// User / Employee lifecycle
+
+export interface UserRegisteredData {
+  userId: string;
+  username: string;
+  nom: string;
+  prenom?: string;
+  email?: string;
+  agenceId?: string;
+}
+
+export interface UserPasswordChangedData {
+  userId: string;
+  userName: string;
+  email?: string;
+}
+
+export interface EmployeeCreatedData {
+  employeId: string;
+  userId: string;
+  nom: string;
+  prenom?: string;
+  email?: string;
+  telephone?: string;
+  matricule: string;
+  username?: string;
+  agenceId?: string;
+  agenceNom?: string;
+}
+
+// Operations terrain
+
+export interface ProspectionCreatedData {
+  prospectionId: string;
+  agentId: string;
+  agentNom?: string;
+  userId?: string;
+  nomProspect: string;
+  telephone?: string;
+  localisation?: string;
+  agenceId?: string;
+}
+
+export interface PaiementTerrainValidatedData {
+  paiementId: string;
+  clientId?: string;
+  agentId?: string;
+  montant: string;
+  typePaiement: string;
+  methodePaiement: string;
+  reference?: string;
+  creditId?: string;
+  compteId?: string;
+  agenceId?: string;
 }
 
 // ============================================================================

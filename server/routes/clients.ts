@@ -27,6 +27,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { eq, sql, or, isNull, and, gte, desc } from "drizzle-orm";
 import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 export function registerClientRoutes(app: Express) {
   // ============================================
@@ -901,6 +902,23 @@ export function registerClientRoutes(app: Express) {
             "success",
             "low"
         );
+
+        // Domain event: client created (welcome notification)
+        dispatchDomainEvent({
+          type: "CLIENT_CREATED",
+          data: {
+            clientId: client.id,
+            clientNom: client.nom,
+            clientPrenom: client.prenom || undefined,
+            telephone: client.telephone || undefined,
+            email: client.email || undefined,
+            agenceId: client.agenceId || undefined,
+            agenceNom: agenceNom || undefined,
+            numeroCompte: compteCourant?.numeroCompte || undefined,
+          },
+          timestamp: new Date(),
+          agenceId: client.agenceId || undefined,
+        });
 
         // Update Dashboard & Lists via WebSocket
         const wsServer = await import("../ws-server"); // Dynamic import for ESM

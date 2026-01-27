@@ -590,6 +590,17 @@ export function registerAuthRoutes(app: Express) {
         "high"
     );
 
+    // Domain event: password changed (security confirmation)
+    dispatchDomainEvent({
+      type: "USER_PASSWORD_CHANGED",
+      data: {
+        userId: user.id,
+        userName: [user.nom, user.prenom].filter(Boolean).join(" ") || user.username || "",
+        email: user.email || undefined,
+      },
+      timestamp: new Date(),
+    });
+
     res.json({ message: "Password updated successfully" });
   });
 
@@ -650,6 +661,19 @@ export function registerAuthRoutes(app: Express) {
         "success",
         "medium"
       );
+
+      // Domain event: user registered (welcome email)
+      dispatchDomainEvent({
+        type: "USER_REGISTERED",
+        data: {
+          userId: user.id,
+          username: user.username || "",
+          nom: user.nom || "",
+          prenom: user.prenom || undefined,
+          email: user.email || undefined,
+        },
+        timestamp: new Date(),
+      });
 
       res.status(201).json(user);
     } catch (error) {

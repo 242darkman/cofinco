@@ -12,6 +12,7 @@ import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
 import { StorageService } from "../services/storage-service";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 // Helper pour accepter string ou number et convertir en number
 const numericString = z.union([z.number(), z.string()]).transform((val) => {
@@ -364,6 +365,24 @@ export function registerEmployesRoutes(app: Express) {
         "success",
         "medium"
       );
+
+      // Domain event: employee created (welcome notification)
+      dispatchDomainEvent({
+        type: "EMPLOYEE_CREATED",
+        data: {
+          employeId: result.employe.id,
+          userId: result.user.id,
+          nom: data.nom,
+          prenom: data.prenom || undefined,
+          email: data.email || undefined,
+          telephone: data.telephone || undefined,
+          matricule,
+          username: data.username || undefined,
+          agenceId: data.agenceId || undefined,
+        },
+        timestamp: new Date(),
+        agenceId: data.agenceId || undefined,
+      });
 
       // Notify
       try {
