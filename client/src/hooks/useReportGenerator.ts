@@ -1,9 +1,13 @@
 import { useState, useCallback } from 'react';
-import { Users, Wallet, PiggyBank, UsersRound, ArrowRightLeft, Briefcase, TrendingUp, BookOpen, LucideIcon } from 'lucide-react';
+import { Users, Wallet, PiggyBank, UsersRound, LucideIcon } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { requestListAll } from '../lib/api-client';
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 export interface ReportType {
   id: string;
@@ -12,6 +16,23 @@ export interface ReportType {
   description: string;
 }
 
+interface ReportConfig {
+  title: string;
+  columns: string[];
+  /** Formatted string values for PDF / CSV / Print */
+  getRowValues: (item: any) => string[];
+  /** Raw values for Excel (numbers stay numbers) */
+  getRawValues: (item: any) => any[];
+  /** Summary KPIs for the report */
+  getSummary: (data: any[]) => { label: string; value: string }[];
+  /** Field used for client-side date-range filtering */
+  dateField: string;
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 export const reportTypes: ReportType[] = [
   { id: 'clients', label: 'Rapport Clients', icon: Users, description: 'Liste complète des clients avec statistiques' },
   { id: 'credits', label: 'Rapport Crédits', icon: Wallet, description: 'État des crédits et remboursements' },
@@ -19,134 +40,260 @@ export const reportTypes: ReportType[] = [
   { id: 'tontines', label: 'Rapport Tontines', icon: UsersRound, description: 'Activité des groupes de tontine' },
 ];
 
+const COMPANY_NAME = 'COFIN&CO';
+const COMPANY_SUBTITLE = 'Établissement de Microfinance';
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function fmtMoney(val: any): string {
+  return `${Number(val || 0).toLocaleString('fr-FR')} FCFA`;
+}
+
+function fmtDate(val: any): string {
+  if (!val) return '-';
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('fr-FR');
+}
+
+/** Convert ISO date string YYYY-MM-DD → DD/MM/YYYY */
+function fmtDateRange(s: string): string {
+  if (!s) return '-';
+  const [y, m, d] = s.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : s;
+}
+
+function clientFullName(item: any): string {
+  const p = item.clients?.prenom || '';
+  const n = item.clients?.nom || '';
+  return (p + ' ' + n).trim() || '-';
+}
+
+function translateStatut(s: string | null | undefined): string {
+  if (!s) return '-';
+  const map: Record<string, string> = {
+    ACTIVE: 'Actif', INACTIVE: 'Inactif', BLOCKED: 'Bloqué', CLOSED: 'Clôturé',
+    PENDING: 'En attente', APPROVED: 'Approuvé', REJECTED: 'Rejeté',
+    DISBURSED: 'Décaissé', OVERDUE: 'En retard', PAID_OFF: 'Soldé',
+    DEFAULTED: 'Défaillant', WRITTEN_OFF: 'Passé en perte',
+    SAVINGS: 'Épargne', CURRENT: 'Courant',
+    active: 'Actif', inactive: 'Inactif',
+  };
+  return map[s] || s;
+}
+
+// ============================================================================
+// REPORT CONFIGS – one per report type
+// ============================================================================
+
+function buildConfigs(): Record<string, ReportConfig> {
+  return {
+    clients: {
+      title: 'Rapport des Clients',
+      columns: ['Nom', 'Prénom', 'Téléphone', 'Email', 'Agence', 'Statut'],
+      dateField: 'createdAt',
+      getRowValues: (i) => [
+        i.nom || '-', i.prenom || '-', i.telephone || '-',
+        i.email || '-', i.agence_nom || '-', translateStatut(i.statut),
+      ],
+      getRawValues(i) { return this.getRowValues(i); },
+      getSummary: (data) => {
+        const actifs = data.filter(d => (d.statut || '').toUpperCase() === 'ACTIVE').length;
+        return [
+          { label: 'Total clients', value: String(data.length) },
+          { label: 'Actifs', value: String(actifs) },
+          { label: 'Inactifs', value: String(data.length - actifs) },
+        ];
+      },
+    },
+
+    credits: {
+      title: 'Rapport des Crédits',
+      columns: ['Client', 'N° Crédit', 'Montant (FCFA)', 'Taux (%)', 'Durée (mois)', 'Date Début', 'Statut'],
+      dateField: 'createdAt',
+      getRowValues: (i) => [
+        clientFullName(i),
+        i.numeroCredit || i.numero_credit || '-',
+        fmtMoney(i.montant),
+        `${Number(i.taux || 0)}%`,
+        String(i.duree || '-'),
+        fmtDate(i.dateDebut || i.date_debut),
+        translateStatut(i.statut),
+      ],
+      getRawValues: (i) => [
+        clientFullName(i),
+        i.numeroCredit || i.numero_credit || '-',
+        Number(i.montant || 0),
+        Number(i.taux || 0),
+        Number(i.duree || 0),
+        fmtDate(i.dateDebut || i.date_debut),
+        translateStatut(i.statut),
+      ],
+      getSummary: (data) => {
+        const total = data.reduce((s, d) => s + Number(d.montant || 0), 0);
+        const restant = data.reduce((s, d) => s + Number(d.soldeRestant || d.solde_restant || 0), 0);
+        const enRetard = data.filter(d => d.statut === 'OVERDUE').length;
+        return [
+          { label: 'Total crédits', value: String(data.length) },
+          { label: 'Montant total', value: fmtMoney(total) },
+          { label: 'Solde restant', value: fmtMoney(restant) },
+          { label: 'En retard', value: String(enRetard) },
+        ];
+      },
+    },
+
+    epargnes: {
+      title: 'Rapport des Épargnes',
+      columns: ['N° Compte', 'Client', 'Solde (FCFA)', 'Type', 'Taux (%)', 'Statut'],
+      dateField: 'createdAt',
+      getRowValues: (i) => [
+        i.numeroCompte || i.numero_compte || '-',
+        clientFullName(i),
+        fmtMoney(i.soldeCourant ?? i.solde_courant ?? i.solde),
+        translateStatut(i.typeCompte || i.type_compte),
+        `${Number(i.produit?.tauxInteret ?? i.produit?.taux_interet ?? 0)}%`,
+        translateStatut(i.statut),
+      ],
+      getRawValues: (i) => [
+        i.numeroCompte || i.numero_compte || '-',
+        clientFullName(i),
+        Number(i.soldeCourant ?? i.solde_courant ?? i.solde ?? 0),
+        translateStatut(i.typeCompte || i.type_compte),
+        Number(i.produit?.tauxInteret ?? i.produit?.taux_interet ?? 0),
+        translateStatut(i.statut),
+      ],
+      getSummary: (data) => {
+        const totalSolde = data.reduce((s, d) => s + Number(d.soldeCourant ?? d.solde_courant ?? d.solde ?? 0), 0);
+        const actifs = data.filter(d => (d.statut || '').toUpperCase() === 'ACTIVE').length;
+        return [
+          { label: 'Total comptes', value: String(data.length) },
+          { label: 'Solde global', value: fmtMoney(totalSolde) },
+          { label: 'Comptes actifs', value: String(actifs) },
+        ];
+      },
+    },
+
+    tontines: {
+      title: 'Rapport des Tontines',
+      columns: ['Nom', 'Type', 'Cotisation (FCFA)', 'Fréquence', 'Membres', 'Statut'],
+      dateField: 'createdAt',
+      getRowValues: (i) => [
+        i.nom || '-',
+        i.typeDistribution || i.type_distribution || '-',
+        fmtMoney(i.montantCotisation || i.montant_cotisation),
+        i.frequence || '-',
+        `${i.nombreMembresActuel ?? i.membresActuels ?? i.nombre_membres_actuel ?? 0}/${i.nombreMembres ?? i.nombre_membres ?? '?'}`,
+        translateStatut(i.statut),
+      ],
+      getRawValues(i) { return this.getRowValues(i); },
+      getSummary: (data) => {
+        const totalCot = data.reduce((s, d) => s + Number(d.montantCotisation || d.montant_cotisation || 0), 0);
+        const totalM = data.reduce((s, d) => s + Number(d.nombreMembresActuel ?? d.membresActuels ?? 0), 0);
+        return [
+          { label: 'Total tontines', value: String(data.length) },
+          { label: 'Cotisation cumulée', value: fmtMoney(totalCot) },
+          { label: 'Total membres', value: String(totalM) },
+          { label: 'Actives', value: String(data.filter(d => d.statut === 'ACTIVE').length) },
+        ];
+      },
+    },
+  };
+}
+
+// ============================================================================
+// HOOK
+// ============================================================================
+
 export function useReportGenerator() {
   const [reportType, setReportType] = useState('clients');
   const [format, setFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf');
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+    end: new Date().toISOString().split('T')[0],
   });
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     status: 'all',
     segment: 'all',
     includeTransactions: true,
-    includeStats: true
+    includeStats: true,
   });
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
+  // ── Endpoint mapping ──────────────────────────────────────────────────────
   const endpoints: Record<string, string> = {
     clients: '/api/clients',
     credits: '/api/credits',
-    epargnes: '/api/epargne',
+    epargnes: '/api/comptes',       // ← fixed: was /api/epargne (404)
     tontines: '/api/tontines',
   };
 
-  const buildQueryParams = useCallback(() => {
-    const params: Record<string, string> = {};
-    if (dateRange.start) params.startDate = dateRange.start;
-    if (dateRange.end) params.endDate = dateRange.end;
-    if (filters.status !== 'all') params.status = filters.status;
-    if (filters.segment !== 'all') params.segment = filters.segment;
-    return params;
-  }, [dateRange, filters]);
+  const normalizeApiPath = (ep: string) => ep.startsWith('/api/') ? ep.slice(4) : ep;
 
-  const applyClientFilters = (data: any[]) => {
-    let filtered = data;
-    if (filters.status !== 'all') {
-      filtered = filtered.filter((client) => client.statut === filters.status);
+  // ── Client-side date-range filtering ──────────────────────────────────────
+  const filterByDateRange = useCallback((data: any[], dateField: string) => {
+    if (!dateRange.start && !dateRange.end) return data;
+    const start = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null;
+    const end = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : null;
+    return data.filter((item) => {
+      const raw = item[dateField] || item.createdAt || item.created_at || item.dateDebut || item.date_debut;
+      if (!raw) return true;
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return true;
+      if (start && d < start) return false;
+      if (end && d > end) return false;
+      return true;
+    });
+  }, [dateRange]);
+
+  const applyClientFilters = useCallback((data: any[]) => {
+    let out = data;
+    if (filters.status !== 'all') out = out.filter(c => c.statut === filters.status);
+    if (filters.segment !== 'all') out = out.filter(c => c.segment === filters.segment);
+    return out;
+  }, [filters]);
+
+  // ── Data fetching ─────────────────────────────────────────────────────────
+  const fetchReportData = useCallback(async (type?: string) => {
+    const t = type || reportType;
+    const endpoint = endpoints[t];
+    if (!endpoint) return [];
+    try {
+      const params: Record<string, string> = {};
+      if (t === 'epargnes') params.limit = '5000';
+      const data = await requestListAll<any>(normalizeApiPath(endpoint), params);
+      const cfg = buildConfigs()[t];
+      let filtered = filterByDateRange(data, cfg.dateField);
+      if (t === 'clients') filtered = applyClientFilters(filtered);
+      return filtered;
+    } catch (err) {
+      console.error('Erreur récupération données:', err);
+      return [];
     }
-    if (filters.segment !== 'all') {
-      filtered = filtered.filter((client) => client.segment === filters.segment);
-    }
-    return filtered;
-  };
+  }, [reportType, filterByDateRange, applyClientFilters]);
 
-  const normalizeApiPath = (endpoint: string) =>
-    endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
-
+  // ── Preview ───────────────────────────────────────────────────────────────
   const loadPreview = async (type: string) => {
     setLoadingPreview(true);
     setReportType(type);
     try {
-      const endpoint = endpoints[type];
-      if (!endpoint) {
-        setPreviewData([]);
-        return;
-      }
-      const data = await requestListAll<any>(
-        normalizeApiPath(endpoint),
-        buildQueryParams()
-      );
-      setPreviewData(type === 'clients' ? applyClientFilters(data) : data);
-    } catch (error) {
-      console.error('Erreur chargement aperçu:', error);
-      setPreviewData([]);
-    } finally {
-      setLoadingPreview(false);
-    }
+      setPreviewData(await fetchReportData(type));
+    } catch { setPreviewData([]); }
+    finally { setLoadingPreview(false); }
   };
 
-  const fetchReportData = async () => {
-    const endpoint = endpoints[reportType];
-    if (!endpoint) return [];
-    try {
-      const data = await requestListAll<any>(
-        normalizeApiPath(endpoint),
-        buildQueryParams()
-      );
-      return reportType === 'clients' ? applyClientFilters(data) : data;
-    } catch (error) {
-      console.error('Erreur récupération données:', error);
-      return [];
-    }
-  };
-
-  const getReportConfig = () => {
-    const configs: Record<string, { columns: string[]; keys: string[]; title: string }> = {
-      clients: {
-        title: 'Rapport des Clients',
-        columns: ['Nom', 'Prénom', 'Téléphone', 'Email', 'Segment', 'Score', 'Statut'],
-        keys: ['nom', 'prenom', 'telephone', 'email', 'segment', 'score', 'statut']
-      },
-      credits: {
-        title: 'Rapport des Crédits',
-        columns: ['Client', 'Montant (FCFA)', 'Taux (%)', 'Durée (mois)', 'Type', 'Date Début', 'Statut'],
-        keys: ['clientId', 'montant', 'taux', 'duree', 'typeCredit', 'dateDebut', 'statut']
-      },
-      epargnes: {
-        title: 'Rapport des Épargnes',
-        columns: ['Numéro Compte', 'Client', 'Solde (FCFA)', 'Type', 'Taux (%)', 'Statut'],
-        keys: ['numeroCompte', 'clientId', 'solde', 'typeCompte', 'tauxInteret', 'statut']
-      },
-      tontines: {
-        title: 'Rapport des Tontines',
-        columns: ['Nom', 'Type', 'Cotisation (FCFA)', 'Fréquence', 'Membres', 'Statut'],
-        keys: ['nom', 'type', 'montantCotisation', 'frequence', 'nombreMembres', 'statut']
-      }
-    };
-    return configs[reportType] || configs.clients;
-  };
-
+  const getReportConfig = () => buildConfigs()[reportType] || buildConfigs().clients;
   const getPreviewColumns = () => getReportConfig().columns.slice(0, 5);
-
   const getPreviewRow = (item: any) => {
-    const config = getReportConfig();
-    if (!item) {
-      return config.keys.slice(0, 5).map(() => '-');
-    }
-    return config.keys.slice(0, 5).map(key => {
-      const val = item[key];
-      if (key === 'montant' || key === 'solde' || key === 'montantCotisation') {
-        return `${Number(val || 0).toLocaleString('fr-FR')}`;
-      }
-      if (key === 'dateDebut' && val) {
-        return new Date(val).toLocaleDateString('fr-FR');
-      }
-      return String(val || '-');
-    });
+    if (!item) return [];
+    return getReportConfig().getRowValues(item).slice(0, 5);
   };
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // PDF GENERATION
+  // ═════════════════════════════════════════════════════════════════════════
 
   const generatePDF = async () => {
     setLoading(true);
@@ -154,229 +301,218 @@ export function useReportGenerator() {
       const data = await fetchReportData();
       const config = getReportConfig();
       const doc = new jsPDF();
+      const W = doc.internal.pageSize.width;
+      const H = doc.internal.pageSize.height;
 
-      // Header with branding
-      doc.setFillColor(15, 23, 42); // slate-900
-      doc.rect(0, 0, doc.internal.pageSize.width, 40, 'F');
-      
+      // ── Header ──
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, W, 44, 'F');
+
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
+      doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
-      doc.text('COFIN', 14, 20);
-      
-      doc.setFontSize(12);
+      doc.text(COMPANY_NAME, 14, 18);
+
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(config.title, 14, 30);
+      doc.setTextColor(148, 163, 184);
+      doc.text(COMPANY_SUBTITLE, 14, 25);
 
-      // Report info
-      doc.setFontSize(9);
-      doc.setTextColor(148, 163, 184); // slate-400
-      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, 14, 37);
-      doc.text(`Période: ${dateRange.start} au ${dateRange.end}`, doc.internal.pageSize.width - 14, 37, { align: 'right' });
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text(config.title, 14, 35);
 
-      // Table with autoTable
-      const tableData = data.map(item => 
-        config.keys.map(key => {
-          const val = item[key];
-          if (key === 'montant' || key === 'solde' || key === 'montantCotisation') {
-            return `${Number(val || 0).toLocaleString('fr-FR')} FCFA`;
-          }
-          if (key === 'dateDebut' && val) {
-            return new Date(val).toLocaleDateString('fr-FR');
-          }
-          return String(val || '-');
-        })
-      );
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, W - 14, 18, { align: 'right' });
+      doc.text(`Période: ${fmtDateRange(dateRange.start)} — ${fmtDateRange(dateRange.end)}`, W - 14, 25, { align: 'right' });
+      doc.text(`${data.length} enregistrement${data.length !== 1 ? 's' : ''}`, W - 14, 32, { align: 'right' });
 
+      // ── Table ──
       autoTable(doc, {
         head: [config.columns],
-        body: tableData,
-        startY: 50,
+        body: data.map(item => config.getRowValues(item)),
+        startY: 52,
         theme: 'striped',
-        headStyles: {
-          fillColor: [59, 130, 246], // blue-500
-          textColor: 255,
-          fontStyle: 'bold',
-          fontSize: 9
+        headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: 'bold', fontSize: 8, cellPadding: 4 },
+        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59], cellPadding: 3 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { top: 52, left: 14, right: 14 },
+        didDrawPage: (pd) => {
+          doc.setFontSize(7);
+          doc.setTextColor(148, 163, 184);
+          doc.text(`${COMPANY_NAME} — ${config.title}`, 14, H - 10);
+          doc.text(`Page ${pd.pageNumber} / ${doc.getNumberOfPages()}`, W - 14, H - 10, { align: 'right' });
         },
-        bodyStyles: {
-          fontSize: 8,
-          textColor: [30, 41, 59] // slate-800
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252] // slate-50
-        },
-        margin: { top: 50, left: 14, right: 14 },
-        didDrawPage: (data) => {
-          // Footer on each page
-          const pageCount = doc.getNumberOfPages();
-          doc.setFontSize(8);
-          doc.setTextColor(100);
-          doc.text(
-            `Page ${data.pageNumber} / ${pageCount}`,
-            doc.internal.pageSize.width / 2,
-            doc.internal.pageSize.height - 10,
-            { align: 'center' }
-          );
-        }
       });
 
-      // Summary section
-      const finalY = (doc as any).lastAutoTable?.finalY || 100;
-      if (finalY < doc.internal.pageSize.height - 50) {
-        doc.setFillColor(241, 245, 249); // slate-100
-        doc.roundedRect(14, finalY + 10, doc.internal.pageSize.width - 28, 25, 3, 3, 'F');
-        doc.setFontSize(10);
-        doc.setTextColor(30, 41, 59);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Résumé', 20, finalY + 20);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.text(`Total enregistrements: ${data.length}`, 20, finalY + 28);
+      // ── Summary ──
+      if (filters.includeStats) {
+        const finalY: number = (doc as any).lastAutoTable?.finalY || 100;
+        const summary = config.getSummary(data);
+        const boxH = 14 + summary.length * 8;
+        if (finalY + boxH + 20 < H) {
+          doc.setFillColor(241, 245, 249);
+          doc.roundedRect(14, finalY + 10, W - 28, boxH, 3, 3, 'F');
+          doc.setDrawColor(203, 213, 225);
+          doc.roundedRect(14, finalY + 10, W - 28, boxH, 3, 3, 'S');
+
+          doc.setFontSize(10);
+          doc.setTextColor(15, 23, 42);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Résumé', 20, finalY + 20);
+
+          doc.setFontSize(8);
+          doc.setTextColor(51, 65, 85);
+          summary.forEach((s, idx) => {
+            const y = finalY + 28 + idx * 8;
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${s.label}: `, 20, y);
+            doc.setFont('helvetica', 'bold');
+            doc.text(s.value, 20 + doc.getTextWidth(`${s.label}: `), y);
+          });
+        }
       }
 
+      // ── Confidentiality ──
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Document confidentiel — Ne pas diffuser — République du Congo', W / 2, H - 5, { align: 'center' });
+
       doc.save(`rapport_${reportType}_${dateRange.start}_${dateRange.end}.pdf`);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // EXCEL GENERATION
+  // ═════════════════════════════════════════════════════════════════════════
 
   const generateExcel = async () => {
     setLoading(true);
     try {
       const data = await fetchReportData();
       const config = getReportConfig();
-      
-      // Transform data with proper column names
-      const formattedData = data.map(item => {
+
+      const rows = data.map(item => {
+        const vals = config.getRawValues(item);
         const row: Record<string, any> = {};
-        config.columns.forEach((col, idx) => {
-          const key = config.keys[idx];
-          let val = item[key];
-          if (key === 'montant' || key === 'solde' || key === 'montantCotisation') {
-            val = Number(val || 0);
-          }
-          if (key === 'dateDebut' && val) {
-            val = new Date(val).toLocaleDateString('fr-FR');
-          }
-          row[col] = val || '-';
-        });
+        config.columns.forEach((col, i) => { row[col] = vals[i] ?? '-'; });
         return row;
       });
 
-      const ws = XLSX.utils.json_to_sheet(formattedData);
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = config.columns.map(col => {
+        const max = rows.reduce((m, r) => Math.max(m, String(r[col] ?? '').length), col.length);
+        return { wch: Math.min(max + 2, 40) };
+      });
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, config.title.substring(0, 31));
+
+      if (filters.includeStats) {
+        const summaryRows = config.getSummary(data).map(s => ({ Indicateur: s.label, Valeur: s.value }));
+        summaryRows.push(
+          { Indicateur: 'Période', Valeur: `${fmtDateRange(dateRange.start)} — ${fmtDateRange(dateRange.end)}` },
+          { Indicateur: 'Généré le', Valeur: new Date().toLocaleDateString('fr-FR') },
+        );
+        const sws = XLSX.utils.json_to_sheet(summaryRows);
+        sws['!cols'] = [{ wch: 30 }, { wch: 30 }];
+        XLSX.utils.book_append_sheet(wb, sws, 'Résumé');
+      }
+
       XLSX.writeFile(wb, `rapport_${reportType}_${dateRange.start}_${dateRange.end}.xlsx`);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // CSV GENERATION
+  // ═════════════════════════════════════════════════════════════════════════
 
   const generateCSV = async () => {
     setLoading(true);
     try {
       const data = await fetchReportData();
       const config = getReportConfig();
-      
-      const headers = config.columns.join(',');
-      const rows = data.map(item => 
-        config.keys.map(key => {
-          let val = item[key];
-          if (key === 'montant' || key === 'solde' || key === 'montantCotisation') {
-            val = Number(val || 0);
-          }
-          if (key === 'dateDebut' && val) {
-            val = new Date(val).toLocaleDateString('fr-FR');
-          }
-          return `"${String(val || '-').replace(/"/g, '""')}"`;
-        }).join(',')
+
+      const header = config.columns.join(',');
+      const body = data.map(item =>
+        config.getRowValues(item).map(v => `"${String(v).replace(/"/g, '""')}"`).join(','),
       ).join('\n');
 
-      const blob = new Blob([`${headers}\n${rows}`], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `rapport_${reportType}_${dateRange.start}_${dateRange.end}.csv`;
-      link.click();
-    } finally {
-      setLoading(false);
-    }
+      // UTF-8 BOM so Excel renders French characters correctly
+      const blob = new Blob(['\uFEFF' + header + '\n' + body], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `rapport_${reportType}_${dateRange.start}_${dateRange.end}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally { setLoading(false); }
   };
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // PRINT
+  // ═════════════════════════════════════════════════════════════════════════
 
   const printReport = async () => {
     setLoading(true);
     try {
       const data = await fetchReportData();
       const config = getReportConfig();
+      const summary = config.getSummary(data);
 
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Veuillez autoriser les popups pour imprimer');
-        return;
-      }
+      const w = window.open('', '_blank');
+      if (!w) { alert('Veuillez autoriser les popups pour imprimer'); return; }
 
-      const tableRows = data.map(item => `
-        <tr>
-          ${config.keys.map(key => {
-            let val = item[key];
-            if (key === 'montant' || key === 'solde' || key === 'montantCotisation') {
-              val = `${Number(val || 0).toLocaleString('fr-FR')} FCFA`;
-            }
-            if (key === 'dateDebut' && val) {
-              val = new Date(val).toLocaleDateString('fr-FR');
-            }
-            return `<td>${val || '-'}</td>`;
-          }).join('')}
-        </tr>
-      `).join('');
+      const rows = data.map(item =>
+        `<tr>${config.getRowValues(item).map(v => `<td>${v}</td>`).join('')}</tr>`,
+      ).join('');
 
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>COFIN - ${config.title}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; padding: 20px; color: #1e293b; }
-            .header { background: #0f172a; color: white; padding: 20px; margin: -20px -20px 20px; }
-            .header h1 { font-size: 24px; margin-bottom: 5px; }
-            .header p { font-size: 14px; opacity: 0.8; }
-            .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 12px; color: #64748b; }
-            table { width: 100%; border-collapse: collapse; font-size: 11px; }
-            th { background: #3b82f6; color: white; padding: 10px 8px; text-align: left; font-weight: bold; }
-            td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
-            tr:nth-child(even) { background: #f8fafc; }
-            .summary { background: #f1f5f9; padding: 15px; margin-top: 20px; border-radius: 8px; }
-            .summary h3 { font-size: 14px; margin-bottom: 8px; }
-            @media print { body { padding: 0; } .header { margin: 0 0 20px; } }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>COFIN</h1>
-            <p>${config.title}</p>
-          </div>
-          <div class="meta">
-            <span>Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</span>
-            <span>Période: ${dateRange.start} au ${dateRange.end}</span>
-          </div>
-          <table>
-            <thead><tr>${config.columns.map(c => `<th>${c}</th>`).join('')}</tr></thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-          <div class="summary">
-            <h3>Résumé</h3>
-            <p>Total enregistrements: ${data.length}</p>
-          </div>
-          <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-    } finally {
-      setLoading(false);
-    }
+      const summaryHtml = filters.includeStats
+        ? `<div class="summary"><h3>Résumé</h3><div class="sg">${summary.map(s => `<div class="si"><span class="sl">${s.label}</span><span class="sv">${s.value}</span></div>`).join('')}</div></div>`
+        : '';
+
+      w.document.write(`<!DOCTYPE html><html><head>
+<title>${COMPANY_NAME} — ${config.title}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;color:#1e293b}
+.hd{background:#0f172a;color:#fff;padding:24px 28px;margin:-20px -20px 24px}
+.hd-row{display:flex;justify-content:space-between;align-items:flex-start}
+.hd h1{font-size:22px;letter-spacing:.5px}
+.hd .sub{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.hd h2{font-size:14px;font-weight:500;margin-top:12px;color:#e2e8f0}
+.hd .mr{text-align:right;font-size:10px;color:#94a3b8;line-height:1.7}
+table{width:100%;border-collapse:collapse;font-size:10px;margin-top:4px}
+th{background:#1e40af;color:#fff;padding:8px 10px;text-align:left;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.3px}
+td{padding:7px 10px;border-bottom:1px solid #e2e8f0}
+tr:nth-child(even){background:#f8fafc}
+.summary{background:#f1f5f9;padding:16px 20px;margin-top:24px;border-radius:8px;border:1px solid #cbd5e1}
+.summary h3{font-size:13px;margin-bottom:10px;color:#0f172a}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.si{display:flex;justify-content:space-between;font-size:11px}
+.sl{color:#64748b}.sv{font-weight:600;color:#0f172a}
+.ft{margin-top:28px;text-align:center;color:#94a3b8;font-size:8px}
+@media print{body{padding:0}.hd{margin:0 0 20px;-webkit-print-color-adjust:exact;print-color-adjust:exact}th,tr:nth-child(even),.summary{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<div class="hd"><div class="hd-row"><div>
+<h1>${COMPANY_NAME}</h1><div class="sub">${COMPANY_SUBTITLE}</div>
+<h2>${config.title}</h2></div>
+<div class="mr">Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}<br>
+Période: ${fmtDateRange(dateRange.start)} — ${fmtDateRange(dateRange.end)}<br>
+${data.length} enregistrement${data.length !== 1 ? 's' : ''}</div></div></div>
+<table><thead><tr>${config.columns.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+<tbody>${rows}</tbody></table>
+${summaryHtml}
+<div class="ft">Document confidentiel — Ne pas diffuser — ${COMPANY_NAME} — République du Congo</div>
+<script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}</script>
+</body></html>`);
+      w.document.close();
+    } finally { setLoading(false); }
   };
+
+  // ═════════════════════════════════════════════════════════════════════════
 
   return {
     reportType, setReportType,
@@ -388,6 +524,7 @@ export function useReportGenerator() {
     loadPreview,
     generatePDF, generateExcel, generateCSV, printReport,
     getPreviewColumns, getPreviewRow,
-    fetchReportData
+    getReportConfig,
+    fetchReportData,
   };
 }
