@@ -31,6 +31,7 @@ import { StatutTransfertCoffre, StatutCaisse, isOperationCaisseEntree, STATUT_SE
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
 import { createMouvementFinancier } from "../ledger";
+import { postGlForMouvement } from "../accounting-posting-service";
 
 // ============================================================================
 // TYPES
@@ -955,23 +956,50 @@ export class SessionClosingService {
 
     try {
       // Créer le mouvement financier pour l'écart de caisse
-      await createMouvementFinancier(
+      const typePaiement = isExcedent ? "SESSION_SURPLUS" : "SESSION_DEFICIT";
+      const mouvement = await createMouvementFinancier(
         tx,
         {
           agenceId,
           sens: isExcedent ? "CREDIT" : "DEBIT",
           montant: montantAbsolu.toString(),
           sourceModule: "CAISSE",
-          typePaiement: "INTERNAL_TRANSFER",
+          typePaiement,
+          requiresGlPosting: true,
           metadata: {
             ecart,
             justification,
             type: isExcedent ? "EXCEDENT_CAISSE" : "DEFICIT_CAISSE",
             sessionId,
+            caisseId,
           },
         },
         caissierId
       );
+
+      // GL posting — write the accounting entry for this écart
+      if (agenceId) {
+        try {
+          const glResult = await postGlForMouvement(tx, mouvement, agenceId, caissierId, {
+            sessionId,
+            caisseId,
+            ecart,
+            direction: isExcedent ? "SURPLUS" : "DEFICIT",
+          });
+          if (glResult) {
+            await tx.update(mouvementsFinanciers)
+              .set({ glPostingStatus: "POSTED", glPostingError: null })
+              .where(eq(mouvementsFinanciers.id, mouvement.id));
+          }
+        } catch (glError: unknown) {
+          const message = glError instanceof Error ? glError.message : "Unknown GL error";
+          console.error(`[SessionClosingService] GL posting failed for écart mouvement ${mouvement.id}: ${message}`);
+          await tx.update(mouvementsFinanciers)
+            .set({ glPostingStatus: "FAILED", glPostingError: message })
+            .where(eq(mouvementsFinanciers.id, mouvement.id));
+          // Don't rethrow — closing should still succeed even if GL posting fails
+        }
+      }
     } catch (error) {
       console.error("[SessionClosingService] Écart comptable creation failed:", error);
       // Ne pas bloquer le processus, mais logger l'erreur

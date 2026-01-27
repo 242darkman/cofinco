@@ -128,6 +128,11 @@ export const bulletinsPaie = pgTable("bulletins_paie", {
   genereParId: uuid("genere_par_id"), // User ID qui a généré
   statut: varchar("statut").default("DRAFT"), // 'DRAFT', 'VALIDATED', 'PAID'
   datePaiement: date("date_paiement"),
+  // GL Posting tracking (PR-4)
+  engagementMouvementId: uuid("engagement_mouvement_id"), // Set when VALIDATED → mouvement engagement
+  paiementMouvementId: uuid("paiement_mouvement_id"),     // Set when PAID → mouvement décaissement
+  engagementEcritureId: uuid("engagement_ecriture_id"),   // GL écriture for engagement
+  paiementEcritureId: uuid("paiement_ecriture_id"),       // GL écriture for payment
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

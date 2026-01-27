@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen, FileText, BarChart3, TrendingUp, Download, Building2,
   Calculator, DollarSign, Filter, Search, Calendar, Lock, Settings,
-  ChevronDown, ChevronRight, Printer, Mail, PieChart, Activity, Plus, CheckCircle
+  ChevronDown, ChevronRight, Printer, Mail, PieChart, Activity, Plus, CheckCircle,
+  RotateCcw, AlertTriangle, X
 } from 'lucide-react';
 import SaisieEcriture from './SaisieEcriture';
 import BalanceGenerale from './BalanceGenerale';
@@ -17,6 +19,21 @@ import TabGroup from '../../ui/TabGroup';
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';
+import {
+  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
+} from 'recharts';
+import {
+  useChartOfAccounts,
+  useJournaux,
+  useJournauxStats,
+  useJournalEntries,
+  useBilanStats,
+  usePeriods,
+  useClosePeriod,
+  useAccountingWebSocket,
+} from '../../../hooks/accounting/useAccounting';
+import { comptabiliteKeys } from '../../../lib/query-keys';
 
 // ============================================
 // INTERFACES
@@ -26,32 +43,40 @@ interface CompteOHADA {
   numero_compte: string;
   intitule: string;
   classe: number;
-  type_compte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux'; // Updated to match new component
+  type_compte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
   sens_normal: 'Débit' | 'Crédit';
   niveau: number;
   actif: boolean;
   description: string;
-  solde_actuel: number; // Added for stats
+  solde_actuel: number;
 }
 
 type TabKey = 'plan' | 'journaux' | 'ecritures' | 'balance' | 'grandlivre' | 'bilan' | 'resultat' | 'tva' | 'tresorerie' | 'tafire' | 'liasse' | 'rapports';
 
-interface JournalEcriture {
+interface JournalFromApi {
   id: string;
-  date: string;
-  piece: string;
-  libelle: string;
-  compte: string;
-  debit: number;
-  credit: number;
+  code: string;
+  intitule: string;
+  type_journal?: string;
+  actif?: boolean;
 }
 
-interface JournalType {
+interface JournalDisplay {
+  id: string;
   code: string;
   label: string;
   color: string;
   count: number;
-  ecritures: JournalEcriture[];
+}
+
+interface JournalEntryFromApi {
+  id: string;
+  date: string;
+  numero_piece: string;
+  libelle: string;
+  journal_id: string;
+  total_debit: number;
+  total_credit: number;
 }
 
 // ============================================
@@ -81,14 +106,18 @@ const classesOHADA = [
   { numero: 8, label: 'Autres comptes', color: 'from-slate-500 to-slate-600' },
 ];
 
-const journauxTypes: JournalType[] = [
-  { code: 'AC', label: 'Journal des Achats', color: 'from-orange-500 to-orange-600', count: 45, ecritures: [] },
-  { code: 'VE', label: 'Journal des Ventes', color: 'from-green-500 to-green-600', count: 78, ecritures: [] },
-  { code: 'BQ', label: 'Journal de Banque', color: 'from-blue-500 to-blue-600', count: 156, ecritures: [] },
-  { code: 'CA', label: 'Journal de Caisse', color: 'from-purple-500 to-purple-600', count: 89, ecritures: [] },
-  { code: 'OD', label: 'Opérations Diverses', color: 'from-slate-500 to-slate-600', count: 23, ecritures: [] },
-  { code: 'AN', label: 'A Nouveaux', color: 'from-cyan-500 to-cyan-600', count: 12, ecritures: [] },
-];
+const JOURNAL_COLORS: Record<string, string> = {
+  CAISSE: 'from-purple-500 to-purple-600',
+  BANK: 'from-blue-500 to-blue-600',
+  ACHAT: 'from-orange-500 to-orange-600',
+  VENTE: 'from-green-500 to-green-600',
+  OD: 'from-slate-500 to-slate-600',
+  MMTN: 'from-amber-500 to-amber-600',
+  MAIR: 'from-red-500 to-red-600',
+  CRED: 'from-cyan-500 to-cyan-600',
+  EPGN: 'from-emerald-500 to-emerald-600',
+};
+const DEFAULT_JOURNAL_COLOR = 'from-indigo-500 to-indigo-600';
 
 const rapportsDisponibles = [
   { id: 'balance', label: 'Balance générale', icon: BarChart3, color: 'from-blue-500 to-blue-600' },
@@ -107,12 +136,87 @@ interface ComptabiliteSageOHADAProps {
 }
 
 const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeView }) => {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('plan');
-  const [comptes, setComptes] = useState<CompteOHADA[]>([]);
-  const [loading, setLoading] = useState(true);
   const [expandedClasses, setExpandedClasses] = useState<number[]>([]);
-  const [selectedJournal, setSelectedJournal] = useState<JournalType | null>(null);
+  const [selectedJournal, setSelectedJournal] = useState<JournalDisplay | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [reversingEntryId, setReversingEntryId] = useState<string | null>(null);
+  const [reversalReason, setReversalReason] = useState('');
+  const [reversalLoading, setReversalLoading] = useState(false);
+  const [reversalError, setReversalError] = useState<string | null>(null);
+  const [bilanDateFin, setBilanDateFin] = useState(new Date().toISOString().split('T')[0]);
+
+  // Real-time WebSocket invalidation
+  useAccountingWebSocket();
+
+  // Callback for child components to invalidate accounting data
+  const invalidateAccounting = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: comptabiliteKeys.all });
+  }, [queryClient]);
+
+  const handleReverseEntry = useCallback(async () => {
+    if (!reversingEntryId || !reversalReason.trim()) return;
+    setReversalLoading(true);
+    setReversalError(null);
+    try {
+      const res = await fetch(`/api/comptabilite/entries/${reversingEntryId}/reverse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reversalReason.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Erreur extourne' }));
+        throw new Error(err.message);
+      }
+      setReversingEntryId(null);
+      setReversalReason('');
+      invalidateAccounting();
+    } catch (e: any) {
+      setReversalError(e.message || 'Erreur extourne');
+    } finally {
+      setReversalLoading(false);
+    }
+  }, [reversingEntryId, reversalReason, invalidateAccounting]);
+
+  // React Query: chart of accounts
+  const { data: comptesData, isLoading: loading } = useChartOfAccounts();
+  const comptes: CompteOHADA[] = comptesData || [];
+
+  // React Query: journals + stats
+  const { data: journauxData } = useJournaux();
+  const { data: statsData } = useJournauxStats();
+
+  // Derive journauxDisplay from React Query data
+  const journauxDisplay: JournalDisplay[] = useMemo(() => {
+    if (!journauxData) return [];
+    return journauxData.map((j: JournalFromApi) => {
+      const stat = Array.isArray(statsData)
+        ? statsData.find((s) => s.code === j.code)
+        : null;
+      return {
+        id: j.id,
+        code: j.code,
+        label: j.intitule,
+        color: JOURNAL_COLORS[j.code] || DEFAULT_JOURNAL_COLOR,
+        count: stat ? Number(stat.count) : 0,
+      };
+    });
+  }, [journauxData, statsData]);
+
+  // React Query: journal entries (reactive to selectedJournal)
+  const { data: journalEntriesData, isLoading: journalEntriesLoading } = useJournalEntries(
+    selectedJournal?.id
+  );
+  const journalEntries: JournalEntryFromApi[] = journalEntriesData || [];
+
+  // React Query: bilan stats
+  const { data: bilanStats, isLoading: bilanLoading } = useBilanStats(bilanDateFin);
+
+  // React Query: periods
+  const currentYear = new Date().getFullYear();
+  const { data: periodsData } = usePeriods(currentYear);
+  const closePeriodMutation = useClosePeriod();
 
   useEffect(() => {
     if (activeView) {
@@ -132,54 +236,9 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
     }
   }, [activeView]);
 
-  useEffect(() => {
-    fetchComptes();
+  const handleSelectJournal = useCallback((journal: JournalDisplay) => {
+    setSelectedJournal(journal);
   }, []);
-
-  const fetchComptes = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/comptabilite/comptes');
-      if (res.ok) {
-        const data = await res.json();
-        setComptes(data || []);
-      } else {
-        setComptes([]);
-      }
-    } catch (error) {
-      console.error('Erreur chargement comptes:', error);
-      setComptes([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Add stats fetching
-  const [journauxStats, setJournauxStats] = useState<any[]>([]);
-  const [bilanStats, setBilanStats] = useState<any>(null);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-        try {
-            const [resJournaux, resBilan] = await Promise.all([
-                fetch('/api/comptabilite/journaux-stats'),
-                fetch('/api/comptabilite/bilan-synthetique')
-            ]);
-            
-            if (resJournaux.ok) setJournauxStats(await resJournaux.json());
-            if (resBilan.ok) setBilanStats(await resBilan.json());
-        } catch (e) {
-            console.error("Error fetching stats", e);
-        }
-    };
-    fetchStats();
-  }, []);
-
-  // Merge real stats with static config
-  const journauxDisplay = journauxTypes.map(j => {
-      const stat = Array.isArray(journauxStats) ? journauxStats.find(s => s.code === j.code) : null;
-      return { ...j, count: stat ? stat.count : 0 };
-  });
 
   const toggleClasse = (numero: number) => {
     setExpandedClasses(prev =>
@@ -190,10 +249,26 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   };
 
   const getComptesByClasse = (classeNumero: number) => {
-    // Basic mapping if 'classe' is not explicitly on the object but solvable by numero_compte
-    // Assuming backend returns objects with 'classe' or we derive it:
-    return comptes.filter(c => c.classe === classeNumero || (c.numero_compte && parseInt(String(c.numero_compte).charAt(0)) === classeNumero));
+    let filtered = comptes.filter(c =>
+      c.classe === classeNumero || (c.numero_compte && parseInt(String(c.numero_compte).charAt(0)) === classeNumero)
+    );
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(c =>
+        c.numero_compte.includes(term) ||
+        c.intitule.toLowerCase().includes(term)
+      );
+    }
+
+    return filtered;
   };
+
+  // Count classes that have accounts
+  const classesUtilisees = classesOHADA.filter(cl =>
+    comptes.some(c => c.classe === cl.numero || (c.numero_compte && parseInt(String(c.numero_compte).charAt(0)) === cl.numero))
+  ).length;
 
   // ============================================
   // TAB: Plan OHADA - ADAPTATIF SIDEBAR
@@ -227,15 +302,15 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
             <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <Lock className="w-4 h-4 text-white/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">8</div>
+                <div className="text-base font-bold text-white leading-none">{classesUtilisees}</div>
                 <div className="text-[9px] text-white/70">Classes</div>
               </div>
             </div>
             <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <Activity className="w-4 h-4 text-white/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">100%</div>
-                <div className="text-[9px] text-white/70">Conforme</div>
+                <div className="text-base font-bold text-white leading-none">{comptes.filter(c => c.actif !== false).length}</div>
+                <div className="text-[9px] text-white/70">Actifs</div>
               </div>
             </div>
           </div>
@@ -355,6 +430,8 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   // ============================================
   // TAB: Journaux - ADAPTATIF
   // ============================================
+  const totalEcrituresJournaux = journauxDisplay.reduce((sum, j) => sum + j.count, 0);
+
   const renderJournaux = () => (
     <div className="space-y-3">
       {/* Header compact */}
@@ -370,13 +447,19 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
 
           <div className="w-px h-10 bg-white/20 flex-shrink-0" />
 
-          {/* Stats Placeholder - could be real data */}
-           <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <FileText className="w-4 h-4 text-white/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">{journauxTypes.length}</div>
+                <div className="text-base font-bold text-white leading-none">{journauxDisplay.length}</div>
                 <div className="text-[9px] text-white/70">Journaux</div>
+              </div>
+            </div>
+            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-white/80" />
+              <div>
+                <div className="text-base font-bold text-white leading-none">{totalEcrituresJournaux}</div>
+                <div className="text-[9px] text-white/70">Écritures</div>
               </div>
             </div>
           </div>
@@ -387,62 +470,198 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
       {selectedJournal ? (
         <div className="bg-slate-800 rounded-xl p-4">
           <div className="flex items-center justify-between gap-3 mb-4">
-            <button 
-              onClick={() => setSelectedJournal(null)}
+            <button
+              onClick={() => { setSelectedJournal(null); }}
               className="flex items-center gap-1.5 text-slate-400 hover:text-white text-sm"
             >
               <ChevronRight className="w-4 h-4 rotate-180" />
               Retour
             </button>
-            <h3 className="text-sm font-bold text-white">{selectedJournal.label}</h3>
+            <h3 className="text-sm font-bold text-white">
+              {selectedJournal.code} - {selectedJournal.label}
+              <span className="ml-2 text-xs text-slate-400 font-normal">
+                ({journalEntries.length} écriture{journalEntries.length !== 1 ? 's' : ''})
+              </span>
+            </h3>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-400 text-xs border-b border-slate-700">
-                  <th className="pb-2 pr-4 font-medium w-20">Date</th>
-                  <th className="pb-2 pr-4 font-medium w-16 hidden sm:table-cell">Pièce</th>
+                  <th className="pb-2 pr-4 font-medium w-24">Date</th>
+                  <th className="pb-2 pr-4 font-medium w-28 hidden sm:table-cell">N° Pièce</th>
                   <th className="pb-2 pr-4 font-medium">Libellé</th>
-                  <th className="pb-2 pr-4 font-medium text-right w-20">Débit</th>
-                  <th className="pb-2 font-medium text-right w-20">Crédit</th>
+                  <th className="pb-2 pr-4 font-medium text-right w-28">Débit</th>
+                  <th className="pb-2 pr-4 font-medium text-right w-28">Crédit</th>
+                  <th className="pb-2 font-medium text-center w-20 hidden md:table-cell">Actions</th>
                 </tr>
               </thead>
-              <tbody className="text-white text-xs">
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
-                    Aucune écriture dans ce journal
-                  </td>
-                </tr>
+              <tbody className="text-white text-xs divide-y divide-slate-700/50">
+                {journalEntriesLoading ? (
+                  <>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={`skel-${i}`} className="animate-pulse">
+                        <td className="py-3 pr-4"><div className="h-3 bg-slate-700 rounded w-20" /></td>
+                        <td className="py-3 pr-4 hidden sm:table-cell"><div className="h-3 bg-slate-700 rounded w-16" /></td>
+                        <td className="py-3 pr-4"><div className="h-3 bg-slate-700 rounded w-40" /></td>
+                        <td className="py-3 pr-4 text-right"><div className="h-3 bg-slate-700 rounded w-20 ml-auto" /></td>
+                        <td className="py-3 pr-4 text-right"><div className="h-3 bg-slate-700 rounded w-20 ml-auto" /></td>
+                        <td className="py-3"><div className="h-3 bg-slate-700 rounded w-8 mx-auto" /></td>
+                      </tr>
+                    ))}
+                  </>
+                ) : journalEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      Aucune écriture dans ce journal
+                    </td>
+                  </tr>
+                ) : (
+                  journalEntries.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-slate-700/30 transition-colors">
+                      <td className="py-2 pr-4 text-slate-300">
+                        {entry.date ? new Date(entry.date).toLocaleDateString('fr-FR') : '-'}
+                      </td>
+                      <td className="py-2 pr-4 font-mono text-cyan-400 hidden sm:table-cell">
+                        {entry.numero_piece || '-'}
+                      </td>
+                      <td className="py-2 pr-4 text-white truncate max-w-[200px]">
+                        {entry.libelle || '-'}
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono text-green-400">
+                        {Number(entry.total_debit || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-4 text-right font-mono text-cyan-400">
+                        {Number(entry.total_credit || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2 text-center hidden md:table-cell">
+                        <button
+                          onClick={() => {
+                            setReversingEntryId(entry.id);
+                            setReversalReason('');
+                            setReversalError(null);
+                          }}
+                          className="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                          title="Extourner cette écriture"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
+              {journalEntries.length > 0 && (
+                <tfoot className="bg-slate-700/50">
+                  <tr>
+                    <td colSpan={3} className="py-2 px-4 text-right text-xs font-bold text-white">TOTAUX</td>
+
+                    <td className="py-2 pr-4 text-right font-mono font-bold text-green-400 text-xs">
+                      {journalEntries.reduce((sum, e) => sum + Number(e.total_debit || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="py-2 text-right font-mono font-bold text-cyan-400 text-xs">
+                      {journalEntries.reduce((sum, e) => sum + Number(e.total_credit || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="hidden md:table-cell" />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
+
+          {/* Reversal (Extourne) Dialog */}
+          {reversingEntryId && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-slate-800 rounded-xl p-5 w-full max-w-md mx-4 border border-slate-700 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-amber-500/20 rounded-lg">
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white">Extourner l'écriture</h3>
+                  </div>
+                  <button
+                    onClick={() => setReversingEntryId(null)}
+                    className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-400 mb-3">
+                  Cette action va créer une écriture inverse pour annuler l'écriture sélectionnée.
+                  L'opération est irréversible.
+                </p>
+
+                <label className="block text-xs text-slate-300 mb-1 font-medium">Motif d'extourne *</label>
+                <textarea
+                  value={reversalReason}
+                  onChange={(e) => setReversalReason(e.target.value)}
+                  placeholder="Ex: Erreur de saisie, double enregistrement..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                  rows={3}
+                />
+
+                {reversalError && (
+                  <p className="text-xs text-red-400 mt-2">{reversalError}</p>
+                )}
+
+                <div className="flex gap-2 mt-4 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReversingEntryId(null)}
+                    className="text-xs"
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={RotateCcw}
+                    onClick={handleReverseEntry}
+                    className="text-xs bg-amber-600 hover:bg-amber-700"
+                    disabled={!reversalReason.trim() || reversalLoading}
+                  >
+                    {reversalLoading ? 'Extourne...' : 'Confirmer l\'extourne'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-          {journauxDisplay.map((journal) => (
-            <button
-              key={journal.code}
-              onClick={() => setSelectedJournal(journal)}
-              className={`
-                bg-gradient-to-br ${journal.color} 
-                rounded-lg p-3
-                text-white text-left
-                hover:scale-[1.02] hover:shadow-lg
-                transition-all duration-200
-              `}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-lg font-bold">{journal.code}</span>
-                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
-                  {journal.count}
+          {journauxDisplay.length === 0 ? (
+            <div className="col-span-full text-center py-8 text-slate-400 text-sm">
+              Aucun journal configuré
+            </div>
+          ) : (
+            journauxDisplay.map((journal) => (
+              <button
+                key={journal.code}
+                onClick={() => handleSelectJournal(journal)}
+                className={`
+                  bg-gradient-to-br ${journal.color}
+                  rounded-lg p-3
+                  text-white text-left
+                  hover:scale-[1.02] hover:shadow-lg
+                  transition-all duration-200
+                `}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-lg font-bold">{journal.code}</span>
+                  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
+                    {journal.count}
+                  </span>
+                </div>
+                <span className="text-xs font-medium line-clamp-2 opacity-90">
+                  {journal.label}
                 </span>
-              </div>
-              <span className="text-xs font-medium line-clamp-2 opacity-90">
-                {journal.label}
-              </span>
-            </button>
-          ))}
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>
@@ -585,7 +804,16 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
               <p className="text-[10px] text-white/80 whitespace-nowrap">Situation patrimoniale</p>
             </div>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex gap-2 flex-shrink-0 items-center">
+            <input
+              type="date"
+              value={bilanDateFin}
+              onChange={(e) => setBilanDateFin(e.target.value)}
+              className="h-8 text-xs bg-white/15 border border-white/20 rounded-lg px-2 text-white"
+            />
+            {bilanLoading && (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -664,6 +892,46 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
           </div>
         </div>
       </div>
+
+      {/* Comparison Chart */}
+      <Card variant="default" padding="sm" className="space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="p-1 bg-indigo-500/20 rounded">
+            <BarChart3 size={14} className="text-indigo-400" />
+          </div>
+          <h3 className="text-xs font-bold text-white">Comparaison Actif / Passif</h3>
+          {bilanStats && (
+            <Badge
+              value={Math.abs((bilanStats?.actif?.total || 0) - (bilanStats?.passif?.total || 0)) < 1 ? 'Équilibré' : 'Déséquilibré'}
+              variant={Math.abs((bilanStats?.actif?.total || 0) - (bilanStats?.passif?.total || 0)) < 1 ? 'success' : 'danger'}
+              size="sm"
+              className="ml-auto text-[9px]"
+            />
+          )}
+        </div>
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart
+            data={[
+              { name: 'Immobilisé', actif: bilanStats?.actif?.immobilise || 0, passif: 0 },
+              { name: 'Capitaux', actif: 0, passif: bilanStats?.passif?.capitaux || 0 },
+              { name: 'Circulant', actif: bilanStats?.actif?.circulant || 0, passif: bilanStats?.passif?.circulant || 0 },
+              { name: 'Dettes', actif: 0, passif: bilanStats?.passif?.dettes || 0 },
+              { name: 'Trésorerie', actif: bilanStats?.actif?.tresorerie || 0, passif: 0 },
+            ]}
+            margin={{ left: 5, right: 5, top: 5, bottom: 5 }}
+          >
+            <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis hide />
+            <Tooltip
+              formatter={(value: number) => `${value.toLocaleString()} FCFA`}
+              contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+              itemStyle={{ color: '#e2e8f0' }}
+            />
+            <Bar dataKey="actif" name="Actif" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="passif" name="Passif" fill="#a855f7" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
     </div>
   );
 
@@ -688,24 +956,27 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
       {/* États financiers - grille compacte */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {[
-          { id: 'bilan', label: 'Bilan', desc: 'Actif/Passif', icon: PieChart, color: 'from-blue-500 to-blue-600' },
-          { id: 'resultat', label: 'Résultat', desc: 'Charges/Produits', icon: TrendingUp, color: 'from-green-500 to-green-600' },
-          { id: 'tafire', label: 'TAFIRE', desc: 'Tableau financier', icon: Activity, color: 'from-purple-500 to-purple-600' },
-          { id: 'annexes', label: 'Annexes', desc: 'Notes', icon: FileText, color: 'from-cyan-500 to-cyan-600' },
-          { id: 'flux', label: 'Trésorerie', desc: 'Flux', icon: DollarSign, color: 'from-orange-500 to-orange-600' },
-          { id: 'variation', label: 'Variation', desc: 'Capitaux', icon: BarChart3, color: 'from-pink-500 to-pink-600' },
+          { id: 'bilan', tab: 'bilan' as TabKey, label: 'Bilan', desc: 'Actif/Passif', icon: PieChart, color: 'from-blue-500 to-blue-600' },
+          { id: 'resultat', tab: 'resultat' as TabKey, label: 'Résultat', desc: 'Charges/Produits', icon: TrendingUp, color: 'from-green-500 to-green-600' },
+          { id: 'tafire', tab: 'tafire' as TabKey, label: 'TAFIRE', desc: 'Tableau financier', icon: Activity, color: 'from-purple-500 to-purple-600' },
+          { id: 'annexes', tab: null, label: 'Annexes', desc: 'Notes', icon: FileText, color: 'from-cyan-500 to-cyan-600' },
+          { id: 'flux', tab: 'tresorerie' as TabKey, label: 'Trésorerie', desc: 'Flux', icon: DollarSign, color: 'from-orange-500 to-orange-600' },
+          { id: 'variation', tab: null, label: 'Variation', desc: 'Capitaux', icon: BarChart3, color: 'from-pink-500 to-pink-600' },
         ].map((etat) => {
           const Icon = etat.icon;
           return (
             <button
               key={etat.id}
+              onClick={() => etat.tab && setActiveTab(etat.tab)}
               className={`
-                bg-gradient-to-br ${etat.color} 
+                bg-gradient-to-br ${etat.color}
                 rounded-lg p-3
                 text-white text-left
                 hover:scale-[1.02] hover:shadow-lg
                 transition-all duration-200
+                ${!etat.tab ? 'opacity-50 cursor-not-allowed' : ''}
               `}
+              disabled={!etat.tab}
             >
               <Icon className="w-5 h-5 mb-2" />
               <div className="text-xs font-bold">{etat.label}</div>
@@ -786,6 +1057,74 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
           );
         })}
       </div>
+
+      {/* Clôture des Périodes */}
+      <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-amber-400" />
+            <h3 className="text-sm font-bold text-white">Clôture des Périodes — {currentYear}</h3>
+          </div>
+          <Badge
+            variant="info"
+            size="sm"
+            rawValue
+            value={(() => {
+              const periods = periodsData as Array<{ month: number; status: string }> | undefined;
+              const closed = periods?.filter(p => p.status === 'closed').length ?? 0;
+              return `${closed}/12 clôturées`;
+            })()}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+          {Array.from({ length: 12 }, (_, i) => {
+            const month = i + 1;
+            const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+            const periods = periodsData as Array<{ id: string; month: number; status: string; closed_at?: string }> | undefined;
+            const period = periods?.find(p => p.month === month);
+            const isClosed = period?.status === 'closed';
+
+            return (
+              <div
+                key={month}
+                className={`rounded-lg border p-2 text-center transition-colors ${
+                  isClosed
+                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                    : 'bg-slate-700/30 border-slate-600/30'
+                }`}
+              >
+                <div className="text-xs font-bold text-white mb-1">{monthNames[i]}</div>
+                {isClosed ? (
+                  <div className="flex flex-col items-center gap-0.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <span className="text-[9px] text-emerald-400">Clôturée</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Clôturer la période ${monthNames[i]} ${currentYear} ? Cette action est irréversible.`)) {
+                        closePeriodMutation.mutate({ year: currentYear, month });
+                      }
+                    }}
+                    disabled={closePeriodMutation.isPending}
+                    className="mt-0.5 px-2 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 text-[10px] font-medium rounded transition-colors disabled:opacity-50"
+                  >
+                    {closePeriodMutation.isPending ? '...' : 'Clôturer'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {closePeriodMutation.isError && (
+          <div className="mt-3 flex items-center gap-2 text-red-400 text-xs bg-red-500/10 rounded-lg p-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>Erreur lors de la clôture : {(closePeriodMutation.error as Error)?.message || 'Erreur inconnue'}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -794,11 +1133,11 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
     switch (activeTab) {
       case 'plan': return renderPlanOHADA();
       case 'journaux': return renderJournaux();
-      case 'ecritures': return <SaisieEcriture onSuccess={fetchComptes} />;
+      case 'ecritures': return <SaisieEcriture onSuccess={invalidateAccounting} />;
       case 'balance': return <BalanceGenerale />;
       case 'grandlivre': return <GrandLivre />;
       case 'bilan': return renderBilan();
-      case 'resultat': return <CompteResultat comptes={comptes} loading={loading} />;
+      case 'resultat': return <CompteResultat />;
       case 'tva': return <DeclarationTVA />;
       case 'tresorerie': return <TableauTresorerie />;
       case 'tafire': return <TAFIRE />;
@@ -829,9 +1168,27 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-0.5">
           {loading ? (
-            <div className="flex flex-col items-center justify-center h-48 text-slate-400">
-              <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
-              <span className="text-sm">Chargement...</span>
+            <div className="space-y-4 animate-pulse">
+              {/* Header skeleton */}
+              <div className="h-20 bg-slate-800 rounded-xl" />
+              {/* Stats row skeleton */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-16 bg-slate-800 rounded-lg" />
+                ))}
+              </div>
+              {/* Table skeleton */}
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/30 overflow-hidden">
+                <div className="h-10 bg-slate-700/50" />
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-4 py-3 border-t border-slate-700/20">
+                    <div className="h-3 bg-slate-700 rounded w-16" />
+                    <div className="h-3 bg-slate-700 rounded w-24" />
+                    <div className="h-3 bg-slate-700 rounded flex-1" />
+                    <div className="h-3 bg-slate-700 rounded w-20" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             renderContent()

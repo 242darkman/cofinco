@@ -13,6 +13,7 @@ import { eq, sql, desc, and, isNull } from "drizzle-orm";
 import { getWsInstance } from "../../ws-server";
 
 import { updateSessionSolde } from "../ledger";
+import { postGlForMouvement } from "../accounting-posting-service";
 import { balanceService } from "../balance-service";
 import {
   assertCoffreCanDebit,
@@ -114,15 +115,19 @@ export async function executeTransfertCoffre(
 
     // 6. Créer le mouvement DÉBIT (Sortie Source)
     // Source: Si Coffre (Sortie Coffre), Si Caisse (Sortie Caisse)
+    const typePaiement = isCoffreSource ? "COFFRE_TO_CAISSE" : "CAISSE_TO_COFFRE";
     const [mouvementDebit] = await tx.insert(mouvementsFinanciers).values({
       montant: transfert.montant,
       sens: "DEBIT",
-      sourceModule: "TRANSFERT",
+      sourceModule: "COFFRE_TRANSFER",
+      typePaiement: typePaiement as any,
       agenceId: transfert.agenceId,
       reference: refDebit,
       idempotencyKey: `${transfert.idempotencyKey || transfert.id}-debit`,
       statut: StatutTransaction.POSTED,
       dateOperation: new Date(),
+      requiresGlPosting: true,
+      glPostingStatus: "PENDING",
       metadata: {
         transfertId: transfert.id,
         coffreId: isCoffreSource ? coffre.id : undefined,
@@ -130,26 +135,31 @@ export async function executeTransfertCoffre(
         type: isCoffreSource ? "SORTIE_COFFRE" : "SORTIE_CAISSE",
         groupRef,
         description: `Transfert sortant vers ${isCoffreSource ? caisse.nom : coffre.nom}`,
-        categorie: "Transfert Interne", 
+        categorie: "Transfert Interne",
       },
     }).returning();
 
     // 7. Créer le mouvement CRÉDIT (Entrée Destination)
+    // GL posting is handled via the DEBIT mouvement — one écriture covers both sides
     const [mouvementCredit] = await tx.insert(mouvementsFinanciers).values({
       montant: transfert.montant,
       sens: "CREDIT",
-      sourceModule: "TRANSFERT",
+      sourceModule: "COFFRE_TRANSFER",
+      typePaiement: typePaiement as any,
       agenceId: transfert.agenceId,
       reference: refCredit,
       idempotencyKey: `${transfert.idempotencyKey || transfert.id}-credit`,
       statut: StatutTransaction.POSTED,
       dateOperation: new Date(),
+      requiresGlPosting: false,
+      glPostingStatus: "SKIPPED",
       metadata: {
         transfertId: transfert.id,
         coffreId: !isCoffreSource ? coffre.id : undefined,
         caisseId: isCoffreSource ? caisse.id : undefined,
         type: !isCoffreSource ? "ENTREE_COFFRE" : "ENTREE_CAISSE",
         groupRef,
+        glCoveredByMouvementDebit: true,
         description: `Transfert entrant de ${isCoffreSource ? coffre.nom : caisse.nom}`,
         categorie: "Transfert Interne",
       },
@@ -234,6 +244,31 @@ export async function executeTransfertCoffre(
         }
     }
 
+    // 9b. GL Posting — one écriture for the whole transfer (via DEBIT mouvement)
+    if (transfert.agenceId) {
+      try {
+        const glResult = await postGlForMouvement(tx, mouvementDebit, transfert.agenceId, executorId, {
+          transfertId: transfert.id,
+          coffreNom: coffre.nom,
+          caisseNom: caisse.nom,
+          direction: isCoffreSource ? "COFFRE→CAISSE" : "CAISSE→COFFRE",
+        });
+        if (glResult) {
+          await tx.update(mouvementsFinanciers)
+            .set({ glPostingStatus: "POSTED", glPostingError: null })
+            .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Unknown GL error";
+        console.error(`[CoffreTransfer] GL posting failed for transfert ${transfertId}: ${message}`);
+        await tx.update(mouvementsFinanciers)
+          .set({ glPostingStatus: "FAILED", glPostingError: message })
+          .where(eq(mouvementsFinanciers.id, mouvementDebit.id));
+        // Don't rethrow — coffre transfer should still succeed even if GL posting fails
+        // The FAILED status will be picked up by the coverage report
+      }
+    }
+
     // 10. Finaliser le transfert
     const [updatedTransfert] = await tx.update(transfertsCoffreCaisse)
       .set({
@@ -311,6 +346,14 @@ export async function executeTransfertCoffre(
             typePaiement: isCoffreSource ? 'SAFE_SUPPLY' : 'SAFE_DEPOSIT',
           });
         }
+      // ACCOUNTING_UPDATE broadcast
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "ACCOUNTING_UPDATE",
+          payload: { type: "coffre_transfer_posted", transfertId: transfert.id },
+        });
+      }
     } catch (e) {
         console.error("Failed to broadcast BALANCE_UPDATED for transfert", e);
     }

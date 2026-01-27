@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { BookOpen, Search, Download, Printer, Filter, Calendar as CalendarIcon, ArrowRight, TrendingUp, ArrowDownRight, ArrowUpRight, DollarSign, ChevronLeft, ChevronRight, RefreshCw, FileText, Info, ExternalLink } from 'lucide-react';
 import PageHeader from '../../ui/PageHeader';
 import StatCard from '../../ui/StatCard';
@@ -7,8 +7,8 @@ import Button from '../../ui/Button';
 import Card from '../../ui/Card';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import { comptabiliteApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { useChartOfAccounts, useGrandLivre, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 
 interface GrandLivreEntry {
   id: string;
@@ -47,62 +47,30 @@ interface GrandLivreData {
 }
 
 export default function GrandLivre() {
-  const [comptes, setComptes] = useState<any[]>([]);
   const [compteSelectionne, setCompteSelectionne] = useState('');
-  const [grandLivreData, setGrandLivreData] = useState<GrandLivreData | null>(null);
   const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
 
-  const fetchComptes = useCallback(async () => {
-    try {
-      const data = await comptabiliteApi.getPlanOhada();
-      setComptes(data || []);
-    } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement des comptes'));
-      setComptes([]);
-    }
+  // Real-time WebSocket invalidation
+  useAccountingWebSocket();
+
+  // React Query: chart of accounts for the dropdown
+  const { data: comptesData } = useChartOfAccounts();
+  const comptes = comptesData || [];
+
+  // React Query: grand livre data
+  const { data: grandLivreData, isLoading: loading, refetch: fetchGrandLivre } = useGrandLivre(
+    compteSelectionne || undefined,
+    { dateDebut, dateFin, page, pageSize }
+  );
+
+  // Reset page when account or dates change
+  const handleCompteChange = useCallback((newCompte: string) => {
+    setCompteSelectionne(newCompte);
+    setPage(1);
   }, []);
-
-  const fetchGrandLivre = useCallback(async () => {
-    if (!compteSelectionne) return;
-    setLoading(true);
-    try {
-      const data = await comptabiliteApi.getGrandLivreV2(compteSelectionne, {
-        dateDebut,
-        dateFin,
-        page,
-        pageSize
-      });
-      setGrandLivreData(data);
-    } catch (error: any) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement du grand livre'));
-      setGrandLivreData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [compteSelectionne, dateDebut, dateFin, page, pageSize]);
-
-  useEffect(() => {
-    fetchComptes();
-  }, [fetchComptes]);
-
-  useEffect(() => {
-    if (compteSelectionne) {
-      setPage(1); // Reset to first page when account changes
-      fetchGrandLivre();
-    } else {
-      setGrandLivreData(null);
-    }
-  }, [compteSelectionne, dateDebut, dateFin]);
-
-  useEffect(() => {
-    if (compteSelectionne && page > 1) {
-      fetchGrandLivre();
-    }
-  }, [page]);
 
   const entries = grandLivreData?.entries || [];
   const totalDebit = grandLivreData?.totalDebits || 0;
@@ -315,7 +283,7 @@ export default function GrandLivre() {
                      </label>
                      <select
                         value={compteSelectionne}
-                        onChange={(e) => setCompteSelectionne(e.target.value)}
+                        onChange={(e) => handleCompteChange(e.target.value)}
                         className="w-full bg-slate-900/50 text-white text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500 transition-colors"
                       >
                         <option value="">Selectionner un compte...</option>
@@ -332,7 +300,7 @@ export default function GrandLivre() {
                         variant="ghost"
                         size="sm"
                         icon={RefreshCw}
-                        onClick={fetchGrandLivre}
+                        onClick={() => fetchGrandLivre()}
                         disabled={!compteSelectionne || loading}
                         className={`bg-slate-900/50 border-slate-700 hover:bg-slate-800 ${loading ? 'animate-spin' : ''}`}
                         title="Rafraichir"

@@ -227,6 +227,10 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "COMPTE",
   "COFFRE",
   "MOBILE_MONEY",
+  // PR-0: Nouveaux modules pour GL wiring
+  "RH_PAYROLL",
+  "COFFRE_TRANSFER",
+  "INTER_COFFRE",
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -251,6 +255,8 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "SESSION_FORCE_CLOSED",
   "CAISSE_STATUS_CHANGED",
   "CAISSE_LIQUIDATED",
+  // GL Posting events (PR-0)
+  "GL_POSTING_FAILED",
 ]);
 
 // ============================================
@@ -285,6 +291,19 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "ADJUSTMENT",
   "INTEREST_PAYMENT",
   "LIQUIDATION",
+  // PR-0: Coffre / Sessions / RH
+  "COFFRE_TO_CAISSE",
+  "CAISSE_TO_COFFRE",
+  "COFFRE_TRANSIT_OUT",
+  "COFFRE_TRANSIT_IN",
+  "SESSION_OPENING_FLOAT",
+  "SESSION_CLOSING_TRANSFER",
+  "SESSION_DEFICIT",
+  "SESSION_SURPLUS",
+  "PAYROLL_ENGAGEMENT",
+  "PAYROLL_PAYMENT",
+  "SALARY_ADVANCE",
+  "FINANCIAL_PENALTY",
 ]);
 
 // ============================================

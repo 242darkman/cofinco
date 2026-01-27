@@ -15,6 +15,7 @@ import { eq, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { TypeCompte } from "@shared/enum/status-constants";
 import accountingPostingService from "./accounting-posting-service";
+import { postGlForMouvement, AccountingRuleNotFoundError } from "./accounting-posting-service";
 import { balanceService } from "./balance-service";
 import type { BalanceEntityType } from "@shared/types/balances";
 
@@ -22,7 +23,7 @@ import type { BalanceEntityType } from "@shared/types/balances";
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
 
 // Types for the ledger service
-export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE" | "MOBILE_MONEY";
+export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE" | "MOBILE_MONEY" | "RH_PAYROLL" | "COFFRE_TRANSFER" | "INTER_COFFRE";
 export type SensMouvement = "DEBIT" | "CREDIT";
 export type TypeEvenement =
   | "MOUVEMENT_CREE"
@@ -34,7 +35,8 @@ export type TypeEvenement =
   | "COMPTE_CREE"
   | "COMPTE_BLOQUE"
   | "COMPTE_DEBLOQUE"
-  | "COMPTE_TRANSFERE_AGENCE";
+  | "COMPTE_TRANSFERE_AGENCE"
+  | "GL_POSTING_FAILED";
 
 export interface MouvementData {
   montant: string;
@@ -53,6 +55,7 @@ export interface MouvementData {
   sourceId?: string;
   idempotencyKey?: string;
   metadata?: Record<string, any>;
+  requiresGlPosting?: boolean;
 }
 
 export interface OutboxEventData {
@@ -88,6 +91,9 @@ export function generateReference(sourceModule: SourceModule | "TIC"): string {
     TIC: "TIC",
     COFFRE: "COF",
     MOBILE_MONEY: "MMO",
+    RH_PAYROLL: "RHP",
+    COFFRE_TRANSFER: "CTR",
+    INTER_COFFRE: "ICF",
   };
   
   return `${prefixes[sourceModule]}-${year}${month}${day}-${time}${random}`;
@@ -149,6 +155,8 @@ export async function createMouvementFinancier(
     metadata: data.metadata,
     createdBy: validatedUserId,
     dateOperation: new Date(),
+    requiresGlPosting: data.requiresGlPosting !== false,
+    glPostingStatus: "PENDING",
   }).returning();
   
   return mouvement;
@@ -521,8 +529,79 @@ export async function checkIdempotencyKey(idempotencyKey: string): Promise<boole
 }
 
 /**
- * Execute an operation with full ledger flow
- * This is the main entry point for all financial operations
+ * Build additional GL metadata within a transaction.
+ * Enriches the posting context with client names, credit numbers, etc.
+ */
+async function buildGlMetadata(
+  tx: PgTransaction<any, any, any>,
+  mouvement: MouvementFinancier,
+  additionalEventData?: Record<string, any>
+): Promise<Record<string, any>> {
+  const metadata: Record<string, any> = { ...(additionalEventData || {}) };
+
+  if (mouvement.clientId) {
+    try {
+      const [clientUser] = await tx
+        .select({ nom: users.nom, prenom: users.prenom })
+        .from(clients)
+        .innerJoin(users, eq(clients.userId, users.id))
+        .where(eq(clients.id, mouvement.clientId))
+        .limit(1);
+      if (clientUser) {
+        metadata.clientName = `${clientUser.nom} ${clientUser.prenom || ""}`.trim();
+      }
+    } catch {
+      // clientName will fall back to "Client"
+    }
+  }
+
+  if (mouvement.creditId) {
+    try {
+      const [credit] = await tx.select({ numeroCredit: credits.numeroCredit })
+        .from(credits)
+        .where(eq(credits.id, mouvement.creditId))
+        .limit(1);
+      if (credit) {
+        metadata.creditNumber = credit.numeroCredit;
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  if (mouvement.tontineId) {
+    try {
+      const [tontine] = await tx.select({ nom: tontines.nom })
+        .from(tontines)
+        .where(eq(tontines.id, mouvement.tontineId))
+        .limit(1);
+      if (tontine) {
+        metadata.tontineName = tontine.nom;
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  if (mouvement.methodePaiement === "MOBILE_MONEY" && mouvement.metadata) {
+    const mouvMeta = mouvement.metadata as Record<string, any>;
+    if (mouvMeta.provider) {
+      metadata.provider = mouvMeta.provider;
+    }
+  }
+
+  return metadata;
+}
+
+/**
+ * Execute an operation with full ledger flow.
+ *
+ * This is the main entry point for all financial operations.
+ * Flow: mouvement → business op → GL posting (sync) → outbox events.
+ *
+ * GL posting happens WITHIN the same transaction. If GL posting fails:
+ * - requiresGlPosting=true → entire transaction is rolled back
+ * - requiresGlPosting=false → mouvement.glPostingStatus set to SKIPPED/FAILED, transaction continues
  */
 export async function executeWithLedger<T>(
   sourceModule: SourceModule,
@@ -541,8 +620,10 @@ export async function executeWithLedger<T>(
     }
   }
 
+  const requiresGl = mouvementData.requiresGlPosting !== false;
+
   const transactionResult = await db.transaction(async (tx) => {
-    // 1. Create mouvement financier
+    // 1. Create mouvement financier (glPostingStatus = 'PENDING')
     const mouvement = await createMouvementFinancier(
       tx,
       { ...mouvementData, sourceModule },
@@ -555,113 +636,94 @@ export async function executeWithLedger<T>(
     // 3. Create outbox events for all relevant channels
     await createMouvementEvents(tx, mouvement, additionalEventData);
 
-    return { result, mouvement, additionalEventData };
+    // 4. Synchronous GL posting (within the same transaction)
+    let glPostingStatus: string = "PENDING";
+    let glPostingError: string | null = null;
+
+    if (mouvementData.agenceId) {
+      try {
+        const glMetadata = await buildGlMetadata(tx, mouvement, additionalEventData as Record<string, any> | undefined);
+        const glResult = await postGlForMouvement(tx, mouvement, mouvementData.agenceId, userId, glMetadata);
+
+        if (glResult) {
+          glPostingStatus = "POSTED";
+          console.log(`[Ledger] GL posted sync: ${mouvement.id} -> ${glResult.numeroPiece}`);
+        } else {
+          // null = already posted (idempotent)
+          glPostingStatus = "POSTED";
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Unknown GL error";
+
+        if (error instanceof AccountingRuleNotFoundError) {
+          if (requiresGl) {
+            // Critical: no rule and GL is required → rollback
+            throw error;
+          }
+          // Non-critical: mark as SKIPPED
+          glPostingStatus = "SKIPPED";
+          glPostingError = message;
+          console.warn(`[Ledger] GL skipped (no rule, not required): ${mouvement.id} - ${message}`);
+        } else {
+          if (requiresGl) {
+            // Critical: GL is required → rollback
+            throw error;
+          }
+          // Non-critical: mark as FAILED
+          glPostingStatus = "FAILED";
+          glPostingError = message;
+          console.error(`[Ledger] GL failed (not required, continuing): ${mouvement.id} - ${message}`);
+        }
+      }
+    } else {
+      // No agenceId → cannot post to GL
+      glPostingStatus = requiresGl ? "PENDING" : "SKIPPED";
+    }
+
+    // 5. Update mouvement with GL posting status
+    await tx.update(mouvementsFinanciers)
+      .set({ glPostingStatus, glPostingError })
+      .where(eq(mouvementsFinanciers.id, mouvement.id));
+
+    return { result, mouvement: { ...mouvement, glPostingStatus, glPostingError }, additionalEventData };
   });
 
-  // 4. Post to GL asynchronously (fire-and-forget, non-blocking)
-  // This ensures the business transaction succeeds even if GL posting fails
-  // GL posting has its own idempotency, so retries are safe
-  if (mouvementData.agenceId && transactionResult.mouvement) {
-    postToGeneralLedger(transactionResult.mouvement, mouvementData.agenceId, userId, transactionResult.additionalEventData)
-      .catch(err => console.warn(`[Ledger] GL posting deferred for ${transactionResult.mouvement.id}: ${err.message}`));
-  }
-
-  // 5. Emit BALANCE_UPDATED events via WebSocket (immediate, after commit)
-  // This provides real-time updates without waiting for outbox worker polling
+  // 6. Emit BALANCE_UPDATED + ACCOUNTING_UPDATE events via WebSocket (after commit)
   emitBalanceUpdates(transactionResult.mouvement, mouvementData.agenceId, transactionResult.additionalEventData);
 
   return { result: transactionResult.result, mouvement: transactionResult.mouvement };
 }
 
 /**
- * Post a mouvement to the General Ledger (SYSCOHADA)
- * This is called asynchronously after the business transaction completes
- * It's idempotent - safe to retry
+ * @deprecated Use postGlForMouvement() within a transaction instead.
+ * Kept for standalone retry of FAILED mouvements.
+ *
+ * Post a mouvement to the General Ledger (SYSCOHADA) — standalone (own transaction).
+ * Idempotent — safe to retry.
  */
-async function postToGeneralLedger(
+export async function retryGlPosting(
   mouvement: MouvementFinancier,
   agenceId: string,
-  userId?: string,
-  additionalEventData?: Record<string, any>
+  userId?: string
 ): Promise<void> {
-  try {
-    // Build additional metadata for the GL entry
-    const metadata: Record<string, any> = {
-      ...(additionalEventData || {}),
-    };
+  const result = await accountingPostingService.postFromMouvement({
+    mouvement,
+    agenceId,
+    userId,
+  });
 
-    // Try to get client name if available (nom/prenom are in users table)
-    if (mouvement.clientId) {
-      try {
-        const [clientUser] = await db
-          .select({ nom: users.nom, prenom: users.prenom })
-          .from(clients)
-          .innerJoin(users, eq(clients.userId, users.id))
-          .where(eq(clients.id, mouvement.clientId))
-          .limit(1);
-        if (clientUser) {
-          metadata.clientName = `${clientUser.nom} ${clientUser.prenom || ""}`.trim();
-        }
-      } catch (e) {
-        // Ignore - clientName will be "Client"
-      }
-    }
-
-    // Try to get credit number if available
-    if (mouvement.creditId) {
-      try {
-        const [credit] = await db.select({ numeroCredit: credits.numeroCredit })
-          .from(credits)
-          .where(eq(credits.id, mouvement.creditId))
-          .limit(1);
-        if (credit) {
-          metadata.creditNumber = credit.numeroCredit;
-        }
-      } catch (e) {
-        // Ignore
-      }
-    }
-
-    // Try to get tontine name if available
-    if (mouvement.tontineId) {
-      try {
-        const [tontine] = await db.select({ nom: tontines.nom })
-          .from(tontines)
-          .where(eq(tontines.id, mouvement.tontineId))
-          .limit(1);
-        if (tontine) {
-          metadata.tontineName = tontine.nom;
-        }
-      } catch (e) {
-        // Ignore
-      }
-    }
-
-    // Determine provider from metadata if Mobile Money
-    if (mouvement.methodePaiement === "MOBILE_MONEY" && mouvement.metadata) {
-      const mouvMeta = mouvement.metadata as Record<string, any>;
-      if (mouvMeta.provider) {
-        metadata.provider = mouvMeta.provider;
-      }
-    }
-
-    // Post to GL using the accounting posting service
-    const result = await accountingPostingService.postFromMouvement({
-      mouvement,
-      agenceId,
-      userId,
-      additionalMetadata: metadata
-    });
-
-    if (result) {
-      console.log(`[Ledger] GL posted: ${mouvement.id} -> ${result.numeroPiece}`);
-    } else {
-      console.log(`[Ledger] GL posting skipped for ${mouvement.id} (no matching rule or already posted)`);
-    }
-  } catch (error: any) {
-    // Log but don't throw - GL posting is async and shouldn't break business flow
-    console.error(`[Ledger] GL posting failed for ${mouvement.id}: ${error.message}`);
-    // In a production system, we'd queue this for retry
+  // Update mouvement glPostingStatus
+  if (result) {
+    await db.update(mouvementsFinanciers)
+      .set({ glPostingStatus: "POSTED", glPostingError: null })
+      .where(eq(mouvementsFinanciers.id, mouvement.id));
+    console.log(`[Ledger] GL retry posted: ${mouvement.id} -> ${result.numeroPiece}`);
+  }
+  // null means already posted — also mark as POSTED
+  else {
+    await db.update(mouvementsFinanciers)
+      .set({ glPostingStatus: "POSTED", glPostingError: null })
+      .where(eq(mouvementsFinanciers.id, mouvement.id));
   }
 }
 

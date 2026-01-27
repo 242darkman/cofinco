@@ -10,6 +10,7 @@ import {
   mouvementsFinanciers,
 } from "@shared/schema";
 import { generateReference } from "../ledger";
+import { postGlForMouvement } from "../accounting-posting-service";
 import {
   TypeTacheRegularisation,
   StatutTacheRegularisation,
@@ -243,16 +244,20 @@ export async function executeDispatch(
 
       // 6. Créer le mouvement financier (sortie du coffre source)
       const referenceSource = generateReference("TIC");
+      const agenceIdSource = coffreSource.owner_id as string | null;
       const [mouvementSource] = await tx
         .insert(mouvementsFinanciers)
         .values({
           montant: transfert.montant,
           sens: "CREDIT", // Sortie = Crédit (diminution)
           reference: referenceSource,
-          sourceModule: "TRANSFERT",
-          agenceId: coffreSource.owner_id as string | null,
+          sourceModule: "INTER_COFFRE",
+          typePaiement: "COFFRE_TRANSIT_OUT" as any,
+          agenceId: agenceIdSource,
           statut: "POSTED",
           dateOperation: new Date(),
+          requiresGlPosting: true,
+          glPostingStatus: "PENDING",
           metadata: {
             transfertInterCoffreId: transfertId,
             type: "SORTIE_COFFRE_TRANSIT",
@@ -270,6 +275,28 @@ export async function executeDispatch(
           updatedAt: new Date(),
         })
         .where(eq(coffresForts.id, transfert.coffreSourceId));
+
+      // 7b. GL Posting — dispatch creates Debit 581 / Credit 571
+      if (agenceIdSource) {
+        try {
+          const glResult = await postGlForMouvement(tx, mouvementSource, agenceIdSource, userId, {
+            transfertInterCoffreId: transfertId,
+            direction: "DISPATCH",
+            coffreSourceCode: coffreSource.code as string,
+          });
+          if (glResult) {
+            await tx.update(mouvementsFinanciers)
+              .set({ glPostingStatus: "POSTED", glPostingError: null })
+              .where(eq(mouvementsFinanciers.id, mouvementSource.id));
+          }
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : "Unknown GL error";
+          console.error(`[InterCoffre] GL dispatch failed for ${transfertId}: ${message}`);
+          await tx.update(mouvementsFinanciers)
+            .set({ glPostingStatus: "FAILED", glPostingError: message })
+            .where(eq(mouvementsFinanciers.id, mouvementSource.id));
+        }
+      }
 
       // 8. Mettre à jour le transfert avec condition stricte
       const now = new Date();
@@ -439,16 +466,20 @@ export async function executeReceive(
 
       // 5. Créer le mouvement financier (entrée coffre destination)
       const referenceDest = generateReference("TIC");
+      const agenceIdDest = coffreDest.owner_id as string | null;
       const [mouvementDest] = await tx
         .insert(mouvementsFinanciers)
         .values({
           montant: montantRecu.toString(),
           sens: "DEBIT", // Entrée = Débit (augmentation)
           reference: referenceDest,
-          sourceModule: "TRANSFERT",
-          agenceId: coffreDest.owner_id as string | null,
+          sourceModule: "INTER_COFFRE",
+          typePaiement: "COFFRE_TRANSIT_IN" as any,
+          agenceId: agenceIdDest,
           statut: "POSTED",
           dateOperation: new Date(),
+          requiresGlPosting: true,
+          glPostingStatus: "PENDING",
           metadata: {
             transfertInterCoffreId: transfertId,
             type: "ENTREE_COFFRE_RECEPTION",
@@ -467,6 +498,29 @@ export async function executeReceive(
           updatedAt: new Date(),
         })
         .where(eq(coffresForts.id, transfert.coffreDestinationId));
+
+      // 6b. GL Posting — receive creates Debit 571 / Credit 581
+      if (agenceIdDest) {
+        try {
+          const glResult = await postGlForMouvement(tx, mouvementDest, agenceIdDest, userId, {
+            transfertInterCoffreId: transfertId,
+            direction: "RECEIVE",
+            coffreDestCode: coffreDest.code as string,
+            ecart,
+          });
+          if (glResult) {
+            await tx.update(mouvementsFinanciers)
+              .set({ glPostingStatus: "POSTED", glPostingError: null })
+              .where(eq(mouvementsFinanciers.id, mouvementDest.id));
+          }
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : "Unknown GL error";
+          console.error(`[InterCoffre] GL receive failed for ${transfertId}: ${message}`);
+          await tx.update(mouvementsFinanciers)
+            .set({ glPostingStatus: "FAILED", glPostingError: message })
+            .where(eq(mouvementsFinanciers.id, mouvementDest.id));
+        }
+      }
 
       // 7. Créer ou récupérer les comptes de liaison
       const compteLiaisonSource = await getOrCreateCompteLiaison(tx, {

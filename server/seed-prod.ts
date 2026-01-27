@@ -209,8 +209,11 @@ const PLAN_COMPTABLE_DATA = [
   { num: '411400', label: 'Clients - Tontines', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '419000', label: 'Clients - Avances et acomptes', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '42', label: 'Personnel', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '421', label: 'Personnel — rémunérations dues', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '43', label: 'Sécurité Sociale', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '431', label: 'Sécurité Sociale — cotisations dues', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '44', label: 'État', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '441', label: 'État — impôts sur salaires (IPR)', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '443', label: 'TVA Facturée', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '445', label: 'TVA Récupérable', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '47', label: 'Comptes transitoires', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
@@ -235,8 +238,10 @@ const PLAN_COMPTABLE_DATA = [
   { num: '627100', label: 'Commissions Mobile Money', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '627200', label: 'Frais bancaires', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '63', label: 'Impôts et taxes', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
-  { num: '661', label: 'Charges d\'intérêts', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
-  { num: '66', label: 'Charges personnel', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '66', label: 'Charges de personnel', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '661', label: 'Rémunérations du personnel', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '664', label: 'Charges sociales', classe: 6, type: 'Charge', sens: 'Débit', isSystem: false },
+  { num: '658', label: 'Charges diverses', classe: 6, type: 'Charge', sens: 'Débit', isSystem: false },
   { num: '669', label: 'Autres charges financières', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '681', label: 'Dotations amortissements', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '691', label: 'Provisions créances douteuses', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
@@ -251,6 +256,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '708200', label: 'Frais de tenue de compte', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708300', label: 'Commissions de gestion', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708400', label: 'Pénalités de retard', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '758', label: 'Produits divers de gestion courante', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: false },
   { num: '76', label: 'Produits financiers', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '79', label: 'Reprises provisions', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
 ];
@@ -265,6 +271,111 @@ const JOURNAUX_DATA = [
   { code: 'MAIR', intitule: 'Mobile Money Airtel', typeJournal: 'Mobile Money' },
   { code: 'CRED', intitule: 'Journal des Crédits', typeJournal: 'Crédits' },
   { code: 'EPGN', intitule: 'Journal Épargne', typeJournal: 'Épargne' },
+];
+
+// Accounting Rules — maps (sourceType, eventType) → journal + debit/credit accounts
+// sourceType is always "MOUVEMENT"; eventType matches mouvement.typePaiement
+const ACCOUNTING_RULES_DATA = [
+  // --- Coffre ↔ Caisse transfers ---
+  {
+    code: 'COFFRE_TO_CAISSE',
+    name: 'Transfert Coffre → Caisse',
+    description: 'Approvisionnement caisse depuis coffre-fort',
+    sourceType: 'MOUVEMENT',
+    eventType: 'COFFRE_TO_CAISSE',
+    journalCode: 'OD',
+    debitAccount: '521',   // Caisse (reçoit)
+    creditAccount: '531',  // Coffre-fort (envoie)
+    descriptionTemplate: 'Approvisionnement caisse depuis coffre-fort',
+    priority: 100,
+  },
+  {
+    code: 'CAISSE_TO_COFFRE',
+    name: 'Transfert Caisse → Coffre',
+    description: 'Versement caisse vers coffre-fort',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CAISSE_TO_COFFRE',
+    journalCode: 'OD',
+    debitAccount: '531',   // Coffre-fort (reçoit)
+    creditAccount: '521',  // Caisse (envoie)
+    descriptionTemplate: 'Versement caisse vers coffre-fort',
+    priority: 100,
+  },
+  // --- Inter-coffre transfers (transit via 581) ---
+  {
+    code: 'COFFRE_TRANSIT_OUT',
+    name: 'Dispatch inter-coffres (sortie)',
+    description: 'Sortie coffre source → transit',
+    sourceType: 'MOUVEMENT',
+    eventType: 'COFFRE_TRANSIT_OUT',
+    journalCode: 'OD',
+    debitAccount: '581',   // Virements internes (transit)
+    creditAccount: '531',  // Coffre-fort source
+    descriptionTemplate: 'Dispatch inter-coffres — sortie vers transit',
+    priority: 100,
+  },
+  {
+    code: 'COFFRE_TRANSIT_IN',
+    name: 'Réception inter-coffres (entrée)',
+    description: 'Entrée transit → coffre destination',
+    sourceType: 'MOUVEMENT',
+    eventType: 'COFFRE_TRANSIT_IN',
+    journalCode: 'OD',
+    debitAccount: '531',   // Coffre-fort destination
+    creditAccount: '581',  // Virements internes (transit)
+    descriptionTemplate: 'Réception inter-coffres — entrée depuis transit',
+    priority: 100,
+  },
+  // --- Session closing écarts ---
+  {
+    code: 'SESSION_DEFICIT',
+    name: 'Écart de caisse négatif (déficit)',
+    description: 'Manquant constaté à la clôture de session',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SESSION_DEFICIT',
+    journalCode: 'OD',
+    debitAccount: '658',   // Charges diverses
+    creditAccount: '521',  // Caisse
+    descriptionTemplate: 'Écart de caisse négatif — déficit constaté',
+    priority: 100,
+  },
+  {
+    code: 'SESSION_SURPLUS',
+    name: 'Écart de caisse positif (excédent)',
+    description: 'Excédent constaté à la clôture de session',
+    sourceType: 'MOUVEMENT',
+    eventType: 'SESSION_SURPLUS',
+    journalCode: 'OD',
+    debitAccount: '521',   // Caisse
+    creditAccount: '758',  // Produits divers de gestion courante
+    descriptionTemplate: 'Écart de caisse positif — excédent constaté',
+    priority: 100,
+  },
+  // --- RH / Paie ---
+  {
+    code: 'PAYROLL_ENGAGEMENT',
+    name: 'Engagement paie (validation bulletin)',
+    description: 'Constatation charge salariale brute',
+    sourceType: 'MOUVEMENT',
+    eventType: 'PAYROLL_ENGAGEMENT',
+    journalCode: 'OD',
+    debitAccount: '661',   // Rémunérations du personnel
+    creditAccount: '421',  // Personnel — rémunérations dues
+    descriptionTemplate: 'Engagement paie — salaire brut',
+    priority: 100,
+  },
+  {
+    code: 'PAYROLL_PAYMENT',
+    name: 'Paiement paie (décaissement)',
+    description: 'Décaissement salaire net depuis caisse',
+    sourceType: 'MOUVEMENT',
+    eventType: 'PAYROLL_PAYMENT',
+    journalCode: 'CAISSE',
+    debitAccount: '421',   // Personnel — rémunérations dues
+    creditAccount: '521',  // Caisse
+    descriptionTemplate: 'Paiement salaire net — décaissement',
+    priority: 100,
+  },
 ];
 
 // ============================================================================
@@ -616,7 +727,10 @@ async function seedAccountingBootstrap(context: SeedContext, dryRun: boolean): P
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
-    return [{ table: 'planComptable', action: 'skipped', count: PLAN_COMPTABLE_DATA.length, details: 'dry-run' }];
+    return [
+      { table: 'planComptable', action: 'skipped', count: PLAN_COMPTABLE_DATA.length, details: 'dry-run' },
+      { table: 'accountingRules', action: 'skipped', count: ACCOUNTING_RULES_DATA.length, details: 'dry-run' },
+    ];
   }
 
   // Exercice courant
@@ -662,6 +776,17 @@ async function seedAccountingBootstrap(context: SeedContext, dryRun: boolean): P
     }
   }
   results.push({ table: 'journaux', action: 'created', count: JOURNAUX_DATA.length });
+
+  // Accounting Rules - upsert by code
+  let rulesCreated = 0;
+  for (const rule of ACCOUNTING_RULES_DATA) {
+    const [existing] = await db.select().from(accountingRules).where(eq(accountingRules.code, rule.code));
+    if (!existing) {
+      await db.insert(accountingRules).values(rule);
+      rulesCreated++;
+    }
+  }
+  results.push({ table: 'accountingRules', action: 'created', count: rulesCreated, details: `${rulesCreated} new rules (${ACCOUNTING_RULES_DATA.length} total)` });
 
   return results;
 }

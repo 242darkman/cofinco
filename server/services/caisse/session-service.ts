@@ -20,6 +20,7 @@ import {
   isIncomingOperation,
   isOutgoingOperation,
 } from "@shared/config/caisse-operations";
+import { postGlForMouvement } from "../accounting-posting-service";
 
 // ============================================================================
 // TYPES & CONSTANTES
@@ -494,18 +495,21 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
         let mouvementAjustementId: string | null = null;
         if (Math.abs(ecart) > 0) {
           const sensAjustement = ecart > 0 ? "CREDIT" as const : "DEBIT" as const;
+          const ecartTypePaiement = ecart > 0 ? "SESSION_SURPLUS" : "SESSION_DEFICIT";
           const [mouvementAjustement] = await tx.insert(mouvementsFinanciers).values({
             montant: Math.abs(ecart).toString(),
             sens: sensAjustement,
             sourceModule: "CAISSE" as const,
             agenceId: session.agenceId,
             sessionCaisseId: sessionId,
-            typePaiement: "ADJUSTMENT",
+            typePaiement: ecartTypePaiement,
             methodePaiement: "CASH" as const,
             reference: `ADJ-${sessionId.substring(0, 8)}-${Date.now()}`,
             idempotencyKey: `adj-close-${sessionId}`,
             statut: StatutTransaction.POSTED,
             dateOperation: new Date(),
+            requiresGlPosting: true,
+            glPostingStatus: "PENDING",
             metadata: {
               type: "ECART_FERMETURE",
               soldeTheorique,
@@ -531,6 +535,29 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
             description: `Ajustement écart de ${ecart > 0 ? "+" : ""}${ecart} FCFA à la fermeture`,
             statut: StatutTransaction.POSTED,
           });
+
+          // GL posting for écart mouvement
+          if (session.agenceId) {
+            try {
+              const glResult = await postGlForMouvement(tx, mouvementAjustement, session.agenceId, closedBy, {
+                sessionId,
+                caisseId: caisse.id,
+                ecart,
+                direction: ecart > 0 ? "SURPLUS" : "DEFICIT",
+              });
+              if (glResult) {
+                await tx.update(mouvementsFinanciers)
+                  .set({ glPostingStatus: "POSTED", glPostingError: null })
+                  .where(eq(mouvementsFinanciers.id, mouvementAjustement.id));
+              }
+            } catch (glError: unknown) {
+              const message = glError instanceof Error ? glError.message : "Unknown GL error";
+              console.error(`[SessionService] GL posting failed for écart mouvement ${mouvementAjustement.id}: ${message}`);
+              await tx.update(mouvementsFinanciers)
+                .set({ glPostingStatus: "FAILED", glPostingError: message })
+                .where(eq(mouvementsFinanciers.id, mouvementAjustement.id));
+            }
+          }
         }
 
         // 6. Mettre à jour le solde de la caisse physique avec le solde réel compté

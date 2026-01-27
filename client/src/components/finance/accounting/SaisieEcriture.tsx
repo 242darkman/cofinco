@@ -13,8 +13,8 @@ interface Compte {
 
 interface Journal {
   id: string;
-  code: string; // Changed from code_journal
-  intitule: string; // Changed from libelle
+  code: string;
+  intitule: string;
 }
 
 interface LigneEcriture {
@@ -43,11 +43,11 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
   const [showCompteSearch, setShowCompteSearch] = useState<number | null>(null);
 
   const [form, setForm] = useState({
-    journal_id: '',
-    numero_piece: '',
+    journalCode: '',
     date_ecriture: new Date().toISOString().split('T')[0],
     libelle: ''
   });
+  const [submitting, setSubmitting] = useState(false);
 
   const [lignes, setLignes] = useState<LigneEcriture[]>([
     { compte_id: '', numero_compte: '', intitule: '', libelle: '', debit: 0, credit: 0 },
@@ -131,30 +131,41 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
       return;
     }
 
+    if (!form.journalCode) {
+      toast.warning('Veuillez sélectionner un journal.');
+      return;
+    }
+
+    if (!form.libelle.trim()) {
+      toast.warning('Veuillez saisir un libellé.');
+      return;
+    }
+
+    const lignesValides = lignes.filter(l => l.numero_compte && (Number(l.debit) > 0 || Number(l.credit) > 0));
+    if (lignesValides.length < 2) {
+      toast.warning('Minimum 2 lignes avec un compte et un montant.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const lignesData = lignes
-        .filter(l => l.compte_id && (l.debit > 0 || l.credit > 0))
-        .map(l => ({
-          compte_id: l.compte_id,
+      const result = await comptabiliteApi.createEntry({
+        journalCode: form.journalCode,
+        dateEcriture: form.date_ecriture,
+        libelle: form.libelle,
+        lignes: lignesValides.map(l => ({
+          numeroCompte: l.numero_compte,
+          compteId: l.compte_id || undefined,
           libelle: l.libelle || form.libelle,
           debit: Number(l.debit) || 0,
           credit: Number(l.credit) || 0
-        }));
-
-      await comptabiliteApi.createEcriture({
-        journal_id: form.journal_id,
-        numero_piece: form.numero_piece,
-        date_ecriture: form.date_ecriture,
-        libelle: form.libelle,
-        montant_total: totalDebit,
-        lignes: lignesData
+        }))
       });
 
-      toast.success('Écriture créée avec succès');
+      toast.success(`Écriture ${result.numeroPiece} créée et postée au GL`);
 
       setForm({
-        journal_id: '',
-        numero_piece: '',
+        journalCode: '',
         date_ecriture: new Date().toISOString().split('T')[0],
         libelle: ''
       });
@@ -166,8 +177,10 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
       if (onSuccess) onSuccess();
     } catch (error) {
       toast.error(handleApiError(error, "Erreur lors de la création de l'écriture"));
+    } finally {
+      setSubmitting(false);
     }
-  }, [isEquilibre, lignes, form, totalDebit, onSuccess]);
+  }, [isEquilibre, lignes, form, onSuccess]);
 
   return (
     <div className="space-y-3">
@@ -231,15 +244,15 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
           {canCreateEcritures ? (
             <button
               onClick={handleSubmit}
-              disabled={!isEquilibre}
+              disabled={!isEquilibre || submitting}
               className={`px-4 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors flex-shrink-0 ${
-                isEquilibre
+                isEquilibre && !submitting
                   ? 'bg-white/20 hover:bg-white/30 text-white'
                   : 'bg-white/10 text-white/50 cursor-not-allowed'
               }`}
             >
               <Save className="w-3.5 h-3.5" />
-              <span>Enregistrer</span>
+              <span>{submitting ? 'Enregistrement...' : 'Enregistrer & Poster'}</span>
             </button>
           ) : (
             <div className="px-3 py-1.5 bg-amber-500/20 text-amber-300 rounded-lg text-xs flex items-center gap-1.5">
@@ -257,29 +270,16 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
           <div className="flex-1 min-w-[150px] max-w-[220px]">
             <label className="block text-[10px] font-medium text-slate-400 mb-1">Journal *</label>
             <select
-              value={form.journal_id}
-              onChange={(e) => setForm({ ...form, journal_id: e.target.value })}
+              value={form.journalCode}
+              onChange={(e) => setForm({ ...form, journalCode: e.target.value })}
               className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
               required
             >
               <option value="">Sélectionner...</option>
               {journaux.map(j => (
-                <option key={j.id} value={j.id}>{j.code} - {j.intitule}</option>
+                <option key={j.id} value={j.code}>{j.code} - {j.intitule}</option>
               ))}
             </select>
-          </div>
-
-          {/* N° Pièce */}
-          <div className="flex-1 min-w-[120px] max-w-[160px]">
-            <label className="block text-[10px] font-medium text-slate-400 mb-1">N° Pièce *</label>
-            <input
-              type="text"
-              value={form.numero_piece}
-              onChange={(e) => setForm({ ...form, numero_piece: e.target.value })}
-              className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="PC-2024-001"
-              required
-            />
           </div>
 
           {/* Date */}
@@ -490,15 +490,15 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
         <div className="md:hidden">
           <button
             onClick={handleSubmit}
-            disabled={!isEquilibre}
+            disabled={!isEquilibre || submitting}
             className={`w-full px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
-              isEquilibre
+              isEquilibre && !submitting
                 ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
                 : 'bg-slate-700 text-slate-400 cursor-not-allowed'
             }`}
           >
             <Save className="w-4 h-4" />
-            Enregistrer en Brouillon
+            {submitting ? 'Enregistrement...' : 'Enregistrer & Poster au GL'}
           </button>
         </div>
       )}

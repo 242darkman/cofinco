@@ -1569,35 +1569,117 @@ export const auditApi = {
 };
 
 // Comptabilité API
+interface CompteResultatResponse {
+  exercice: string;
+  charges: Array<{ numero_compte: string; intitule: string; montant: number }>;
+  produits: Array<{ numero_compte: string; intitule: string; montant: number }>;
+  totalCharges: number;
+  totalProduits: number;
+  resultatNet: number;
+  margeNette: number;
+  type: 'benefice' | 'perte';
+}
+
+interface CompteOHADAApi {
+  id: string;
+  numero_compte: string;
+  intitule: string;
+  classe: number;
+  type_compte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
+  sens_normal: 'Débit' | 'Crédit';
+  niveau: number;
+  actif: boolean;
+  description: string;
+  solde_actuel: number;
+}
+
+interface JournalApi {
+  id: string;
+  code: string;
+  intitule: string;
+  type_journal?: string;
+  actif?: boolean;
+}
+
+interface EntryDetailsResponse {
+  id: string;
+  date_ecriture: string;
+  numero_piece: string;
+  libelle: string;
+  statut: string;
+  journal: { id: string; code: string; intitule: string } | null;
+  lignes: Array<{
+    id: string;
+    compte_id: string;
+    numero_compte: string;
+    compte_intitule: string;
+    libelle: string;
+    debit: string;
+    credit: string;
+    ref_externe?: string;
+  }>;
+  total_debit: number;
+  total_credit: number;
+  is_balanced: boolean;
+}
+
+interface GlPeriodApi {
+  id: string;
+  agence_id: string;
+  year: number;
+  month: number;
+  status: string;
+  closed_at?: string;
+  closed_by?: string;
+  notes?: string;
+}
+
+interface PostedEntryApi {
+  id: string;
+  date_ecriture: string;
+  numero_piece: string;
+  libelle: string;
+  statut: string;
+  source_type: string;
+  source_id: string;
+  journal_code: string;
+  journal_intitule: string;
+}
+
+export interface DeclarationTVAApi {
+  id: string;
+  mois: number;
+  annee: number;
+  tva_collectee: number;
+  tva_deductible: number;
+  tva_a_payer: number;
+  credit_tva: number;
+  statut: "DRAFT" | "VALIDATED" | "PAID" | "LATE";
+  numero_quittance?: string;
+  date_depot?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
 export const comptabiliteApi = {
   // Compte de Résultat
-  getCompteResultat: (exercice: string) => request<any>(`/comptabilite/compte-resultat?exercice=${exercice}`),
+  getCompteResultat: (exercice: string) => request<CompteResultatResponse>(`/comptabilite/compte-resultat?exercice=${exercice}`),
 
   // Déclarations TVA
-  getDeclarationsTVA: () => request<any[]>('/comptabilite/declarations-tva'),
-  createDeclarationTVA: (data: any) => request<any>('/comptabilite/declarations-tva', {
+  getDeclarationsTVA: () => request<DeclarationTVAApi[]>('/comptabilite/declarations-tva'),
+  createDeclarationTVA: (data: Record<string, unknown>) => request<DeclarationTVAApi>('/comptabilite/declarations-tva', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
 
   // Plan OHADA (comptes)
-  getPlanOhada: () => request<any[]>('/comptabilite/plan-ohada'),
+  getPlanOhada: () => request<CompteOHADAApi[]>('/comptabilite/plan-ohada'),
 
   // Journaux
-  getJournaux: () => request<any[]>('/comptabilite/journaux'),
+  getJournaux: () => request<JournalApi[]>('/comptabilite/journaux'),
 
-  // Écritures
-  createEcriture: (data: any) => request<any>('/comptabilite/ecritures', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-
-  // Grand Livre (legacy)
-  getGrandLivre: (compteId: string, params: { dateDebut: string; dateFin: string }) =>
-    request<any[]>(`/comptabilite/grand-livre/${compteId}?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}`),
-
-  // Grand Livre V2 (with running balance and pagination)
-  getGrandLivreV2: (compteId: string, params: { dateDebut: string; dateFin: string; page?: number; pageSize?: number }) =>
+  // Grand Livre (with running balance and pagination)
+  getGrandLivre: (compteId: string, params: { dateDebut: string; dateFin: string; page?: number; pageSize?: number }) =>
     request<{
       compteId: string;
       numeroCompte: string;
@@ -1632,12 +1714,8 @@ export const comptabiliteApi = {
       };
     }>(`/comptabilite/v2/grand-livre/${compteId}?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}&page=${params.page || 1}&pageSize=${params.pageSize || 50}`),
 
-  // Balance Générale (legacy)
-  getBalance: (params: { dateDebut: string; dateFin: string }) =>
-    request<any[]>(`/comptabilite/balance?dateDebut=${params.dateDebut}&dateFin=${params.dateFin}`),
-
-  // Balance V2 (enhanced with totals)
-  getBalanceV2: (params: { dateDebut: string; dateFin: string; classe?: number }) =>
+  // Balance Générale (enhanced with totals)
+  getBalance: (params: { dateDebut: string; dateFin: string; classe?: number }) =>
     request<{
       entries: Array<{
         compteId: string;
@@ -1664,7 +1742,7 @@ export const comptabiliteApi = {
 
   // Périodes
   getPeriods: (year?: number) =>
-    request<any[]>(`/comptabilite/periods${year ? `?year=${year}` : ''}`),
+    request<GlPeriodApi[]>(`/comptabilite/periods${year ? `?year=${year}` : ''}`),
 
   closePeriod: (data: { year: number; month: number; notes?: string }) =>
     request<{ success: boolean; message: string }>('/comptabilite/periods/close', {
@@ -1684,7 +1762,7 @@ export const comptabiliteApi = {
 
   // Entry details
   getEntryDetails: (ecritureId: string) =>
-    request<any>(`/comptabilite/entries/${ecritureId}`),
+    request<EntryDetailsResponse>(`/comptabilite/entries/${ecritureId}`),
 
   // Check posting status
   getPostingStatus: (sourceType: string, sourceId: string) =>
@@ -1694,10 +1772,10 @@ export const comptabiliteApi = {
 
   // Get entries by source type
   getEntriesBySource: (sourceType: string, params?: { page?: number; pageSize?: number }) =>
-    request<any[]>(`/comptabilite/entries-by-source/${sourceType}?page=${params?.page || 1}&pageSize=${params?.pageSize || 50}`),
+    request<PostedEntryApi[]>(`/comptabilite/entries-by-source/${sourceType}?page=${params?.page || 1}&pageSize=${params?.pageSize || 50}`),
 
   // Create manual entry (v2)
-  createEntryV2: (data: {
+  createEntry: (data: {
     journalCode: string;
     dateEcriture: string;
     libelle: string;

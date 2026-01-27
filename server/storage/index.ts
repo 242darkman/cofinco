@@ -29,7 +29,7 @@ import {
     PosDevice, InsertPosDevice, Employe, InsertEmploye, EmployeWithUser, Zone, InsertZone, Agence,
     
     // Accounting uses CompteComptable now
-    CompteComptable, InsertCompteComptable, Journal, InsertJournal, Ecriture, InsertEcriture, DeclarationTva, InsertDeclarationTva,
+    CompteComptable, InsertCompteComptable, Journal, InsertJournal, DeclarationTva, InsertDeclarationTva,
 
     InsertAvantage, ObjectifMensuel, InsertObjectifMensuel,
     CaisseAssignation, InsertCaisseAssignation,
@@ -510,15 +510,12 @@ export interface IStorage {
     createJournal(journal: InsertJournal): Promise<Journal>;
 
     getAllEcritures(filter?: { journalId?: string; dateDebut?: string; dateFin?: string }): Promise<any[]>;
-    createEcriture(ecriture: InsertEcriture, lignes: any[]): Promise<Ecriture>;
-    getGrandLivre(compteId: string, dateDebut: string, dateFin: string): Promise<any[]>;
 
     getDeclarationsTva(): Promise<DeclarationTva[]>;
     createDeclarationTva(declaration: InsertDeclarationTva): Promise<DeclarationTva>;
 
     getBalance(dateDebut: string, dateFin: string): Promise<any[]>;
     getJournauxStats(): Promise<any[]>;
-    getBilan(dateFin: string): Promise<any>;
 
     // Loyalty
     addLoyaltyPoints(clientId: string, points: number, source: string, description?: string, transactionAmount?: number): Promise<void>;

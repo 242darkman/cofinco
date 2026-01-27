@@ -1,47 +1,43 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
-import { insertCompteSchema, insertEcritureSchema, insertJournalSchema, insertDeclarationTvaSchema } from "@shared/schema";
-import { normalizeKeysDeep, addSnakeCaseAliasesDeep } from "./utils";
+import { insertJournalSchema, insertDeclarationTvaSchema } from "@shared/schema";
+import { normalizeKeysDeep, addSnakeCaseAliasesDeep, toHttpError, getErrorMessage, manualEntrySchema } from "./utils";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
-import { z } from "zod";
 import { getWsInstance } from "../ws-server";
 import accountingPostingService from "../services/accounting-posting-service";
 import { db } from "../db";
-import { glPeriods, glPostingLinks, ecritures, lignesEcritures, planComptable, journaux } from "@shared/schema";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { glPeriods, glPostingLinks, ecritures, lignesEcritures, planComptable, journaux, mouvementsFinanciers, accountingRules } from "@shared/schema";
+import { eq, and, desc, asc, sql, count } from "drizzle-orm";
+import { SystemRole } from "@shared/types/roles";
+
+/** Typed Express Request with authenticated user from requireAuth middleware */
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    username: string;
+    nom: string;
+    prenom: string | null;
+    role: SystemRole;
+    agence?: string | null;
+    agenceId?: string | null;
+    email?: string;
+    telephone?: string;
+  };
+}
 
 export function registerAccountingRoutes(app: Express) {
 
   // 1. Plan Comptable (roles: admin, chef, comptable)
   app.get("/api/comptabilite/comptes", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
-    const comptes = await storage.getAllComptes();
+    const comptes = await storage.getAllComptesComptables();
     res.json(addSnakeCaseAliasesDeep(comptes));
   });
 
   app.get("/api/comptabilite/plan-ohada", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
-    // Alias for same endpoint if needed by legacy calls
-    const comptes = await storage.getAllComptes();
+    const comptes = await storage.getAllComptesComptables();
     res.json(addSnakeCaseAliasesDeep(comptes));
-  });
-
-  // Create compte (roles: admin, comptable)
-  app.post("/api/comptabilite/comptes", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req, res) => {
-    try {
-      const data = insertCompteSchema.parse(normalizeKeysDeep(req.body));
-      const compte = await storage.createCompte(data);
-
-      // Notify
-      const wsInstance = getWsInstance();
-      if (wsInstance) {
-          wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'compte_new', id: compte.id } });
-      }
-
-      res.json(addSnakeCaseAliasesDeep(compte));
-    } catch (e) {
-      res.status(400).json({ message: "Invalid data" });
-    }
   });
 
   // 2. Journaux (roles: admin, chef, comptable)
@@ -63,58 +59,13 @@ export function registerAccountingRoutes(app: Express) {
       }
 
       res.json(addSnakeCaseAliasesDeep(journal));
-    } catch (e) {
-      res.status(400).json({ message: "Invalid data" });
+    } catch (error: unknown) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
     }
   });
 
-  // 3. Ecritures (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/ecritures", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
-    const filter = {
-      journalId: req.query.journalId as string,
-      dateDebut: req.query.dateDebut as string,
-      dateFin: req.query.dateFin as string
-    };
-    const ecritures = await storage.getAllEcritures(filter);
-    res.json(addSnakeCaseAliasesDeep(ecritures));
-  });
-
-  // Create écriture (roles: admin, comptable)
-  app.post("/api/comptabilite/ecritures", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req, res) => {
-    try {
-      const body = normalizeKeysDeep(req.body) as any;
-      // Validate Header
-      const headerData = insertEcritureSchema.parse(body);
-
-      // Validate Lines
-      const lignesData = z.array(z.any()).parse(body.lignes);
-
-      const ecriture = await storage.createEcriture(headerData, lignesData);
-
-      // Notify
-      const wsInstance = getWsInstance();
-      if (wsInstance) {
-          wsInstance.broadcast({ type: "ACCOUNTING_UPDATE", payload: { type: 'ecriture_new', id: ecriture.id } });
-      }
-
-      res.json(addSnakeCaseAliasesDeep(ecriture));
-    } catch (e) {
-      console.error(e);
-      res.status(400).json({ message: "Invalid data", error: e });
-    }
-  });
-
-  // 4. Grand Livre (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/grand-livre/:compteId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
-    const { compteId } = req.params;
-    const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
-    const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
-
-    const mouvements = await storage.getGrandLivre(compteId, dateDebut, dateFin);
-    res.json(addSnakeCaseAliasesDeep(mouvements));
-  });
-
-  // 5. TVA (roles: admin, chef, comptable)
+  // 3. TVA (roles: admin, chef, comptable)
   app.get("/api/comptabilite/declarations-tva", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const declarations = await storage.getDeclarationsTva();
     res.json(addSnakeCaseAliasesDeep(declarations));
@@ -133,33 +84,92 @@ export function registerAccountingRoutes(app: Express) {
       }
 
       res.json(addSnakeCaseAliasesDeep(declaration));
-    } catch (e) {
-      res.status(400).json({ message: "Invalid data" });
+    } catch (error: unknown) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
     }
   });
 
-  // 6. Balance (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/balance", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
-    const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
-    const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
-    const balance = await storage.getBalance(dateDebut, dateFin);
-    res.json(addSnakeCaseAliasesDeep(balance));
-  });
-
-  // 7. Stats Journaux (roles: admin, chef, comptable)
+  // 4. Stats Journaux (roles: admin, chef, comptable)
   app.get("/api/comptabilite/journaux-stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
     const stats = await storage.getJournauxStats();
     res.json(addSnakeCaseAliasesDeep(stats));
   });
 
-  // 8. Bilan Synthetique (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/bilan-synthetique", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
-    const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
-    const bilan = await storage.getBilan(dateFin);
-    res.json(bilan);
+  // 5. Compte de Résultat (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/compte-resultat", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
+    const exercice = req.query.exercice as string || String(new Date().getFullYear());
+    const dateDebut = `${exercice}-01-01`;
+    const dateFin = `${exercice}-12-31`;
+
+    try {
+      const balance = await storage.getBalance(dateDebut, dateFin);
+
+      // Classe 6 = Charges, Classe 7 = Produits (OHADA)
+      const charges = balance
+        .filter(c => c.numero_compte.startsWith('6'))
+        .map(c => ({
+          numero_compte: c.numero_compte,
+          intitule: c.intitule,
+          montant: c.total_debit - c.total_credit
+        }))
+        .filter(c => c.montant !== 0)
+        .sort((a, b) => a.numero_compte.localeCompare(b.numero_compte));
+
+      const produits = balance
+        .filter(c => c.numero_compte.startsWith('7'))
+        .map(c => ({
+          numero_compte: c.numero_compte,
+          intitule: c.intitule,
+          montant: c.total_credit - c.total_debit
+        }))
+        .filter(c => c.montant !== 0)
+        .sort((a, b) => a.numero_compte.localeCompare(b.numero_compte));
+
+      const totalCharges = charges.reduce((sum, c) => sum + c.montant, 0);
+      const totalProduits = produits.reduce((sum, c) => sum + c.montant, 0);
+      const resultatNet = totalProduits - totalCharges;
+      const margeNette = totalProduits > 0 ? (resultatNet / totalProduits) * 100 : 0;
+
+      res.json({
+        exercice,
+        charges,
+        produits,
+        totalCharges,
+        totalProduits,
+        resultatNet,
+        margeNette,
+        type: resultatNet >= 0 ? 'benefice' : 'perte'
+      });
+    } catch (error: unknown) {
+      console.error('Erreur compte de résultat:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
   });
 
-  // 9. Tableau de Trésorerie (roles: admin, chef, comptable)
+  // 9b. Écritures filtrées par journal (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/journaux/:journalId/ecritures", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
+    try {
+      const { journalId } = req.params;
+      const dateDebut = req.query.dateDebut as string;
+      const dateFin = req.query.dateFin as string;
+
+      const entries = await storage.getAllEcritures({
+        journalId,
+        dateDebut,
+        dateFin
+      });
+
+      res.json(addSnakeCaseAliasesDeep(entries));
+    } catch (error: unknown) {
+      console.error('Erreur écritures journal:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // 10. Tableau de Trésorerie (roles: admin, chef, comptable)
   app.get("/api/comptabilite/tableau-tresorerie", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
     const dateDebut = req.query.dateDebut as string || new Date().getFullYear() + '-01-01';
     const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
@@ -175,8 +185,8 @@ export function registerAccountingRoutes(app: Express) {
       const immosComptes = balance.filter(c => c.numero_compte.startsWith('2'));
       const capitauxComptes = balance.filter(c => c.numero_compte.startsWith('1'));
 
-      const calcNetFlow = (comptes: any[]) => comptes.reduce((sum, c) =>
-        sum + (c.total_debit || 0) - (c.total_credit || 0), 0);
+      const calcNetFlow = (comptes: Array<Record<string, unknown>>) => comptes.reduce((sum, c) =>
+        sum + (Number(c.total_debit) || 0) - (Number(c.total_credit) || 0), 0);
 
       const result = {
         exploitation: [
@@ -200,9 +210,10 @@ export function registerAccountingRoutes(app: Express) {
       };
 
       res.json(result);
-    } catch (error) {
-      console.error('Erreur tableau trésorerie:', error);
-      res.status(500).json({ message: 'Erreur calcul trésorerie' });
+    } catch (error: unknown) {
+      console.error('Erreur tableau trésorerie:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
@@ -218,10 +229,10 @@ export function registerAccountingRoutes(app: Express) {
       const balanceN = await storage.getBalance(dateDebut, dateFin);
       const balanceN1 = await storage.getBalance(dateDebutN1, dateFinN1);
 
-      const getNetBalance = (balance: any[], prefixes: string[]) =>
+      const getNetBalance = (balance: Array<Record<string, unknown>>, prefixes: string[]) =>
         balance
-          .filter(c => prefixes.some(p => c.numero_compte.startsWith(p)))
-          .reduce((sum, c) => sum + (c.solde_debiteur || 0) - (c.solde_crediteur || 0), 0);
+          .filter(c => prefixes.some(p => String(c.numero_compte || '').startsWith(p)))
+          .reduce((sum, c) => sum + (Number(c.solde_debiteur) || 0) - (Number(c.solde_crediteur) || 0), 0);
 
       const result = {
         ressourcesDurables: [
@@ -252,9 +263,10 @@ export function registerAccountingRoutes(app: Express) {
       };
 
       res.json(result);
-    } catch (error) {
-      console.error('Erreur TAFIRE:', error);
-      res.status(500).json({ message: 'Erreur calcul TAFIRE' });
+    } catch (error: unknown) {
+      console.error('Erreur TAFIRE:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
@@ -266,7 +278,7 @@ export function registerAccountingRoutes(app: Express) {
   app.get("/api/comptabilite/v2/grand-livre/:compteId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { compteId } = req.params;
-      const agenceId = (req as any).user?.agenceId;
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
 
       if (!agenceId) {
         return res.status(400).json({ message: "Agence non définie" });
@@ -287,16 +299,17 @@ export function registerAccountingRoutes(app: Express) {
       );
 
       res.json(result);
-    } catch (error: any) {
-      console.error('Erreur Grand Livre V2:', error);
-      res.status(500).json({ message: error.message || 'Erreur récupération grand livre' });
+    } catch (error: unknown) {
+      console.error('Erreur Grand Livre:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
   // 12. Balance V2 - Enhanced Trial Balance (roles: admin, chef, comptable)
   app.get("/api/comptabilite/v2/balance", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId;
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
 
       if (!agenceId) {
         return res.status(400).json({ message: "Agence non définie" });
@@ -314,16 +327,80 @@ export function registerAccountingRoutes(app: Express) {
       );
 
       res.json(result);
-    } catch (error: any) {
-      console.error('Erreur Balance V2:', error);
-      res.status(500).json({ message: error.message || 'Erreur calcul balance' });
+    } catch (error: unknown) {
+      console.error('Erreur Balance:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // 12b. Bilan V2 - Computed from GL Posting Service (roles: admin, chef, comptable)
+  app.get("/api/comptabilite/v2/bilan", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
+
+      if (!agenceId) {
+        return res.status(400).json({ message: "Agence non définie" });
+      }
+
+      const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
+
+      // Get all balances from inception to dateFin
+      const balanceData = await accountingPostingService.getBalance(
+        agenceId,
+        '2000-01-01',
+        dateFin
+      );
+
+      const entries = balanceData.entries;
+
+      // Helper: net balance for given prefixes (debit - credit)
+      const getNetBalance = (prefixes: string[]) =>
+        entries
+          .filter(e => prefixes.some(p => e.numeroCompte.startsWith(p)))
+          .reduce((sum, e) => sum + e.soldeDebiteur - e.soldeCrediteur, 0);
+
+      // OHADA Bilan structure
+      // Actif (normally debit balances)
+      const actifImmobilise = getNetBalance(['2']);
+      const actifCirculant = getNetBalance(['3', '41', '42', '43', '44', '45', '46', '47']);
+      const tresorerieActif = getNetBalance(['5']);
+
+      // Passif (normally credit balances, so we negate)
+      const capitauxPropres = -getNetBalance(['1']);
+      const dettesFinancieres = -getNetBalance(['16']);
+      const passifCirculant = -getNetBalance(['40', '42', '43', '44', '48', '49']);
+
+      const actifTotal = Math.max(0, actifImmobilise) + Math.max(0, actifCirculant) + Math.max(0, tresorerieActif);
+      const passifTotal = Math.max(0, capitauxPropres) + Math.max(0, dettesFinancieres) + Math.max(0, passifCirculant);
+
+      res.json({
+        actif: {
+          immobilise: Math.max(0, actifImmobilise),
+          circulant: Math.max(0, actifCirculant),
+          tresorerie: Math.max(0, tresorerieActif),
+          total: actifTotal,
+        },
+        passif: {
+          capitaux: Math.max(0, capitauxPropres),
+          dettes: Math.max(0, dettesFinancieres),
+          circulant: Math.max(0, passifCirculant),
+          total: passifTotal,
+        },
+        isEquilibre: Math.abs(actifTotal - passifTotal) < 1,
+        dateFin,
+      });
+    } catch (error: unknown) {
+      console.error('Erreur Bilan:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
   // 13. Periods Management (roles: admin, chef, comptable)
   app.get("/api/comptabilite/periods", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId;
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
 
       if (!agenceId) {
         return res.status(400).json({ message: "Agence non définie" });
@@ -338,20 +415,22 @@ export function registerAccountingRoutes(app: Express) {
         .orderBy(asc(glPeriods.month));
 
       res.json(addSnakeCaseAliasesDeep(periods));
-    } catch (error: any) {
-      console.error('Erreur récupération périodes:', error);
-      res.status(500).json({ message: error.message || 'Erreur récupération périodes' });
+    } catch (error: unknown) {
+      console.error('Erreur récupération périodes:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
   // 14. Close Period (roles: admin, comptable)
   app.post("/api/comptabilite/periods/close", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId;
-      const userId = (req as any).user?.id;
+      const user = (req as AuthenticatedRequest).user;
+      const agenceId = user?.agenceId;
+      const userId = user?.id;
 
-      if (!agenceId) {
-        return res.status(400).json({ message: "Agence non définie" });
+      if (!agenceId || !userId) {
+        return res.status(400).json({ message: "Agence ou utilisateur non défini" });
       }
 
       const { year, month, notes } = req.body;
@@ -375,9 +454,10 @@ export function registerAccountingRoutes(app: Express) {
       }
 
       res.json({ success: true, message: `Période ${month}/${year} clôturée` });
-    } catch (error: any) {
-      console.error('Erreur clôture période:', error);
-      res.status(400).json({ message: error.message || 'Erreur clôture période' });
+    } catch (error: unknown) {
+      console.error('Erreur clôture période:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
@@ -385,8 +465,8 @@ export function registerAccountingRoutes(app: Express) {
   app.post("/api/comptabilite/entries/:ecritureId/reverse", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { ecritureId } = req.params;
-      const agenceId = (req as any).user?.agenceId;
-      const userId = (req as any).user?.id;
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
+      const userId = (req as AuthenticatedRequest).user?.id;
 
       if (!agenceId) {
         return res.status(400).json({ message: "Agence non définie" });
@@ -419,9 +499,10 @@ export function registerAccountingRoutes(app: Express) {
       }
 
       res.json(result);
-    } catch (error: any) {
-      console.error('Erreur extourne:', error);
-      res.status(400).json({ message: error.message || 'Erreur extourne' });
+    } catch (error: unknown) {
+      console.error('Erreur extourne:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
@@ -477,9 +558,10 @@ export function registerAccountingRoutes(app: Express) {
         total_credit: totalCredit,
         is_balanced: Math.abs(totalDebit - totalCredit) < 0.01
       });
-    } catch (error: any) {
-      console.error('Erreur détail écriture:', error);
-      res.status(500).json({ message: error.message || 'Erreur récupération écriture' });
+    } catch (error: unknown) {
+      console.error('Erreur détail écriture:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
@@ -487,7 +569,7 @@ export function registerAccountingRoutes(app: Express) {
   app.get("/api/comptabilite/posting-status/:sourceType/:sourceId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { sourceType, sourceId } = req.params;
-      const agenceId = (req as any).user?.agenceId;
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
 
       if (!agenceId) {
         return res.status(400).json({ message: "Agence non définie" });
@@ -521,9 +603,10 @@ export function registerAccountingRoutes(app: Express) {
       } else {
         res.json({ posted: false });
       }
-    } catch (error: any) {
-      console.error('Erreur vérification posting:', error);
-      res.status(500).json({ message: error.message || 'Erreur vérification' });
+    } catch (error: unknown) {
+      console.error('Erreur vérification posting:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
@@ -531,7 +614,7 @@ export function registerAccountingRoutes(app: Express) {
   app.get("/api/comptabilite/entries-by-source/:sourceType", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: Request, res: Response) => {
     try {
       const { sourceType } = req.params;
-      const agenceId = (req as any).user?.agenceId;
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
 
       if (!agenceId) {
         return res.status(400).json({ message: "Agence non définie" });
@@ -565,9 +648,10 @@ export function registerAccountingRoutes(app: Express) {
         .offset(offset);
 
       res.json(addSnakeCaseAliasesDeep(entries));
-    } catch (error: any) {
-      console.error('Erreur récupération écritures par source:', error);
-      res.status(500).json({ message: error.message || 'Erreur récupération' });
+    } catch (error: unknown) {
+      console.error('Erreur récupération écritures par source:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
     }
   });
 
@@ -575,27 +659,20 @@ export function registerAccountingRoutes(app: Express) {
   // For manual accounting entries (not auto-posted from business transactions)
   app.post("/api/comptabilite/v2/ecritures", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId;
-      const userId = (req as any).user?.id;
+      const agenceId = (req as AuthenticatedRequest).user?.agenceId;
+      const userId = (req as AuthenticatedRequest).user?.id;
 
       if (!agenceId) {
-        return res.status(400).json({ message: "Agence non définie" });
+        return res.status(400).json({ code: "VALIDATION_ERROR", message: "Agence non définie" });
       }
 
-      const { journalCode, dateEcriture, libelle, lignes } = req.body;
+      // Strict Zod validation — replaces loose req.body destructuring
+      const parsed = manualEntrySchema.parse(req.body);
+      const { journalCode, dateEcriture, libelle, lignes } = parsed;
 
-      if (!journalCode || !dateEcriture || !libelle || !lignes || !Array.isArray(lignes)) {
-        return res.status(400).json({ message: "Données manquantes: journalCode, dateEcriture, libelle, lignes requis" });
-      }
-
-      // Validate lines have accounts
+      // Resolve account IDs / numbers from DB
       const processedLines = [];
       for (const ligne of lignes) {
-        if (!ligne.numeroCompte && !ligne.compteId) {
-          return res.status(400).json({ message: "Chaque ligne doit avoir un compte" });
-        }
-
-        // Get account if only number provided
         let compteId = ligne.compteId;
         let numeroCompte = ligne.numeroCompte;
 
@@ -607,7 +684,7 @@ export function registerAccountingRoutes(app: Express) {
             .limit(1);
 
           if (!compte) {
-            return res.status(400).json({ message: `Compte non trouvé: ${numeroCompte}` });
+            return res.status(400).json({ code: "NOT_FOUND", message: `Compte non trouvé: ${numeroCompte}` });
           }
           compteId = compte.id;
         } else if (compteId && !numeroCompte) {
@@ -618,18 +695,18 @@ export function registerAccountingRoutes(app: Express) {
             .limit(1);
 
           if (!compte) {
-            return res.status(400).json({ message: `Compte non trouvé: ${compteId}` });
+            return res.status(400).json({ code: "NOT_FOUND", message: `Compte non trouvé: ${compteId}` });
           }
           numeroCompte = compte.numeroCompte;
         }
 
         processedLines.push({
-          compteId,
-          numeroCompte,
+          compteId: compteId!,
+          numeroCompte: numeroCompte!,
           libelle: ligne.libelle || libelle,
-          debit: parseFloat(ligne.debit || 0),
-          credit: parseFloat(ligne.credit || 0),
-          refExterne: ligne.refExterne
+          debit: ligne.debit,
+          credit: ligne.credit,
+          refExterne: ligne.refExterne,
         });
       }
 
@@ -645,25 +722,151 @@ export function registerAccountingRoutes(app: Express) {
         description: libelle,
         lines: processedLines,
         metadata: { manualEntry: true },
-        userId
+        userId,
       });
 
-      // Notify
-      const wsInstance = getWsInstance();
-      if (wsInstance) {
-        wsInstance.broadcast({
-          type: "ACCOUNTING_UPDATE",
-          payload: { type: 'ecriture_new', id: result.ecritureId, numeroPiece: result.numeroPiece }
-        });
+      // WebSocket notification is handled by postEntry() internally
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: unknown) {
+      console.error('Erreur création écriture manuelle:', getErrorMessage(error));
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
+    }
+  });
+
+  // ============================================================================
+  // TOMBSTONE ROUTES — Legacy endpoints removed, return 410 Gone
+  // ============================================================================
+
+  // ============================================================================
+  // COVERAGE & OBSERVABILITY
+  // ============================================================================
+
+  /**
+   * GET /api/comptabilite/coverage/report
+   * Returns GL posting coverage statistics:
+   * - Counts by glPostingStatus (PENDING, POSTED, FAILED, SKIPPED)
+   * - Coverage percentage (POSTED / total requiring GL)
+   * - List of FAILED mouvements with error details
+   * - Accounting rules inventory
+   */
+  app.get("/api/comptabilite/coverage/report", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      // 1. Count mouvements by GL posting status
+      const statusCounts = await db
+        .select({
+          glPostingStatus: mouvementsFinanciers.glPostingStatus,
+          count: count(),
+        })
+        .from(mouvementsFinanciers)
+        .groupBy(mouvementsFinanciers.glPostingStatus);
+
+      const statusMap: Record<string, number> = {};
+      for (const row of statusCounts) {
+        statusMap[row.glPostingStatus || "UNKNOWN"] = row.count;
+      }
+
+      const posted = statusMap["POSTED"] || 0;
+      const failed = statusMap["FAILED"] || 0;
+      const pending = statusMap["PENDING"] || 0;
+      const skipped = statusMap["SKIPPED"] || 0;
+      const unknown = statusMap["UNKNOWN"] || 0;
+      const total = posted + failed + pending + skipped + unknown;
+      const requiresGl = posted + failed + pending; // Those that should have GL
+      const coveragePercent = requiresGl > 0 ? Math.round((posted / requiresGl) * 10000) / 100 : 100;
+
+      // 2. Get FAILED mouvements (most recent 50)
+      const failedMouvements = await db
+        .select({
+          id: mouvementsFinanciers.id,
+          reference: mouvementsFinanciers.reference,
+          sourceModule: mouvementsFinanciers.sourceModule,
+          typePaiement: mouvementsFinanciers.typePaiement,
+          montant: mouvementsFinanciers.montant,
+          sens: mouvementsFinanciers.sens,
+          glPostingError: mouvementsFinanciers.glPostingError,
+          createdAt: mouvementsFinanciers.createdAt,
+        })
+        .from(mouvementsFinanciers)
+        .where(eq(mouvementsFinanciers.glPostingStatus, "FAILED"))
+        .orderBy(desc(mouvementsFinanciers.createdAt))
+        .limit(50);
+
+      // 3. Accounting rules inventory
+      const rules = await db
+        .select({
+          code: accountingRules.code,
+          name: accountingRules.name,
+          sourceType: accountingRules.sourceType,
+          eventType: accountingRules.eventType,
+          journalCode: accountingRules.journalCode,
+          debitAccount: accountingRules.debitAccount,
+          creditAccount: accountingRules.creditAccount,
+          active: accountingRules.active,
+        })
+        .from(accountingRules)
+        .orderBy(asc(accountingRules.code));
+
+      // 4. Coverage by source module
+      const moduleBreakdown = await db
+        .select({
+          sourceModule: mouvementsFinanciers.sourceModule,
+          glPostingStatus: mouvementsFinanciers.glPostingStatus,
+          count: count(),
+        })
+        .from(mouvementsFinanciers)
+        .groupBy(mouvementsFinanciers.sourceModule, mouvementsFinanciers.glPostingStatus);
+
+      const byModule: Record<string, Record<string, number>> = {};
+      for (const row of moduleBreakdown) {
+        const mod = row.sourceModule || "UNKNOWN";
+        if (!byModule[mod]) byModule[mod] = {};
+        byModule[mod][row.glPostingStatus || "UNKNOWN"] = row.count;
       }
 
       res.json({
         success: true,
-        ...result
+        data: {
+          summary: {
+            total,
+            posted,
+            failed,
+            pending,
+            skipped,
+            unknown,
+            coveragePercent,
+            requiresGl,
+          },
+          byModule,
+          failedMouvements,
+          rules,
+          generatedAt: new Date().toISOString(),
+        },
       });
-    } catch (error: any) {
-      console.error('Erreur création écriture manuelle:', error);
-      res.status(400).json({ message: error.message || 'Erreur création écriture' });
+    } catch (error) {
+      console.error("[Coverage] Report generation failed:", error);
+      res.status(500).json({ success: false, error: "Failed to generate coverage report" });
     }
   });
+
+  const legacyTombstone = (_req: Request, res: Response) => {
+    res.set("Deprecation", "true");
+    res.set("Sunset", new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+    console.warn(`[DEPRECATED] Legacy endpoint called: ${_req.method} ${_req.originalUrl}`);
+    res.status(410).json({
+      code: "ENDPOINT_DEPRECATED",
+      message: "Cette route est supprimée. Utilisez /api/comptabilite/v2/ecritures pour les écritures.",
+    });
+  };
+
+  app.post("/api/comptabilite/ecritures", requireAuth, legacyTombstone);
+  app.get("/api/comptabilite/ecritures", requireAuth, legacyTombstone);
+  app.post("/api/comptabilite/comptes", requireAuth, legacyTombstone);
+  app.get("/api/comptabilite/grand-livre/:compteId", requireAuth, legacyTombstone);
+  app.get("/api/comptabilite/balance", requireAuth, legacyTombstone);
+  app.get("/api/comptabilite/bilan-synthetique", requireAuth, legacyTombstone);
 }

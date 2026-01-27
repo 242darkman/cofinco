@@ -16,6 +16,8 @@
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
     "db:reset:force": "node --env-file=.env --import tsx scripts/db-reset.ts -- --force",
     "db:validate": "node --env-file=.env --import tsx scripts/validate-seed.ts",
+    "db:backfill-gl": "node --env-file=.env --import tsx scripts/backfill-gl-posting-status.ts",
+    "db:backfill-gl:dry-run": "node --env-file=.env --import tsx scripts/backfill-gl-posting-status.ts --dry-run",
     "audit:integrity": "node --env-file=.env --import tsx scripts/audit-integrity.ts",
     "test": "vitest"
   },

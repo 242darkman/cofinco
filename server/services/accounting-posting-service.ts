@@ -36,6 +36,37 @@ import {
   PeriodStatus,
 } from "@shared/schema";
 import { mouvementsFinanciers, type MouvementFinancier } from "@shared/schema/finance";
+import { getWsInstance } from "../ws-server";
+
+// ============================================================================
+// ERRORS
+// ============================================================================
+
+/** Thrown when no accounting rule matches a mouvement — must be handled, never silenced */
+export class AccountingRuleNotFoundError extends Error {
+  public readonly sourceModule: string | null;
+  public readonly typePaiement: string | null;
+  public readonly methodePaiement: string | null;
+
+  constructor(mouvement: MouvementFinancier) {
+    super(
+      `No accounting rule found for: sourceModule=${mouvement.sourceModule}, ` +
+      `typePaiement=${mouvement.typePaiement}, methodePaiement=${mouvement.methodePaiement}`
+    );
+    this.name = "AccountingRuleNotFoundError";
+    this.sourceModule = mouvement.sourceModule;
+    this.typePaiement = mouvement.typePaiement;
+    this.methodePaiement = mouvement.methodePaiement;
+  }
+}
+
+/** Thrown when GL account referenced by a rule doesn't exist in plan comptable */
+export class GlAccountNotFoundError extends Error {
+  constructor(accountNumber: string, side: "debit" | "credit") {
+    super(`GL account not found: ${accountNumber} (${side})`);
+    this.name = "GlAccountNotFoundError";
+  }
+}
 
 // ============================================================================
 // TYPES
@@ -87,7 +118,7 @@ async function getNextPieceNumber(
     sql`SELECT get_next_piece_number(${agenceId}::uuid, ${journalCode}, ${year}) as piece_number`
   );
 
-  const pieceNumber = (result.rows[0] as any)?.piece_number;
+  const pieceNumber = (result.rows[0] as Record<string, unknown>)?.piece_number as string | undefined;
   if (!pieceNumber) {
     // Fallback: manual increment if function doesn't exist
     const [seq] = await tx
@@ -353,6 +384,306 @@ async function getJournalByCode(
 }
 
 // ============================================================================
+// TRANSACTIONAL GL POSTING (called from within executeWithLedger)
+// ============================================================================
+
+/**
+ * Post a GL entry for a mouvement within an existing transaction.
+ *
+ * This is the preferred entry point for all automated GL posting from
+ * business flows. It:
+ * - Checks idempotency (returns null if already posted)
+ * - Finds matching accounting rule (throws AccountingRuleNotFoundError if none)
+ * - Creates ecriture + lines + gl_posting_links
+ *
+ * @throws AccountingRuleNotFoundError — no rule matches
+ * @throws GlAccountNotFoundError — rule references a non-existent account
+ * @throws Error — journal not found or period closed
+ */
+export async function postGlForMouvement(
+  tx: PgTransaction<any, any, any>,
+  mouvement: MouvementFinancier,
+  agenceId: string,
+  userId?: string,
+  additionalMetadata?: Record<string, any>
+): Promise<PostEntryResult | null> {
+  // 1. Idempotency check — already posted is OK (return null silently)
+  const existingEcritureId = await checkIdempotency(tx, agenceId, "MOUVEMENT", mouvement.id);
+  if (existingEcritureId) {
+    console.log(`[AccountingPosting] Mouvement ${mouvement.id} already posted`);
+    return null;
+  }
+
+  // 2. Find matching accounting rule — THROWS if none found
+  const rule = await findMatchingRule(
+    tx,
+    agenceId,
+    "MOUVEMENT",
+    mouvement.typePaiement || "UNKNOWN",
+    mouvement.methodePaiement || undefined,
+    additionalMetadata?.provider || undefined
+  );
+
+  if (!rule) {
+    throw new AccountingRuleNotFoundError(mouvement);
+  }
+
+  // 3. Get accounts — THROWS if not found
+  const debitAccount = await getAccountByNumber(tx, rule.debitAccount, agenceId);
+  if (!debitAccount) {
+    throw new GlAccountNotFoundError(rule.debitAccount, "debit");
+  }
+  const creditAccount = await getAccountByNumber(tx, rule.creditAccount, agenceId);
+  if (!creditAccount) {
+    throw new GlAccountNotFoundError(rule.creditAccount, "credit");
+  }
+
+  // 4. Get journal
+  const journal = await getJournalByCode(tx, rule.journalCode, agenceId);
+  if (!journal) {
+    throw new Error(`Journal not found: ${rule.journalCode}`);
+  }
+
+  // 5. Build description from template
+  const amount = parseFloat(mouvement.montant);
+  let description = rule.descriptionTemplate || rule.name;
+  description = description
+    .replace("{clientName}", additionalMetadata?.clientName || "Client")
+    .replace("{creditNumber}", additionalMetadata?.creditNumber || mouvement.creditId || "")
+    .replace("{tontineName}", additionalMetadata?.tontineName || "Tontine")
+    .replace("{reference}", mouvement.reference || "");
+
+  // 6. Build entry lines (simple 2-line debit/credit)
+  const lines: PostEntryLine[] = [
+    {
+      compteId: debitAccount.id,
+      numeroCompte: debitAccount.numeroCompte,
+      libelle: description,
+      debit: amount,
+      credit: 0,
+      refExterne: mouvement.reference,
+    },
+    {
+      compteId: creditAccount.id,
+      numeroCompte: creditAccount.numeroCompte,
+      libelle: description,
+      debit: 0,
+      credit: amount,
+      refExterne: mouvement.reference,
+    },
+  ];
+
+  // 7. Get or create exercice and period
+  const entryDate = mouvement.dateOperation ? new Date(mouvement.dateOperation) : new Date();
+  const exerciceId = await getOrCreateExercice(tx, agenceId, entryDate);
+  const { periodId, isClosed } = await getOrCreatePeriod(tx, agenceId, entryDate, exerciceId);
+
+  if (isClosed) {
+    throw new Error(`Period is closed for date ${entryDate.toISOString().split("T")[0]}, cannot post mouvement ${mouvement.id}`);
+  }
+
+  const year = entryDate.getFullYear();
+  const numeroPiece = await getNextPieceNumber(tx, agenceId, rule.journalCode, year);
+
+  // 8. Build metadata
+  const metadata = {
+    ...additionalMetadata,
+    mouvementReference: mouvement.reference,
+    sourceModule: mouvement.sourceModule,
+    typePaiement: mouvement.typePaiement,
+    methodePaiement: mouvement.methodePaiement,
+    clientId: mouvement.clientId,
+    compteId: mouvement.compteId,
+    creditId: mouvement.creditId,
+    tontineId: mouvement.tontineId,
+    ruleCode: rule.code,
+    ruleName: rule.name,
+  };
+
+  // 9. Create ecriture
+  const [ecriture] = await tx
+    .insert(ecritures)
+    .values({
+      exerciceId,
+      journalId: journal.id,
+      dateEcriture: entryDate.toISOString().split("T")[0],
+      numeroPiece,
+      libelle: description,
+      statut: EntryStatus.POSTED,
+      sourceType: "MOUVEMENT",
+      sourceId: mouvement.id,
+      mouvementId: mouvement.id,
+      metadata,
+      agenceId,
+      createdBy: userId,
+      validatedBy: userId,
+      validatedAt: new Date(),
+    })
+    .returning();
+
+  // 10. Create lines
+  for (const line of lines) {
+    if (line.debit === 0 && line.credit === 0) continue;
+    await tx.insert(lignesEcritures).values({
+      ecritureId: ecriture.id,
+      compteId: line.compteId,
+      numeroCompte: line.numeroCompte,
+      libelle: line.libelle,
+      debit: line.debit.toString(),
+      credit: line.credit.toString(),
+      refExterne: line.refExterne,
+    });
+  }
+
+  // 11. Create idempotency link (with new fields)
+  await tx.insert(glPostingLinks).values({
+    agenceId,
+    sourceType: "MOUVEMENT",
+    sourceId: mouvement.id,
+    ecritureId: ecriture.id,
+    mouvementId: mouvement.id,
+    status: "POSTED",
+    attempts: 1,
+  });
+
+  // 12. Update period stats
+  await tx
+    .update(glPeriods)
+    .set({
+      totalDebits: sql`${glPeriods.totalDebits} + ${amount}`,
+      totalCredits: sql`${glPeriods.totalCredits} + ${amount}`,
+      entryCount: sql`${glPeriods.entryCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(glPeriods.id, periodId));
+
+  console.log(`[AccountingPosting] GL posted mouvement ${mouvement.id} as ${numeroPiece} using rule ${rule.code}`);
+
+  return {
+    ecritureId: ecriture.id,
+    numeroPiece,
+    totalDebit: amount,
+    totalCredit: amount,
+    lineCount: 2,
+  };
+}
+
+/**
+ * Post a multi-line GL entry within an existing transaction.
+ * Used for complex entries like payroll (multiple debit/credit lines).
+ *
+ * @throws Error — if entry is not balanced, journal not found, or period closed
+ */
+export async function postMultiLineEntry(
+  tx: PgTransaction<any, any, any>,
+  request: Omit<PostEntryRequest, "sourceType"> & { sourceType?: string }
+): Promise<PostEntryResult> {
+  const {
+    agenceId, sourceId, journalCode, entryDate, description,
+    lines, metadata, mouvementId, userId,
+    sourceType = "MOUVEMENT",
+  } = request;
+
+  // 1. Idempotency check
+  const existingEcritureId = await checkIdempotency(tx, agenceId, sourceType, sourceId);
+  if (existingEcritureId) {
+    const [existing] = await tx.select().from(ecritures).where(eq(ecritures.id, existingEcritureId)).limit(1);
+    if (existing) {
+      const existingLines = await tx.select().from(lignesEcritures).where(eq(lignesEcritures.ecritureId, existing.id));
+      return {
+        ecritureId: existing.id,
+        numeroPiece: existing.numeroPiece,
+        totalDebit: existingLines.reduce((s, l) => s + parseFloat(l.debit), 0),
+        totalCredit: existingLines.reduce((s, l) => s + parseFloat(l.credit), 0),
+        lineCount: existingLines.length,
+      };
+    }
+  }
+
+  // 2. Validate balance
+  const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
+  const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
+  if (Math.abs(totalDebit - totalCredit) > 0.01) {
+    throw new Error(`Entry is not balanced: debit=${totalDebit}, credit=${totalCredit}`);
+  }
+
+  // 3. Get journal
+  const journal = await getJournalByCode(tx, journalCode, agenceId);
+  if (!journal) {
+    throw new Error(`Journal not found: ${journalCode}`);
+  }
+
+  // 4. Get exercice & period
+  const exerciceId = await getOrCreateExercice(tx, agenceId, entryDate);
+  const { periodId, isClosed } = await getOrCreatePeriod(tx, agenceId, entryDate, exerciceId);
+  if (isClosed) {
+    throw new Error(`Period is closed for date ${entryDate.toISOString().split("T")[0]}`);
+  }
+
+  const year = entryDate.getFullYear();
+  const numeroPiece = await getNextPieceNumber(tx, agenceId, journalCode, year);
+
+  // 5. Create ecriture
+  const [ecriture] = await tx
+    .insert(ecritures)
+    .values({
+      exerciceId,
+      journalId: journal.id,
+      dateEcriture: entryDate.toISOString().split("T")[0],
+      numeroPiece,
+      libelle: description,
+      statut: EntryStatus.POSTED,
+      sourceType,
+      sourceId,
+      mouvementId,
+      metadata: metadata || {},
+      agenceId,
+      createdBy: userId,
+      validatedBy: userId,
+      validatedAt: new Date(),
+    })
+    .returning();
+
+  // 6. Create lines
+  for (const line of lines) {
+    if (line.debit === 0 && line.credit === 0) continue;
+    await tx.insert(lignesEcritures).values({
+      ecritureId: ecriture.id,
+      compteId: line.compteId,
+      numeroCompte: line.numeroCompte,
+      libelle: line.libelle,
+      debit: line.debit.toString(),
+      credit: line.credit.toString(),
+      refExterne: line.refExterne,
+    });
+  }
+
+  // 7. Idempotency link
+  await tx.insert(glPostingLinks).values({
+    agenceId,
+    sourceType,
+    sourceId,
+    ecritureId: ecriture.id,
+    mouvementId,
+    status: "POSTED",
+    attempts: 1,
+  });
+
+  // 8. Update period stats
+  await tx
+    .update(glPeriods)
+    .set({
+      totalDebits: sql`${glPeriods.totalDebits} + ${totalDebit}`,
+      totalCredits: sql`${glPeriods.totalCredits} + ${totalCredit}`,
+      entryCount: sql`${glPeriods.entryCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(glPeriods.id, periodId));
+
+  return { ecritureId: ecriture.id, numeroPiece, totalDebit, totalCredit, lineCount: lines.filter(l => l.debit !== 0 || l.credit !== 0).length };
+}
+
+// ============================================================================
 // MAIN POSTING FUNCTIONS
 // ============================================================================
 
@@ -366,7 +697,7 @@ async function getJournalByCode(
  * - Atomic transaction
  */
 export async function postEntry(request: PostEntryRequest): Promise<PostEntryResult> {
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const { agenceId, sourceType, sourceId, journalCode, entryDate, description, lines, metadata, mouvementId, userId } = request;
 
     // 1. Check idempotency
@@ -485,183 +816,56 @@ export async function postEntry(request: PostEntryRequest): Promise<PostEntryRes
       lineCount: lines.length,
     };
   });
+
+  // Emit WebSocket event after transaction commits
+  try {
+    const wsInstance = getWsInstance();
+    if (wsInstance) {
+      wsInstance.broadcast({
+        type: "ACCOUNTING_UPDATE",
+        payload: { type: 'gl_entry_posted', id: result.ecritureId, numeroPiece: result.numeroPiece },
+      });
+    }
+  } catch {
+    // Don't let WS failure break accounting flow
+  }
+
+  return result;
 }
 
 /**
- * Post an entry automatically from a mouvement financier
- * Uses accounting rules to determine the correct accounts
+ * Post an entry automatically from a mouvement financier.
+ * Uses accounting rules to determine the correct accounts.
+ *
+ * This is the standalone version (creates its own transaction).
+ * For use within an existing transaction, use postGlForMouvement() instead.
+ *
+ * @throws AccountingRuleNotFoundError — no rule matches the mouvement
+ * @throws GlAccountNotFoundError — rule references a non-existent account
  */
 export async function postFromMouvement(request: PostFromMouvementRequest): Promise<PostEntryResult | null> {
   const { mouvement, agenceId, userId, additionalMetadata } = request;
 
-  return await db.transaction(async (tx) => {
-    // 1. Check idempotency using mouvement ID
-    const existingEcritureId = await checkIdempotency(tx, agenceId, "MOUVEMENT", mouvement.id);
-    if (existingEcritureId) {
-      console.log(`[AccountingPosting] Mouvement ${mouvement.id} already posted`);
-      return null; // Already posted
-    }
-
-    // 2. Find matching accounting rule
-    const rule = await findMatchingRule(
-      tx,
-      agenceId,
-      "MOUVEMENT",
-      mouvement.typePaiement || "UNKNOWN",
-      mouvement.methodePaiement || undefined,
-      additionalMetadata?.provider || undefined
-    );
-
-    if (!rule) {
-      console.warn(`[AccountingPosting] No rule found for: sourceModule=${mouvement.sourceModule}, typePaiement=${mouvement.typePaiement}, methodePaiement=${mouvement.methodePaiement}`);
-      return null;
-    }
-
-    // 3. Get accounts
-    const debitAccount = await getAccountByNumber(tx, rule.debitAccount, agenceId);
-    const creditAccount = await getAccountByNumber(tx, rule.creditAccount, agenceId);
-
-    if (!debitAccount) {
-      console.error(`[AccountingPosting] Debit account not found: ${rule.debitAccount}`);
-      return null;
-    }
-    if (!creditAccount) {
-      console.error(`[AccountingPosting] Credit account not found: ${rule.creditAccount}`);
-      return null;
-    }
-
-    // 4. Get journal
-    const journal = await getJournalByCode(tx, rule.journalCode, agenceId);
-    if (!journal) {
-      console.error(`[AccountingPosting] Journal not found: ${rule.journalCode}`);
-      return null;
-    }
-
-    // 5. Build description from template
-    const amount = parseFloat(mouvement.montant);
-    let description = rule.descriptionTemplate || rule.name;
-    description = description
-      .replace("{clientName}", additionalMetadata?.clientName || "Client")
-      .replace("{creditNumber}", additionalMetadata?.creditNumber || mouvement.creditId || "")
-      .replace("{tontineName}", additionalMetadata?.tontineName || "Tontine")
-      .replace("{reference}", mouvement.reference || "");
-
-    // 6. Build entry lines
-    const lines: PostEntryLine[] = [
-      {
-        compteId: debitAccount.id,
-        numeroCompte: debitAccount.numeroCompte,
-        libelle: description,
-        debit: amount,
-        credit: 0,
-        refExterne: mouvement.reference,
-      },
-      {
-        compteId: creditAccount.id,
-        numeroCompte: creditAccount.numeroCompte,
-        libelle: description,
-        debit: 0,
-        credit: amount,
-        refExterne: mouvement.reference,
-      },
-    ];
-
-    // 7. Post the entry
-    const entryDate = mouvement.dateOperation ? new Date(mouvement.dateOperation) : new Date();
-
-    // Call postEntry directly within the same transaction context
-    // We need to replicate the logic here to stay in the same transaction
-    const exerciceId = await getOrCreateExercice(tx, agenceId, entryDate);
-    const { periodId, isClosed } = await getOrCreatePeriod(tx, agenceId, entryDate, exerciceId);
-
-    if (isClosed) {
-      console.warn(`[AccountingPosting] Period closed for mouvement ${mouvement.id}, skipping`);
-      return null;
-    }
-
-    const year = entryDate.getFullYear();
-    const numeroPiece = await getNextPieceNumber(tx, agenceId, rule.journalCode, year);
-
-    // Build metadata
-    const metadata = {
-      ...additionalMetadata,
-      mouvementReference: mouvement.reference,
-      sourceModule: mouvement.sourceModule,
-      typePaiement: mouvement.typePaiement,
-      methodePaiement: mouvement.methodePaiement,
-      clientId: mouvement.clientId,
-      compteId: mouvement.compteId,
-      creditId: mouvement.creditId,
-      tontineId: mouvement.tontineId,
-      ruleCode: rule.code,
-      ruleName: rule.name,
-    };
-
-    // Create ecriture
-    const [ecriture] = await tx
-      .insert(ecritures)
-      .values({
-        exerciceId,
-        journalId: journal.id,
-        dateEcriture: entryDate.toISOString().split("T")[0],
-        numeroPiece,
-        libelle: description,
-        statut: EntryStatus.POSTED,
-        sourceType: "MOUVEMENT",
-        sourceId: mouvement.id,
-        mouvementId: mouvement.id,
-        metadata,
-        agenceId,
-        createdBy: userId,
-        validatedBy: userId,
-        validatedAt: new Date(),
-      })
-      .returning();
-
-    // Create lines
-    for (const line of lines) {
-      if (line.debit === 0 && line.credit === 0) continue;
-
-      await tx.insert(lignesEcritures).values({
-        ecritureId: ecriture.id,
-        compteId: line.compteId,
-        numeroCompte: line.numeroCompte,
-        libelle: line.libelle,
-        debit: line.debit.toString(),
-        credit: line.credit.toString(),
-        refExterne: line.refExterne,
-      });
-    }
-
-    // Create idempotency link
-    await tx.insert(glPostingLinks).values({
-      agenceId,
-      sourceType: "MOUVEMENT",
-      sourceId: mouvement.id,
-      ecritureId: ecriture.id,
-    });
-
-    // Update period stats
-    await tx
-      .update(glPeriods)
-      .set({
-        totalDebits: sql`${glPeriods.totalDebits} + ${amount}`,
-        totalCredits: sql`${glPeriods.totalCredits} + ${amount}`,
-        entryCount: sql`${glPeriods.entryCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(glPeriods.id, periodId));
-
-    console.log(`[AccountingPosting] Auto-posted mouvement ${mouvement.id} as ${numeroPiece} using rule ${rule.code}`);
-
-    return {
-      ecritureId: ecriture.id,
-      numeroPiece,
-      totalDebit: amount,
-      totalCredit: amount,
-      lineCount: 2,
-    };
+  const result = await db.transaction(async (tx) => {
+    return postGlForMouvement(tx, mouvement, agenceId, userId, additionalMetadata);
   });
+
+  // Emit WebSocket event after transaction commits (only if entry was actually posted)
+  if (result) {
+    try {
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "ACCOUNTING_UPDATE",
+          payload: { type: 'gl_entry_posted', id: result.ecritureId, numeroPiece: result.numeroPiece },
+        });
+      }
+    } catch {
+      // Don't let WS failure break accounting flow
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -1119,6 +1323,8 @@ export async function getBalance(
 export default {
   postEntry,
   postFromMouvement,
+  postGlForMouvement,
+  postMultiLineEntry,
   reverseEntry,
   closePeriod,
   getGrandLivre,

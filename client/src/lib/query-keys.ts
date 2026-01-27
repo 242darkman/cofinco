@@ -170,13 +170,30 @@ export const clientKeys = {
 export const comptabiliteKeys = {
   all: ['/api/comptabilite'] as const,
 
+  // Plan comptable OHADA
+  planOhada: () => ['/api/comptabilite', 'plan-ohada'] as const,
+
+  // Journaux
+  journaux: () => ['/api/comptabilite', 'journaux'] as const,
+  journauxStats: () => ['/api/comptabilite', 'journaux-stats'] as const,
+  journalEntries: (journalId: string) => ['/api/comptabilite', 'journal-entries', journalId] as const,
+
   // Balance générale
-  balance: (dateDebut?: string, dateFin?: string) =>
-    ['/api/comptabilite/v2/balance', { dateDebut, dateFin }] as const,
+  balance: (dateDebut?: string, dateFin?: string, classe?: number) =>
+    ['/api/comptabilite/v2/balance', { dateDebut, dateFin, classe }] as const,
 
   // Grand livre
-  grandLivre: (compteId: string, dateDebut?: string, dateFin?: string) =>
-    ['/api/comptabilite/v2/grand-livre', compteId, { dateDebut, dateFin }] as const,
+  grandLivre: (compteId: string, dateDebut?: string, dateFin?: string, page?: number) =>
+    ['/api/comptabilite/v2/grand-livre', compteId, { dateDebut, dateFin, page }] as const,
+
+  // Bilan synthétique
+  bilan: (dateFin?: string) => ['/api/comptabilite', 'bilan', dateFin] as const,
+
+  // Compte de résultat
+  compteResultat: (exercice?: string) => ['/api/comptabilite', 'compte-resultat', exercice] as const,
+
+  // Périodes comptables
+  periods: (year?: number) => ['/api/comptabilite', 'periods', year] as const,
 
   // Factures
   factures: () => ['/api/factures'] as const,

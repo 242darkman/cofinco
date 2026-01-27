@@ -1,4 +1,124 @@
-import { z } from "zod";
+import { z, ZodError } from "zod";
+
+// ============================================================================
+// ERROR HANDLING HELPERS (strict — no `any`)
+// ============================================================================
+
+/** Safely extract an error message from an unknown thrown value */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "An unknown error occurred";
+}
+
+/** Check if value is a plain record (no `any` cast needed) */
+export function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Well-known error types for accounting module */
+export type HttpErrorCode =
+  | "VALIDATION_ERROR"
+  | "PERIOD_CLOSED"
+  | "NOT_FOUND"
+  | "FORBIDDEN"
+  | "ENDPOINT_DEPRECATED"
+  | "INTERNAL_ERROR";
+
+export interface HttpError {
+  status: number;
+  code: HttpErrorCode;
+  message: string;
+  details?: unknown;
+}
+
+/** Map an unknown error to a structured HTTP error object */
+export function toHttpError(error: unknown): HttpError {
+  // ZodError → 400 validation
+  if (error instanceof ZodError) {
+    return {
+      status: 400,
+      code: "VALIDATION_ERROR",
+      message: "Données invalides",
+      details: error.flatten().fieldErrors,
+    };
+  }
+
+  // Known business errors encoded as Error with message keywords
+  if (error instanceof Error) {
+    const msg = error.message;
+
+    if (msg.includes("Period is closed") || msg.includes("Période clôturée")) {
+      return { status: 409, code: "PERIOD_CLOSED", message: msg };
+    }
+    if (msg.includes("not found") || msg.includes("non trouvé")) {
+      return { status: 404, code: "NOT_FOUND", message: msg };
+    }
+    if (msg.includes("Forbidden") || msg.includes("interdit")) {
+      return { status: 403, code: "FORBIDDEN", message: msg };
+    }
+
+    // Generic server error — surface the message but code 500
+    return { status: 500, code: "INTERNAL_ERROR", message: msg };
+  }
+
+  return { status: 500, code: "INTERNAL_ERROR", message: "An unknown error occurred" };
+}
+
+// ============================================================================
+// ZOD SCHEMAS — STRICT ACCOUNTING VALIDATION
+// ============================================================================
+
+/** Schema for a single line in a manual accounting entry */
+const manualEntryLineSchema = z.object({
+  compteId: z.string().uuid().optional(),
+  numeroCompte: z.string().min(1).optional(),
+  libelle: z.string().optional(),
+  debit: z.preprocess(
+    (v) => (typeof v === "string" ? parseFloat(v) : v),
+    z.number().min(0, "Le débit ne peut pas être négatif")
+  ).default(0),
+  credit: z.preprocess(
+    (v) => (typeof v === "string" ? parseFloat(v) : v),
+    z.number().min(0, "Le crédit ne peut pas être négatif")
+  ).default(0),
+  refExterne: z.string().optional(),
+}).refine(
+  (l) => !!l.compteId || !!l.numeroCompte,
+  { message: "Chaque ligne doit avoir compteId ou numeroCompte" }
+).refine(
+  (l) => !(l.debit > 0 && l.credit > 0),
+  { message: "Une ligne ne peut pas avoir à la fois un débit et un crédit > 0" }
+);
+
+/** Full schema for POST /api/comptabilite/v2/ecritures */
+export const manualEntrySchema = z.object({
+  journalCode: z.string().min(1, "Code journal requis"),
+  dateEcriture: z.string().min(1, "Date requise").refine(
+    (d) => !isNaN(Date.parse(d)),
+    { message: "Date invalide" }
+  ),
+  libelle: z.string().min(1, "Libellé requis"),
+  lignes: z.array(manualEntryLineSchema)
+    .min(2, "Au minimum 2 lignes d'écriture")
+    .max(200, "Maximum 200 lignes"),
+}).superRefine((data, ctx) => {
+  const totalDebit = data.lignes.reduce((s, l) => s + l.debit, 0);
+  const totalCredit = data.lignes.reduce((s, l) => s + l.credit, 0);
+  if (Math.abs(totalDebit - totalCredit) > 0.01) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `L'écriture n'est pas équilibrée: Débit=${totalDebit.toFixed(2)}, Crédit=${totalCredit.toFixed(2)}`,
+      path: ["lignes"],
+    });
+  }
+});
+
+export type ManualEntryInput = z.infer<typeof manualEntrySchema>;
+
+// ============================================================================
+// KEY / VALUE CONVERSION UTILITIES
+// ============================================================================
 
 export const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Object.prototype.toString.call(value) === "[object Object]";

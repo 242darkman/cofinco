@@ -505,6 +505,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "ACCOUNTING_UPDATE":
          debounceInvalidate(["/api/comptabilite"]);
          debounceInvalidate(["/api/factures"]);
+         window.dispatchEvent(new CustomEvent('accounting-update', { detail: message.payload }));
          break;
 
       case "OPERATIONS_UPDATE":

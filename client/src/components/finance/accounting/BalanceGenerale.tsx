@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Download, Printer, Filter, Calendar, BarChart3, RefreshCw, ChevronDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import { comptabiliteApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { useBalanceGenerale, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 
 interface BalanceCompte {
   compteId: string;
@@ -16,82 +16,37 @@ interface BalanceCompte {
   totalCredit: number;
   soldeDebiteur: number;
   soldeCrediteur: number;
-  // Legacy format aliases
-  numero_compte?: string;
-  type_compte?: string;
-  total_debit?: number;
-  total_credit?: number;
-  solde_debiteur?: number;
-  solde_crediteur?: number;
-}
-
-interface BalanceTotals {
-  totalDebits: number;
-  totalCredits: number;
-  totalSoldeDebiteur: number;
-  totalSoldeCrediteur: number;
-  isBalanced: boolean;
 }
 
 export default function BalanceGenerale() {
-  const [balance, setBalance] = useState<BalanceCompte[]>([]);
-  const [totalsFromApi, setTotalsFromApi] = useState<BalanceTotals | null>(null);
-  const [loading, setLoading] = useState(false);
   const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);
   const [filtreClasse, setFiltreClasse] = useState<string>('all');
 
-  const fetchBalance = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Use V2 API with enhanced response
-      const data = await comptabiliteApi.getBalanceV2({
-        dateDebut,
-        dateFin,
-        classe: filtreClasse !== 'all' ? parseInt(filtreClasse) : undefined
-      });
+  // Real-time WebSocket invalidation
+  useAccountingWebSocket();
 
-      // Normalize data format
-      const normalizedEntries = data.entries.map(e => ({
-        ...e,
-        // Add legacy aliases for compatibility
-        numero_compte: e.numeroCompte,
-        type_compte: e.typeCompte,
-        total_debit: e.totalDebit,
-        total_credit: e.totalCredit,
-        solde_debiteur: e.soldeDebiteur,
-        solde_crediteur: e.soldeCrediteur
-      }));
+  // React Query - replaces manual fetch + useState
+  const classeParam = filtreClasse !== 'all' ? parseInt(filtreClasse) : undefined;
+  const { data, isLoading: loading, refetch: fetchBalance } = useBalanceGenerale({
+    dateDebut,
+    dateFin,
+    classe: classeParam,
+  });
 
-      setBalance(normalizedEntries);
-      setTotalsFromApi(data.totals);
-    } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement de la balance'));
-      setBalance([]);
-      setTotalsFromApi(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [dateDebut, dateFin, filtreClasse]);
+  const filteredBalance: BalanceCompte[] = useMemo(() => data?.entries || [], [data]);
+  const totalsFromApi = data?.totals || null;
 
-  useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
-
-  // Balance is already filtered by classe on the server if specified
-  const filteredBalance = balance;
-
-  // Use totals from API or calculate locally
   const totaux = totalsFromApi ? {
     debit: totalsFromApi.totalDebits,
     credit: totalsFromApi.totalCredits,
     solde_debiteur: totalsFromApi.totalSoldeDebiteur,
     solde_crediteur: totalsFromApi.totalSoldeCrediteur
   } : filteredBalance.reduce((acc, compte) => ({
-    debit: acc.debit + (compte.totalDebit || compte.total_debit || 0),
-    credit: acc.credit + (compte.totalCredit || compte.total_credit || 0),
-    solde_debiteur: acc.solde_debiteur + (compte.soldeDebiteur || compte.solde_debiteur || 0),
-    solde_crediteur: acc.solde_crediteur + (compte.soldeCrediteur || compte.solde_crediteur || 0)
+    debit: acc.debit + (compte.totalDebit || 0),
+    credit: acc.credit + (compte.totalCredit || 0),
+    solde_debiteur: acc.solde_debiteur + (compte.soldeDebiteur || 0),
+    solde_crediteur: acc.solde_crediteur + (compte.soldeCrediteur || 0)
   }), { debit: 0, credit: 0, solde_debiteur: 0, solde_crediteur: 0 });
 
   const isEquilibre = totalsFromApi?.isBalanced ?? (
@@ -117,13 +72,13 @@ export default function BalanceGenerale() {
     }
     try {
       const data = filteredBalance.map(compte => ({
-        'N Compte': compte.numeroCompte || compte.numero_compte || '',
+        'N Compte': compte.numeroCompte || '',
         'Intitule': compte.intitule,
-        'Type': compte.typeCompte || compte.type_compte || '',
-        'Total Debit': compte.totalDebit ?? compte.total_debit ?? 0,
-        'Total Credit': compte.totalCredit ?? compte.total_credit ?? 0,
-        'Solde Debiteur': compte.soldeDebiteur ?? compte.solde_debiteur ?? 0,
-        'Solde Crediteur': compte.soldeCrediteur ?? compte.solde_crediteur ?? 0
+        'Type': compte.typeCompte || '',
+        'Total Debit': compte.totalDebit ?? 0,
+        'Total Credit': compte.totalCredit ?? 0,
+        'Solde Debiteur': compte.soldeDebiteur ?? 0,
+        'Solde Crediteur': compte.soldeCrediteur ?? 0
       }));
 
       data.push({
@@ -184,21 +139,14 @@ export default function BalanceGenerale() {
       const maxRows = Math.min(filteredBalance.length, 20);
 
       filteredBalance.slice(0, maxRows).forEach((compte) => {
-        const numCompte = compte.numeroCompte || compte.numero_compte || '';
-        const typeCompte = compte.typeCompte || compte.type_compte || '';
-        const totalDebit = compte.totalDebit ?? compte.total_debit ?? 0;
-        const totalCredit = compte.totalCredit ?? compte.total_credit ?? 0;
-        const soldeDebiteur = compte.soldeDebiteur ?? compte.solde_debiteur ?? 0;
-        const soldeCrediteur = compte.soldeCrediteur ?? compte.solde_crediteur ?? 0;
-
         doc.setFontSize(9);
-        doc.text(numCompte, 25, y);
+        doc.text(compte.numeroCompte || '', 25, y);
         doc.text((compte.intitule || '').substring(0, 40), 60, y);
-        doc.text(typeCompte, 140, y);
-        doc.text(totalDebit.toLocaleString('fr-FR'), 175, y);
-        doc.text(totalCredit.toLocaleString('fr-FR'), 205, y);
-        doc.text(soldeDebiteur.toLocaleString('fr-FR'), 235, y);
-        doc.text(soldeCrediteur.toLocaleString('fr-FR'), 260, y);
+        doc.text(compte.typeCompte || '', 140, y);
+        doc.text((compte.totalDebit ?? 0).toLocaleString('fr-FR'), 175, y);
+        doc.text((compte.totalCredit ?? 0).toLocaleString('fr-FR'), 205, y);
+        doc.text((compte.soldeDebiteur ?? 0).toLocaleString('fr-FR'), 235, y);
+        doc.text((compte.soldeCrediteur ?? 0).toLocaleString('fr-FR'), 260, y);
         y += 8;
       });
 
@@ -371,7 +319,7 @@ export default function BalanceGenerale() {
 
           {/* Bouton Actualiser */}
           <button
-            onClick={fetchBalance}
+            onClick={() => fetchBalance()}
             disabled={loading}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
@@ -384,9 +332,19 @@ export default function BalanceGenerale() {
       {/* Contenu principal */}
       <div className="bg-slate-800 rounded-xl overflow-hidden">
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-green-500 border-t-transparent mx-auto"></div>
-            <p className="text-slate-400 text-sm mt-3">Calcul de la balance...</p>
+          <div className="animate-pulse">
+            {/* Table header skeleton */}
+            <div className="h-10 bg-slate-700/50 rounded-t-lg" />
+            {/* Table rows skeleton */}
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3 border-t border-slate-700/20">
+                <div className="h-3 bg-slate-700 rounded w-16" />
+                <div className="h-3 bg-slate-700 rounded flex-1" />
+                <div className="h-3 bg-slate-700 rounded w-24" />
+                <div className="h-3 bg-slate-700 rounded w-24" />
+                <div className="h-3 bg-slate-700 rounded w-20" />
+              </div>
+            ))}
           </div>
         ) : (
           <>
@@ -423,41 +381,34 @@ export default function BalanceGenerale() {
                     </tr>
                   ) : (
                     filteredBalance.map((compte) => {
-                      const numCompte = compte.numeroCompte || compte.numero_compte || '';
-                      const typeCompte = compte.typeCompte || compte.type_compte || '';
-                      const totalDebit = compte.totalDebit ?? compte.total_debit ?? 0;
-                      const totalCredit = compte.totalCredit ?? compte.total_credit ?? 0;
-                      const soldeDebiteur = compte.soldeDebiteur ?? compte.solde_debiteur ?? 0;
-                      const soldeCrediteur = compte.soldeCrediteur ?? compte.solde_crediteur ?? 0;
-
                       return (
-                        <tr key={compte.compteId || numCompte} className="hover:bg-slate-700/30 transition-colors">
+                        <tr key={compte.compteId || compte.numeroCompte} className="hover:bg-slate-700/30 transition-colors">
                           <td className="px-3 py-2">
-                            <span className="text-cyan-400 font-mono text-xs font-medium">{numCompte}</span>
+                            <span className="text-cyan-400 font-mono text-xs font-medium">{compte.numeroCompte}</span>
                           </td>
                           <td className="px-3 py-2 text-white text-xs truncate max-w-[200px]">{compte.intitule}</td>
                           <td className="px-3 py-2 hidden md:table-cell">
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                              typeCompte === 'Actif' ? 'bg-green-500/20 text-green-400' :
-                              typeCompte === 'Passif' ? 'bg-blue-500/20 text-blue-400' :
-                              typeCompte === 'Charge' ? 'bg-red-500/20 text-red-400' :
-                              typeCompte === 'Produit' ? 'bg-purple-500/20 text-purple-400' :
+                              compte.typeCompte === 'Actif' ? 'bg-green-500/20 text-green-400' :
+                              compte.typeCompte === 'Passif' ? 'bg-blue-500/20 text-blue-400' :
+                              compte.typeCompte === 'Charge' ? 'bg-red-500/20 text-red-400' :
+                              compte.typeCompte === 'Produit' ? 'bg-purple-500/20 text-purple-400' :
                               'bg-slate-500/20 text-slate-400'
                             }`}>
-                              {typeCompte}
+                              {compte.typeCompte}
                             </span>
                           </td>
                           <td className="px-3 py-2 text-right text-white text-xs font-mono">
-                            {totalDebit > 0 ? totalDebit.toLocaleString() : '-'}
+                            {compte.totalDebit > 0 ? compte.totalDebit.toLocaleString() : '-'}
                           </td>
                           <td className="px-3 py-2 text-right text-white text-xs font-mono">
-                            {totalCredit > 0 ? totalCredit.toLocaleString() : '-'}
+                            {compte.totalCredit > 0 ? compte.totalCredit.toLocaleString() : '-'}
                           </td>
                           <td className="px-3 py-2 text-right text-green-400 text-xs font-mono font-medium hidden lg:table-cell">
-                            {soldeDebiteur > 0 ? soldeDebiteur.toLocaleString() : '-'}
+                            {compte.soldeDebiteur > 0 ? compte.soldeDebiteur.toLocaleString() : '-'}
                           </td>
                           <td className="px-3 py-2 text-right text-cyan-400 text-xs font-mono font-medium hidden lg:table-cell">
-                            {soldeCrediteur > 0 ? soldeCrediteur.toLocaleString() : '-'}
+                            {compte.soldeCrediteur > 0 ? compte.soldeCrediteur.toLocaleString() : '-'}
                           </td>
                         </tr>
                       );

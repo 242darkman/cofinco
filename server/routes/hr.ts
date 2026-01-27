@@ -26,6 +26,7 @@ import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { storage } from "server/storage";
 import { hrService } from "../services/hr-service";
+import { postPayrollEngagement, postPayrollPayment } from "../services/hr-accounting-service";
 import { users } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { z } from "zod";
@@ -933,17 +934,36 @@ hrRouter.patch("/paie/validate", getAuthUser, attachAbility, requireAbility(Acti
       return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Liste de bulletins requise'));
     }
 
-    // Update bulletins to VALIDATED
-    const updated = await db
-      .update(bulletinsPaie)
-      .set({ statut: BulletinStatus.VALIDATED })
-      .where(
-        and(
-          sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
-          eq(bulletinsPaie.statut, BulletinStatus.DRAFT)
+    // Update bulletins to VALIDATED + GL posting (within transaction)
+    const agenceId = req.user?.agenceId;
+    const userId = req.user?.id || "system";
+
+    const updated = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(bulletinsPaie)
+        .set({ statut: BulletinStatus.VALIDATED })
+        .where(
+          and(
+            sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
+            eq(bulletinsPaie.statut, BulletinStatus.DRAFT)
+          )
         )
-      )
-      .returning();
+        .returning();
+
+      // Post GL engagement for each validated bulletin
+      if (agenceId) {
+        for (const bulletin of rows) {
+          try {
+            await postPayrollEngagement(tx, bulletin, agenceId, userId);
+          } catch (glError) {
+            console.error(`[HR] GL engagement failed for bulletin ${bulletin.id}:`, glError);
+            // Don't block validation — GL status tracked on mouvement
+          }
+        }
+      }
+
+      return rows;
+    });
 
     // Audit log
     await hrService.logAction(
@@ -988,21 +1008,39 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
     }
 
     const paymentDate = datePaiement ? new Date(datePaiement) : new Date();
+    const agenceId = req.user?.agenceId;
+    const userId = req.user?.id || "system";
 
-    // Update bulletins to PAID
-    const updated = await db
-      .update(bulletinsPaie)
-      .set({
-        statut: BulletinStatus.PAID,
-        datePaiement: paymentDate.toISOString().split('T')[0],
-      })
-      .where(
-        and(
-          sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
-          eq(bulletinsPaie.statut, BulletinStatus.VALIDATED)
+    // Update bulletins to PAID + GL posting (within transaction)
+    const updated = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(bulletinsPaie)
+        .set({
+          statut: BulletinStatus.PAID,
+          datePaiement: paymentDate.toISOString().split('T')[0],
+        })
+        .where(
+          and(
+            sql`${bulletinsPaie.id} = ANY(${bulletinIds})`,
+            eq(bulletinsPaie.statut, BulletinStatus.VALIDATED)
+          )
         )
-      )
-      .returning();
+        .returning();
+
+      // Post GL payment for each paid bulletin
+      if (agenceId) {
+        for (const bulletin of rows) {
+          try {
+            await postPayrollPayment(tx, bulletin, agenceId, userId);
+          } catch (glError) {
+            console.error(`[HR] GL payment failed for bulletin ${bulletin.id}:`, glError);
+            // Don't block payment — GL status tracked on mouvement
+          }
+        }
+      }
+
+      return rows;
+    });
 
     // Calculate total paid
     const totalPaid = updated.reduce((sum, b) => sum + parseInt(b.salaireNet || '0'), 0);

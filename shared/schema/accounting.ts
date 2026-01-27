@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, date, jsonb, check } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, json, date, jsonb, check, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
@@ -178,10 +178,20 @@ export const glPostingLinks = pgTable("gl_posting_links", {
   sourceType: text("source_type").notNull(),
   sourceId: uuid("source_id").notNull(),
   ecritureId: uuid("ecriture_id").notNull().references(() => ecritures.id, { onDelete: "cascade" }),
+  mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("POSTED"), // POSTED | FAILED
+  attempts: integer("attempts").notNull().default(1),
+  lastAttemptAt: timestamp("last_attempt_at").defaultNow(),
+  nextRetryAt: timestamp("next_retry_at"),
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  uqSource: uniqueIndex("uq_gl_posting_links_source").on(t.agenceId, t.sourceType, t.sourceId),
+  idxMouvement: index("idx_gl_posting_links_mouvement").on(t.mouvementId),
+  idxStatus: index("idx_gl_posting_links_status").on(t.status),
+}));
 
-export const insertGlPostingLinkSchema = createInsertSchema(glPostingLinks).omit({ id: true, createdAt: true });
+export const insertGlPostingLinkSchema = createInsertSchema(glPostingLinks).omit({ id: true, createdAt: true, lastAttemptAt: true });
 export type InsertGlPostingLink = z.infer<typeof insertGlPostingLinkSchema>;
 export type GlPostingLink = typeof glPostingLinks.$inferSelect;
 

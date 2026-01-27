@@ -1,36 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  TrendingUp, TrendingDown, DollarSign, Download, Filter,
-  ArrowUpRight, ArrowDownRight, Activity, Percent, ArrowRight,
-  PieChart, BarChart3, Wallet, Printer
+  TrendingUp, Download,
+  ArrowUpRight, ArrowDownRight, Activity, ArrowRight,
+  PieChart as PieChartIcon, BarChart3, Printer, RefreshCw
 } from 'lucide-react';
 import { Card, Button, Badge, ResponsiveTable } from '../../ui';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
+import { useCompteResultat } from '../../../hooks/accounting/useAccounting';
+import {
+  ResponsiveContainer,
+  PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+} from 'recharts';
 
-interface CompteComptable {
-  id: string;
+interface CompteResultatLine {
   numero_compte: string;
   intitule: string;
-  type_compte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
-  solde_actuel: number;
+  montant: number;
 }
 
-interface CompteResultatProps {
-  comptes: CompteComptable[];
-  loading?: boolean;
+interface CompteResultatData {
+  exercice: string;
+  charges: CompteResultatLine[];
+  produits: CompteResultatLine[];
+  totalCharges: number;
+  totalProduits: number;
+  resultatNet: number;
+  margeNette: number;
+  type: 'benefice' | 'perte';
 }
 
-export default function CompteResultat({ comptes, loading }: CompteResultatProps) {
+export default function CompteResultat() {
   const [viewMode, setViewMode] = useState<'synthese' | 'charges' | 'produits'>('synthese');
+  const [exercice, setExercice] = useState(String(new Date().getFullYear()));
 
-  const charges = comptes.filter(c => c.type_compte === 'Charge');
-  const produits = comptes.filter(c => c.type_compte === 'Produit');
+  const { data, isLoading: loading, refetch } = useCompteResultat(exercice);
+  const result = data as CompteResultatData | undefined;
 
-  const totalCharges = charges.reduce((sum, c) => sum + c.solde_actuel, 0);
-  const totalProduits = produits.reduce((sum, c) => sum + c.solde_actuel, 0);
-  const resultatNet = totalProduits - totalCharges;
-  const rentabilite = totalProduits > 0 ? (resultatNet / totalProduits) * 100 : 0;
+  const charges = useMemo(() => result?.charges || [], [result]);
+  const produits = useMemo(() => result?.produits || [], [result]);
+
+  const totalCharges = result?.totalCharges || 0;
+  const totalProduits = result?.totalProduits || 0;
+  const resultatNet = result?.resultatNet || 0;
+  const rentabilite = result?.margeNette || 0;
 
   const formatMoney = (amount: number) => (amount || 0).toLocaleString() + ' FCFA';
 
@@ -40,7 +54,7 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
       const chargesData = charges.map(c => ({
         'N° Compte': c.numero_compte,
         'Intitulé': c.intitule,
-        'Montant': c.solde_actuel
+        'Montant': c.montant
       }));
       chargesData.push({ 'N° Compte': 'TOTAL CHARGES', 'Intitulé': '', 'Montant': totalCharges });
 
@@ -48,7 +62,7 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
       const produitsData = produits.map(c => ({
         'N° Compte': c.numero_compte,
         'Intitulé': c.intitule,
-        'Montant': c.solde_actuel
+        'Montant': c.montant
       }));
       produitsData.push({ 'N° Compte': 'TOTAL PRODUITS', 'Intitulé': '', 'Montant': totalProduits });
 
@@ -89,7 +103,7 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
       doc.setFontSize(12);
       doc.setTextColor(100);
       doc.text('COFIN&CO-M - Système Comptable OHADA', 105, 30, { align: 'center' });
-      doc.text(`Exercice: ${new Date().getFullYear()}`, 105, 38, { align: 'center' });
+      doc.text(`Exercice: ${exercice}`, 105, 38, { align: 'center' });
 
       doc.setDrawColor(30, 58, 138);
       doc.line(20, 44, 190, 44);
@@ -107,7 +121,7 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
       produits.slice(0, 10).forEach((p) => {
         doc.text(p.numero_compte, 25, y);
         doc.text(p.intitule.substring(0, 50), 45, y);
-        doc.text((p.solde_actuel || 0).toLocaleString('fr-FR'), 160, y, { align: 'right' });
+        doc.text((p.montant || 0).toLocaleString('fr-FR'), 160, y, { align: 'right' });
         y += 6;
       });
 
@@ -130,7 +144,7 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
       charges.slice(0, 10).forEach((c) => {
         doc.text(c.numero_compte, 25, y);
         doc.text(c.intitule.substring(0, 50), 45, y);
-        doc.text((c.solde_actuel || 0).toLocaleString('fr-FR'), 160, y, { align: 'right' });
+        doc.text((c.montant || 0).toLocaleString('fr-FR'), 160, y, { align: 'right' });
         y += 6;
       });
 
@@ -175,10 +189,10 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
       label: 'Intitulé', 
       format: (val: string) => <span className="text-slate-200 text-xs font-medium">{val}</span> 
     },
-    { 
-      key: 'solde_actuel', 
-      label: 'Montant', 
-      format: (val: number) => <span className="font-bold text-white text-xs">{(val || 0).toLocaleString()}</span> 
+    {
+      key: 'montant',
+      label: 'Montant',
+      format: (val: number) => <span className="font-bold text-white text-xs">{(val || 0).toLocaleString()}</span>
     }
   ];
 
@@ -191,12 +205,38 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
             <p className="text-[10px] text-slate-400">Analyse de la performance</p>
          </div>
          <div className="flex gap-2">
-            <Button variant="outline" size="sm" icon={Filter} className="h-8 text-xs">{new Date().getFullYear()}</Button>
+            <select
+              value={exercice}
+              onChange={(e) => setExercice(e.target.value)}
+              className="h-8 text-xs bg-slate-800 border border-slate-700 rounded-lg px-2 text-white"
+            >
+              {Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - i)).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <Button variant="outline" size="sm" icon={RefreshCw} className="h-8 text-xs" onClick={() => refetch()}>
+              {loading ? '...' : ''}
+            </Button>
             <Button variant="outline" size="sm" icon={Download} className="h-8 text-xs" onClick={handleExportExcel}>Excel</Button>
             <Button variant="primary" size="sm" icon={Printer} className="h-8 text-xs" onClick={handleExportPDF}>PDF</Button>
          </div>
       </div>
 
+      {loading && !result ? (
+        <div className="space-y-3 animate-pulse">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-24 bg-slate-800 rounded-xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="h-48 bg-slate-800 rounded-xl" />
+            <div className="h-48 bg-slate-800 rounded-xl" />
+          </div>
+          <div className="h-64 bg-slate-800 rounded-xl" />
+        </div>
+      ) : (
+      <>
       {/* Top Cards - Dashboard Style */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Charges Card */}
@@ -279,7 +319,7 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
                <Card variant="default" padding="sm" className="space-y-3">
                   <div className="flex items-center gap-2">
                      <div className="p-1 bg-purple-500/20 rounded">
-                        <PieChart size={14} className="text-purple-400" />
+                        <PieChartIcon size={14} className="text-purple-400" />
                      </div>
                      <h3 className="text-xs font-bold text-white">Analyse de Rentabilité</h3>
                   </div>
@@ -318,37 +358,80 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
                   </p>
                </Card>
 
-               {/* Top Postes - Mini Tables */}
-               <div className="grid grid-cols-2 gap-3">
-                  <Card variant="default" padding="sm" className="space-y-2">
-                     <div className="flex items-center justify-between">
-                        <h4 className="text-[10px] font-bold text-red-400">Top Charges</h4>
-                        <BarChart3 size={12} className="text-red-400/50" />
+               {/* Charts */}
+               <Card variant="default" padding="sm" className="space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                     <div className="p-1 bg-blue-500/20 rounded">
+                        <BarChart3 size={14} className="text-blue-400" />
                      </div>
-                     <div className="space-y-1">
-                       {charges.slice(0, 3).map(c => (
-                           <div key={c.id} className="flex justify-between items-center text-[10px]">
-                              <span className="text-slate-300 truncate w-16">{c.intitule}</span>
-                              <span className="text-white font-mono">{(c.solde_actuel || 0).toLocaleString()}</span>
-                           </div>
-                        ))}
+                     <h3 className="text-xs font-bold text-white">Répartition</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                     {/* Donut Chart: Charges vs Produits */}
+                     <div className="flex flex-col items-center">
+                        <ResponsiveContainer width="100%" height={140}>
+                           <PieChart>
+                              <Pie
+                                 data={[
+                                    { name: 'Charges', value: totalCharges },
+                                    { name: 'Produits', value: totalProduits },
+                                 ]}
+                                 cx="50%"
+                                 cy="50%"
+                                 innerRadius={35}
+                                 outerRadius={55}
+                                 paddingAngle={4}
+                                 dataKey="value"
+                                 stroke="none"
+                              >
+                                 <Cell fill="#ef4444" />
+                                 <Cell fill="#22c55e" />
+                              </Pie>
+                              <Tooltip
+                                 formatter={(value: number) => `${value.toLocaleString()} FCFA`}
+                                 contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                                 itemStyle={{ color: '#e2e8f0' }}
+                              />
+                           </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex gap-3 text-[10px] mt-1">
+                           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Charges</span>
+                           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Produits</span>
+                        </div>
                      </div>
-                  </Card>
-                  <Card variant="default" padding="sm" className="space-y-2">
-                     <div className="flex items-center justify-between">
-                        <h4 className="text-[10px] font-bold text-emerald-400">Top Produits</h4>
-                        <BarChart3 size={12} className="text-emerald-400/50" />
+
+                     {/* Bar Chart: Top 5 postes */}
+                     <div>
+                        <ResponsiveContainer width="100%" height={160}>
+                           <BarChart
+                              layout="vertical"
+                              data={[
+                                 ...charges.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#ef4444' })),
+                                 ...produits.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#22c55e' })),
+                              ].sort((a, b) => b.montant - a.montant).slice(0, 5)}
+                              margin={{ left: 5, right: 5 }}
+                           >
+                              <XAxis type="number" hide />
+                              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} width={45} />
+                              <Tooltip
+                                 formatter={(value: number) => `${value.toLocaleString()} FCFA`}
+                                 contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 11 }}
+                                 itemStyle={{ color: '#e2e8f0' }}
+                              />
+                              <Bar dataKey="montant" radius={[0, 4, 4, 0]}>
+                                 {[
+                                    ...charges.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#ef4444' })),
+                                    ...produits.slice(0, 3).map(c => ({ name: c.numero_compte, montant: c.montant, fill: '#22c55e' })),
+                                 ].sort((a, b) => b.montant - a.montant).slice(0, 5).map((entry, i) => (
+                                    <Cell key={i} fill={entry.fill} />
+                                 ))}
+                              </Bar>
+                           </BarChart>
+                        </ResponsiveContainer>
                      </div>
-                     <div className="space-y-1">
-                        {produits.slice(0, 3).map(c => (
-                           <div key={c.id} className="flex justify-between items-center text-[10px]">
-                              <span className="text-slate-300 truncate w-16">{c.intitule}</span>
-                              <span className="text-white font-mono">{(c.solde_actuel || 0).toLocaleString()}</span>
-                           </div>
-                        ))}
-                     </div>
-                  </Card>
-               </div>
+                  </div>
+               </Card>
             </div>
          )}
 
@@ -371,6 +454,8 @@ export default function CompteResultat({ comptes, loading }: CompteResultatProps
             </Card>
          )}
       </div>
+      </>
+      )}
     </div>
   );
 }

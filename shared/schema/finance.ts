@@ -390,6 +390,11 @@ export const mouvementsFinanciers = pgTable(
     sourceTable: text("source_table"),
     sourceId: uuid("source_id"),
     metadata: json("metadata"),
+
+    // GL Posting tracking (PR-0)
+    requiresGlPosting: boolean("requires_gl_posting").notNull().default(true),
+    glPostingStatus: text("gl_posting_status").notNull().default("PENDING"), // PENDING | POSTED | FAILED | SKIPPED
+    glPostingError: text("gl_posting_error"),
   },
   (t) => ({
     uqReference: uniqueIndex("uq_mouvements_reference").on(t.reference),
@@ -400,6 +405,9 @@ export const mouvementsFinanciers = pgTable(
     idxCreditDate: index("idx_mouvements_credit_date").on(t.creditId, t.dateOperation),
     idxSessionDate: index("idx_mouvements_session_date").on(t.sessionCaisseId, t.dateOperation),
     idxModuleDate: index("idx_mouvements_module_date").on(t.sourceModule, t.dateOperation),
+    idxAgenceCreated: index("idx_mouvements_agence_created").on(t.agenceId, t.createdAt),
+    idxAgenceModuleRef: index("idx_mouvements_agence_module_ref").on(t.agenceId, t.sourceModule, t.reference),
+    idxGlStatus: index("idx_mouvements_gl_status").on(t.glPostingStatus),
 
     chkMontantPos: sql`CONSTRAINT chk_mouvements_montant_pos CHECK (${t.montant} > 0)`,
   }),

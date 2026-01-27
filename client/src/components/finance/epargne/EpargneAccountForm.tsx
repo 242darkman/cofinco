@@ -693,7 +693,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                               key={compte.id}
                               className="px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded-md border border-slate-600"
                             >
-                              {type} • {compte.numero_compte}
+                              {TYPE_COMPTE_LABELS[normalizeTypeCompte(type)]} • {compte.numero_compte}
                             </span>
                           );
                         })}
