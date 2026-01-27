@@ -28,12 +28,13 @@ interface SessionForceClosedEvent {
 
 interface CaisseUpdateEvent {
   caisseId: string;
-  type: 'SESSION_OPENED' | 'FUNDS_DISPATCHED' | 'FUNDS_REJECTED' | 'BALANCE_UPDATED';
+  type: 'SESSION_OPENED' | 'FUNDS_DISPATCHED' | 'FUNDS_REJECTED' | 'BALANCE_UPDATED' | 'OPENING_CANCELLED' | 'OPENING_CANCELLED_FUNDS_RETURNED';
   sessionId?: string;
   newBalance?: number;
   montant?: number;
   reason?: string;
   openingType?: string;
+  restitution?: boolean;
 }
 
 interface UseCaisseWebSocketOptions {
@@ -149,6 +150,13 @@ export function useCaisseWebSocket({
                     duration: 5000,
                     description: data.payload.reason || 'Raison non spécifiée',
                 });
+            } else if (updateType === 'OPENING_CANCELLED_FUNDS_RETURNED') {
+                toast.warning('Ouverture annulée — Fonds restitués au coffre', {
+                    duration: 5000,
+                    description: `Montant restitué: ${Number(data.payload.montant || 0).toLocaleString()} FCFA`,
+                });
+            } else if (updateType === 'OPENING_CANCELLED') {
+                toast.info('Demande d\'ouverture annulée', { duration: 3000 });
             } else if (updateType === 'BALANCE_UPDATED') {
                 // Silent update, just refresh
             }

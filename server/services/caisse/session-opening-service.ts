@@ -21,12 +21,16 @@ import {
   coffresForts,
   configCoffreFort,
   comptageBillets,
+  mouvementsFinanciers,
+  operationsCaisse,
 } from "@shared/schema";
 import { eq, and, isNull, inArray, desc } from "drizzle-orm";
-import { StatutTransfertCoffre, StatutCaisse } from "@shared/enum/status-constants";
+import { StatutTransfertCoffre, StatutCaisse, StatutTransaction, STATUT_SESSION_CAISSE_LABELS, type StatutSessionCaisseType } from "@shared/enum/status-constants";
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
 import { getWsInstance } from "../../ws-server";
+import { updateCoffreBalance, updateCaisseBalance } from "../coffre/coffre-guard";
+import { balanceService } from "../balance-service";
 
 // ============================================================================
 // TYPES
@@ -400,7 +404,7 @@ export class SessionOpeningService {
         if (transfert.statut !== StatutTransfertCoffre.REQUESTED) {
           return {
             success: false,
-            error: `Le transfert doit être en statut 'REQUESTED' (actuel: ${transfert.statut})`,
+            error: `Ce transfert ne peut plus être validé car il a déjà été ${transfert.statut === "VALIDATED" ? "validé" : transfert.statut === "EXECUTED" ? "exécuté" : transfert.statut === "REJECTED" ? "rejeté" : transfert.statut === "CANCELLED" ? "annulé" : "traité"}.`,
             errorCode: "INVALID_TRANSITION",
           };
         }
@@ -626,9 +630,18 @@ export class SessionOpeningService {
         }
 
         if (session.statut !== "FUNDS_DISPATCHED") {
+          const label = STATUT_SESSION_CAISSE_LABELS[session.statut as StatutSessionCaisseType] || session.statut;
+          const guidance: Record<string, string> = {
+            REQUESTING_FUNDS: "Les fonds n'ont pas encore été envoyés par le coffre. Veuillez patienter.",
+            OPEN: "Cette session est déjà ouverte.",
+            CLOSING_COUNT: "Cette session est en cours de fermeture.",
+            CLOSING_VALIDATION: "Cette session est en cours de fermeture.",
+            CLOSED: "Cette session est déjà fermée.",
+          };
+          const detail = guidance[session.statut] || "";
           return {
             success: false,
-            error: `Session dans un état invalide: ${session.statut}. Attendu: FUNDS_DISPATCHED`,
+            error: `Impossible de confirmer la réception des fonds : la session est actuellement en statut « ${label} ». ${detail}`.trim(),
             errorCode: "INVALID_STATE",
           };
         }
@@ -832,7 +845,9 @@ export class SessionOpeningService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Annulation d'une demande par le caissier (uniquement si REQUESTING_FUNDS)
+  // Annulation d'une demande par le caissier (REQUESTING_FUNDS ou FUNDS_DISPATCHED)
+  // Si les fonds ont déjà été envoyés (FUNDS_DISPATCHED), le transfert est
+  // annulé et les fonds sont restitués au coffre-fort (historisé des deux côtés).
   // ─────────────────────────────────────────────────────────────────────────
   async cancelOpeningRequest(params: CancelRequestParams): Promise<{
     success: boolean;
@@ -867,47 +882,269 @@ export class SessionOpeningService {
           };
         }
 
-        // 3. Vérifier l'état (uniquement REQUESTING_FUNDS peut être annulé)
-        if (session.statut !== "REQUESTING_FUNDS") {
+        // 3. Vérifier l'état (REQUESTING_FUNDS ou FUNDS_DISPATCHED peuvent être annulés)
+        const statutActuel = session.statut;
+        if (statutActuel !== "REQUESTING_FUNDS" && statutActuel !== "FUNDS_DISPATCHED") {
+          const label = STATUT_SESSION_CAISSE_LABELS[statutActuel as StatutSessionCaisseType] || statutActuel;
+          const guidance: Record<string, string> = {
+            OPEN: "La session est déjà ouverte et ne peut plus être annulée.",
+            CLOSING_COUNT: "La session est en cours de fermeture.",
+            CLOSING_VALIDATION: "La session est en cours de fermeture.",
+            CLOSED: "Cette session est déjà fermée.",
+          };
+          const detail = guidance[statutActuel] || "";
           return {
             success: false,
-            error: `Seules les demandes en attente peuvent être annulées (état actuel: ${session.statut})`,
+            error: `Impossible d'annuler la demande : la session est actuellement en statut « ${label} ». ${detail}`.trim(),
             errorCode: "INVALID_STATE",
           };
         }
 
-        // 4. Annuler le transfert associé
+        const isFundsDispatched = statutActuel === "FUNDS_DISPATCHED";
+        const cancelReason = reason || "Annulé par le caissier";
+
+        // Variables hoistées pour être accessibles dans la section WS (étape 7)
+        let coffreBalanceAfterReversal: number | null = null;
+        let caisseBalanceAfterReversal: number | null = null;
+        let reversalCoffreId: string | null = null;
+        let reversalMontant = 0;
+
+        // 4. Annuler le transfert associé et restituer les fonds au coffre si nécessaire
         if (session.openingTransfertId) {
-          await this.transfertService.cancelTransfert({
-            transfertId: session.openingTransfertId,
-            cancelledBy: userId,
-            reason: reason || "Annulé par le caissier",
-            ipAddress,
-            userAgent,
-          });
+          // Récupérer le transfert dans la transaction pour le traiter directement
+          const [transfert] = await tx
+            .select()
+            .from(transfertsCoffreCaisse)
+            .where(eq(transfertsCoffreCaisse.id, session.openingTransfertId))
+            .for("update");
+
+          if (transfert) {
+            const montant = Number(transfert.montant);
+            const wasExecuted = transfert.statut === StatutTransfertCoffre.EXECUTED || !!transfert.executedAt;
+            const isCoffreSource = transfert.typeTransfert === "COFFRE_VERS_CAISSE";
+            reversalMontant = montant;
+            reversalCoffreId = transfert.coffreId;
+            if (wasExecuted && isCoffreSource && montant > 0) {
+              // Re-créditer le coffre-fort (annuler le débit)
+              const coffreResult = await updateCoffreBalance(tx, transfert.coffreId, +montant);
+              coffreBalanceAfterReversal = Number(coffreResult.solde);
+
+              // Re-débiter la caisse (annuler le crédit)
+              const caisseResult = await updateCaisseBalance(tx, transfert.caisseId, -montant);
+              caisseBalanceAfterReversal = Number(caisseResult.solde);
+
+              // Créer les mouvements d'annulation dans le ledger
+              const refPrefix = `ANN-${Date.now().toString().slice(-6)}`;
+
+              await tx.insert(mouvementsFinanciers).values({
+                montant: montant.toString(),
+                sens: "CREDIT",
+                sourceModule: "TRANSFERT",
+                agenceId: transfert.agenceId,
+                reference: `${refPrefix}-COFFRE-CREDIT`,
+                idempotencyKey: `${transfert.id}-cancel-coffre-credit`,
+                statut: StatutTransaction.POSTED,
+                dateOperation: new Date(),
+                metadata: {
+                  transfertId: transfert.id,
+                  coffreId: transfert.coffreId,
+                  type: "RESTITUTION_COFFRE",
+                  description: `Restitution coffre: annulation ouverture caisse — ${cancelReason}`,
+                  categorie: "Annulation Transfert",
+                  sessionId,
+                },
+              });
+
+              await tx.insert(mouvementsFinanciers).values({
+                montant: montant.toString(),
+                sens: "DEBIT",
+                sourceModule: "TRANSFERT",
+                agenceId: transfert.agenceId,
+                reference: `${refPrefix}-CAISSE-DEBIT`,
+                idempotencyKey: `${transfert.id}-cancel-caisse-debit`,
+                statut: StatutTransaction.POSTED,
+                dateOperation: new Date(),
+                metadata: {
+                  transfertId: transfert.id,
+                  caisseId: transfert.caisseId,
+                  type: "RESTITUTION_CAISSE",
+                  description: `Reprise fonds caisse: annulation ouverture — ${cancelReason}`,
+                  categorie: "Annulation Transfert",
+                  sessionId,
+                },
+              });
+            }
+
+            // Annuler le transfert (REQUESTED/VALIDATED/EXECUTED → CANCELLED)
+            await tx
+              .update(transfertsCoffreCaisse)
+              .set({
+                statut: StatutTransfertCoffre.CANCELLED,
+                reasonRejection: isFundsDispatched
+                  ? `Restitution coffre-fort: ${cancelReason}`
+                  : cancelReason,
+                updatedAt: new Date(),
+              })
+              .where(eq(transfertsCoffreCaisse.id, session.openingTransfertId));
+
+            // Audit côté transfert
+            await tx.insert(transfertsCoffreAuditLogs).values({
+              transfertId: session.openingTransfertId,
+              action: wasExecuted ? "RESTITUTION_EXECUTED" : (isFundsDispatched ? "RESTITUTION_COFFRE" : "CANCELLED"),
+              statutAvant: transfert.statut,
+              statutApres: StatutTransfertCoffre.CANCELLED,
+              details: {
+                reason: cancelReason,
+                restitution: isFundsDispatched || wasExecuted,
+                reversed: wasExecuted,
+                montant,
+                caisseId: transfert.caisseId,
+                coffreId: transfert.coffreId,
+                sessionId,
+              },
+              userId,
+              ipAddress,
+              userAgent,
+            });
+          }
         }
 
+        // 4b. Annuler toutes les opérations liées à cette session
+        //     Sans ceci, les opérations POSTED de la session annulée polluent
+        //     le dashboard caisse des sessions suivantes sur la même caisse physique.
+        await tx
+          .update(operationsCaisse)
+          .set({
+            statut: StatutTransaction.CANCELLED as any,
+            annulledAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(operationsCaisse.sessionId, sessionId));
+
         // 5. Fermer la session
+        //    IMPORTANT: Remettre à zéro les montants et openedAt car la caisse n'a jamais
+        //    réellement ouvert. Sans ceci, la query dashboard comptabilise un solde fantôme
+        //    via montantFermetureTheorique de la session.
         await tx
           .update(sessionsCaisse)
           .set({
+            statut: "CLOSED" as any,
             closedAt: new Date(),
-            observations: `Demande annulée: ${reason || "À la demande du caissier"}`,
+            openedAt: null,
+            montantOuverture: "0",
+            montantFermetureTheorique: "0",
+            observations: isFundsDispatched
+              ? `Ouverture annulée après envoi des fonds: ${cancelReason}. Fonds restitués au coffre-fort.`
+              : `Demande annulée: ${cancelReason}`,
             updatedAt: new Date(),
           })
           .where(eq(sessionsCaisse.id, sessionId));
 
-        // 6. Log d'audit
+        // 6. Log d'audit côté session
         await tx.insert(sessionsCaisseAuditLogs).values({
           sessionId,
-          action: "REQUEST_CANCELLED",
-          statutAvant: "REQUESTING_FUNDS",
+          action: isFundsDispatched ? "OPENING_CANCELLED_FUNDS_RETURNED" : "REQUEST_CANCELLED",
+          statutAvant: statutActuel,
           statutApres: "CLOSED",
-          details: { reason },
+          details: {
+            reason: cancelReason,
+            restitution: isFundsDispatched,
+            montant: isFundsDispatched ? Number(session.montantDemande) : undefined,
+          },
           userId,
           ipAddress,
           userAgent,
         });
+
+        // 7. Notifications temps réel (caisse + coffre + agence)
+        try {
+          const ws = getWsInstance();
+          if (ws && session.agenceId) {
+            const cancelType = isFundsDispatched ? 'OPENING_CANCELLED_FUNDS_RETURNED' : 'OPENING_CANCELLED';
+            const montant = Number(session.montantDemande || 0);
+
+            // A. Notifier le hook WS dédié caisse (toasts + callbacks onCaisseUpdate)
+            ws.broadcastToAggregate('caisse', session.caisseId, {
+              type: 'CAISSE_UPDATE',
+              payload: {
+                caisseId: session.caisseId,
+                type: cancelType,
+                sessionId,
+                montant,
+                restitution: isFundsDispatched,
+              }
+            });
+
+            // B. Invalider les queries caisse pour TOUS les clients de l'agence
+            //    (WebSocketContext gère CAISSE_UPDATE → invalidate sessions, active, pending, etc.)
+            ws.broadcastToAgency(session.agenceId, {
+              type: 'CAISSE_UPDATE',
+              payload: {
+                caisseId: session.caisseId,
+                type: cancelType,
+                sessionId,
+                montant,
+                restitution: isFundsDispatched,
+              }
+            });
+
+            // C. Invalider les queries coffre pour TOUS les clients de l'agence
+            //    (WebSocketContext gère REALTIME_EVENT coffre → invalidate transferts, stats, mouvements)
+            ws.broadcastToAgency(session.agenceId, {
+              type: 'REALTIME_EVENT',
+              payload: {
+                aggregateType: 'coffre',
+                aggregateId: session.agenceId,
+                event: cancelType,
+                sessionId,
+                caisseId: session.caisseId,
+                montant,
+                restitution: isFundsDispatched,
+              }
+            });
+
+            // D. Activité en temps réel (fil d'activité agence)
+            ws.broadcastToAgency(session.agenceId, {
+              type: 'LIVE_ACTIVITY',
+              payload: {
+                action: isFundsDispatched
+                  ? `Ouverture annulée — Fonds restitués au coffre: ${montant.toLocaleString()} FCFA`
+                  : `Demande d'ouverture annulée par le caissier`,
+                type: 'cancellation',
+                timestamp: new Date().toISOString(),
+              }
+            });
+
+            // E. BALANCE_UPDATED pour le dashboard principal (encaisse disponible)
+            //    Sans ceci, le dashboard ne rafraîchit pas en temps réel après annulation
+            if (coffreBalanceAfterReversal !== null && reversalCoffreId) {
+              balanceService.broadcastBalanceUpdate({
+                entityType: 'coffre',
+                entityId: reversalCoffreId,
+                agenceId: session.agenceId,
+                newBalance: coffreBalanceAfterReversal,
+                previousBalance: coffreBalanceAfterReversal - reversalMontant,
+                mouvementRef: `ANN-COFFRE-${session.id}`,
+                sourceModule: 'TRANSFERT',
+                typePaiement: 'RESTITUTION_COFFRE',
+              });
+            }
+            if (caisseBalanceAfterReversal !== null) {
+              balanceService.broadcastBalanceUpdate({
+                entityType: 'caisse',
+                entityId: session.caisseId,
+                agenceId: session.agenceId,
+                newBalance: caisseBalanceAfterReversal,
+                previousBalance: caisseBalanceAfterReversal + reversalMontant,
+                mouvementRef: `ANN-CAISSE-${session.id}`,
+                sourceModule: 'TRANSFERT',
+                typePaiement: 'RESTITUTION_CAISSE',
+              });
+            }
+          }
+        } catch (wsError) {
+          console.error("[SessionOpeningService] WebSocket notification failed:", wsError);
+        }
 
         return { success: true };
       });
@@ -1013,14 +1250,14 @@ export class SessionOpeningService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // OUVERTURE DIRECTE: Avec fonds reporté existants (sans coffre)
+  // OUVERTURE DIRECTE: Sans passer par le workflow coffre
   // ─────────────────────────────────────────────────────────────────────────
   /**
-   * Permet d'ouvrir une session directement avec le solde existant de la caisse
-   * (fonds reporté de la veille) sans passer par le workflow coffre.
+   * Permet d'ouvrir une session directement sans passer par le workflow coffre.
    *
-   * Cas d'usage: Le caissier a laissé un fonds de roulement lors de la fermeture
-   * et souhaite reprendre son travail sans approvisionnement supplémentaire.
+   * Cas d'usage:
+   * - Le caissier a un fonds de roulement reporté de la veille
+   * - Le caissier souhaite ouvrir sa caisse à 0 FCFA (sans approvisionnement)
    */
   async openDirectWithExistingFunds(params: {
     caissierId: string;
@@ -1039,7 +1276,7 @@ export class SessionOpeningService {
 
     try {
       return await db.transaction(async (tx) => {
-        // 1. Récupérer la caisse et vérifier qu'elle a un solde > 0
+        // 1. Récupérer la caisse
         const [caisse] = await tx
           .select()
           .from(caisses)
@@ -1055,13 +1292,6 @@ export class SessionOpeningService {
         }
 
         const soldeExistant = Number(caisse.solde || 0);
-        if (soldeExistant <= 0) {
-          return {
-            success: false,
-            error: "La caisse n'a pas de fonds reporté. Veuillez demander un approvisionnement au coffre.",
-            errorCode: "NO_EXISTING_FUNDS",
-          };
-        }
 
         // 2. Vérifier qu'aucune session n'est ouverte sur cette caisse
         const existingCaisseSession = await tx
@@ -1137,7 +1367,9 @@ export class SessionOpeningService {
             timeoutAt,
             observations: observations
               ? `[Ouverture directe] ${observations}`
-              : "[Ouverture directe avec fonds reporté]",
+              : soldeExistant > 0
+                ? "[Ouverture directe avec fonds reporté]"
+                : "[Ouverture directe à 0 FCFA]",
             lastActivity: new Date(),
           })
           .returning();
@@ -1160,8 +1392,10 @@ export class SessionOpeningService {
           statutApres: "OPEN",
           details: {
             soldeExistant,
-            type: "FONDS_REPORTE",
-            message: "Ouverture directe avec le fonds reporté de la veille",
+            type: soldeExistant > 0 ? "FONDS_REPORTE" : "OUVERTURE_VIDE",
+            message: soldeExistant > 0
+              ? "Ouverture directe avec le fonds reporté de la veille"
+              : "Ouverture directe à 0 FCFA sans approvisionnement coffre",
           },
           ipAddress,
           userAgent,
@@ -1187,7 +1421,9 @@ export class SessionOpeningService {
             ws.broadcastToAgency(agenceId, {
               type: 'LIVE_ACTIVITY',
               payload: {
-                action: `Session ouverte (fonds reporté): ${soldeExistant.toLocaleString()} FCFA`,
+                action: soldeExistant > 0
+                  ? `Session ouverte (fonds reporté): ${soldeExistant.toLocaleString()} FCFA`
+                  : `Session ouverte à 0 FCFA (sans approvisionnement)`,
                 type: 'session',
                 timestamp: new Date().toISOString()
               }

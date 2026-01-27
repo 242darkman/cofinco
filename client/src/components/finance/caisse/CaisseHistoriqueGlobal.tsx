@@ -112,7 +112,7 @@ export default function CaisseHistoriqueGlobal({
         amount: parseFloat(op.montant),
         type: op.typeOperation,
         type_operation: op.typeOperation,
-        status: 'Succès' as const,
+        status: op.statut || 'POSTED',
         date: op.createdAt,
         description: op.description,
         client: op.clientNom ? {

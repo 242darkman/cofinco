@@ -23,6 +23,7 @@ import { mmReconciliationReports } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export const paymentsRouter = Router();
+export const webhooksRouter = Router();
 
 // ============================================
 // WEBHOOK SECURITY MIDDLEWARE
@@ -189,7 +190,9 @@ const listFilterSchema = z.object({
  * - Signature HMAC-SHA256 vérifiée par le provider
  * - Logs structurés
  */
-paymentsRouter.post("/webhooks/mtn", webhookIpValidator("MTN"), async (req, res) => {
+// Handlers webhook réutilisables (montés sur paymentsRouter ET webhooksRouter)
+async function handleMtnWebhook(req: Request, res: Response) {
+  console.log("📩 MTN WEBHOOK POST:", { headers: req.headers, body: req.body });
   const startTime = Date.now();
   const clientIp = (req as any).webhookClientIp || getClientIp(req);
 
@@ -206,7 +209,6 @@ paymentsRouter.post("/webhooks/mtn", webhookIpValidator("MTN"), async (req, res)
     const signature = (req.headers["x-callback-signature"] as string) || "";
     const headers = req.headers as Record<string, string>;
 
-    // Extraire l'externalRef pour les logs (si présent)
     const bodyData = req.body as Record<string, unknown>;
     if (bodyData.externalId) {
       logEntry.intentId = bodyData.externalId as string;
@@ -225,16 +227,11 @@ paymentsRouter.post("/webhooks/mtn", webhookIpValidator("MTN"), async (req, res)
 
     console.error("[Webhook MTN] Processing error", logEntry);
 
-    // Toujours retourner 200 pour éviter les retries du provider
     res.status(200).json({ received: true, error: "Processing failed" });
   }
-});
+}
 
-/**
- * POST /api/webhooks/airtel
- * Callback webhook Airtel Money
- */
-paymentsRouter.post("/webhooks/airtel", webhookIpValidator("AIRTEL"), async (req, res) => {
+async function handleAirtelWebhook(req: Request, res: Response) {
   const startTime = Date.now();
   const clientIp = (req as any).webhookClientIp || getClientIp(req);
 
@@ -251,7 +248,6 @@ paymentsRouter.post("/webhooks/airtel", webhookIpValidator("AIRTEL"), async (req
     const signature = (req.headers["x-airtel-signature"] as string) || "";
     const headers = req.headers as Record<string, string>;
 
-    // Extraire l'ID pour les logs
     const bodyData = req.body as Record<string, unknown>;
     const transaction = bodyData.transaction as Record<string, unknown> | undefined;
     if (transaction?.partner_id) {
@@ -273,7 +269,15 @@ paymentsRouter.post("/webhooks/airtel", webhookIpValidator("AIRTEL"), async (req
 
     res.status(200).json({ received: true, error: "Processing failed" });
   }
-});
+}
+
+// Routes webhook sur paymentsRouter: /api/payments/webhooks/mtn
+paymentsRouter.post("/webhooks/mtn", webhookIpValidator("MTN"), handleMtnWebhook);
+paymentsRouter.post("/webhooks/airtel", webhookIpValidator("AIRTEL"), handleAirtelWebhook);
+
+// Routes webhook sur webhooksRouter: /api/webhooks/mtn (path propre pour les providers)
+webhooksRouter.post("/mtn", webhookIpValidator("MTN"), handleMtnWebhook);
+webhooksRouter.post("/airtel", webhookIpValidator("AIRTEL"), handleAirtelWebhook);
 
 // ============================================
 // API AUTHENTIFIÉE

@@ -316,7 +316,7 @@ export default function AdminNotificationsMonitor() {
                         {job.channel}
                       </span>
                     </td>
-                    <td className="p-2 text-slate-300 font-mono">{job.templateCode}</td>
+                    <td className="p-2 text-slate-300 font-mono">{formatTemplateCode(job.templateCode)}</td>
                     <td className="p-2">
                       <StatusBadge status={job.status} />
                     </td>
@@ -349,7 +349,7 @@ export default function AdminNotificationsMonitor() {
               <div key={job.id} className="p-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">
-                    {job.channel} / {job.templateCode}
+                    {job.channel} / {formatTemplateCode(job.templateCode)}
                   </span>
                   <StatusBadge status={job.status} />
                 </div>
@@ -404,21 +404,84 @@ function MetricCard({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { bg: string; text: string }> = {
-    QUEUED: { bg: 'bg-yellow-900/30', text: 'text-yellow-400' },
-    PROCESSING: { bg: 'bg-blue-900/30', text: 'text-blue-400' },
-    SENT: { bg: 'bg-green-900/30', text: 'text-green-400' },
-    FAILED: { bg: 'bg-red-900/30', text: 'text-red-400' },
-    DEAD_LETTER: { bg: 'bg-orange-900/30', text: 'text-orange-400' },
+  const config: Record<string, { bg: string; text: string; label: string }> = {
+    QUEUED: { bg: 'bg-yellow-900/30', text: 'text-yellow-400', label: 'EN FILE' },
+    PROCESSING: { bg: 'bg-blue-900/30', text: 'text-blue-400', label: 'EN COURS' },
+    SENT: { bg: 'bg-green-900/30', text: 'text-green-400', label: 'ENVOYÉ' },
+    FAILED: { bg: 'bg-red-900/30', text: 'text-red-400', label: 'ÉCHOUÉ' },
+    DEAD_LETTER: { bg: 'bg-orange-900/30', text: 'text-orange-400', label: 'DEAD LETTER' },
   };
 
-  const c = config[status] || { bg: 'bg-slate-800', text: 'text-slate-400' };
+  const c = config[status] || { bg: 'bg-slate-800', text: 'text-slate-400', label: status };
 
   return (
     <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${c.bg} ${c.text}`}>
-      {status}
+      {c.label}
     </span>
   );
+}
+
+
+function formatTemplateCode(code: string): string {
+  const map: Record<string, string> = {
+    // Credit
+    'CREDIT_REQUEST_CREATED': 'Demande de crédit créée',
+    'CREDIT_APPROVED': 'Crédit approuvé',
+    'CREDIT_REJECTED': 'Crédit refusé',
+    'CREDIT_DISBURSED': 'Crédit décaissé',
+    'CREDIT_OVERDUE': 'Crédit en retard',
+    'CREDIT_INVESTIGATION_ASSIGNED': 'Enquête crédit assignée',
+    'CREDIT_PAID_OFF': 'Crédit remboursé',
+    'CREDIT_REFUND_APPROVED': 'Remboursement approuvé',
+    'CREDIT_REFUND_PAID': 'Remboursement effectué',
+    // Transfer
+    'TRANSFER_REQUESTED': 'Virement demandé',
+    'TRANSFER_VALIDATED': 'Virement validé',
+    'TRANSFER_REJECTED': 'Virement rejeté',
+    'TRANSFER_EXECUTED': 'Virement exécuté',
+    'SCHEDULED_TRANSFER_EXECUTED': 'Virement programmé exécuté',
+    'SCHEDULED_TRANSFER_FAILED': 'Echec virement programmé',
+    // HR
+    'HR_LEAVE_REQUESTED': 'Congé demandé',
+    'HR_LEAVE_APPROVED': 'Congé approuvé',
+    'HR_LEAVE_REJECTED': 'Congé refusé',
+    // Tontine
+    'TONTINE_MEMBER_JOINED': 'Adhésion tontine',
+    'TONTINE_CONTRIBUTION_RECEIVED': 'Cotisation reçue',
+    'TONTINE_CONTRIBUTION_OVERDUE': 'Cotisation en retard',
+    'TONTINE_PENALTY_APPLIED': 'Pénalité appliquée',
+    'TONTINE_DISTRIBUTION_APPROVED': 'Distribution approuvée',
+    'TONTINE_DISTRIBUTION_PAID': 'Distribution payée',
+    'TONTINE_CYCLE_STARTED': 'Nouveau cycle tontine',
+    // Accounts
+    'ACCOUNT_CREATED': 'Compte créé',
+    'ACCOUNT_ACTIVATED': 'Compte activé',
+    'ACCOUNT_DEPOSIT': 'Dépôt effectué',
+    'ACCOUNT_WITHDRAWAL': 'Retrait effectué',
+    'ACCOUNT_BLOCKED': 'Compte bloqué',
+    'ACCOUNT_UNBLOCKED': 'Compte débloqué',
+    'ACCOUNT_CLOSED': 'Compte clôturé',
+    'INTEREST_CAPITALIZED': 'Intérêts capitalisés',
+    // Auth / Security
+    'USER_PASSWORD_RESET': 'Réinitialisation mot de passe',
+    'SESSION_FORCE_CLOSED': 'Session fermée de force',
+    // Client / User
+    'CLIENT_CREATED': 'Client créé',
+    'USER_REGISTERED': 'Utilisateur inscrit',
+    'USER_PASSWORD_CHANGED': 'Mot de passe modifié',
+    'EMPLOYEE_CREATED': 'Employé créé',
+    // Terrain
+    'PROSPECTION_CREATED': 'Prospection créée',
+    'PAIEMENT_TERRAIN_VALIDATED': 'Paiement terrain validé',
+  };
+  
+  if (map[code]) return map[code];
+
+  // Fallback: SNAKE_CASE -> Snake Case
+  return code
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
 function SettingBadge({ label, enabled }: { label: string; enabled?: boolean }) {
@@ -432,3 +495,4 @@ function SettingBadge({ label, enabled }: { label: string; enabled?: boolean }) 
     </div>
   );
 }
+

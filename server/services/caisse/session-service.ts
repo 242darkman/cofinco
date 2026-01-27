@@ -1081,6 +1081,9 @@ export async function getCaisseHistoriqueSummary(caisseId: string): Promise<{
     .from(sessionsCaisse)
     .where(eq(sessionsCaisse.caisseId, caisseId));
 
+  // Exclure les opérations annulées et supprimées du résumé statistique
+  // Les opérations annulées apparaissent dans l'historique (marquées "Annulé")
+  // mais ne doivent pas fausser les totaux d'entrées/sorties
   const operations = await db
     .select({
       typeOperation: operationsCaisse.typeOperation,
@@ -1091,7 +1094,8 @@ export async function getCaisseHistoriqueSummary(caisseId: string): Promise<{
     .where(
       and(
         sql`${operationsCaisse.sessionId} IN (SELECT id FROM sessions_caisse WHERE caisse_id = ${caisseId})`,
-        isNull(operationsCaisse.deletedAt)
+        isNull(operationsCaisse.deletedAt),
+        isNull(operationsCaisse.annulledAt)
       )
     )
     .orderBy(desc(operationsCaisse.createdAt));

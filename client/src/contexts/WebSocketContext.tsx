@@ -440,16 +440,17 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "CAISSE_UPDATE":
-         // NOTE: Les mises à jour de solde caisse/session sont gérées par BALANCE_UPDATED
-         // Ce handler reste pour les notifications non-financières (ouverture session, transferts, etc.)
-         // Utilisation des query keys centralisés
+         // Invalidation des queries caisse (sessions, opérations, supervision)
          debounceInvalidate(caisseKeys.sessions());
          debounceInvalidate(caisseKeys.sessionActive());
          debounceInvalidate(caisseKeys.operations());
          debounceInvalidate(caisseKeys.operationsToday());
          debounceInvalidate(caisseKeys.supervision());
          debounceInvalidate(caisseKeys.all);
-         // dashboard-stats est invalidé par BALANCE_UPDATED
+         // Filet de sécurité: rafraîchir aussi le dashboard principal
+         // BALANCE_UPDATED le fait déjà pour les opérations financières, mais certaines
+         // actions caisse (ouverture, annulation) peuvent ne pas émettre BALANCE_UPDATED
+         debounceInvalidate(dashboardKeys.stats());
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
          break;
 

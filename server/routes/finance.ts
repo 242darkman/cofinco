@@ -2332,22 +2332,23 @@ export function registerFinanceRoutes(app: Express) {
     res.json(addSnakeCaseAliasesDeep(caisses));
   });
 
-  // Opérations caisse du jour (historique de la CAISSE physique, pas de l'utilisateur)
-  // CORRECTION: Filtre par caisseId pour voir tout l'historique de la machine
+  // Opérations caisse du jour — scoped à la SESSION ACTIVE uniquement
+  // Le solde de session est calculé côté client comme: montant_ouverture + entrées - sorties
+  // Il est donc CRITIQUE de ne retourner que les opérations de la session en cours,
+  // sinon des opérations d'anciennes sessions (y compris annulées) polluent le calcul.
   app.get("/api/operations-caisse/today", requireAuth, async (req, res) => {
       try {
         const user = req.session.user!;
 
-        // Récupérer la session active de l'utilisateur pour identifier la caisse
+        // Récupérer la session active de l'utilisateur
         const activeSession = await storage.getActiveSessionForUser(user.id);
 
         if (!activeSession) {
           return res.json([]); // Pas de session active, pas d'opérations
         }
 
-        // CORRECTION: Récupérer toutes les opérations de cette CAISSE (pas seulement la session)
-        // Cela permet de voir l'historique de la caisse physique, peu importe qui a fait les opérations
-        const operations = await storage.getOperationsByCaisse(activeSession.caisseId);
+        // Retourner uniquement les opérations de la session active (pas de toute la caisse)
+        const operations = await storage.getOperationsBySession(activeSession.id);
 
         res.json(addSnakeCaseAliasesDeep(operations));
       } catch (error: any) {
@@ -3531,9 +3532,10 @@ export function registerFinanceRoutes(app: Express) {
 
   /**
    * POST /api/sessions-caisse/open-direct
-   * Ouverture directe avec le fonds reporté existant (sans passer par le coffre)
-   * Cas d'usage: Le caissier a laissé un fonds de roulement lors de la fermeture
-   * et souhaite reprendre son travail sans approvisionnement supplémentaire.
+   * Ouverture directe sans passer par le workflow coffre.
+   * Cas d'usage:
+   * - Le caissier a un fonds de roulement reporté de la veille
+   * - Le caissier souhaite ouvrir sa caisse à 0 FCFA (sans approvisionnement)
    */
   app.post("/api/sessions-caisse/open-direct", requireAuth, async (req, res) => {
     const user = req.session.user!;
@@ -3568,7 +3570,6 @@ export function registerFinanceRoutes(app: Express) {
     if (!result.success) {
       const statusMap: Record<string, number> = {
         CAISSE_NOT_FOUND: 404,
-        NO_EXISTING_FUNDS: 400,
         CAISSE_OCCUPIED: 409,
         USER_HAS_SESSION: 409,
         DB_ERROR: 500,

@@ -27,7 +27,7 @@ import {
   comptageBillets,
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, count } from "drizzle-orm";
-import { StatutTransfertCoffre, StatutCaisse, isOperationCaisseEntree } from "@shared/enum/status-constants";
+import { StatutTransfertCoffre, StatutCaisse, isOperationCaisseEntree, STATUT_SESSION_CAISSE_LABELS, type StatutSessionCaisseType } from "@shared/enum/status-constants";
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
 import { createMouvementFinancier } from "../ledger";
@@ -168,9 +168,18 @@ export class SessionClosingService {
 
         // 3. Vérifier que la session est en statut OPEN
         if (session.statut !== "OPEN") {
+          const label = STATUT_SESSION_CAISSE_LABELS[session.statut as StatutSessionCaisseType] || session.statut;
+          const guidance: Record<string, string> = {
+            REQUESTING_FUNDS: "Veuillez attendre la validation du coffre avant d'utiliser la caisse.",
+            FUNDS_DISPATCHED: "Les fonds ont été envoyés par le coffre. Veuillez d'abord confirmer la réception des fonds pour finaliser l'ouverture de votre session.",
+            CLOSING_COUNT: "La session est déjà en cours de fermeture (phase de comptage).",
+            CLOSING_VALIDATION: "La session est déjà en cours de fermeture (phase de validation).",
+            CLOSED: "Cette session est déjà fermée.",
+          };
+          const detail = guidance[session.statut] || "";
           return {
             success: false,
-            error: `Impossible de fermer une session en statut ${session.statut}`,
+            error: `Impossible de fermer la session : elle est actuellement en statut « ${label} ». ${detail}`.trim(),
             errorCode: "INVALID_STATUS" as const,
           };
         }
@@ -308,9 +317,10 @@ export class SessionClosingService {
 
         // 3. Vérifier que la session est en statut CLOSING_COUNT
         if (session.statut !== "CLOSING_COUNT") {
+          const label = STATUT_SESSION_CAISSE_LABELS[session.statut as StatutSessionCaisseType] || session.statut;
           return {
             success: false,
-            error: `La session doit être en phase de comptage. Statut actuel: ${session.statut}`,
+            error: `Impossible de soumettre le comptage : la session est actuellement en statut « ${label} » et non en phase de comptage.`,
             errorCode: "INVALID_STATUS" as const,
           };
         }
@@ -463,9 +473,10 @@ export class SessionClosingService {
 
         // 3. Vérifier que la session est en statut CLOSING_VALIDATION
         if (session.statut !== "CLOSING_VALIDATION") {
+          const label = STATUT_SESSION_CAISSE_LABELS[session.statut as StatutSessionCaisseType] || session.statut;
           return {
             success: false,
-            error: `La session doit être en phase de validation. Statut actuel: ${session.statut}`,
+            error: `Impossible de finaliser la fermeture : la session est actuellement en statut « ${label} » et non en phase de validation.`,
             errorCode: "INVALID_STATUS" as const,
           };
         }
@@ -659,7 +670,7 @@ export class SessionClosingService {
         if (transfert.statut !== StatutTransfertCoffre.REQUESTED) {
           return {
             success: false,
-            error: `Transfert déjà traité (statut: ${transfert.statut})`,
+            error: `Ce transfert a déjà été traité (${transfert.statut === "VALIDATED" ? "validé" : transfert.statut === "EXECUTED" ? "exécuté" : transfert.statut === "REJECTED" ? "rejeté" : transfert.statut === "CANCELLED" ? "annulé" : transfert.statut}).`,
             errorCode: "ALREADY_PROCESSED",
           };
         }

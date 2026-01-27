@@ -892,7 +892,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
     .where(and(
       eq(sessionsCaisse.caissierId, userId),
-      isNull(sessionsCaisse.closedAt)
+      isNull(sessionsCaisse.closedAt),
+      // Seules les sessions dont l'ouverture est finalisée sont considérées actives
+      inArray(sessionsCaisse.statut, ["OPEN", "CLOSING_COUNT", "CLOSING_VALIDATION"] as any)
     ));
 
     if (results.length === 0) return undefined;
@@ -1051,13 +1053,16 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     const sessionIds = sessions.map(s => s.id);
 
-    // Récupérer toutes les opérations de ces sessions (du jour)
+    // Récupérer les opérations VALIDES de ces sessions (du jour)
+    // Exclure les opérations annulées/supprimées pour ne pas polluer les calculs de solde
     return db.select()
       .from(operationsCaisse)
       .where(
         and(
           inArray(operationsCaisse.sessionId, sessionIds),
-          gte(operationsCaisse.createdAt, today)
+          gte(operationsCaisse.createdAt, today),
+          isNull(operationsCaisse.annulledAt),
+          isNull(operationsCaisse.deletedAt)
         )
       )
       .orderBy(desc(operationsCaisse.createdAt));

@@ -211,7 +211,13 @@ export async function setupAuth(app: Express) {
     },
   });
 
-  app.use(sessionMiddleware);
+  // Skip session middleware for webhook endpoints (external providers like MTN/Airtel)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/webhooks')) {
+      return next();
+    }
+    return sessionMiddleware!(req, res, next);
+  });
 
   console.log(`[Auth] Session middleware configured (store: ${sessionStoreType})`);
 }

@@ -95,8 +95,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
     pieces_25: 0, pieces_20: 0, pieces_10: 0, pieces_5: 0, pieces_1: 0,
   });
 
-  // Mode d'ouverture sélectionné (pour caisse avec fonds reporté)
-  const [openingMode, setOpeningMode] = useState<OpeningMode>('request');
+  // Mode d'ouverture sélectionné (direct = sans coffre, request = avec coffre)
+  const [openingMode, setOpeningMode] = useState<OpeningMode>('direct');
 
   // Charger les agences pour Admin
   useEffect(() => {
@@ -320,6 +320,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
 
     try {
       await sessionCaisseApi.cancelRequest(session.id, "Annulé par le caissier");
+      queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
       setSuccessMessage('Demande annulée.');
       setTimeout(() => {
         onClose();
@@ -425,7 +426,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                <span>Ouverture Sécurisée</span>
              </div>
              <p className="text-xs text-slate-400 leading-relaxed">
-               Vous initiez une demande de fonds pour votre session. Cette demande devra être validée par le Responsable Coffre.
+               Ouvrez votre caisse directement ou demandez un approvisionnement au coffre-fort.
              </p>
            </div>
 
@@ -476,7 +477,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   {step === 'confirm' && 'Confirmation des fonds'}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  {step === 'auth' && 'Précisez votre caisse et le montant souhaité.'}
+                  {step === 'auth' && 'Sélectionnez votre caisse et le mode d\'ouverture.'}
                   {step === 'waiting' && 'En attente de l\'approbation du responsable.'}
                   {step === 'confirm' && 'Veuillez confirmer le billetage reçu.'}
                 </p>
@@ -558,20 +559,22 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                     </div>
                   </div>
 
-                  {/* FONDS REPORTÉ - Choix d'ouverture */}
-                  {hasFondsReporte && selectedCaisseId && (
-                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-4 animate-in slide-in-from-top-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                          <Banknote className="h-5 w-5 text-amber-400" />
+                  {/* CHOIX DU MODE D'OUVERTURE */}
+                  {selectedCaisseId && (
+                    <div className={`p-4 ${hasFondsReporte ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-900/50 border-slate-700'} border rounded-xl space-y-4 animate-in slide-in-from-top-2`}>
+                      {hasFondsReporte && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                            <Banknote className="h-5 w-5 text-amber-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-amber-200">Fonds reporté disponible</p>
+                            <p className="text-xs text-amber-300/70">
+                              Cette caisse contient <span className="font-bold text-amber-200">{formatMoney(soldeExistant)}</span> de la session précédente.
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-amber-200">Fonds reporté disponible</p>
-                          <p className="text-xs text-amber-300/70">
-                            Cette caisse contient <span className="font-bold text-amber-200">{formatMoney(soldeExistant)}</span> de la session précédente.
-                          </p>
-                        </div>
-                      </div>
+                      )}
 
                       <div className="grid grid-cols-2 gap-3">
                         <button
@@ -586,11 +589,13 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                           <div className="flex items-center gap-2 mb-1">
                             <Unlock className={`h-4 w-4 ${openingMode === 'direct' ? 'text-emerald-400' : 'text-slate-400'}`} />
                             <span className={`text-sm font-semibold ${openingMode === 'direct' ? 'text-emerald-300' : 'text-slate-300'}`}>
-                              Ouverture rapide
+                              {hasFondsReporte ? 'Ouverture rapide' : 'Ouverture à vide'}
                             </span>
                           </div>
                           <p className="text-xs text-slate-400">
-                            Ouvrir avec le fonds existant ({formatMoney(soldeExistant)})
+                            {hasFondsReporte
+                              ? `Ouvrir avec le fonds existant (${formatMoney(soldeExistant)})`
+                              : 'Ouvrir la caisse à 0 FCFA sans approvisionnement'}
                           </p>
                         </button>
 
@@ -606,19 +611,21 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                           <div className="flex items-center gap-2 mb-1">
                             <Plus className={`h-4 w-4 ${openingMode === 'request' ? 'text-cyan-400' : 'text-slate-400'}`} />
                             <span className={`text-sm font-semibold ${openingMode === 'request' ? 'text-cyan-300' : 'text-slate-300'}`}>
-                              Avec complément
+                              {hasFondsReporte ? 'Avec complément' : 'Demander au coffre'}
                             </span>
                           </div>
                           <p className="text-xs text-slate-400">
-                            Demander des fonds supplémentaires au coffre
+                            {hasFondsReporte
+                              ? 'Demander des fonds supplémentaires au coffre'
+                              : 'Demander un approvisionnement au coffre-fort'}
                           </p>
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* 2. MONTANT DOTATION - uniquement si mode "request" ou pas de fonds reporté */}
-                  {(openingMode === 'request' || !hasFondsReporte) && (
+                  {/* 2. MONTANT DOTATION - uniquement si mode "request" (demande au coffre) */}
+                  {openingMode === 'request' && (
                   <div className="space-y-3">
                      <label className="text-xs font-bold text-slate-500 uppercase ml-1">Dotation souhaitée (FCFA)</label>
                      
@@ -782,10 +789,10 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
            <div className="mt-auto pt-6 border-t border-slate-800">
               {step === 'auth' && (
                 <button
-                  onClick={hasFondsReporte && openingMode === 'direct' ? handleDirectOpening : handleRequestOpening}
+                  onClick={openingMode === 'direct' ? handleDirectOpening : handleRequestOpening}
                   disabled={loading || !selectedCaisseId || authData.pin.length < 4}
                   className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:bg-slate-800 disabled:text-slate-500 ${
-                    hasFondsReporte && openingMode === 'direct'
+                    openingMode === 'direct'
                       ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20 text-white'
                       : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20 text-white'
                   }`}
@@ -793,11 +800,11 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                    {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
                      <>
                        <span>
-                         {hasFondsReporte && openingMode === 'direct'
+                         {openingMode === 'direct'
                            ? 'Ouvrir la session'
                            : 'Envoyer la demande'}
                        </span>
-                       {hasFondsReporte && openingMode === 'direct'
+                       {openingMode === 'direct'
                          ? <Unlock size={20} />
                          : <ArrowRight size={20} />}
                      </>
@@ -806,18 +813,28 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
               )}
 
               {step === 'confirm' && (
-                <button 
-                  onClick={handleConfirmReception}
-                  disabled={loading || calculerTotal() <= 0}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all"
-                >
-                   {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
-                     <>
-                       <span>Confirmer & Ouvrir</span>
-                       <Check size={20} />
-                     </>
-                   )}
-                </button>
+                <div className="space-y-3">
+                  <button
+                    onClick={handleConfirmReception}
+                    disabled={loading || calculerTotal() <= 0}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all"
+                  >
+                     {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+                       <>
+                         <span>Confirmer & Ouvrir</span>
+                         <Check size={20} />
+                       </>
+                     )}
+                  </button>
+                  <button
+                    onClick={handleCancelRequest}
+                    disabled={loading}
+                    className="w-full text-slate-500 hover:text-red-400 text-xs font-bold transition-colors flex items-center justify-center gap-2 py-2"
+                  >
+                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban size={14} />}
+                    Annuler l'ouverture et restituer les fonds au coffre
+                  </button>
+                </div>
               )}
            </div>
 

@@ -426,6 +426,7 @@ export interface CaisseHistoriqueOperation {
   modePaiement: string;
   reference: string;
   description: string;
+  statut: string;
   createdAt: string;
   clientNom: string | null;
   clientPrenom: string | null;

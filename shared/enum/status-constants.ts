@@ -292,6 +292,8 @@ export const TypeMouvementCoffre = {
   CREDIT_DISBURSEMENT: "CREDIT_DISBURSEMENT",
   TRANSFER_OUT: "TRANSFER_OUT",
   TRANSFER_IN: "TRANSFER_IN",
+  RESTITUTION_COFFRE: "RESTITUTION_COFFRE",
+  RESTITUTION_CAISSE: "RESTITUTION_CAISSE",
 } as const;
 
 export type TypeMouvementCoffreType = (typeof TypeMouvementCoffre)[keyof typeof TypeMouvementCoffre];
@@ -309,6 +311,8 @@ export const TYPE_MOUVEMENT_COFFRE_LABELS: Record<string, string> = {
   [TypeMouvementCoffre.CREDIT_DISBURSEMENT]: "Décaissement Crédit",
   [TypeMouvementCoffre.TRANSFER_OUT]: "Transfert Sortant",
   [TypeMouvementCoffre.TRANSFER_IN]: "Transfert Entrant",
+  [TypeMouvementCoffre.RESTITUTION_COFFRE]: "Restitution Coffre",
+  [TypeMouvementCoffre.RESTITUTION_CAISSE]: "Restitution Caisse",
 };
 
 /**

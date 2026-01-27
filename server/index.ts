@@ -84,7 +84,13 @@ app.use(compression({
 // - sensitiveOpsLimiter: 20 ops / min (financial transactions)
 // - uploadLimiter: 30 uploads / min (file uploads)
 
-app.use("/api/", apiLimiter);
+app.use("/api/", (req, res, next) => {
+  // Exclude webhook endpoints from rate limiting (external providers)
+  if (req.originalUrl.startsWith('/api/webhooks')) {
+    return next();
+  }
+  return apiLimiter(req, res, next);
+});
 app.use("/api/auth/login", authLimiter);
 app.use("/api/credits", sensitiveOpsLimiter);
 app.use("/api/remboursements", sensitiveOpsLimiter);

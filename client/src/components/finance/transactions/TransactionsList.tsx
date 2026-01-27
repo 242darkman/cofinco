@@ -54,38 +54,16 @@ export interface TransactionsListProps {
 
 // --- Helper Functions ---
 
-/**
- * Labels FR pour compatibilité avec anciennes données
- * La config partagée utilise des codes EN (INITIAL_DEPOSIT, etc.)
- */
-const FR_ENTREE_KEYWORDS = [
-  'dépôt', 'versement', 'remboursement', 'encaissement',
-  'cotisation', 'approvisionnement', 'frais engagement',
-  'activation', 'credit'
-];
+/** Détermine si une opération est une entrée (crédit pour la caisse) */
+const isEntree = (type: string): boolean => isIncomingOperation(type);
 
-/**
- * Détermine si une opération est une entrée (crédit pour la caisse)
- * Utilise la config partagée + fallback sur les labels FR
- */
-const isEntree = (type: string): boolean => {
-  // 1. Check shared config (EN operation types)
-  if (isIncomingOperation(type)) {
-    return true;
-  }
-
-  // 2. Fallback: check French keywords for legacy data
-  const typeLower = type.toLowerCase();
-  return FR_ENTREE_KEYWORDS.some(keyword => typeLower.includes(keyword));
-};
-
-/** Normalize status to canonical EN values */
+/** Normalize DB status to canonical display values */
 const normalizeStatus = (status: string): OperationStatus => {
   const s = status.toUpperCase();
-  if (s === 'SUCCESS' || s === 'COMPLETED' || s === 'SUCCÈS') return 'SUCCESS';
-  if (s === 'FAILED' || s === 'ERROR' || s === 'ÉCHEC') return 'FAILED';
-  if (s === 'PENDING' || s === 'EN ATTENTE') return 'PENDING';
-  if (s === 'CANCELLED' || s === 'CANCELED' || s === 'ANNULÉ') return 'CANCELLED';
+  if (s === 'POSTED' || s === 'SUCCESS' || s === 'COMPLETED') return 'SUCCESS';
+  if (s === 'FAILED' || s === 'ERROR') return 'FAILED';
+  if (s === 'PENDING') return 'PENDING';
+  if (s === 'CANCELLED' || s === 'CANCELED') return 'CANCELLED';
   return 'SUCCESS';
 };
 

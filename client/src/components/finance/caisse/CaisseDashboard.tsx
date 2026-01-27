@@ -127,9 +127,11 @@ export default function CaisseDashboard({
       if (supervisedSession) return supervisedSession;
 
       const data = await sessionCaisseApi.getActive();
-      const status = data ? (data.computedStatus || computeSessionStatus(data)) : null;
-      // Consider OPEN, CLOSING_COUNT, and CLOSING_VALIDATION as active sessions
-      if (data && (status === 'OPEN' || status === 'CLOSING_COUNT' || status === 'CLOSING_VALIDATION')) {
+      if (!data) return null;
+      // Use actual DB statut — only OPEN and closing phases are truly active sessions
+      // REQUESTING_FUNDS and FUNDS_DISPATCHED are pending opening workflow
+      const statut = data.statut;
+      if (statut === 'OPEN' || statut === 'CLOSING_COUNT' || statut === 'CLOSING_VALIDATION') {
         return data as SessionCaisse;
       }
       return null;
@@ -259,6 +261,10 @@ export default function CaisseDashboard({
         } else if (data.type === 'FUNDS_REJECTED') {
             // Request rejected - reset to initial state
             refetchPendingSession();
+        } else if (data.type === 'OPENING_CANCELLED' || data.type === 'OPENING_CANCELLED_FUNDS_RETURNED') {
+            // Opening cancelled - refresh pending state
+            refetchPendingSession();
+            refetchSession();
         } else if (data.type === 'BALANCE_UPDATED') {
             refetchSession();
         }
@@ -590,7 +596,7 @@ export default function CaisseDashboard({
                     amount: toNumber(tx.montant),
                     type: tx.type_operation,
                     type_operation: tx.type_operation,
-                    status: 'SUCCESS',
+                    status: tx.statut || tx.status || 'POSTED',
                     date: tx.created_at,
                     description: tx.description,
                     client: tx.client_nom ? {
@@ -986,7 +992,7 @@ export default function CaisseDashboard({
           amount: toNumber(tx.montant),
           type: tx.type_operation,
           type_operation: tx.type_operation,
-          status: 'SUCCESS',
+          status: tx.statut || tx.status || 'POSTED',
           date: tx.created_at,
           description: tx.description,
           client: tx.client_nom ? {
@@ -1258,7 +1264,13 @@ export default function CaisseDashboard({
 
        {showOuverture && (
         <CaisseOuverture
-          onClose={() => setShowOuverture(false)}
+          onClose={() => {
+            setShowOuverture(false);
+            // Rafraîchir l'état de la session après fermeture du modal
+            // (annulation, rejet ou simple fermeture)
+            refetchSession();
+            refetchPendingSession();
+          }}
           onSuccess={handleOuvertureCaisse}
           pendingSession={pendingSession || undefined}
         />

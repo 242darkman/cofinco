@@ -34,7 +34,7 @@ import { checkMaintenanceMode } from "./middleware/maintenance";
 import { transfertsInterCoffresRouter } from "./routes/transferts-inter-coffres";
 import storageRouter from "./routes/storage";
 import { regularisationRouter } from "./routes/regularisation";
-import { paymentsRouter } from "./routes/payments";
+import { paymentsRouter, webhooksRouter } from "./routes/payments";
 import { paymentsTestRouter } from "./routes/payments-test";
 import balancesRouter from "./routes/balances";
 
@@ -55,7 +55,7 @@ export function registerRoutes(app: Express): Server {
 
   // Mobile Money Payments & Webhooks
   app.use("/api/payments", paymentsRouter);
-  app.use("/api/webhooks", paymentsRouter); // Webhooks MTN/Airtel
+  app.use("/api/webhooks", webhooksRouter); // Webhooks MTN/Airtel (router dédié, sans auth)
   app.use("/api/payments-test", paymentsTestRouter); // Test endpoints (dev only)
 
   // Storage routes (unified)

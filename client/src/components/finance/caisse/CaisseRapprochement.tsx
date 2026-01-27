@@ -156,8 +156,9 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
   // ========== STEP 2: SUBMIT COUNT ==========
   const handleSubmitCount = async () => {
-    // Validate
-    if (soldeCalcule <= 0) {
+    // Validate: bloquer seulement si le comptage est à 0 alors que le théorique ne l'est pas
+    // (cas légitime: session ouverte à 0 FCFA sans opérations → comptage physique = 0)
+    if (soldeCalcule <= 0 && soldeTheorique > 0) {
       toast.warning('Veuillez effectuer le billetage avant de continuer');
       return;
     }
@@ -649,7 +650,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
               </Button>
               <Button
                 onClick={handleSubmitCount}
-                disabled={loading || soldeCalcule <= 0 || (Math.abs(soldeCalcule - soldeTheorique) > 0 && !ecartJustification.trim())}
+                disabled={loading || (soldeCalcule <= 0 && soldeTheorique > 0) || (Math.abs(soldeCalcule - soldeTheorique) > 0 && !ecartJustification.trim())}
                 className={`w-full sm:flex-1 ${soldeCalcule - soldeTheorique === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
               >
                 {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : <ArrowRight size={16} className="mr-2" />}

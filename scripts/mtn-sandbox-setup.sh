@@ -45,7 +45,7 @@ CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
   -H "X-Reference-Id: $API_USER_ID" \
   -H "Ocp-Apim-Subscription-Key: $SUBSCRIPTION_KEY" \
   -d "{
-    \"providerCallbackHost\": \"https://webhook.site\"
+    \"providerCallbackHost\": \"kailee-fey-lillyana.ngrok-free.dev\"
   }")
 
 HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -1)
